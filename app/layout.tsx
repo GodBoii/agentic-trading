@@ -1,19 +1,36 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
-  title: 'Agentic Trading',
-  description: 'Secure trading platform',
-}
+  title: "Agentic Trading - AI-Powered Trading Platform",
+  description: "Automated trading powered by AI agents",
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
+};
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="dark">
+      <head>
+        <link rel="icon" href="/icon.png" />
+      </head>
+      <body
+        className={`${inter.variable} antialiased`}
+      >
+        {children}
+      </body>
     </html>
-  )
+  );
 }
