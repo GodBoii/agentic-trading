@@ -146,24 +146,6 @@ def get_llm_os(
             "Each agent contributes their specialized expertise.",
             "Synthesize findings into cohesive trading insights."
         ],
-        user_id=user_id,
-        db=db,
-        enable_agentic_memory=use_memory,
-        enable_user_memories=use_memory,
-        enable_session_summaries=use_memory,
-        stream_intermediate_steps=True,
-        search_knowledge=use_memory,
-        events_to_skip=[
-            TeamRunEvent.run_started,
-            TeamRunEvent.run_completed,
-            TeamRunEvent.memory_update_started,
-            TeamRunEvent.memory_update_completed,
-        ],
-        read_team_history=True,
-        add_history_to_context=True,
-        num_history_runs=20,
-        store_events=True,
-        markdown=True,
         add_datetime_to_context=True,
         debug_mode=debug_mode,
     )
@@ -179,7 +161,7 @@ def get_llm_os(
     # --- CRITICAL CHANGE: Instantiate the standard Team class ---
     # This allows the `db` object to automatically handle session persistence.
     llm_os_team = Team(
-        name="Aetheria_AI",
+        name="Aetheria_AI_Trader",
         model=Gemini(id="gemini-2.5-flash"),
         members=main_team_members,
         tools=direct_tools,
