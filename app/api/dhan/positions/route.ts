@@ -34,15 +34,26 @@ export async function GET(request: NextRequest) {
             headers: {
                 'Content-Type': 'application/json',
                 'access-token': tradingKeys.dhan_access_token,
+                'dhan-client-id': tradingKeys.dhan_client_id,
             },
         })
 
         if (!dhanResponse.ok) {
             const errorText = await dhanResponse.text()
             console.error('Dhan API error:', errorText)
+
+            // Try to parse error text as JSON to get a cleaner message if possible
+            let errorMessage = 'Failed to fetch positions from Dhan'
+            try {
+                const errorJson = JSON.parse(errorText)
+                errorMessage = errorJson.errorMessage || errorJson.message || JSON.stringify(errorJson)
+            } catch (e) {
+                errorMessage = `Dhan API Error: ${errorText.substring(0, 100)}`
+            }
+
             return NextResponse.json(
-                { error: 'Failed to fetch positions from Dhan' },
-                { status: 500 }
+                { error: errorMessage },
+                { status: dhanResponse.status } // Propagate the actual status code (e.g. 401)
             )
         }
 

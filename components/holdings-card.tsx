@@ -30,7 +30,8 @@ export default function HoldingsCard() {
             const response = await fetch('/api/dhan/holdings')
 
             if (!response.ok) {
-                throw new Error('Failed to fetch holdings')
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to fetch holdings')
             }
 
             const data = await response.json()

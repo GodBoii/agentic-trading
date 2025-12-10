@@ -28,7 +28,8 @@ export default function FundsCard() {
             const response = await fetch('/api/dhan/funds')
 
             if (!response.ok) {
-                throw new Error('Failed to fetch funds')
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to fetch funds')
             }
 
             const data = await response.json()

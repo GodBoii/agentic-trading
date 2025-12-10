@@ -85,8 +85,8 @@ function DashboardContent() {
             {showToast && (
                 <div className="fixed top-8 right-8 z-50 animate-slide-in-right">
                     <div className={`brutal-box-sm p-6 flex items-center gap-4 ${toastType === 'success'
-                            ? 'border-brutal-green shadow-brutal-green'
-                            : 'border-brutal-red shadow-brutal-red'
+                        ? 'border-brutal-green shadow-brutal-green'
+                        : 'border-brutal-red shadow-brutal-red'
                         }`}>
                         <div className={`w-3 h-3 ${toastType === 'success' ? 'bg-brutal-green' : 'bg-brutal-red'}`}></div>
                         <p className="font-bold text-brutal-cream uppercase tracking-wide text-sm">
@@ -110,10 +110,8 @@ function DashboardContent() {
                 <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-brutal-cream border-4 border-brutal-black flex items-center justify-center">
-                                <svg className="w-8 h-8 text-brutal-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                                    <path strokeLinecap="square" strokeLinejoin="miter" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                </svg>
+                            <div className="w-16 h-16 bg-brutal-cream border-4 border-brutal-black flex items-center justify-center p-2">
+                                <img src="/icon.png" alt="Logo" className="w-full h-full object-contain" />
                             </div>
                             <div>
                                 <h1 className="text-4xl font-bold text-brutal-cream uppercase tracking-tight">

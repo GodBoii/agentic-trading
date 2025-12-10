@@ -34,15 +34,32 @@ export async function GET(request: NextRequest) {
             headers: {
                 'Content-Type': 'application/json',
                 'access-token': tradingKeys.dhan_access_token,
+                'dhan-client-id': tradingKeys.dhan_client_id,
             },
         })
 
         if (!dhanResponse.ok) {
             const errorText = await dhanResponse.text()
             console.error('Dhan API error:', errorText)
+
+            // Try to parse error text as JSON
+            let errorJson: any = {}
+            try {
+                errorJson = JSON.parse(errorText)
+            } catch (e) {
+                // If not JSON, use text
+            }
+
+            // Handle "No holdings available" as a success case with empty array
+            if (errorJson.errorCode === 'DH-1111' || errorJson.errorMessage === 'No holdings available') {
+                return NextResponse.json([])
+            }
+
+            const errorMessage = errorJson.errorMessage || errorJson.message || `Dhan API Error: ${errorText.substring(0, 100)}`
+
             return NextResponse.json(
-                { error: 'Failed to fetch holdings from Dhan' },
-                { status: 500 }
+                { error: errorMessage },
+                { status: dhanResponse.status }
             )
         }
 

@@ -33,7 +33,8 @@ export default function PositionsCard() {
             const response = await fetch('/api/dhan/positions')
 
             if (!response.ok) {
-                throw new Error('Failed to fetch positions')
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to fetch positions')
             }
 
             const data = await response.json()
@@ -148,8 +149,8 @@ export default function PositionsCard() {
                                     <h4 className="font-bold text-brutal-cream text-xl font-mono">{position.tradingSymbol}</h4>
                                     <div className="flex gap-2 mt-2">
                                         <span className={`px-3 py-1 font-bold text-xs uppercase font-mono ${position.positionType === 'LONG'
-                                                ? 'bg-brutal-green/20 text-brutal-green border-2 border-brutal-green'
-                                                : 'bg-brutal-red/20 text-brutal-red border-2 border-brutal-red'
+                                            ? 'bg-brutal-green/20 text-brutal-green border-2 border-brutal-green'
+                                            : 'bg-brutal-red/20 text-brutal-red border-2 border-brutal-red'
                                             }`}>
                                             {position.positionType}
                                         </span>
@@ -160,8 +161,8 @@ export default function PositionsCard() {
                                 </div>
                                 <div className="text-right">
                                     <p className={`text-2xl font-bold font-mono ${position.unrealizedProfit >= 0
-                                            ? 'text-brutal-green'
-                                            : 'text-brutal-red'
+                                        ? 'text-brutal-green'
+                                        : 'text-brutal-red'
                                         }`}>
                                         {formatCurrency(position.unrealizedProfit)}
                                     </p>
