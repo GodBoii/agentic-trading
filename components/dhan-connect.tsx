@@ -13,7 +13,6 @@ export default function DhanConnect() {
         setError(null)
 
         try {
-            // Call the auth API route
             const response = await fetch('/api/dhan/auth', {
                 method: 'POST',
                 headers: {
@@ -28,7 +27,6 @@ export default function DhanConnect() {
                 throw new Error(data.error || 'Failed to initiate connection')
             }
 
-            // Redirect user to Dhan login page
             window.location.href = data.url
 
         } catch (err) {
@@ -38,44 +36,32 @@ export default function DhanConnect() {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 space-y-4">
-            <div className="flex items-center gap-3">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full">
-                    <svg
-                        className="w-6 h-6 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                    </svg>
-                </div>
+        <div className="brutal-box p-8 space-y-6">
+            <div className="flex items-center gap-4">
+                <div className="w-3 h-3 bg-brutal-green flex-shrink-0"></div>
                 <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">
                         Connect to Dhan
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Link your Dhan account to start trading
+                    <p className="text-sm text-brutal-cream/60 font-mono mt-1">
+                        Link your trading account
                     </p>
                 </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
-                    {error}
+                <div className="brutal-box-sm border-brutal-red shadow-brutal-red p-4 animate-shake">
+                    <p className="text-brutal-red font-mono text-sm font-bold uppercase">
+                        {error}
+                    </p>
                 </div>
             )}
 
-            <form onSubmit={handleConnect} className="space-y-4">
+            <form onSubmit={handleConnect} className="space-y-6">
                 <div>
                     <label
                         htmlFor="clientId"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                        className="block text-sm font-bold text-brutal-cream mb-3 uppercase tracking-wider font-mono"
                     >
                         Dhan Client ID
                     </label>
@@ -84,25 +70,27 @@ export default function DhanConnect() {
                         type="text"
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
-                        placeholder="e.g., 1000054321"
+                        placeholder="1000054321"
                         required
                         disabled={isLoading}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="brutal-input w-full px-4 py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        aria-label="Enter your Dhan Client ID"
                     />
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Find your Client ID in your Dhan account settings
+                    <p className="mt-3 text-xs text-brutal-cream/50 font-mono uppercase tracking-wide">
+                        Find your ID in Dhan account settings
                     </p>
                 </div>
 
                 <button
                     type="submit"
                     disabled={isLoading || !clientId.trim()}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
+                    className="brutal-btn w-full py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-brutal"
+                    aria-label="Connect to Dhan account"
                 >
                     {isLoading ? (
-                        <span className="flex items-center justify-center">
+                        <span className="flex items-center justify-center gap-3">
                             <svg
-                                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                className="animate-spin h-5 w-5 text-brutal-black"
                                 xmlns="http://www.w3.org/2000/svg"
                                 fill="none"
                                 viewBox="0 0 24 24"
@@ -129,24 +117,12 @@ export default function DhanConnect() {
                 </button>
             </form>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
                 <div className="flex gap-3">
-                    <svg
-                        className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                    </svg>
-                    <div className="text-sm text-blue-800 dark:text-blue-300">
-                        <p className="font-semibold mb-1">Secure Connection</p>
-                        <p className="text-blue-700 dark:text-blue-400">
+                    <div className="w-2 h-2 bg-brutal-green flex-shrink-0 mt-1"></div>
+                    <div className="text-xs text-brutal-cream/70 font-mono leading-relaxed">
+                        <p className="font-bold mb-2 uppercase tracking-wide">Secure Connection</p>
+                        <p>
                             Your credentials are encrypted and stored securely. We never see your Dhan password.
                         </p>
                     </div>

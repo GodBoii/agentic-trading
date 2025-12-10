@@ -51,13 +51,13 @@ export default function FundsCard() {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <div className="brutal-box p-8">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                    <div className="h-6 bg-brutal-cream/20 w-1/3"></div>
                     <div className="space-y-3">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-16 bg-brutal-cream/10"></div>
+                        <div className="h-12 bg-brutal-cream/10"></div>
+                        <div className="h-12 bg-brutal-cream/10"></div>
                     </div>
                 </div>
             </div>
@@ -66,66 +66,80 @@ export default function FundsCard() {
 
     if (error || !funds) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Account Funds</h3>
-                <p className="text-red-600 dark:text-red-400">
-                    {error || 'No fund data available'}
-                </p>
+            <div className="brutal-box p-8">
+                <div className="flex items-center gap-4 mb-4">
+                    <div className="w-3 h-3 bg-brutal-red"></div>
+                    <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">Account Funds</h3>
+                </div>
+                <div className="brutal-box-sm border-brutal-red shadow-brutal-red p-4">
+                    <p className="text-brutal-red font-mono text-sm font-bold uppercase">
+                        {error || 'No fund data available'}
+                    </p>
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
+        <div className="brutal-box p-8">
+            <div className="flex items-center gap-4 mb-8">
+                <div className="w-4 h-4 bg-brutal-green flex-shrink-0"></div>
                 <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Account Funds</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Trading account balance</p>
+                    <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">Account Funds</h3>
+                    <p className="text-sm text-brutal-cream/60 font-mono mt-1">Trading account balance</p>
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {/* Available Balance - Highlighted */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4 border-2 border-green-500">
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Available Balance</span>
-                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            {formatCurrency(funds.availabelBalance)}
-                        </span>
+                <div className="brutal-box-sm border-brutal-green shadow-brutal-green p-6">
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <p className="text-xs font-bold text-brutal-green uppercase tracking-wider font-mono mb-2">
+                                Available Balance
+                            </p>
+                            <p className="text-4xl font-bold text-brutal-green font-mono">
+                                {formatCurrency(funds.availabelBalance)}
+                            </p>
+                        </div>
+                        <div className="w-6 h-6 bg-brutal-green"></div>
                     </div>
                 </div>
 
                 {/* Other Fund Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Opening Balance</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+                        <p className="text-xs text-brutal-cream/60 mb-2 uppercase tracking-wide font-mono font-bold">
+                            Opening Balance
+                        </p>
+                        <p className="text-xl font-bold text-brutal-cream font-mono">
                             {formatCurrency(funds.sodLimit)}
                         </p>
                     </div>
 
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Utilized Amount</p>
-                        <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                    <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+                        <p className="text-xs text-brutal-cream/60 mb-2 uppercase tracking-wide font-mono font-bold">
+                            Utilized Amount
+                        </p>
+                        <p className="text-xl font-bold text-brutal-red font-mono">
                             {formatCurrency(funds.utilizedAmount)}
                         </p>
                     </div>
 
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Withdrawable Balance</p>
-                        <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                    <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+                        <p className="text-xs text-brutal-cream/60 mb-2 uppercase tracking-wide font-mono font-bold">
+                            Withdrawable
+                        </p>
+                        <p className="text-xl font-bold text-brutal-cream font-mono">
                             {formatCurrency(funds.withdrawableBalance)}
                         </p>
                     </div>
 
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Collateral Amount</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+                        <p className="text-xs text-brutal-cream/60 mb-2 uppercase tracking-wide font-mono font-bold">
+                            Collateral
+                        </p>
+                        <p className="text-xl font-bold text-brutal-cream font-mono">
                             {formatCurrency(funds.collateralAmount)}
                         </p>
                     </div>
@@ -134,9 +148,10 @@ export default function FundsCard() {
                 {/* Refresh Button */}
                 <button
                     onClick={fetchFunds}
-                    className="w-full mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-all font-medium text-sm"
+                    className="brutal-btn w-full py-3 text-sm"
+                    aria-label="Refresh fund data"
                 >
-                    🔄 Refresh Funds
+                    ↻ Refresh Funds
                 </button>
             </div>
         </div>

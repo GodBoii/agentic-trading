@@ -56,12 +56,12 @@ export default function PositionsCard() {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <div className="brutal-box p-8">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                    <div className="h-6 bg-brutal-cream/20 w-1/3"></div>
                     <div className="space-y-3">
-                        <div className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                        <div className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-16 bg-brutal-cream/10"></div>
+                        <div className="h-16 bg-brutal-cream/10"></div>
                     </div>
                 </div>
             </div>
@@ -70,9 +70,14 @@ export default function PositionsCard() {
 
     if (error) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Open Positions</h3>
-                <p className="text-red-600 dark:text-red-400">{error}</p>
+            <div className="brutal-box p-8">
+                <div className="flex items-center gap-4 mb-4">
+                    <div className="w-3 h-3 bg-brutal-red"></div>
+                    <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">Open Positions</h3>
+                </div>
+                <div className="brutal-box-sm border-brutal-red shadow-brutal-red p-4">
+                    <p className="text-brutal-red font-mono text-sm font-bold uppercase">{error}</p>
+                </div>
             </div>
         )
     }
@@ -82,39 +87,42 @@ export default function PositionsCard() {
     const totalRealized = positions.reduce((sum, pos) => sum + pos.realizedProfit, 0)
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+        <div className="brutal-box p-8">
             <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                    </div>
+                <div className="flex items-center gap-4">
+                    <div className="w-4 h-4 bg-brutal-yellow flex-shrink-0"></div>
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Open Positions</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{positions.length} active trades</p>
+                        <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">Positions</h3>
+                        <p className="text-sm text-brutal-cream/60 font-mono mt-1">{positions.length} active trades</p>
                     </div>
                 </div>
                 <button
                     onClick={fetchPositions}
-                    className="px-3 py-1.5 bg-purple-100 dark:bg-purple-900/20 hover:bg-purple-200 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-400 rounded-lg transition-all text-sm font-medium"
+                    className="brutal-btn px-4 py-2 text-xs"
+                    aria-label="Refresh positions data"
                 >
-                    🔄 Refresh
+                    ↻ Refresh
                 </button>
             </div>
 
             {/* P&L Summary */}
             {positions.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Unrealized P&L</p>
-                        <p className={`text-lg font-bold ${totalUnrealized >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+                        <p className="text-xs font-bold text-brutal-cream/60 mb-2 uppercase tracking-wide font-mono">
+                            Unrealized P&L
+                        </p>
+                        <p className={`text-xl font-bold font-mono ${totalUnrealized >= 0 ? 'text-brutal-green' : 'text-brutal-red'
+                            }`}>
                             {formatCurrency(totalUnrealized)}
                         </p>
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Realized P&L</p>
-                        <p className={`text-lg font-bold ${totalRealized >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+                        <p className="text-xs font-bold text-brutal-cream/60 mb-2 uppercase tracking-wide font-mono">
+                            Realized P&L
+                        </p>
+                        <p className={`text-xl font-bold font-mono ${totalRealized >= 0 ? 'text-brutal-green' : 'text-brutal-red'
+                            }`}>
                             {formatCurrency(totalRealized)}
                         </p>
                     </div>
@@ -122,61 +130,61 @@ export default function PositionsCard() {
             )}
 
             {positions.length === 0 ? (
-                <div className="text-center py-8">
-                    <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p className="text-gray-600 dark:text-gray-400">No open positions</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">All positions closed for the day</p>
+                <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-12 text-center">
+                    <div className="w-16 h-16 mx-auto border-4 border-brutal-cream/30 flex items-center justify-center mb-4">
+                        <svg className="w-8 h-8 text-brutal-cream/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="square" strokeLinejoin="miter" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <p className="text-brutal-cream/60 font-mono uppercase tracking-wide text-sm">No open positions</p>
+                    <p className="text-brutal-cream/40 font-mono text-xs mt-2">All positions closed for the day</p>
                 </div>
             ) : (
-                <div className="overflow-x-auto">
-                    <div className="space-y-3">
-                        {positions.map((position, index) => (
-                            <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 dark:text-white">{position.tradingSymbol}</h4>
-                                        <div className="flex gap-2 mt-1">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${position.positionType === 'LONG'
-                                                    ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                                                    : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                                                }`}>
-                                                {position.positionType}
-                                            </span>
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium">
-                                                {position.productType}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className={`text-lg font-bold ${position.unrealizedProfit >= 0
-                                                ? 'text-green-600 dark:text-green-400'
-                                                : 'text-red-600 dark:text-red-400'
+                <div className="space-y-4">
+                    {positions.map((position, index) => (
+                        <div key={index} className="brutal-box-sm border-brutal-cream/50 shadow-none p-5 hover:border-brutal-cream transition-colors">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 className="font-bold text-brutal-cream text-xl font-mono">{position.tradingSymbol}</h4>
+                                    <div className="flex gap-2 mt-2">
+                                        <span className={`px-3 py-1 font-bold text-xs uppercase font-mono ${position.positionType === 'LONG'
+                                                ? 'bg-brutal-green/20 text-brutal-green border-2 border-brutal-green'
+                                                : 'bg-brutal-red/20 text-brutal-red border-2 border-brutal-red'
                                             }`}>
-                                            {formatCurrency(position.unrealizedProfit)}
-                                        </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">P&L</p>
+                                            {position.positionType}
+                                        </span>
+                                        <span className="px-3 py-1 bg-brutal-cream/10 text-brutal-cream border-2 border-brutal-cream/30 font-bold text-xs uppercase font-mono">
+                                            {position.productType}
+                                        </span>
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-3 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-gray-600 dark:text-gray-400 text-xs">Net Qty</p>
-                                        <p className="font-semibold text-gray-900 dark:text-white">{position.netQty}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-600 dark:text-gray-400 text-xs">Buy Avg</p>
-                                        <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(position.buyAvg)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-600 dark:text-gray-400 text-xs">Sell Avg</p>
-                                        <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(position.sellAvg)}</p>
-                                    </div>
+                                <div className="text-right">
+                                    <p className={`text-2xl font-bold font-mono ${position.unrealizedProfit >= 0
+                                            ? 'text-brutal-green'
+                                            : 'text-brutal-red'
+                                        }`}>
+                                        {formatCurrency(position.unrealizedProfit)}
+                                    </p>
+                                    <p className="text-xs text-brutal-cream/50 font-mono uppercase tracking-wider mt-1">P&L</p>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+
+                            <div className="grid grid-cols-3 gap-4 pt-4 border-t-2 border-brutal-cream/20">
+                                <div>
+                                    <p className="text-brutal-cream/60 text-xs font-mono uppercase tracking-wide mb-1">Net Qty</p>
+                                    <p className="font-bold text-brutal-cream font-mono text-lg">{position.netQty}</p>
+                                </div>
+                                <div>
+                                    <p className="text-brutal-cream/60 text-xs font-mono uppercase tracking-wide mb-1">Buy Avg</p>
+                                    <p className="font-bold text-brutal-cream font-mono">{formatCurrency(position.buyAvg)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-brutal-cream/60 text-xs font-mono uppercase tracking-wide mb-1">Sell Avg</p>
+                                    <p className="font-bold text-brutal-cream font-mono">{formatCurrency(position.sellAvg)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>
