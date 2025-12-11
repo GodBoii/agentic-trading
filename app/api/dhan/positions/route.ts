@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
             .single()
 
         if (dbError || !tradingKeys) {
+            console.error('[Positions] No connection keys found for user:', user.id)
+            if (dbError) console.error('[Positions] DB Error:', dbError)
             return NextResponse.json(
                 { error: 'Dhan account not connected' },
                 { status: 404 }
