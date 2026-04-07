@@ -1,0 +1,41 @@
+services:
+  stage1:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_stage1
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+
+  tick-collector:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_tick_collector
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+    profiles: ["live"]
+
+  stage2-live:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_stage2_loop
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+    profiles: ["live"]
