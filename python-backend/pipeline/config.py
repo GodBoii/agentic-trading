@@ -27,3 +27,8 @@ class PipelineConfig:
     stage2_workers: int = 20
     stage2_loop_interval_seconds: int = 600
     tick_stats_save_interval_seconds: int = 30
+    market_timezone: str = "Asia/Calcutta"
+    market_open_hour: int = 9
+    market_open_minute: int = 15
+    market_close_hour: int = 15
+    market_close_minute: int = 30
