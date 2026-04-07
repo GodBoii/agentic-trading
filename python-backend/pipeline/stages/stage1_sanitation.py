@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 from pipeline.services.surveillance_service import SurveillanceService
 from pipeline.services.universe_service import UniverseService
@@ -21,6 +22,7 @@ class Stage1Sanitation:
     def __init__(self, config: Optional[PipelineConfig] = None):
         self.config = config or PipelineConfig()
         self.dhan = DhanService(self.config)
+        self.market_time = MarketTimeService(self.config)
         self.universe_service = UniverseService(self.config)
         self.surveillance_service = SurveillanceService(self.config)
         self.lock = Lock()
@@ -145,6 +147,8 @@ class Stage1Sanitation:
 
         passed_records.sort(key=lambda row: row["adv_20_cr"], reverse=True)
         summary = {
+            "market_date": self.market_time.market_date_str(),
+            "output_file": "",
             "input_universe": total,
             "gsm_excluded": len(self.gsm_ids),
             "asm_excluded": len(self.asm_ids),
@@ -166,10 +170,14 @@ class Stage1Sanitation:
         payload = StorageService.build_payload("stage1_sanitation", summary, "stocks", passed_records)
         StorageService.save_snapshot(self.config.stage1_latest_path, payload)
 
-        timestamp_path = self.config.backend_dir / f"stage1_universe_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        StorageService.save_snapshot(timestamp_path, payload)
+        market_date = summary["market_date"]
+        daily_path = self.config.stage1_daily_path(market_date)
+        summary["output_file"] = daily_path.name
+        payload["summary"] = summary
+        StorageService.save_snapshot(daily_path, payload)
 
         print("\nStage 1 complete")
         print(f"Passed Stage 1: {len(passed_records)}")
+        print(f"Saved official daily snapshot: {daily_path.name}")
         print(f"Saved latest snapshot: {self.config.stage1_latest_path.name}")
         return payload

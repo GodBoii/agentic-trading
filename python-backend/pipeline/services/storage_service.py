@@ -1,11 +1,25 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class StorageService:
+    @staticmethod
+    def _resolve_timezone(timezone_name: str):
+        aliases = [timezone_name]
+        if timezone_name == "Asia/Calcutta":
+            aliases.append("Asia/Kolkata")
+
+        for alias in aliases:
+            try:
+                return ZoneInfo(alias)
+            except ZoneInfoNotFoundError:
+                continue
+
+        return timezone(timedelta(hours=5, minutes=30), name="IST")
+
     @staticmethod
     def save_snapshot(path: Path, payload: Dict[str, Any]) -> None:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -42,7 +56,7 @@ class StorageService:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
 
-        return dt.astimezone(ZoneInfo(timezone_name)).date().isoformat()
+        return dt.astimezone(StorageService._resolve_timezone(timezone_name)).date().isoformat()
 
     @staticmethod
     def is_snapshot_for_market_date(path: Path, timezone_name: str, market_date: str) -> bool:
