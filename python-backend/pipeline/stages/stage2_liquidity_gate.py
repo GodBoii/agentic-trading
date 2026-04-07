@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
 
@@ -18,16 +19,19 @@ class Stage2LiquidityGate:
     def __init__(self, config: Optional[PipelineConfig] = None):
         self.config = config or PipelineConfig()
         self.dhan = DhanService(self.config)
+        self.market_time = MarketTimeService(self.config)
         self.lock = Lock()
         self.progress = 0
         self.last_reported_decile = 0
         self.last_heartbeat_ts = 0.0
 
     def _load_stage1_universe(self) -> List[Dict[str, Any]]:
-        payload = StorageService.load_snapshot(self.config.stage1_latest_path)
+        market_date = self.market_time.market_date_str()
+        stage1_path = self.config.stage1_daily_path(market_date)
+        payload = StorageService.load_snapshot(stage1_path)
         if not payload:
             raise FileNotFoundError(
-                f"Stage 1 snapshot not found: {self.config.stage1_latest_path}. Run Stage 1 before Stage 2."
+                f"Stage 1 snapshot not found: {stage1_path}. Run Stage 1 before Stage 2."
             )
         return payload.get("stocks", [])
 
@@ -181,6 +185,7 @@ class Stage2LiquidityGate:
             }
             payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", [])
             StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+            StorageService.save_snapshot(self.config.stage2_daily_path(self.market_time.market_date_str()), payload)
             print("Stage 2 skipped because tick stats are not available yet.")
             return payload
         quote_map = self._fetch_live_quotes(stage1_stocks)
@@ -199,6 +204,7 @@ class Stage2LiquidityGate:
             }
             payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", [])
             StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+            StorageService.save_snapshot(self.config.stage2_daily_path(self.market_time.market_date_str()), payload)
             print("Stage 2 skipped because live quote data could not be fetched.")
             return payload
 
@@ -252,11 +258,11 @@ class Stage2LiquidityGate:
 
         payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", passed_records)
         StorageService.save_snapshot(self.config.stage2_latest_path, payload)
-
-        timestamp_path = self.config.backend_dir / f"stage2_liquidity_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        StorageService.save_snapshot(timestamp_path, payload)
+        daily_path = self.config.stage2_daily_path(self.market_time.market_date_str())
+        StorageService.save_snapshot(daily_path, payload)
 
         print("\nStage 2 complete")
         print(f"Passed Stage 2: {len(passed_records)}")
+        print(f"Saved official daily snapshot: {daily_path.name}")
         print(f"Saved latest snapshot: {self.config.stage2_latest_path.name}")
         return payload
