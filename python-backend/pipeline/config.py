@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -32,3 +33,14 @@ class PipelineConfig:
     market_open_minute: int = 15
     market_close_hour: int = 15
     market_close_minute: int = 30
+
+    def stage1_daily_path(self, market_date: str) -> Path:
+        return self.backend_dir / f"stage1-{market_date}.json"
+
+    def stage2_daily_path(self, market_date: str) -> Path:
+        return self.backend_dir / f"stage2-{market_date}.json"
+
+    def tick_stats_daily_path(self, market_date: Optional[str] = None) -> Path:
+        if market_date:
+            return self.backend_dir / f"stage2-tick-stats-{market_date}.json"
+        return self.tick_stats_latest_path
