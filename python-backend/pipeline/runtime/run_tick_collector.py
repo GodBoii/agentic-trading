@@ -75,6 +75,11 @@ class TickCollector:
     def run(self) -> None:
         instruments = self.load_stage1_instruments()
         print(f"Starting tick collector for {len(instruments)} Stage 1 stocks")
+        if not instruments:
+            print("Tick collector is idle because Stage 1 has no survivors yet.")
+            while True:
+                self.save_stats()
+                time.sleep(self.config.tick_stats_save_interval_seconds)
 
         while True:
             try:

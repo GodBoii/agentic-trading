@@ -115,6 +115,21 @@ class DhanService:
                 continue
         return parsed
 
+    def fetch_ohlc_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        time.sleep(self.quote_request_gap)
+        resp = self.market_api.ohlc_data({"BSE_EQ": security_ids})
+        if str(resp.get("status", "")).lower() != "success":
+            return {}
+
+        data = resp.get("data", {}).get("data", {}).get("BSE_EQ", {})
+        parsed: Dict[int, Dict[str, Any]] = {}
+        for raw_security_id, value in data.items():
+            try:
+                parsed[int(raw_security_id)] = value
+            except Exception:
+                continue
+        return parsed
+
     def build_marketfeed(self, instruments: List[tuple]) -> MarketFeed:
         return MarketFeed(self.dhan_context, instruments, version="v2")
 
