@@ -36,7 +36,10 @@ class Stage2LiquidityGate:
         return payload.get("stocks", [])
 
     def _load_tick_stats(self) -> Dict[int, Dict[str, Any]]:
-        payload = StorageService.load_snapshot(self.config.tick_stats_latest_path)
+        tick_stats_path = self.config.tick_stats_daily_path(self.market_time.market_date_str())
+        payload = StorageService.load_snapshot(tick_stats_path)
+        if not payload:
+            payload = StorageService.load_snapshot(self.config.tick_stats_latest_path)
         if not payload:
             print("Tick stats file not found. Stage 2 tick-rate gate will fail until the live tick collector is running.")
             return {}
@@ -105,8 +108,11 @@ class Stage2LiquidityGate:
         total: int,
     ) -> Tuple[Optional[Dict[str, Any]], bool]:
         security_id = int(stock["security_id"])
+        print(f"Stage 2 processing {stock.get('symbol') or security_id} ({security_id})...")
         quote_item = quote_map.get(security_id)
         if not quote_item:
+            print(f"Stage 2 skip {security_id}: no live quote found")
+            self._log_progress(total)
             return None, False
 
         spread_percent = self._compute_spread_percent(quote_item)
@@ -118,6 +124,8 @@ class Stage2LiquidityGate:
 
         intraday_resp = self.dhan.fetch_intraday_history(security_id, days=5, interval=1)
         if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
+            print(f"Stage 2 skip {security_id}: intraday history fetch failed")
+            self._log_progress(total)
             return None, False
         intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
         rvol = self.dhan.compute_time_of_day_rvol(intraday_frame)
@@ -151,6 +159,11 @@ class Stage2LiquidityGate:
             record["stage2_reason"] = "time_of_day_rvol"
             passed = False
 
+        status_text = "PASS" if passed else f"FILTERED ({record['stage2_reason']})"
+        print(
+            f"Stage 2 result {security_id}: {status_text} | "
+            f"spread={record['spread_percent']} ticks/hr={ticks_last_hour} rvol={record['time_of_day_rvol']}"
+        )
         self._log_progress(total)
 
         return record, passed
@@ -168,8 +181,29 @@ class Stage2LiquidityGate:
         if max_stocks:
             stage1_stocks = stage1_stocks[:max_stocks]
             print(f"TEST MODE: limiting Stage 2 to first {max_stocks} Stage 1 stocks")
+        print(f"Loaded {len(stage1_stocks)} Stage 1 survivor(s) for Stage 2")
+
+        if not stage1_stocks:
+            summary = {
+                "input_stage1_count": 0,
+                "data_retrieved": 0,
+                "failed_fetch": 0,
+                "stage2_passed": 0,
+                "status": "no_stage1_stocks",
+                "stage2_filters": {
+                    "max_spread_percent": self.config.stage2_max_spread_percent,
+                    "min_ticks_per_hour": self.config.stage2_min_ticks_per_hour,
+                    "min_time_of_day_rvol": self.config.stage2_min_rvol,
+                },
+            }
+            payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", [])
+            StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+            StorageService.save_snapshot(self.config.stage2_daily_path(self.market_time.market_date_str()), payload)
+            print("Stage 2 skipped because Stage 1 produced zero survivors.")
+            return payload
 
         tick_map = self._load_tick_stats()
+        print(f"Loaded tick stats for {len(tick_map)} security id(s)")
         if not tick_map:
             summary = {
                 "input_stage1_count": len(stage1_stocks),
@@ -189,6 +223,7 @@ class Stage2LiquidityGate:
             print("Stage 2 skipped because tick stats are not available yet.")
             return payload
         quote_map = self._fetch_live_quotes(stage1_stocks)
+        print(f"Loaded live quote snapshots for {len(quote_map)} security id(s)")
         if not quote_map:
             summary = {
                 "input_stage1_count": len(stage1_stocks),
@@ -209,6 +244,10 @@ class Stage2LiquidityGate:
             return payload
 
         total = len(stage1_stocks)
+        print(
+            f"Stage 2 historical refinement starting for {total} stock(s) "
+            f"with {workers} worker(s) and shared rate limit {self.config.historical_rate_limit_per_sec}/sec"
+        )
         all_records: List[Dict[str, Any]] = []
         passed_records: List[Dict[str, Any]] = []
         failed_count = 0
