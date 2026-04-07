@@ -24,6 +24,7 @@ services:
     volumes:
       - ./python-backend:/app/python-backend
       - ./:/app
+    restart: unless-stopped
     profiles: ["live"]
 
   stage2-live:
@@ -38,4 +39,7 @@ services:
     volumes:
       - ./python-backend:/app/python-backend
       - ./:/app
+    depends_on:
+      - tick-collector
+    restart: unless-stopped
     profiles: ["live"]

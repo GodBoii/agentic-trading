@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from threading import Lock
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from pipeline.config import PipelineConfig
@@ -19,6 +20,8 @@ class Stage2LiquidityGate:
         self.dhan = DhanService(self.config)
         self.lock = Lock()
         self.progress = 0
+        self.last_reported_decile = 0
+        self.last_heartbeat_ts = 0.0
 
     def _load_stage1_universe(self) -> List[Dict[str, Any]]:
         payload = StorageService.load_snapshot(self.config.stage1_latest_path)
@@ -44,6 +47,19 @@ class Stage2LiquidityGate:
 
     def _chunk_ids(self, items: List[Dict[str, Any]], size: int) -> List[List[Dict[str, Any]]]:
         return [items[i:i + size] for i in range(0, len(items), size)]
+
+    def _log_progress(self, total: int) -> None:
+        with self.lock:
+            self.progress += 1
+            completed_pct = int((self.progress / total) * 100) if total else 100
+            decile = min(10, completed_pct // 10)
+            now = time.time()
+            if now - self.last_heartbeat_ts >= 30:
+                self.last_heartbeat_ts = now
+                print(f"Stage 2 still running... {self.progress}/{total} processed")
+            if decile > self.last_reported_decile:
+                self.last_reported_decile = decile
+                print(f"Stage 2 {decile * 10}% done... ({self.progress}/{total})")
 
     def _fetch_live_quotes(self, stocks: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
         batches = self._chunk_ids(stocks, self.config.stage2_quote_batch_size)
@@ -131,10 +147,7 @@ class Stage2LiquidityGate:
             record["stage2_reason"] = "time_of_day_rvol"
             passed = False
 
-        with self.lock:
-            self.progress += 1
-            status = "PASS" if passed else "FILTERED"
-            print(f"[{self.progress}/{total}] {record['symbol']} ({security_id}) {status}")
+        self._log_progress(total)
 
         return record, passed
 
@@ -144,13 +157,50 @@ class Stage2LiquidityGate:
         print("=" * 60)
 
         workers = workers or self.config.stage2_workers
+        self.progress = 0
+        self.last_reported_decile = 0
+        self.last_heartbeat_ts = time.time()
         stage1_stocks = self._load_stage1_universe()
         if max_stocks:
             stage1_stocks = stage1_stocks[:max_stocks]
             print(f"TEST MODE: limiting Stage 2 to first {max_stocks} Stage 1 stocks")
 
         tick_map = self._load_tick_stats()
+        if not tick_map:
+            summary = {
+                "input_stage1_count": len(stage1_stocks),
+                "data_retrieved": 0,
+                "failed_fetch": 0,
+                "stage2_passed": 0,
+                "status": "waiting_for_tick_stats",
+                "stage2_filters": {
+                    "max_spread_percent": self.config.stage2_max_spread_percent,
+                    "min_ticks_per_hour": self.config.stage2_min_ticks_per_hour,
+                    "min_time_of_day_rvol": self.config.stage2_min_rvol,
+                },
+            }
+            payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", [])
+            StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+            print("Stage 2 skipped because tick stats are not available yet.")
+            return payload
         quote_map = self._fetch_live_quotes(stage1_stocks)
+        if not quote_map:
+            summary = {
+                "input_stage1_count": len(stage1_stocks),
+                "data_retrieved": 0,
+                "failed_fetch": len(stage1_stocks),
+                "stage2_passed": 0,
+                "status": "quote_fetch_failed",
+                "stage2_filters": {
+                    "max_spread_percent": self.config.stage2_max_spread_percent,
+                    "min_ticks_per_hour": self.config.stage2_min_ticks_per_hour,
+                    "min_time_of_day_rvol": self.config.stage2_min_rvol,
+                },
+            }
+            payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", [])
+            StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+            print("Stage 2 skipped because live quote data could not be fetched.")
+            return payload
 
         total = len(stage1_stocks)
         all_records: List[Dict[str, Any]] = []
@@ -188,6 +238,7 @@ class Stage2LiquidityGate:
             "data_retrieved": len(all_records),
             "failed_fetch": failed_count,
             "stage2_passed": len(passed_records),
+            "status": "completed",
             "stage2_filters": {
                 "max_spread_percent": self.config.stage2_max_spread_percent,
                 "min_ticks_per_hour": self.config.stage2_min_ticks_per_hour,
