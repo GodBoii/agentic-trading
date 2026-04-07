@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter
 from datetime import datetime
 from threading import Lock
 import time
@@ -29,24 +30,41 @@ class Stage1Sanitation:
         self.progress = 0
         self.last_reported_decile = 0
         self.last_heartbeat_ts = 0.0
+        self.no_data_count = 0
+        self.passed_count = 0
+        self.sorted_out_count = 0
+        self.failure_reasons: Counter[str] = Counter()
+        self.failure_samples_logged = 0
         self.gsm_ids = set()
         self.asm_ids = set()
 
     def _chunk_stocks(self, stocks: List[Dict[str, Any]], size: int) -> List[List[Dict[str, Any]]]:
         return [stocks[i:i + size] for i in range(0, len(stocks), size)]
 
-    def _log_progress(self, total: int) -> None:
+    def _log_progress(self, total: int, outcome: str) -> None:
         with self.lock:
             self.progress += 1
+            if outcome == "no_data":
+                self.no_data_count += 1
+            elif outcome == "passed":
+                self.passed_count += 1
+            elif outcome == "sorted_out":
+                self.sorted_out_count += 1
+
             completed_pct = int((self.progress / total) * 100) if total else 100
             decile = min(10, completed_pct // 10)
             now = time.time()
+            progress_tail = (
+                f"(no data = {self.no_data_count}, "
+                f"passed = {self.passed_count}, "
+                f"sorted out = {self.sorted_out_count})"
+            )
             if now - self.last_heartbeat_ts >= 30:
                 self.last_heartbeat_ts = now
-                print(f"Still fetching... {self.progress}/{total} processed")
+                print(f"Still fetching... {self.progress}/{total} processed {progress_tail}")
             if decile > self.last_reported_decile:
                 self.last_reported_decile = decile
-                print(f"{decile * 10}% done fetching... ({self.progress}/{total})")
+                print(f"{decile * 10}% done fetching... ({self.progress}/{total}) {progress_tail}")
 
     def _run_bulk_price_prefilter(self, universe: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
         candidates: List[Dict[str, Any]] = []
@@ -110,17 +128,77 @@ class Stage1Sanitation:
         summary["historical_candidates"] = len(candidates)
         return candidates, summary
 
+    def _normalize_failure_reason(self, resp: Optional[Dict[str, Any]]) -> str:
+        if not resp:
+            return "empty_response"
+
+        remarks = resp.get("remarks")
+        if isinstance(remarks, dict):
+            parts = [remarks.get("error_code"), remarks.get("error_type"), remarks.get("error_message")]
+            text = " | ".join(str(part) for part in parts if part)
+            if text:
+                return text
+        elif remarks:
+            return str(remarks)
+
+        data = resp.get("data")
+        if data:
+            text = str(data)
+            return text[:280] + "..." if len(text) > 280 else text
+        return "unknown_failure"
+
+    def _record_failure(
+        self,
+        security_id: int,
+        resp: Optional[Dict[str, Any]],
+        stock: Dict[str, Any],
+        explicit_reason: Optional[str] = None,
+    ) -> None:
+        reason = explicit_reason or self._normalize_failure_reason(resp)
+        with self.lock:
+            self.failure_reasons[reason] += 1
+            if self.failure_samples_logged < 5:
+                debug = resp.get("_debug", {}) if isinstance(resp, dict) else {}
+                print(
+                    f"Stage 1 failure sample {self.failure_samples_logged + 1}: "
+                    f"security_id={security_id}, symbol={stock.get('symbol')}, "
+                    f"exchange={debug.get('exchange_segment_used', 'BSE_EQ')}, "
+                    f"instrument={debug.get('instrument_used', 'unknown')} | reason={reason}"
+                )
+                self.failure_samples_logged += 1
+
     def _process_stock(self, stock: Dict[str, Any], idx: int, total: int) -> Tuple[Optional[Dict[str, Any]], bool]:
         security_id = int(stock["security_id"])
 
-        resp = self.dhan.fetch_daily_history(security_id, days=30)
+        instrument_candidates = [
+            stock.get("instrument"),
+            "EQUITY",
+        ]
+        resp = self.dhan.fetch_daily_history(
+            security_id,
+            days=45,
+            exchange_segment="BSE_EQ",
+            instrument_candidates=instrument_candidates,
+        )
         if not resp or str(resp.get("status", "")).lower() != "success":
-            self._log_progress(total)
+            self._record_failure(security_id, resp, stock)
+            self._log_progress(total, "no_data")
             return None, False
 
         frame = self.dhan.daily_response_to_df(resp)
-        if frame.empty or len(frame) < 20:
-            self._log_progress(total)
+        if frame.empty:
+            self._record_failure(security_id, resp, stock)
+            self._log_progress(total, "no_data")
+            return None, False
+
+        if len(frame) < 14:
+            self._record_failure(
+                security_id,
+                resp,
+                stock,
+                explicit_reason=f"insufficient_history_points={len(frame)}",
+            )
+            self._log_progress(total, "sorted_out")
             return None, False
 
         last_close = float(frame["close"].iloc[-1])
@@ -159,7 +237,7 @@ class Stage1Sanitation:
             elif atr_percent < self.config.stage1_min_atr_percent:
                 record["prefilter_reason"] = "atr_percent"
 
-        self._log_progress(total)
+        self._log_progress(total, "passed" if passed else "sorted_out")
 
         return record, passed
 
@@ -173,6 +251,11 @@ class Stage1Sanitation:
         self.progress = 0
         self.last_reported_decile = 0
         self.last_heartbeat_ts = time.time()
+        self.no_data_count = 0
+        self.passed_count = 0
+        self.sorted_out_count = 0
+        self.failure_reasons = Counter()
+        self.failure_samples_logged = 0
         self.gsm_ids = self.surveillance_service.load_gsm_ids()
         self.asm_ids = self.surveillance_service.load_asm_ids()
         universe = self.universe_service.load_bse_common_equities()
@@ -183,6 +266,26 @@ class Stage1Sanitation:
         total = len(universe)
         print(f"Loaded {total} common BSE equities for Stage 1")
         print(f"Filters: price {self.config.stage1_min_price}-{self.config.stage1_max_price}, ADV20 >= {self.config.stage1_min_adv_cr}Cr, ATR% >= {self.config.stage1_min_atr_percent}")
+        credential_info = self.dhan.credentials_summary()
+        print(
+            "Dhan credential check: "
+            f"client_id={credential_info['client_id_masked']}, "
+            f"data_access_token={credential_info['has_data_access_token']}, "
+            f"app_id={credential_info['has_app_id']}, "
+            f"app_secret={credential_info['has_app_secret']}"
+        )
+        profile = self.dhan.fetch_user_profile()
+        if profile.get("status") == "success" and isinstance(profile.get("data"), dict):
+            profile_data = profile["data"]
+            print(
+                "Dhan profile: "
+                f"dataPlan={profile_data.get('dataPlan')}, "
+                f"dataValidity={profile_data.get('dataValidity')}, "
+                f"tokenValidity={profile_data.get('tokenValidity')}, "
+                f"activeSegment={profile_data.get('activeSegment')}"
+            )
+        else:
+            print(f"Dhan profile check failed: {profile.get('remarks')}")
         print("Stage 1 execution plan:")
         print("  1. Static ASM/GSM removal")
         print("  2. Bulk OHLC prefilter by price range")
@@ -284,6 +387,12 @@ class Stage1Sanitation:
         print(f"Time Taken: {elapsed_seconds:.1f} seconds ({elapsed_minutes:.1f} minutes)")
         print(f"Speed: {speed:.2f} stocks/second")
         print("=" * 60)
+
+        if self.failure_reasons:
+            print("\nTop Stage 1 Failure Reasons:")
+            print("-" * 60)
+            for reason, count in self.failure_reasons.most_common(5):
+                print(f"{count} -> {reason}")
 
         if passed_records:
             print("\nTop 10 Most Liquid Stocks:")

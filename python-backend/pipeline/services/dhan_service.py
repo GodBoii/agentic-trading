@@ -13,6 +13,19 @@ from pipeline.config import PipelineConfig
 
 
 class DhanService:
+    VALID_HISTORICAL_INSTRUMENTS = {
+        "INDEX",
+        "FUTIDX",
+        "OPTIDX",
+        "EQUITY",
+        "FUTSTK",
+        "OPTSTK",
+        "FUTCOM",
+        "OPTFUT",
+        "FUTCUR",
+        "OPTCUR",
+    }
+
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.request_times = deque()
@@ -25,14 +38,57 @@ class DhanService:
         merged.update({k: v for k, v in root_env.items() if v is not None})
         merged.update({k: v for k, v in backend_env.items() if v is not None})
 
-        client_id = merged.get("DHAN_DATA_CLIENT_ID") or merged.get("DHAN_CLIENT_ID")
-        access_token = merged.get("DHAN_DATA_ACCESS_TOKEN") or merged.get("DHAN_ACCESS_TOKEN")
-        if not client_id or not access_token:
+        self.client_id = merged.get("DHAN_DATA_CLIENT_ID") or merged.get("DHAN_CLIENT_ID")
+        self.access_token = merged.get("DHAN_DATA_ACCESS_TOKEN") or merged.get("DHAN_ACCESS_TOKEN")
+        self.app_id = merged.get("DHAN_APP_ID")
+        self.app_secret = merged.get("DHAN_APP_SECRET")
+
+        if not self.client_id or not self.access_token:
             raise ValueError("Missing Dhan credentials. Expected DHAN_DATA_CLIENT_ID and DHAN_DATA_ACCESS_TOKEN.")
 
-        self.dhan_context = DhanContext(client_id, access_token)
+        self.dhan_context = DhanContext(self.client_id, self.access_token)
         self.market_api = dhanhq(self.dhan_context)
         self.historical_api = HistoricalData(self.dhan_context)
+        self.login_api = self.dhan_context.get_dhan_login()
+
+    def _normalize_historical_instruments(self, instrument_candidates: Optional[List[str]]) -> List[str]:
+        # Dhan historical API accepts Dhan instrument names (e.g. EQUITY), not exchange-type tags like ES.
+        normalized: List[str] = []
+        for raw in instrument_candidates or []:
+            if not raw:
+                continue
+            candidate = str(raw).strip().upper()
+            if candidate == "ES":
+                candidate = "EQUITY"
+            if candidate in self.VALID_HISTORICAL_INSTRUMENTS:
+                normalized.append(candidate)
+
+        if "EQUITY" not in normalized:
+            normalized.append("EQUITY")
+
+        # preserve order while deduplicating
+        return list(dict.fromkeys(normalized))
+
+    def credentials_summary(self) -> Dict[str, Any]:
+        masked_client = (
+            f"{self.client_id[:2]}***{self.client_id[-2:]}"
+            if self.client_id and len(self.client_id) >= 4
+            else "***"
+        )
+        return {
+            "client_id_masked": masked_client,
+            "has_data_client_id": bool(self.client_id),
+            "has_data_access_token": bool(self.access_token),
+            "has_app_id": bool(self.app_id),
+            "has_app_secret": bool(self.app_secret),
+        }
+
+    def fetch_user_profile(self) -> Dict[str, Any]:
+        try:
+            response = self.login_api.user_profile(self.access_token)
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
 
     def acquire_data_slot(self) -> None:
         with self.rate_condition:
@@ -47,56 +103,83 @@ class DhanService:
                 wait_time = max(0.01, 1.0 - (now - self.request_times[0]))
                 self.rate_condition.wait(timeout=wait_time)
 
-    def fetch_daily_history(self, security_id: int, days: int = 30, retries: int = 3) -> Optional[Dict[str, Any]]:
+    def fetch_daily_history(
+        self,
+        security_id: int,
+        days: int = 30,
+        retries: int = 3,
+        exchange_segment: str = "BSE_EQ",
+        instrument_candidates: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days)
         last_response = None
+        candidates = self._normalize_historical_instruments(instrument_candidates or ["EQUITY"])
 
-        for attempt in range(retries):
-            self.acquire_data_slot()
-            resp = self.historical_api.historical_daily_data(
-                security_id=str(security_id),
-                exchange_segment="BSE_EQ",
-                instrument_type="EQUITY",
-                from_date=start_date.isoformat(),
-                to_date=end_date.isoformat(),
-            )
-            last_response = resp
+        for instrument_name in candidates:
+            for attempt in range(retries):
+                self.acquire_data_slot()
+                resp = self.historical_api.historical_daily_data(
+                    security_id=str(security_id),
+                    exchange_segment=exchange_segment,
+                    instrument_type=instrument_name,
+                    from_date=start_date.isoformat(),
+                    to_date=end_date.isoformat(),
+                )
+                if isinstance(resp, dict):
+                    resp.setdefault("_debug", {})
+                    resp["_debug"]["instrument_used"] = instrument_name
+                    resp["_debug"]["exchange_segment_used"] = exchange_segment
+                last_response = resp
 
-            if str(resp.get("status", "")).lower() == "success":
-                return resp
+                if str(resp.get("status", "")).lower() == "success":
+                    return resp
 
-            if self._is_rate_limited(resp):
-                time.sleep(min(2.0, 0.4 * (attempt + 1)))
-                continue
-            return resp
+                if self._is_rate_limited(resp):
+                    time.sleep(min(2.0, 0.4 * (attempt + 1)))
+                    continue
+                break
 
         return last_response
 
-    def fetch_intraday_history(self, security_id: int, days: int = 5, interval: int = 1, retries: int = 3) -> Optional[Dict[str, Any]]:
+    def fetch_intraday_history(
+        self,
+        security_id: int,
+        days: int = 5,
+        interval: int = 1,
+        retries: int = 3,
+        exchange_segment: str = "BSE_EQ",
+        instrument_candidates: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days)
         last_response = None
+        candidates = self._normalize_historical_instruments(instrument_candidates or ["EQUITY"])
 
-        for attempt in range(retries):
-            self.acquire_data_slot()
-            resp = self.historical_api.intraday_minute_data(
-                security_id=str(security_id),
-                exchange_segment="BSE_EQ",
-                instrument_type="EQUITY",
-                from_date=start_date.isoformat(),
-                to_date=end_date.isoformat(),
-                interval=interval,
-            )
-            last_response = resp
+        for instrument_name in candidates:
+            for attempt in range(retries):
+                self.acquire_data_slot()
+                resp = self.historical_api.intraday_minute_data(
+                    security_id=str(security_id),
+                    exchange_segment=exchange_segment,
+                    instrument_type=instrument_name,
+                    from_date=start_date.isoformat(),
+                    to_date=end_date.isoformat(),
+                    interval=interval,
+                )
+                if isinstance(resp, dict):
+                    resp.setdefault("_debug", {})
+                    resp["_debug"]["instrument_used"] = instrument_name
+                    resp["_debug"]["exchange_segment_used"] = exchange_segment
+                last_response = resp
 
-            if str(resp.get("status", "")).lower() == "success":
-                return resp
+                if str(resp.get("status", "")).lower() == "success":
+                    return resp
 
-            if self._is_rate_limited(resp):
-                time.sleep(min(2.0, 0.4 * (attempt + 1)))
-                continue
-            return resp
+                if self._is_rate_limited(resp):
+                    time.sleep(min(2.0, 0.4 * (attempt + 1)))
+                    continue
+                break
 
         return last_response
 
