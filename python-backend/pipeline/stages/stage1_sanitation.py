@@ -164,6 +164,7 @@ class Stage1Sanitation:
         return record, passed
 
     def run(self, max_stocks: Optional[int] = None, workers: Optional[int] = None) -> Dict[str, Any]:
+        started_at = time.time()
         print("=" * 60)
         print("STAGE 1 - UNIVERSE SANITATION (PRE-MARKET ONLY)")
         print("=" * 60)
@@ -259,8 +260,41 @@ class Stage1Sanitation:
         payload["summary"] = summary
         StorageService.save_snapshot(daily_path, payload)
 
+        elapsed_seconds = time.time() - started_at
+        elapsed_minutes = elapsed_seconds / 60 if elapsed_seconds else 0.0
+        pass_rate = (len(passed_records) / len(all_records) * 100) if all_records else 0.0
+        speed = (historical_total / elapsed_seconds) if elapsed_seconds > 0 else 0.0
+
         print("\nStage 1 complete")
         print(f"Passed Stage 1: {len(passed_records)}")
         print(f"Saved official daily snapshot: {daily_path.name}")
         print(f"Saved latest snapshot: {self.config.stage1_latest_path.name}")
+        print("\n" + "=" * 60)
+        print("SCAN COMPLETE")
+        print("=" * 60)
+        print(f"Total Stocks Scanned: {historical_total}")
+        print(f"Data Retrieved: {len(all_records)}")
+        print(f"Failed to Fetch: {failed_count}")
+        print(f"GSM Filtered Out: {prefilter_summary['gsm_filtered']}")
+        print(f"ASM Filtered Out: {prefilter_summary['asm_filtered']}")
+        print(f"Missing OHLC: {prefilter_summary['missing_ohlc']}")
+        print(f"Price Filtered Out: {prefilter_summary['price_filtered']}")
+        print(f"Passed All Filters: {len(passed_records)}")
+        print(f"Pass Rate: {pass_rate:.1f}%")
+        print(f"Time Taken: {elapsed_seconds:.1f} seconds ({elapsed_minutes:.1f} minutes)")
+        print(f"Speed: {speed:.2f} stocks/second")
+        print("=" * 60)
+
+        if passed_records:
+            print("\nTop 10 Most Liquid Stocks:")
+            print("-" * 60)
+            for index, row in enumerate(passed_records[:10], 1):
+                name = (row.get("display_name") or row.get("symbol") or str(row.get("security_id")))[:25]
+                print(
+                    f"{index}. {name:<25} "
+                    f"Rs {float(row.get('price') or 0):>7.2f}    "
+                    f"{float(row.get('adv_20_cr') or 0):>7.2f}Cr  "
+                    f"ATR: {float(row.get('atr_percent') or 0):.2f}%"
+                )
+
         return payload
