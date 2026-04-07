@@ -122,7 +122,16 @@ class Stage2LiquidityGate:
         if last_price is not None and volume is not None:
             intraday_value_cr = (float(last_price) * float(volume)) / 10000000
 
-        intraday_resp = self.dhan.fetch_intraday_history(security_id, days=5, interval=1)
+        intraday_resp = self.dhan.fetch_intraday_history(
+            security_id,
+            days=5,
+            interval=1,
+            exchange_segment="BSE_EQ",
+            instrument_candidates=[
+                stock.get("instrument"),
+                "EQUITY",
+            ],
+        )
         if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
             print(f"Stage 2 skip {security_id}: intraday history fetch failed")
             self._log_progress(total)
