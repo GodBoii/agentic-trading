@@ -1,5 +1,5 @@
-from datetime import datetime, time as dt_time
-from zoneinfo import ZoneInfo
+from datetime import datetime, time as dt_time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pipeline.config import PipelineConfig
 
@@ -7,7 +7,22 @@ from pipeline.config import PipelineConfig
 class MarketTimeService:
     def __init__(self, config: PipelineConfig):
         self.config = config
-        self.tz = ZoneInfo(config.market_timezone)
+        self.tz = self._resolve_timezone(config.market_timezone)
+
+    @staticmethod
+    def _resolve_timezone(timezone_name: str):
+        aliases = [timezone_name]
+        if timezone_name == "Asia/Calcutta":
+            aliases.append("Asia/Kolkata")
+
+        for alias in aliases:
+            try:
+                return ZoneInfo(alias)
+            except ZoneInfoNotFoundError:
+                continue
+
+        # Docker/dev fallback: IST has no DST, so a fixed offset is safe here.
+        return timezone(timedelta(hours=5, minutes=30), name="IST")
 
     def now(self) -> datetime:
         return datetime.now(self.tz)

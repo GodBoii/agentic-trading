@@ -9,6 +9,7 @@ from dhanhq import MarketFeed
 
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
 
@@ -16,14 +17,17 @@ class TickCollector:
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.dhan = DhanService(config)
+        self.market_time = MarketTimeService(config)
         self.tick_windows: DefaultDict[int, deque] = defaultdict(deque)
         self.last_save = 0.0
 
     def load_stage1_instruments(self) -> List[tuple]:
-        payload = StorageService.load_snapshot(self.config.stage1_latest_path)
+        market_date = self.market_time.market_date_str()
+        stage1_path = self.config.stage1_daily_path(market_date)
+        payload = StorageService.load_snapshot(stage1_path)
         if not payload:
             raise FileNotFoundError(
-                f"Stage 1 snapshot not found: {self.config.stage1_latest_path}. Run Stage 1 before the tick collector."
+                f"Stage 1 snapshot not found: {stage1_path}. Run Stage 1 before the tick collector."
             )
         stocks = payload.get("stocks", [])
         return [(MarketFeed.BSE, str(stock["security_id"]), MarketFeed.Ticker) for stock in stocks]
@@ -49,6 +53,10 @@ class TickCollector:
             },
         }
         StorageService.save_snapshot(self.config.tick_stats_latest_path, payload)
+        StorageService.save_snapshot(
+            self.config.tick_stats_daily_path(self.market_time.market_date_str()),
+            payload,
+        )
         self.last_save = now
         print(f"Saved tick stats for {len(payload['tick_stats'])} securities")
 
