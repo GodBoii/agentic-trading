@@ -7,4 +7,5 @@ if __name__ == "__main__":
     print("  - python -m pipeline.runtime.run_stage1")
     print("  - python -m pipeline.runtime.run_tick_collector")
     print("  - python -m pipeline.runtime.run_stage2_loop")
+    print("  - python -m pipeline.runtime.run_monitor_loop")
     Stage1Sanitation().run()

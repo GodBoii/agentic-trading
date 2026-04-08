@@ -32,7 +32,7 @@ class Stage2LiquidityGate:
     def _build_stage2_filters_summary(self) -> Dict[str, Any]:
         return {
             "max_spread_percent": self.config.stage2_max_spread_percent,
-            "min_ticks_per_hour": self.config.stage2_min_ticks_per_hour,
+            "min_ticks_last_10min": self.config.stage2_min_ticks_last_10min,
             "min_time_of_day_rvol": self.config.stage2_min_rvol,
             "min_tick_stats_coverage_ratio": self.config.stage2_min_tick_stats_coverage_ratio,
             "max_tick_stats_staleness_seconds": self.config.stage2_max_tick_stats_staleness_seconds,
@@ -52,15 +52,8 @@ class Stage2LiquidityGate:
         status = "PASS" if ok else "WAIT"
         print(f"Stage 2 gate [{gate}]: {status} | {detail}")
 
-    def _summarize_tick_activity(self, tick_map: Dict[int, Dict[str, Any]]) -> Dict[str, Any]:
-        tick_counts: List[int] = []
-        for item in tick_map.values():
-            try:
-                tick_counts.append(int(item.get("ticks_last_hour")))
-            except Exception:
-                continue
-
-        if not tick_counts:
+    def _summarize_numeric_series(self, values: List[int]) -> Dict[str, Any]:
+        if not values:
             return {
                 "count": 0,
                 "min": None,
@@ -70,7 +63,7 @@ class Stage2LiquidityGate:
                 "avg": None,
             }
 
-        ordered = sorted(tick_counts)
+        ordered = sorted(values)
         count = len(ordered)
 
         def percentile(pct: float) -> int:
@@ -85,6 +78,26 @@ class Stage2LiquidityGate:
             "max": ordered[-1],
             "avg": round(sum(ordered) / count, 2),
         }
+
+    def _summarize_tick_activity(self, tick_map: Dict[int, Dict[str, Any]]) -> Dict[str, Any]:
+        series: Dict[str, List[int]] = {
+            "ticks_last_10min": [],
+            "ticks_last_30min": [],
+            "ticks_last_60min": [],
+            "ticks_today": [],
+        }
+
+        for item in tick_map.values():
+            for key in series:
+                try:
+                    value = item.get(key)
+                    if value is None:
+                        continue
+                    series[key].append(int(value))
+                except Exception:
+                    continue
+
+        return {key: self._summarize_numeric_series(values) for key, values in series.items()}
 
     def _summarize_quote_map(self, quote_map: Dict[int, Dict[str, Any]]) -> Dict[str, int]:
         spread_available = 0
@@ -253,6 +266,7 @@ class Stage2LiquidityGate:
             ),
             "collector_universe_size": payload.get("collector_universe_size"),
             "collector_universe_signature": payload.get("collector_universe_signature"),
+            "history_source": self.config.tick_stats_history_daily_path(market_date).name,
         }
         return parsed, metadata
 
@@ -434,7 +448,10 @@ class Stage2LiquidityGate:
 
         rvol = self.dhan.compute_time_of_day_rvol(intraday_frame)
         tick_info = tick_map.get(security_id, {})
-        ticks_last_hour = tick_info.get("ticks_last_hour")
+        ticks_last_10min = tick_info.get("ticks_last_10min")
+        ticks_last_30min = tick_info.get("ticks_last_30min")
+        ticks_last_60min = tick_info.get("ticks_last_60min")
+        ticks_today = tick_info.get("ticks_today")
 
         record = {
             "security_id": security_id,
@@ -444,7 +461,10 @@ class Stage2LiquidityGate:
             "adv_20_cr": stock.get("adv_20_cr"),
             "atr_percent": stock.get("atr_percent"),
             "spread_percent": round(spread_percent, 4) if spread_percent is not None else None,
-            "ticks_last_hour": ticks_last_hour,
+            "ticks_last_10min": ticks_last_10min,
+            "ticks_last_30min": ticks_last_30min,
+            "ticks_last_60min": ticks_last_60min,
+            "ticks_today": ticks_today,
             "time_of_day_rvol": round(rvol, 3) if rvol is not None else None,
             "intraday_value_cr": round(intraday_value_cr, 2) if intraday_value_cr is not None else None,
             "stage2_reason": None,
@@ -458,10 +478,10 @@ class Stage2LiquidityGate:
         elif spread_percent > self.config.stage2_max_spread_percent:
             record["stage2_reason"] = "spread"
             passed = False
-        elif ticks_last_hour is None:
+        elif ticks_last_10min is None:
             record["stage2_reason"] = "tick_rate_unavailable"
             passed = False
-        elif int(ticks_last_hour) < self.config.stage2_min_ticks_per_hour:
+        elif int(ticks_last_10min) < self.config.stage2_min_ticks_last_10min:
             record["stage2_reason"] = "tick_rate"
             passed = False
         elif rvol is None:
@@ -477,7 +497,11 @@ class Stage2LiquidityGate:
         status_text = "PASS" if passed else f"FILTERED ({record['stage2_reason']})"
         print(
             f"Stage 2 result {security_id}: {status_text} | "
-            f"spread={record['spread_percent']} ticks/hr={ticks_last_hour} rvol={record['time_of_day_rvol']}"
+            f"spread={record['spread_percent']} "
+            f"ticks10={ticks_last_10min} "
+            f"ticks30={ticks_last_30min} "
+            f"ticks60={ticks_last_60min} "
+            f"rvol={record['time_of_day_rvol']}"
         )
         self._log_progress(total)
 
@@ -510,7 +534,7 @@ class Stage2LiquidityGate:
         print(
             "Stage 2 thresholds: "
             f"spread<={self.config.stage2_max_spread_percent}%, "
-            f"ticks/hr>={self.config.stage2_min_ticks_per_hour}, "
+            f"ticks/10min>={self.config.stage2_min_ticks_last_10min}, "
             f"rvol>={self.config.stage2_min_rvol}"
         )
 
@@ -531,13 +555,22 @@ class Stage2LiquidityGate:
         )
         tick_activity = self._summarize_tick_activity(tick_map)
         print(
-            "Stage 2 tick activity snapshot: "
-            f"count={tick_activity['count']}, "
-            f"min={tick_activity['min']}, "
-            f"median={tick_activity['median']}, "
-            f"p90={tick_activity['p90']}, "
-            f"max={tick_activity['max']}, "
-            f"avg={tick_activity['avg']}"
+            "Stage 2 tick activity snapshot [10m]: "
+            f"count={tick_activity['ticks_last_10min']['count']}, "
+            f"min={tick_activity['ticks_last_10min']['min']}, "
+            f"median={tick_activity['ticks_last_10min']['median']}, "
+            f"p90={tick_activity['ticks_last_10min']['p90']}, "
+            f"max={tick_activity['ticks_last_10min']['max']}, "
+            f"avg={tick_activity['ticks_last_10min']['avg']}"
+        )
+        print(
+            "Stage 2 tick activity snapshot [60m/day]: "
+            f"ticks60_median={tick_activity['ticks_last_60min']['median']}, "
+            f"ticks60_p90={tick_activity['ticks_last_60min']['p90']}, "
+            f"ticks60_max={tick_activity['ticks_last_60min']['max']}, "
+            f"today_median={tick_activity['ticks_today']['median']}, "
+            f"today_p90={tick_activity['ticks_today']['p90']}, "
+            f"today_max={tick_activity['ticks_today']['max']}"
         )
         if not tick_map:
             self._log_gate_result("tick_stats_present", False, "tick stats file not available yet")
@@ -702,6 +735,7 @@ class Stage2LiquidityGate:
             "status": "completed",
             "stage2_filters": self._build_stage2_filters_summary(),
             "tick_stats": tick_meta,
+            "tick_activity_summary": tick_activity,
             "filter_reason_counts": dict(self.filter_reasons),
             "fetch_failure_reason_counts": dict(self.fetch_failure_reasons),
             "requirements": {
