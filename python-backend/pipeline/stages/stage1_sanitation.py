@@ -33,6 +33,9 @@ class Stage1Sanitation:
         self.no_data_count = 0
         self.passed_count = 0
         self.sorted_out_count = 0
+        self.rate_limited_count = 0
+        self.insufficient_history_count = 0
+        self.true_no_data_count = 0
         self.failure_reasons: Counter[str] = Counter()
         self.failure_samples_logged = 0
         self.gsm_ids = set()
@@ -157,6 +160,13 @@ class Stage1Sanitation:
         reason = explicit_reason or self._normalize_failure_reason(resp)
         with self.lock:
             self.failure_reasons[reason] += 1
+            reason_lower = reason.lower()
+            if reason.startswith("insufficient_history_points="):
+                self.insufficient_history_count += 1
+            elif "dh-904" in reason_lower or "rate_limit" in reason_lower or "too many requests" in reason_lower:
+                self.rate_limited_count += 1
+            else:
+                self.true_no_data_count += 1
             if self.failure_samples_logged < 5:
                 debug = resp.get("_debug", {}) if isinstance(resp, dict) else {}
                 print(
@@ -254,6 +264,9 @@ class Stage1Sanitation:
         self.no_data_count = 0
         self.passed_count = 0
         self.sorted_out_count = 0
+        self.rate_limited_count = 0
+        self.insufficient_history_count = 0
+        self.true_no_data_count = 0
         self.failure_reasons = Counter()
         self.failure_samples_logged = 0
         self.gsm_ids = self.surveillance_service.load_gsm_ids()
@@ -341,6 +354,9 @@ class Stage1Sanitation:
             "historical_candidates": historical_total,
             "data_retrieved": len(all_records),
             "failed_fetch": failed_count,
+            "rate_limited_count": self.rate_limited_count,
+            "insufficient_history_count": self.insufficient_history_count,
+            "true_no_data_count": self.true_no_data_count,
             "stage1_passed": len(passed_records),
             "stage1_filters": {
                 "min_price": self.config.stage1_min_price,
@@ -383,6 +399,9 @@ class Stage1Sanitation:
         print(f"Missing OHLC: {prefilter_summary['missing_ohlc']}")
         print(f"Price Filtered Out: {prefilter_summary['price_filtered']}")
         print(f"Passed All Filters: {len(passed_records)}")
+        print(f"Rate Limited: {self.rate_limited_count}")
+        print(f"Insufficient History: {self.insufficient_history_count}")
+        print(f"True No Data / Fetch Failures: {self.true_no_data_count}")
         print(f"Pass Rate: {pass_rate:.1f}%")
         print(f"Time Taken: {elapsed_seconds:.1f} seconds ({elapsed_minutes:.1f} minutes)")
         print(f"Speed: {speed:.2f} stocks/second")
