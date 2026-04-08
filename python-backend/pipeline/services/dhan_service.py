@@ -1,4 +1,5 @@
 import math
+import random
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
@@ -29,6 +30,7 @@ class DhanService:
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.request_times = deque()
+        self.rate_limit_hits = deque()
         self.rate_condition = Condition()
         self.quote_request_gap = 1.1
 
@@ -90,6 +92,32 @@ class DhanService:
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
+    def _prune_rate_limit_hits(self, now: Optional[float] = None) -> None:
+        now = now or time.time()
+        window = self.config.rate_limit_cooldown_window_seconds
+        while self.rate_limit_hits and now - self.rate_limit_hits[0] > window:
+            self.rate_limit_hits.popleft()
+
+    def _compute_rate_limit_delay(self, attempt: int) -> float:
+        base_delay = min(
+            self.config.rate_limit_backoff_max_seconds,
+            self.config.rate_limit_backoff_base_seconds * (2 ** attempt),
+        )
+        jitter = random.uniform(0.0, self.config.rate_limit_backoff_jitter_seconds)
+        now = time.time()
+        self.rate_limit_hits.append(now)
+        self._prune_rate_limit_hits(now)
+
+        cooldown = 0.0
+        if len(self.rate_limit_hits) >= self.config.rate_limit_cooldown_trigger:
+            cooldown = self.config.rate_limit_cooldown_seconds + random.uniform(
+                0.0,
+                self.config.rate_limit_backoff_jitter_seconds,
+            )
+            self.rate_limit_hits.clear()
+
+        return base_delay + jitter + cooldown
+
     def acquire_data_slot(self) -> None:
         with self.rate_condition:
             while True:
@@ -136,7 +164,7 @@ class DhanService:
                     return resp
 
                 if self._is_rate_limited(resp):
-                    time.sleep(min(2.0, 0.4 * (attempt + 1)))
+                    time.sleep(self._compute_rate_limit_delay(attempt))
                     continue
                 break
 
@@ -177,7 +205,7 @@ class DhanService:
                     return resp
 
                 if self._is_rate_limited(resp):
-                    time.sleep(min(2.0, 0.4 * (attempt + 1)))
+                    time.sleep(self._compute_rate_limit_delay(attempt))
                     continue
                 break
 
@@ -282,4 +310,13 @@ class DhanService:
     def _is_rate_limited(self, resp: Dict[str, Any]) -> bool:
         remarks = str(resp.get("remarks", "")).lower()
         data_blob = str(resp.get("data", "")).lower()
-        return "too many requests" in remarks or "too many requests" in data_blob or "805" in remarks or "805" in data_blob
+        return (
+            "too many requests" in remarks
+            or "too many requests" in data_blob
+            or "dh-904" in remarks
+            or "dh-904" in data_blob
+            or "904" in remarks
+            or "904" in data_blob
+            or "805" in remarks
+            or "805" in data_blob
+        )
