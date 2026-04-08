@@ -40,3 +40,17 @@ services:
       - ./python-backend:/app/python-backend
       - ./:/app
     profiles: ["live"]
+
+  monitor-live:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_monitor_loop
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+    profiles: ["monitor"]
