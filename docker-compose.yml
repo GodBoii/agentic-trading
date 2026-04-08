@@ -12,3 +12,17 @@ services:
       - ./python-backend:/app/python-backend
       - ./:/app
     restart: unless-stopped
+
+  monitor:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_monitor_loop
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+    restart: unless-stopped

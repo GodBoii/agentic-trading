@@ -31,9 +31,9 @@ class Stage2LiquidityGate:
 
     def _build_stage2_filters_summary(self) -> Dict[str, Any]:
         return {
-            "max_spread_percent": self.config.stage2_max_spread_percent,
-            "min_ticks_last_10min": self.config.stage2_min_ticks_last_10min,
-            "min_time_of_day_rvol": self.config.stage2_min_rvol,
+            "max_spread_percent": self.config.monitor_max_spread_percent,
+            "min_ticks_last_10min": self.config.monitor_min_ticks_last_10min,
+            "min_time_of_day_rvol": self.config.monitor_min_rvol,
             "min_tick_stats_coverage_ratio": self.config.stage2_min_tick_stats_coverage_ratio,
             "max_tick_stats_staleness_seconds": self.config.stage2_max_tick_stats_staleness_seconds,
             "min_tick_collector_warmup_seconds": self.config.stage2_min_tick_collector_warmup_seconds,
@@ -44,8 +44,8 @@ class Stage2LiquidityGate:
         return hashlib.sha1(joined.encode("ascii")).hexdigest()[:16]
 
     def _save_payload(self, payload: Dict[str, Any]) -> None:
-        StorageService.save_snapshot(self.config.stage2_latest_path, payload)
-        daily_path = self.config.stage2_daily_path(self.market_time.market_date_str())
+        StorageService.save_snapshot(self.config.monitor_latest_path, payload)
+        daily_path = self.config.monitor_daily_path(self.market_time.market_date_str())
         StorageService.save_snapshot(daily_path, payload)
 
     def _log_gate_result(self, gate: str, ok: bool, detail: str) -> None:
@@ -143,7 +143,7 @@ class Stage2LiquidityGate:
         if extra_summary:
             summary.update(extra_summary)
 
-        payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", [])
+        payload = StorageService.build_payload("monitor_liquidity_gate", summary, "stocks", [])
         self._save_payload(payload)
         return payload
 
@@ -475,19 +475,19 @@ class Stage2LiquidityGate:
         if spread_percent is None:
             record["stage2_reason"] = "spread_unavailable"
             passed = False
-        elif spread_percent > self.config.stage2_max_spread_percent:
+        elif spread_percent > self.config.monitor_max_spread_percent:
             record["stage2_reason"] = "spread"
             passed = False
         elif ticks_last_10min is None:
             record["stage2_reason"] = "tick_rate_unavailable"
             passed = False
-        elif int(ticks_last_10min) < self.config.stage2_min_ticks_last_10min:
+        elif int(ticks_last_10min) < self.config.monitor_min_ticks_last_10min:
             record["stage2_reason"] = "tick_rate"
             passed = False
         elif rvol is None:
             record["stage2_reason"] = "time_of_day_rvol_unavailable"
             passed = False
-        elif rvol < self.config.stage2_min_rvol:
+        elif rvol < self.config.monitor_min_rvol:
             record["stage2_reason"] = "time_of_day_rvol"
             passed = False
 
@@ -509,7 +509,7 @@ class Stage2LiquidityGate:
 
     def run(self, max_stocks: Optional[int] = None, workers: Optional[int] = None) -> Dict[str, Any]:
         print("=" * 60)
-        print("STAGE 2 - HARD LIQUIDITY GATE (LIVE MARKET)")
+        print("MONITOR - LIVE LIQUIDITY GATE")
         print("=" * 60)
         print(f"Current market time: {self.market_time.market_status_text()}")
 
@@ -533,9 +533,9 @@ class Stage2LiquidityGate:
         print(f"Loaded {len(stage1_stocks)} Stage 1 survivor(s) for Stage 2")
         print(
             "Stage 2 thresholds: "
-            f"spread<={self.config.stage2_max_spread_percent}%, "
-            f"ticks/10min>={self.config.stage2_min_ticks_last_10min}, "
-            f"rvol>={self.config.stage2_min_rvol}"
+            f"spread<={self.config.monitor_max_spread_percent}%, "
+            f"ticks/10min>={self.config.monitor_min_ticks_last_10min}, "
+            f"rvol>={self.config.monitor_min_rvol}"
         )
 
         if not stage1_stocks:
@@ -744,16 +744,16 @@ class Stage2LiquidityGate:
             },
         }
 
-        payload = StorageService.build_payload("stage2_liquidity_gate", summary, "stocks", passed_records)
+        payload = StorageService.build_payload("monitor_liquidity_gate", summary, "stocks", passed_records)
         self._save_payload(payload)
 
-        daily_path = self.config.stage2_daily_path(self.market_time.market_date_str())
+        daily_path = self.config.monitor_daily_path(self.market_time.market_date_str())
         print("\nStage 2 complete")
         print(f"Passed Stage 2: {len(passed_records)}")
         print(f"Stage 2 records evaluated: {len(all_records)}")
         print(f"Stage 2 records skipped / fetch failed: {failed_count}")
         print(f"Saved official daily snapshot: {daily_path.name}")
-        print(f"Saved latest snapshot: {self.config.stage2_latest_path.name}")
+        print(f"Saved latest snapshot: {self.config.monitor_latest_path.name}")
 
         if self.filter_reasons:
             print("\nTop Stage 2 Filter Reasons:")
