@@ -8,11 +8,32 @@ from pipeline.stages.stage1_sanitation import Stage1Sanitation
 from pipeline.stages.stage2_liquidity_gate import Stage2LiquidityGate
 
 
+def ensure_current_stage1_snapshot(config: PipelineConfig) -> str:
+    clock = MarketTimeService(config)
+    market_date = clock.market_date_str()
+    stage1_daily_path = config.stage1_daily_path(market_date)
+    if stage1_daily_path.exists():
+        print(
+            f"Stage 1 daily output found: {stage1_daily_path.name}. "
+            "Skipping Stage 1 and continuing."
+        )
+        return market_date
+
+    print(
+        f"Stage 1 daily output not found: {stage1_daily_path.name}. "
+        "Running Stage 1 now."
+    )
+    Stage1Sanitation(config).run()
+    print("Stage 1 finished for current market date.")
+    return market_date
+
+
 def run_stage2_loop(config: PipelineConfig) -> None:
     stage2 = Stage2LiquidityGate(config)
 
     while True:
         print("\nStarting Stage 2 cycle...")
+        ensure_current_stage1_snapshot(config)
         stage2.run()
         print(
             f"Sleeping for {config.stage2_loop_interval_seconds} seconds before next Stage 2 cycle..."
@@ -23,26 +44,14 @@ def run_stage2_loop(config: PipelineConfig) -> None:
 def main() -> None:
     config = PipelineConfig()
     clock = MarketTimeService(config)
-    market_date = clock.market_date_str()
 
     print("=" * 60)
     print("TRADING BACKEND ORCHESTRATOR")
     print("=" * 60)
     print(f"Current market time: {clock.market_status_text()}")
 
-    stage1_daily_path = config.stage1_daily_path(market_date)
-    if stage1_daily_path.exists():
-        print(
-            f"Stage 1 daily output found: {stage1_daily_path.name}. "
-            "Skipping Stage 1 and continuing to Stage 2."
-        )
-    else:
-        print(
-            f"Stage 1 daily output not found: {stage1_daily_path.name}. "
-            "Running Stage 1 now."
-        )
-        Stage1Sanitation(config).run()
-        print("Stage 1 finished for today. Continuing to Stage 2.")
+    ensure_current_stage1_snapshot(config)
+    print("Stage 1 is ready. Continuing to Stage 2.")
 
     tick_thread = threading.Thread(
         target=TickCollector(config).run,
@@ -51,6 +60,7 @@ def main() -> None:
     )
     tick_thread.start()
     print("Tick collector started. Entering Stage 2 live loop.")
+    print(f"Stage 2 loop interval: {config.stage2_loop_interval_seconds} seconds")
 
     run_stage2_loop(config)
 

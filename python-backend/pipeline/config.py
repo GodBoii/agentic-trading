@@ -22,12 +22,22 @@ class PipelineConfig:
     stage2_min_ticks_per_hour: int = 500
     stage2_min_rvol: float = 1.0
     stage2_quote_batch_size: int = 1000
+    stage2_min_tick_stats_coverage_ratio: float = 0.90
+    stage2_max_tick_stats_staleness_seconds: int = 120
+    stage2_min_tick_collector_warmup_seconds: int = 120
+    tick_collector_refresh_check_interval_seconds: int = 30
 
-    historical_rate_limit_per_sec: int = 5
-    stage1_workers: int = 20
-    stage2_workers: int = 20
+    historical_rate_limit_per_sec: int = 4
+    stage1_workers: int = 8
+    stage2_workers: int = 8
     stage2_loop_interval_seconds: int = 600
     tick_stats_save_interval_seconds: int = 30
+    rate_limit_backoff_base_seconds: float = 0.5
+    rate_limit_backoff_max_seconds: float = 8.0
+    rate_limit_backoff_jitter_seconds: float = 0.35
+    rate_limit_cooldown_trigger: int = 6
+    rate_limit_cooldown_window_seconds: int = 15
+    rate_limit_cooldown_seconds: float = 6.0
     market_timezone: str = "Asia/Calcutta"
     market_open_hour: int = 9
     market_open_minute: int = 15
