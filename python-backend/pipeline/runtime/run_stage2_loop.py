@@ -2,12 +2,12 @@ import time
 
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_backend import ensure_current_stage1_snapshot
-from pipeline.stages.stage2_liquidity_gate import Stage2LiquidityGate
+from pipeline.stages.stage2_momentum_ignition import Stage2MomentumIgnition
 
 
 if __name__ == "__main__":
     config = PipelineConfig()
-    stage2 = Stage2LiquidityGate(config)
+    stage2 = Stage2MomentumIgnition(config)
 
     while True:
         print("\nStarting Stage 2 cycle...")
