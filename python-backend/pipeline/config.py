@@ -12,6 +12,7 @@ class PipelineConfig:
     stage1_latest_path: Path = backend_dir / "stage1_universe_latest.json"
     stage2_latest_path: Path = backend_dir / "stage2_liquidity_latest.json"
     tick_stats_latest_path: Path = backend_dir / "stage2_tick_stats_latest.json"
+    tick_stats_history_latest_path: Path = backend_dir / "stage2_tick_stats_history_latest.json"
 
     stage1_min_price: float = 100.0
     stage1_max_price: float = 3000.0
@@ -19,7 +20,7 @@ class PipelineConfig:
     stage1_min_atr_percent: float = 1.5
 
     stage2_max_spread_percent: float = 0.30
-    stage2_min_ticks_per_hour: int = 500
+    stage2_min_ticks_last_10min: int = 50
     stage2_min_rvol: float = 1.0
     stage2_quote_batch_size: int = 1000
     stage2_min_tick_stats_coverage_ratio: float = 0.90
@@ -32,6 +33,7 @@ class PipelineConfig:
     stage2_workers: int = 8
     stage2_loop_interval_seconds: int = 600
     tick_stats_save_interval_seconds: int = 30
+    tick_stats_history_save_interval_seconds: int = 600
     rate_limit_backoff_base_seconds: float = 0.5
     rate_limit_backoff_max_seconds: float = 8.0
     rate_limit_backoff_jitter_seconds: float = 0.35
@@ -54,3 +56,8 @@ class PipelineConfig:
         if market_date:
             return self.backend_dir / f"stage2-tick-stats-{market_date}.json"
         return self.tick_stats_latest_path
+
+    def tick_stats_history_daily_path(self, market_date: Optional[str] = None) -> Path:
+        if market_date:
+            return self.backend_dir / f"stage2-tick-history-{market_date}.json"
+        return self.tick_stats_history_latest_path

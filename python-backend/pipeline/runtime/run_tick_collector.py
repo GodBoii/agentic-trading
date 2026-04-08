@@ -19,12 +19,18 @@ class Stage1UniverseChanged(RuntimeError):
 
 
 class TickCollector:
+    WINDOW_10_MIN_SECONDS = 10 * 60
+    WINDOW_30_MIN_SECONDS = 30 * 60
+    WINDOW_60_MIN_SECONDS = 60 * 60
+
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.dhan = DhanService(config)
         self.market_time = MarketTimeService(config)
         self.tick_windows: DefaultDict[int, deque] = defaultdict(deque)
+        self.tick_totals_today: DefaultDict[int, int] = defaultdict(int)
         self.last_save = 0.0
+        self.last_history_save = 0.0
         self.last_refresh_check = 0.0
         self.current_market_date: Optional[str] = None
         self.current_security_ids: Tuple[int, ...] = tuple()
@@ -96,7 +102,9 @@ class TickCollector:
             self.current_instruments = instruments
             self.collector_started_at = datetime.now(timezone.utc)
             self.tick_windows.clear()
+            self.tick_totals_today.clear()
             self.last_save = 0.0
+            self.last_history_save = 0.0
             raise Stage1UniverseChanged(
                 f"new Stage 1 universe detected for {market_date} with {len(instruments)} instrument(s)"
             )
@@ -104,11 +112,78 @@ class TickCollector:
         return self.current_instruments
 
     def prune(self) -> None:
-        cutoff = time.time() - 3600
+        cutoff = time.time() - self.WINDOW_60_MIN_SECONDS
         for security_id in list(self.tick_windows.keys()):
             window = self.tick_windows[security_id]
             while window and window[0] < cutoff:
                 window.popleft()
+
+    def _build_tick_metrics(self) -> Dict[str, Dict[str, int]]:
+        now = time.time()
+        cutoff_10 = now - self.WINDOW_10_MIN_SECONDS
+        cutoff_30 = now - self.WINDOW_30_MIN_SECONDS
+        metrics: Dict[str, Dict[str, int]] = {}
+
+        for security_id in self.current_security_ids:
+            window = self.tick_windows.get(security_id, deque())
+            ticks_last_10min = sum(1 for ts in window if ts >= cutoff_10)
+            ticks_last_30min = sum(1 for ts in window if ts >= cutoff_30)
+            ticks_last_60min = len(window)
+            metrics[str(security_id)] = {
+                "ticks_last_10min": ticks_last_10min,
+                "ticks_last_30min": ticks_last_30min,
+                "ticks_last_60min": ticks_last_60min,
+                "ticks_today": int(self.tick_totals_today.get(security_id, 0)),
+            }
+
+        return metrics
+
+    def _build_snapshot_payload(self) -> Dict:
+        collector_uptime_seconds = max(
+            0.0,
+            (datetime.now(timezone.utc) - self.collector_started_at).total_seconds(),
+        )
+        return {
+            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "collector_started_at_utc": self.collector_started_at.isoformat(),
+            "collector_uptime_seconds": round(collector_uptime_seconds, 1),
+            "collector_universe_size": len(self.current_security_ids),
+            "collector_universe_signature": self._compute_universe_signature(self.current_security_ids),
+            "tick_stats": self._build_tick_metrics(),
+        }
+
+    def _append_history_checkpoint(self, payload: Dict) -> None:
+        now = time.time()
+        if now - self.last_history_save < self.config.tick_stats_history_save_interval_seconds:
+            return
+
+        market_date = self.market_time.market_date_str()
+        history_path = self.config.tick_stats_history_daily_path(market_date)
+        history_payload = StorageService.load_snapshot(history_path) or {
+            "stage": "tick_stats_history",
+            "market_date": market_date,
+            "collector_started_at_utc": payload.get("collector_started_at_utc"),
+            "collector_universe_size": payload.get("collector_universe_size"),
+            "collector_universe_signature": payload.get("collector_universe_signature"),
+            "checkpoints": [],
+        }
+
+        history_payload["market_date"] = market_date
+        history_payload["collector_started_at_utc"] = payload.get("collector_started_at_utc")
+        history_payload["collector_universe_size"] = payload.get("collector_universe_size")
+        history_payload["collector_universe_signature"] = payload.get("collector_universe_signature")
+        history_payload["generated_at_utc"] = payload.get("generated_at_utc")
+        history_payload.setdefault("checkpoints", []).append(
+            {
+                "generated_at_utc": payload.get("generated_at_utc"),
+                "collector_uptime_seconds": payload.get("collector_uptime_seconds"),
+                "tick_stats": payload.get("tick_stats", {}),
+            }
+        )
+
+        StorageService.save_snapshot(self.config.tick_stats_history_latest_path, history_payload)
+        StorageService.save_snapshot(history_path, history_payload)
+        self.last_history_save = now
 
     def save_stats(self) -> None:
         now = time.time()
@@ -116,21 +191,13 @@ class TickCollector:
             return
 
         self.prune()
-        payload = {
-            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-            "collector_started_at_utc": self.collector_started_at.isoformat(),
-            "collector_universe_size": len(self.current_security_ids),
-            "collector_universe_signature": self._compute_universe_signature(self.current_security_ids),
-            "tick_stats": {
-                str(security_id): {"ticks_last_hour": len(window)}
-                for security_id, window in self.tick_windows.items()
-            },
-        }
+        payload = self._build_snapshot_payload()
         StorageService.save_snapshot(self.config.tick_stats_latest_path, payload)
         StorageService.save_snapshot(
             self.config.tick_stats_daily_path(self.market_time.market_date_str()),
             payload,
         )
+        self._append_history_checkpoint(payload)
         self.last_save = now
         print(f"Saved tick stats for {len(payload['tick_stats'])} securities")
 
@@ -144,6 +211,7 @@ class TickCollector:
             return
 
         self.tick_windows[security_id].append(time.time())
+        self.tick_totals_today[security_id] += 1
         self.save_stats()
 
     def _close_feed(self, feed) -> None:
