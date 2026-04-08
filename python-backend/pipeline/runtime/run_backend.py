@@ -1,11 +1,9 @@
-import threading
 import time
 
 from pipeline.config import PipelineConfig
-from pipeline.runtime.run_tick_collector import TickCollector
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.stages.stage1_sanitation import Stage1Sanitation
-from pipeline.stages.stage2_liquidity_gate import Stage2LiquidityGate
+from pipeline.stages.stage2_momentum_ignition import Stage2MomentumIgnition
 
 
 def ensure_current_stage1_snapshot(config: PipelineConfig) -> str:
@@ -29,7 +27,7 @@ def ensure_current_stage1_snapshot(config: PipelineConfig) -> str:
 
 
 def run_stage2_loop(config: PipelineConfig) -> None:
-    stage2 = Stage2LiquidityGate(config)
+    stage2 = Stage2MomentumIgnition(config)
 
     while True:
         print("\nStarting Stage 2 cycle...")
@@ -52,14 +50,7 @@ def main() -> None:
 
     ensure_current_stage1_snapshot(config)
     print("Stage 1 is ready. Continuing to Stage 2.")
-
-    tick_thread = threading.Thread(
-        target=TickCollector(config).run,
-        name="tick-collector",
-        daemon=True,
-    )
-    tick_thread.start()
-    print("Tick collector started. Entering Stage 2 live loop.")
+    print("Entering Stage 2 momentum loop.")
     print(f"Stage 2 loop interval: {config.stage2_loop_interval_seconds} seconds")
 
     run_stage2_loop(config)
