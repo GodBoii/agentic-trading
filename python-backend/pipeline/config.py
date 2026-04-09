@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -56,6 +57,9 @@ class PipelineConfig:
     rate_limit_cooldown_seconds: float = 6.0
     shared_rate_limit_window_seconds: float = 1.0
     shared_rate_limit_poll_seconds: float = 0.05
+    market_data_gateway_host: str = "0.0.0.0"
+    market_data_gateway_port: int = 8010
+    market_data_gateway_timeout_seconds: float = 30.0
     market_timezone: str = "Asia/Calcutta"
     market_open_hour: int = 9
     market_open_minute: int = 15
@@ -80,3 +84,9 @@ class PipelineConfig:
         if market_date:
             return self.backend_dir / f"stage2-tick-history-{market_date}.json"
         return self.tick_stats_history_latest_path
+
+    def market_data_gateway_url(self) -> Optional[str]:
+        explicit = os.getenv("MARKET_DATA_GATEWAY_URL")
+        if explicit:
+            return explicit.rstrip("/")
+        return None
