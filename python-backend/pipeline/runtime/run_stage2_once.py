@@ -1,5 +1,5 @@
 from pipeline.config import PipelineConfig
-from pipeline.runtime.run_backend import ensure_current_stage1_snapshot
+from pipeline.runtime.run_sorting import ensure_current_stage1_snapshot
 from pipeline.stages.stage2_momentum_ignition import Stage2MomentumIgnition
 
 
