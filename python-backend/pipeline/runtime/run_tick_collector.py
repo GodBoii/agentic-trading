@@ -14,7 +14,7 @@ from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
 
-class Stage1UniverseChanged(RuntimeError):
+class MonitoredUniverseChanged(RuntimeError):
     pass
 
 
@@ -45,14 +45,14 @@ class TickCollector:
             return str(summary_market_date)
         return StorageService.snapshot_market_date(payload, self.config.market_timezone)
 
-    def _load_stage1_payload_for_current_date(self) -> Optional[Dict]:
+    def _load_stage2_payload_for_current_date(self) -> Optional[Dict]:
         market_date = self.market_time.market_date_str()
-        stage1_path = self.config.stage1_daily_path(market_date)
-        payload = StorageService.load_snapshot(stage1_path)
+        stage2_path = self.config.stage2_daily_path(market_date)
+        payload = StorageService.load_snapshot(stage2_path)
         if payload:
             return payload
 
-        latest_payload = StorageService.load_snapshot(self.config.stage1_latest_path)
+        latest_payload = StorageService.load_snapshot(self.config.stage2_latest_path)
         if self._payload_market_date(latest_payload) == market_date:
             return latest_payload
         return None
@@ -70,7 +70,7 @@ class TickCollector:
         joined = ",".join(str(security_id) for security_id in security_ids)
         return hashlib.sha1(joined.encode("ascii")).hexdigest()[:16]
 
-    def _refresh_stage1_instruments(self, force: bool = False) -> List[tuple]:
+    def _refresh_monitored_instruments(self, force: bool = False) -> List[tuple]:
         now = time.time()
         if (
             not force
@@ -80,11 +80,11 @@ class TickCollector:
             return self.current_instruments
 
         self.last_refresh_check = now
-        payload = self._load_stage1_payload_for_current_date()
+        payload = self._load_stage2_payload_for_current_date()
         if not payload:
             if self.current_instruments:
                 return self.current_instruments
-            raise FileNotFoundError("Stage 1 snapshot not found for current market date.")
+            raise FileNotFoundError("Stage 2 snapshot not found for current market date.")
 
         market_date = self.market_time.market_date_str()
         security_ids, instruments = self._build_instruments(payload)
@@ -105,8 +105,8 @@ class TickCollector:
             self.tick_totals_today.clear()
             self.last_save = 0.0
             self.last_history_save = 0.0
-            raise Stage1UniverseChanged(
-                f"new Stage 1 universe detected for {market_date} with {len(instruments)} instrument(s)"
+            raise MonitoredUniverseChanged(
+                f"new Stage 2 shortlist detected for {market_date} with {len(instruments)} instrument(s)"
             )
 
         return self.current_instruments
@@ -228,16 +228,16 @@ class TickCollector:
         while True:
             feed = None
             try:
-                instruments = self._refresh_stage1_instruments(force=True)
+                instruments = self._refresh_monitored_instruments(force=True)
                 if not instruments:
-                    print("Tick collector is idle because Stage 1 has no survivors yet.")
+                    print("Tick collector is idle because Stage 2 has no shortlisted stocks yet.")
                     while True:
-                        self._refresh_stage1_instruments(force=True)
+                        self._refresh_monitored_instruments(force=True)
                         self.save_stats()
                         time.sleep(self.config.tick_stats_save_interval_seconds)
 
                 print(
-                    f"Starting tick collector for {len(instruments)} Stage 1 stocks "
+                    f"Starting tick collector for {len(instruments)} Stage 2 stocks "
                     f"(market_date={self.current_market_date})"
                 )
                 sink = StringIO()
@@ -246,17 +246,17 @@ class TickCollector:
                     feed.run_forever()
 
                 while True:
-                    self._refresh_stage1_instruments()
+                    self._refresh_monitored_instruments()
                     packet = feed.get_data()
                     if isinstance(packet, dict):
                         self.record_packet(packet)
-            except Stage1UniverseChanged as exc:
+            except MonitoredUniverseChanged as exc:
                 self._close_feed(feed)
-                print(f"Tick collector reloading after Stage 1 snapshot change: {exc}")
+                print(f"Tick collector reloading after Stage 2 shortlist change: {exc}")
                 time.sleep(1)
             except FileNotFoundError as exc:
                 self._close_feed(feed)
-                print(f"Tick collector waiting for Stage 1 snapshot: {exc}")
+                print(f"Tick collector waiting for Stage 2 snapshot: {exc}")
                 time.sleep(self.config.tick_stats_save_interval_seconds)
             except Exception as exc:
                 self._close_feed(feed)

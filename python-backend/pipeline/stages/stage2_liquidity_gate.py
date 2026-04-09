@@ -15,7 +15,7 @@ from pipeline.services.storage_service import StorageService
 class Stage2LiquidityGate:
     """
     Live-market stage.
-    Uses Stage 1 survivors + live quote data + rolling tick stats + intraday minute history.
+    Uses Stage 2 momentum shortlist + live quote data + rolling tick stats + intraday minute history.
     """
 
     def __init__(self, config: Optional[PipelineConfig] = None):
@@ -129,12 +129,12 @@ class Stage2LiquidityGate:
         extra_summary: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         summary = {
-            "input_stage1_count": input_count,
+            "input_stage2_count": input_count,
             "data_retrieved": data_retrieved,
             "failed_fetch": failed_fetch,
-            "stage2_passed": 0,
+            "monitor_passed": 0,
             "status": status,
-            "stage2_filters": self._build_stage2_filters_summary(),
+            "monitor_filters": self._build_stage2_filters_summary(),
             "requirements": {
                 "tick_collector_required": True,
                 "live_market_required": True,
@@ -155,23 +155,23 @@ class Stage2LiquidityGate:
             return str(summary_market_date)
         return StorageService.snapshot_market_date(payload, self.config.market_timezone)
 
-    def _load_stage1_universe(self) -> List[Dict[str, Any]]:
+    def _load_stage2_shortlist(self) -> List[Dict[str, Any]]:
         market_date = self.market_time.market_date_str()
-        stage1_path = self.config.stage1_daily_path(market_date)
-        payload = StorageService.load_snapshot(stage1_path)
+        stage2_path = self.config.stage2_daily_path(market_date)
+        payload = StorageService.load_snapshot(stage2_path)
 
         if not payload:
-            latest_payload = StorageService.load_snapshot(self.config.stage1_latest_path)
+            latest_payload = StorageService.load_snapshot(self.config.stage2_latest_path)
             if self._payload_market_date(latest_payload) == market_date:
                 payload = latest_payload
                 print(
-                    f"Using latest Stage 1 snapshot for current market date {market_date} "
-                    f"from {self.config.stage1_latest_path.name}"
+                    f"Using latest Stage 2 snapshot for current market date {market_date} "
+                    f"from {self.config.stage2_latest_path.name}"
                 )
 
         if not payload:
             raise FileNotFoundError(
-                f"Stage 1 snapshot not found: {stage1_path}. Run Stage 1 before Stage 2."
+                f"Stage 2 snapshot not found: {stage2_path}. Run Stage 2 before monitor."
             )
         return payload.get("stocks", [])
 
@@ -520,17 +520,17 @@ class Stage2LiquidityGate:
         self.filter_reasons = Counter()
         self.fetch_failure_reasons = Counter()
         print("Stage 2 execution plan:")
-        print("  1. Load Stage 1 survivors for current market date")
+        print("  1. Load Stage 2 momentum shortlist for current market date")
         print("  2. Validate tick stats freshness, warmup, coverage, and universe sync")
         print("  3. Fetch live quote snapshots and inspect spread availability")
         print("  4. Fetch intraday minute history for each stock")
         print("  5. Apply spread, tick-rate, and RVOL filters")
 
-        stage1_stocks = self._load_stage1_universe()
+        stage2_stocks = self._load_stage2_shortlist()
         if max_stocks:
-            stage1_stocks = stage1_stocks[:max_stocks]
-            print(f"TEST MODE: limiting Stage 2 to first {max_stocks} Stage 1 stocks")
-        print(f"Loaded {len(stage1_stocks)} Stage 1 survivor(s) for Stage 2")
+            stage2_stocks = stage2_stocks[:max_stocks]
+            print(f"TEST MODE: limiting monitor to first {max_stocks} Stage 2 stocks")
+        print(f"Loaded {len(stage2_stocks)} Stage 2 shortlisted stock(s) for monitor")
         print(
             "Stage 2 thresholds: "
             f"spread<={self.config.monitor_max_spread_percent}%, "
@@ -538,12 +538,12 @@ class Stage2LiquidityGate:
             f"rvol>={self.config.monitor_min_rvol}"
         )
 
-        if not stage1_stocks:
-            payload = self._build_skip_payload("no_stage1_stocks", 0)
-            print("Stage 2 skipped because Stage 1 produced zero survivors.")
+        if not stage2_stocks:
+            payload = self._build_skip_payload("no_stage2_shortlist", 0)
+            print("Monitor skipped because Stage 2 produced zero shortlisted stocks.")
             return payload
 
-        expected_security_ids = {int(stock["security_id"]) for stock in stage1_stocks}
+        expected_security_ids = {int(stock["security_id"]) for stock in stage2_stocks}
         expected_universe_signature = self._compute_universe_signature(expected_security_ids)
         tick_map, tick_meta = self._load_tick_stats(expected_security_ids)
         print(
@@ -576,10 +576,10 @@ class Stage2LiquidityGate:
             self._log_gate_result("tick_stats_present", False, "tick stats file not available yet")
             payload = self._build_skip_payload(
                 "waiting_for_tick_stats",
-                len(stage1_stocks),
+                len(stage2_stocks),
                 extra_summary={"tick_stats": tick_meta},
             )
-            print("Stage 2 skipped because tick stats are not available yet.")
+            print("Monitor skipped because tick stats are not available yet.")
             return payload
         self._log_gate_result("tick_stats_present", True, "tick stats file loaded")
 
@@ -594,10 +594,10 @@ class Stage2LiquidityGate:
             )
             payload = self._build_skip_payload(
                 "waiting_for_fresh_tick_stats",
-                len(stage1_stocks),
+                len(stage2_stocks),
                 extra_summary={"tick_stats": tick_meta},
             )
-            print("Stage 2 skipped because tick stats are stale.")
+            print("Monitor skipped because tick stats are stale.")
             return payload
         self._log_gate_result(
             "tick_stats_freshness",
@@ -616,10 +616,10 @@ class Stage2LiquidityGate:
             )
             payload = self._build_skip_payload(
                 "waiting_for_tick_stats_warmup",
-                len(stage1_stocks),
+                len(stage2_stocks),
                 extra_summary={"tick_stats": tick_meta},
             )
-            print("Stage 2 skipped because the tick collector is still warming up.")
+            print("Monitor skipped because the tick collector is still warming up.")
             return payload
         self._log_gate_result(
             "tick_collector_warmup",
@@ -635,10 +635,10 @@ class Stage2LiquidityGate:
             )
             payload = self._build_skip_payload(
                 "waiting_for_tick_stats_coverage",
-                len(stage1_stocks),
+                len(stage2_stocks),
                 extra_summary={"tick_stats": tick_meta},
             )
-            print("Stage 2 skipped because tick stats coverage is too low.")
+            print("Monitor skipped because tick stats coverage is too low.")
             return payload
         self._log_gate_result(
             "tick_stats_coverage",
@@ -655,10 +655,10 @@ class Stage2LiquidityGate:
             )
             payload = self._build_skip_payload(
                 "waiting_for_tick_stats_universe_sync",
-                len(stage1_stocks),
+                len(stage2_stocks),
                 extra_summary={"tick_stats": tick_meta},
             )
-            print("Stage 2 skipped because tick stats still belong to a different Stage 1 universe.")
+            print("Monitor skipped because tick stats still belong to a different Stage 2 shortlist.")
             return payload
         self._log_gate_result(
             "tick_stats_universe_sync",
@@ -666,16 +666,16 @@ class Stage2LiquidityGate:
             f"signature={collector_signature or expected_universe_signature}",
         )
 
-        quote_map = self._fetch_live_quotes(stage1_stocks)
+        quote_map = self._fetch_live_quotes(stage2_stocks)
         print(f"Loaded live quote snapshots for {len(quote_map)} security id(s)")
         if not quote_map:
             self._log_gate_result("quote_snapshot", False, "no quote data returned")
             payload = self._build_skip_payload(
                 "quote_fetch_failed",
-                len(stage1_stocks),
-                failed_fetch=len(stage1_stocks),
+                len(stage2_stocks),
+                failed_fetch=len(stage2_stocks),
             )
-            print("Stage 2 skipped because live quote data could not be fetched.")
+            print("Monitor skipped because live quote data could not be fetched.")
             return payload
         self._log_gate_result("quote_snapshot", True, f"quotes_loaded={len(quote_map)}")
         quote_summary = self._summarize_quote_map(quote_map)
@@ -687,7 +687,7 @@ class Stage2LiquidityGate:
             f"spread_missing={quote_summary['spread_missing']}"
         )
 
-        total = len(stage1_stocks)
+        total = len(stage2_stocks)
         print(
             f"Stage 2 historical refinement starting for {total} stock(s) "
             f"with {workers} worker(s) and shared rate limit {self.config.historical_rate_limit_per_sec}/sec"
@@ -703,7 +703,7 @@ class Stage2LiquidityGate:
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
                 executor.submit(self._process_stock, stock, quote_map, tick_map, idx, total): stock
-                for idx, stock in enumerate(stage1_stocks, 1)
+                for idx, stock in enumerate(stage2_stocks, 1)
             }
             for future in as_completed(futures):
                 try:
@@ -728,12 +728,12 @@ class Stage2LiquidityGate:
         )
 
         summary = {
-            "input_stage1_count": total,
+            "input_stage2_count": total,
             "data_retrieved": len(all_records),
             "failed_fetch": failed_count,
-            "stage2_passed": len(passed_records),
+            "monitor_passed": len(passed_records),
             "status": "completed",
-            "stage2_filters": self._build_stage2_filters_summary(),
+            "monitor_filters": self._build_stage2_filters_summary(),
             "tick_stats": tick_meta,
             "tick_activity_summary": tick_activity,
             "filter_reason_counts": dict(self.filter_reasons),
@@ -748,10 +748,10 @@ class Stage2LiquidityGate:
         self._save_payload(payload)
 
         daily_path = self.config.monitor_daily_path(self.market_time.market_date_str())
-        print("\nStage 2 complete")
-        print(f"Passed Stage 2: {len(passed_records)}")
-        print(f"Stage 2 records evaluated: {len(all_records)}")
-        print(f"Stage 2 records skipped / fetch failed: {failed_count}")
+        print("\nMonitor complete")
+        print(f"Passed monitor gate: {len(passed_records)}")
+        print(f"Monitor records evaluated: {len(all_records)}")
+        print(f"Monitor records skipped / fetch failed: {failed_count}")
         print(f"Saved official daily snapshot: {daily_path.name}")
         print(f"Saved latest snapshot: {self.config.monitor_latest_path.name}")
 
