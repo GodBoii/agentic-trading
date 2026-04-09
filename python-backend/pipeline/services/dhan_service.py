@@ -8,6 +8,7 @@ from threading import Condition
 from typing import Any, DefaultDict, Dict, List, Optional
 
 import pandas as pd
+import requests
 from dhanhq import DhanContext, HistoricalData, MarketFeed, dhanhq
 from dotenv import dotenv_values
 
@@ -33,12 +34,13 @@ class DhanService:
         "OPTCUR",
     }
 
-    def __init__(self, config: PipelineConfig):
+    def __init__(self, config: PipelineConfig, prefer_gateway: bool = True):
         self.config = config
         self.request_times = deque()
         self.rate_limit_hits = deque()
         self.rate_condition = Condition()
         self.quote_request_gap = 1.1
+        self.prefer_gateway = prefer_gateway
 
         root_env = dotenv_values(config.root_dir / ".env")
         backend_env = dotenv_values(config.backend_dir / ".env")
@@ -58,6 +60,13 @@ class DhanService:
         self.market_api = dhanhq(self.dhan_context)
         self.historical_api = HistoricalData(self.dhan_context)
         self.login_api = self.dhan_context.get_dhan_login()
+        self.gateway_url = (
+            self.config.market_data_gateway_url()
+            if self.prefer_gateway
+            else None
+        )
+        self.gateway_timeout_seconds = self.config.market_data_gateway_timeout_seconds
+        self.gateway_session = requests.Session() if self.gateway_url else None
 
     def _normalize_historical_instruments(self, instrument_candidates: Optional[List[str]]) -> List[str]:
         # Dhan historical API accepts Dhan instrument names (e.g. EQUITY), not exchange-type tags like ES.
@@ -92,11 +101,29 @@ class DhanService:
         }
 
     def fetch_user_profile(self) -> Dict[str, Any]:
+        if self.gateway_url:
+            response = self._gateway_post("/v1/user-profile", {})
+            return response if isinstance(response, dict) else {"status": "failure", "remarks": "invalid_gateway_response"}
         try:
             response = self.login_api.user_profile(self.access_token)
             return {"status": "success", "data": response}
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def _gateway_post(self, path: str, payload: Dict[str, Any]) -> Any:
+        if not self.gateway_url or not self.gateway_session:
+            raise RuntimeError("Market data gateway is not configured.")
+
+        response = self.gateway_session.post(
+            f"{self.gateway_url}{path}",
+            json=payload,
+            timeout=self.gateway_timeout_seconds,
+        )
+        response.raise_for_status()
+        body = response.json()
+        if not body.get("ok", False):
+            raise RuntimeError(str(body.get("error", "gateway_error")))
+        return body.get("data")
 
     def _prune_rate_limit_hits(self, now: Optional[float] = None) -> None:
         now = now or time.time()
@@ -196,6 +223,18 @@ class DhanService:
         exchange_segment: str = "BSE_EQ",
         instrument_candidates: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
+        if self.gateway_url:
+            return self._gateway_post(
+                "/v1/daily-history",
+                {
+                    "security_id": security_id,
+                    "days": days,
+                    "retries": retries,
+                    "exchange_segment": exchange_segment,
+                    "instrument_candidates": instrument_candidates,
+                },
+            )
+
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days)
         last_response = None
@@ -236,6 +275,19 @@ class DhanService:
         exchange_segment: str = "BSE_EQ",
         instrument_candidates: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
+        if self.gateway_url:
+            return self._gateway_post(
+                "/v1/intraday-history",
+                {
+                    "security_id": security_id,
+                    "days": days,
+                    "interval": interval,
+                    "retries": retries,
+                    "exchange_segment": exchange_segment,
+                    "instrument_candidates": instrument_candidates,
+                },
+            )
+
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days)
         last_response = None
@@ -269,6 +321,13 @@ class DhanService:
         return last_response
 
     def fetch_quote_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        if self.gateway_url:
+            response = self._gateway_post("/v1/quote-batch", {"security_ids": security_ids})
+            return {
+                int(raw_security_id): value
+                for raw_security_id, value in (response or {}).items()
+            }
+
         self.acquire_data_slot()
         time.sleep(self.quote_request_gap)
         resp = self.market_api.quote_data({"BSE_EQ": security_ids})
@@ -285,6 +344,13 @@ class DhanService:
         return parsed
 
     def fetch_ohlc_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        if self.gateway_url:
+            response = self._gateway_post("/v1/ohlc-batch", {"security_ids": security_ids})
+            return {
+                int(raw_security_id): value
+                for raw_security_id, value in (response or {}).items()
+            }
+
         self.acquire_data_slot()
         time.sleep(self.quote_request_gap)
         resp = self.market_api.ohlc_data({"BSE_EQ": security_ids})

@@ -1,4 +1,18 @@
 services:
+  market-data-gateway:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_market_data_gateway
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -7,7 +21,11 @@ services:
       - python-backend/.env
       - .env
     working_dir: /app/python-backend
+    environment:
+      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
     command: python -m pipeline.runtime.run_backend
+    depends_on:
+      - market-data-gateway
     volumes:
       - ./python-backend:/app/python-backend
       - ./:/app
@@ -21,7 +39,11 @@ services:
       - python-backend/.env
       - .env
     working_dir: /app/python-backend
+    environment:
+      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
     command: python -m pipeline.runtime.run_monitor_loop
+    depends_on:
+      - market-data-gateway
     volumes:
       - ./python-backend:/app/python-backend
       - ./:/app
