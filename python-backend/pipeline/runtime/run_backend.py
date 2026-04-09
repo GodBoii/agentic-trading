@@ -48,6 +48,28 @@ def wait_for_current_stage1_snapshot(
     return market_date
 
 
+def wait_for_current_stage2_snapshot(
+    config: PipelineConfig,
+    poll_seconds: int = 15,
+) -> str:
+    clock = MarketTimeService(config)
+    market_date = clock.market_date_str()
+    stage2_daily_path = config.stage2_daily_path(market_date)
+
+    while not stage2_daily_path.exists():
+        print(
+            f"Stage 2 daily output not found yet: {stage2_daily_path.name}. "
+            f"Waiting {poll_seconds}s for backend to produce it."
+        )
+        time.sleep(poll_seconds)
+
+    print(
+        f"Stage 2 daily output found: {stage2_daily_path.name}. "
+        "Using it for the current market date."
+    )
+    return market_date
+
+
 def run_stage2_loop(config: PipelineConfig) -> None:
     stage2 = Stage2MomentumIgnition(config)
 
