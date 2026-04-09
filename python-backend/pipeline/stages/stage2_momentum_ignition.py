@@ -34,12 +34,44 @@ class Stage2MomentumIgnition:
         self.filter_reasons: Counter[str] = Counter()
         self.fetch_failure_reasons: Counter[str] = Counter()
 
+    def _summarize_numeric_series(self, values: List[float]) -> Dict[str, Any]:
+        if not values:
+            return {
+                "count": 0,
+                "min": None,
+                "median": None,
+                "p90": None,
+                "max": None,
+                "avg": None,
+            }
+
+        ordered = sorted(values)
+        count = len(ordered)
+
+        def percentile(pct: float) -> float:
+            index = int(round((count - 1) * pct))
+            return ordered[index]
+
+        return {
+            "count": count,
+            "min": round(ordered[0], 4),
+            "median": round(percentile(0.50), 4),
+            "p90": round(percentile(0.90), 4),
+            "max": round(ordered[-1], 4),
+            "avg": round(sum(ordered) / count, 4),
+        }
+
     def _build_filters_summary(self) -> Dict[str, Any]:
         return {
             "history_days": self.config.stage2_history_days,
             "min_time_of_day_rvol": self.config.stage2_min_rvol,
             "min_price_vs_vwap_percent": self.config.stage2_min_price_vs_vwap_percent,
             "min_volume_acceleration_ratio": self.config.stage2_min_volume_acceleration_ratio,
+            "volume_acceleration_window_minutes": self.config.stage2_volume_acceleration_window_minutes,
+            "volume_acceleration_denominator_floor_fraction": (
+                self.config.stage2_volume_acceleration_denominator_floor_fraction
+            ),
+            "volume_acceleration_max_ratio": self.config.stage2_volume_acceleration_max_ratio,
             "opening_range_minutes": self.config.stage2_opening_range_minutes,
             "min_breakout_percent": self.config.stage2_min_breakout_percent,
         }
@@ -171,15 +203,114 @@ class Stage2MomentumIgnition:
         return opening_high, opening_low, is_complete
 
     def _compute_volume_acceleration_ratio(self, today_frame: pd.DataFrame) -> Optional[float]:
-        if today_frame.empty or len(today_frame) < 10:
+        window = self.config.stage2_volume_acceleration_window_minutes
+        if today_frame.empty or len(today_frame) < window * 2:
             return None
 
         volume_series = pd.to_numeric(today_frame["volume"], errors="coerce").fillna(0.0)
-        recent = float(volume_series.tail(5).sum())
-        previous = float(volume_series.iloc[-10:-5].sum())
-        if previous <= 0:
-            return None if recent <= 0 else float("inf")
-        return recent / previous
+        recent = float(volume_series.tail(window).sum())
+        previous = float(volume_series.iloc[-(window * 2):-window].sum())
+        if recent <= 0:
+            return None
+
+        positive_minutes = volume_series[volume_series > 0]
+        per_minute_baseline = float(positive_minutes.median()) if not positive_minutes.empty else 0.0
+        denominator_floor = max(
+            1.0,
+            per_minute_baseline
+            * window
+            * self.config.stage2_volume_acceleration_denominator_floor_fraction,
+        )
+        adjusted_previous = max(previous, denominator_floor)
+        ratio = recent / adjusted_previous
+        return min(ratio, self.config.stage2_volume_acceleration_max_ratio)
+
+    def _build_stage_funnel_counts(
+        self,
+        total: int,
+        records: List[Dict[str, Any]],
+        failed_fetch: int,
+    ) -> Dict[str, int]:
+        reasons = Counter(
+            str(record.get("stage2_reason"))
+            for record in records
+            if record.get("stage2_reason")
+        )
+        after_rvol = total - failed_fetch - (
+            reasons.get("time_of_day_rvol_unavailable", 0) + reasons.get("time_of_day_rvol", 0)
+        )
+        after_vwap = after_rvol - (
+            reasons.get("vwap_unavailable", 0) + reasons.get("below_vwap", 0)
+        )
+        after_opening_range = after_vwap - (
+            reasons.get("opening_range_incomplete", 0) + reasons.get("opening_range_breakout", 0)
+        )
+        after_volume_acceleration = after_opening_range - (
+            reasons.get("volume_acceleration_unavailable", 0) + reasons.get("volume_acceleration", 0)
+        )
+
+        return {
+            "input_stage1_count": total,
+            "after_fetch": total - failed_fetch,
+            "after_rvol": max(0, after_rvol),
+            "after_vwap": max(0, after_vwap),
+            "after_opening_range": max(0, after_opening_range),
+            "after_volume_acceleration": max(0, after_volume_acceleration),
+            "passed": max(0, after_volume_acceleration),
+        }
+
+    def _near_miss_gap(self, record: Dict[str, Any]) -> Optional[float]:
+        reason = record.get("stage2_reason")
+        if reason == "time_of_day_rvol" and record.get("time_of_day_rvol") is not None:
+            return max(0.0, self.config.stage2_min_rvol - float(record["time_of_day_rvol"]))
+        if reason == "below_vwap" and record.get("price_vs_vwap_percent") is not None:
+            return max(
+                0.0,
+                self.config.stage2_min_price_vs_vwap_percent - float(record["price_vs_vwap_percent"]),
+            )
+        if reason == "opening_range_breakout" and record.get("opening_range_breakout_percent") is not None:
+            return max(
+                0.0,
+                self.config.stage2_min_breakout_percent - float(record["opening_range_breakout_percent"]),
+            )
+        if reason == "volume_acceleration" and record.get("volume_acceleration_ratio") is not None:
+            return max(
+                0.0,
+                self.config.stage2_min_volume_acceleration_ratio - float(record["volume_acceleration_ratio"]),
+            )
+        return None
+
+    def _build_near_misses(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        near_misses: List[Tuple[float, Dict[str, Any]]] = []
+        for record in records:
+            if record.get("stage2_reason") in {
+                "time_of_day_rvol",
+                "below_vwap",
+                "opening_range_breakout",
+                "volume_acceleration",
+            }:
+                gap = self._near_miss_gap(record)
+                if gap is None:
+                    continue
+                near_misses.append((gap, record))
+
+        near_misses.sort(key=lambda item: (item[0], -(float(item[1].get("time_of_day_rvol") or 0.0))))
+        result: List[Dict[str, Any]] = []
+        for gap, record in near_misses[: self.config.stage2_near_miss_limit]:
+            result.append(
+                {
+                    "security_id": record.get("security_id"),
+                    "display_name": record.get("display_name"),
+                    "symbol": record.get("symbol"),
+                    "stage2_reason": record.get("stage2_reason"),
+                    "miss_gap": round(gap, 4),
+                    "time_of_day_rvol": record.get("time_of_day_rvol"),
+                    "price_vs_vwap_percent": record.get("price_vs_vwap_percent"),
+                    "opening_range_breakout_percent": record.get("opening_range_breakout_percent"),
+                    "volume_acceleration_ratio": record.get("volume_acceleration_ratio"),
+                }
+            )
+        return result
 
     def _score_record(self, record: Dict[str, Any]) -> float:
         rvol = float(record.get("time_of_day_rvol") or 0.0)
@@ -237,6 +368,14 @@ class Stage2MomentumIgnition:
         vwap = self._compute_intraday_vwap(today_frame)
         opening_high, opening_low, opening_range_complete = self._compute_opening_range(today_frame)
         volume_acceleration_ratio = self._compute_volume_acceleration_ratio(today_frame)
+        accel_window = self.config.stage2_volume_acceleration_window_minutes
+        volume_series = pd.to_numeric(today_frame["volume"], errors="coerce").fillna(0.0)
+        recent_volume_window = float(volume_series.tail(accel_window).sum()) if not volume_series.empty else None
+        previous_volume_window = (
+            float(volume_series.iloc[-(accel_window * 2):-accel_window].sum())
+            if len(volume_series) >= accel_window * 2
+            else None
+        )
 
         price_vs_vwap_percent = None
         if vwap and vwap > 0:
@@ -272,11 +411,11 @@ class Stage2MomentumIgnition:
                 and opening_range_breakout_percent >= self.config.stage2_min_breakout_percent
             ),
             "volume_acceleration_ratio": (
-                round(volume_acceleration_ratio, 4)
-                if volume_acceleration_ratio is not None and math.isfinite(volume_acceleration_ratio)
-                else (
-                    "inf" if volume_acceleration_ratio and not math.isfinite(volume_acceleration_ratio) else None
-                )
+                round(volume_acceleration_ratio, 4) if volume_acceleration_ratio is not None else None
+            ),
+            "recent_volume_window": round(recent_volume_window, 2) if recent_volume_window is not None else None,
+            "previous_volume_window": (
+                round(previous_volume_window, 2) if previous_volume_window is not None else None
             ),
             "stage2_reason": None,
             "stage2_score": None,
@@ -411,6 +550,11 @@ class Stage2MomentumIgnition:
                     print(f"Stage 2 task error: {exc}")
 
         passed_records.sort(key=lambda row: -float(row.get("stage2_score") or 0.0))
+        stage_funnel = self._build_stage_funnel_counts(total, all_records, failed_count)
+        score_distribution = self._summarize_numeric_series(
+            [float(row.get("stage2_score") or 0.0) for row in passed_records]
+        )
+        near_misses = self._build_near_misses(all_records)
 
         summary = {
             "market_date": self.market_time.market_date_str(),
@@ -420,6 +564,9 @@ class Stage2MomentumIgnition:
             "stage2_passed": len(passed_records),
             "status": "completed",
             "stage2_filters": self._build_filters_summary(),
+            "stage_funnel_counts": stage_funnel,
+            "score_distribution": score_distribution,
+            "near_misses": near_misses,
             "filter_reason_counts": dict(self.filter_reasons),
             "fetch_failure_reason_counts": dict(self.fetch_failure_reasons),
         }
@@ -440,6 +587,27 @@ class Stage2MomentumIgnition:
         print(f"Saved official daily snapshot: {daily_path.name}")
         print(f"Saved latest snapshot: {self.config.stage2_latest_path.name}")
 
+        print("\nStage 2 Funnel:")
+        print("-" * 60)
+        print(f"Input Stage 1 count: {stage_funnel['input_stage1_count']}")
+        print(f"After fetch: {stage_funnel['after_fetch']}")
+        print(f"After RVOL: {stage_funnel['after_rvol']}")
+        print(f"After VWAP: {stage_funnel['after_vwap']}")
+        print(f"After Opening Range: {stage_funnel['after_opening_range']}")
+        print(f"After Volume Acceleration: {stage_funnel['after_volume_acceleration']}")
+
+        if score_distribution["count"] > 0:
+            print("\nStage 2 Score Distribution:")
+            print("-" * 60)
+            print(
+                f"count={score_distribution['count']} "
+                f"min={score_distribution['min']} "
+                f"median={score_distribution['median']} "
+                f"p90={score_distribution['p90']} "
+                f"max={score_distribution['max']} "
+                f"avg={score_distribution['avg']}"
+            )
+
         if passed_records:
             print("\nTop Stage 2 Momentum Candidates:")
             print("-" * 60)
@@ -458,6 +626,20 @@ class Stage2MomentumIgnition:
             print("-" * 60)
             for reason, count in self.filter_reasons.most_common(5):
                 print(f"{count} -> {reason}")
+
+        if near_misses:
+            print("\nTop Stage 2 Near Misses:")
+            print("-" * 60)
+            for idx, record in enumerate(near_misses[:5], 1):
+                print(
+                    f"{idx}. {record.get('display_name') or record.get('symbol')} "
+                    f"reason={record.get('stage2_reason')} "
+                    f"gap={record.get('miss_gap')} "
+                    f"rvol={record.get('time_of_day_rvol')} "
+                    f"vwap_delta={record.get('price_vs_vwap_percent')} "
+                    f"orb={record.get('opening_range_breakout_percent')} "
+                    f"vol_accel={record.get('volume_acceleration_ratio')}"
+                )
 
         if self.fetch_failure_reasons:
             print("\nTop Stage 2 Fetch Failures:")
