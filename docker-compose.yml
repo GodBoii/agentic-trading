@@ -13,7 +13,7 @@ services:
       - ./:/app
     restart: unless-stopped
 
-  backend:
+  sorting:
     build:
       context: .
       dockerfile: python-backend/Dockerfile
@@ -23,7 +23,7 @@ services:
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    command: python -m pipeline.runtime.run_backend
+    command: python -m pipeline.runtime.run_sorting
     depends_on:
       - market-data-gateway
     volumes:
