@@ -29,7 +29,7 @@ class Stage2LiquidityGate:
         self.filter_reasons: Counter[str] = Counter()
         self.fetch_failure_reasons: Counter[str] = Counter()
 
-    def _build_stage2_filters_summary(self) -> Dict[str, Any]:
+    def _build_monitor_filters_summary(self) -> Dict[str, Any]:
         return {
             "max_spread_percent": self.config.monitor_max_spread_percent,
             "min_ticks_last_10min": self.config.monitor_min_ticks_last_10min,
@@ -50,7 +50,7 @@ class Stage2LiquidityGate:
 
     def _log_gate_result(self, gate: str, ok: bool, detail: str) -> None:
         status = "PASS" if ok else "WAIT"
-        print(f"Stage 2 gate [{gate}]: {status} | {detail}")
+        print(f"Monitor gate [{gate}]: {status} | {detail}")
 
     def _summarize_numeric_series(self, values: List[int]) -> Dict[str, Any]:
         if not values:
@@ -134,7 +134,7 @@ class Stage2LiquidityGate:
             "failed_fetch": failed_fetch,
             "monitor_passed": 0,
             "status": status,
-            "monitor_filters": self._build_stage2_filters_summary(),
+            "monitor_filters": self._build_monitor_filters_summary(),
             "requirements": {
                 "tick_collector_required": True,
                 "live_market_required": True,
@@ -281,15 +281,15 @@ class Stage2LiquidityGate:
             now = time.time()
             if now - self.last_heartbeat_ts >= 30:
                 self.last_heartbeat_ts = now
-                print(f"Stage 2 still running... {self.progress}/{total} processed")
+                print(f"Monitor still running... {self.progress}/{total} processed")
             if decile > self.last_reported_decile:
                 self.last_reported_decile = decile
-                print(f"Stage 2 {decile * 10}% done... ({self.progress}/{total})")
+                print(f"Monitor {decile * 10}% done... ({self.progress}/{total})")
 
     def _fetch_live_quotes(self, stocks: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
         batches = self._chunk_ids(stocks, self.config.stage2_quote_batch_size)
         live_quotes: Dict[int, Dict[str, Any]] = {}
-        print(f"Fetching Stage 2 live quote snapshots in {len(batches)} batch(es)...")
+        print(f"Fetching monitor live quote snapshots in {len(batches)} batch(es)...")
 
         for index, batch in enumerate(batches, 1):
             batch_ids = [int(stock["security_id"]) for stock in batch]
@@ -407,11 +407,11 @@ class Stage2LiquidityGate:
         total: int,
     ) -> Tuple[Optional[Dict[str, Any]], bool]:
         security_id = int(stock["security_id"])
-        print(f"Stage 2 processing {stock.get('symbol') or security_id} ({security_id})...")
+        print(f"Monitor processing {stock.get('symbol') or security_id} ({security_id})...")
         quote_item = quote_map.get(security_id)
         if not quote_item:
             self._record_fetch_failure("quote_missing")
-            print(f"Stage 2 skip {security_id}: no live quote found")
+            print(f"Monitor skip {security_id}: no live quote found")
             self._log_progress(total)
             return None, False
 
@@ -435,14 +435,14 @@ class Stage2LiquidityGate:
         if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
             reason = self._normalize_failure_reason(intraday_resp)
             self._record_fetch_failure(f"intraday_history_failed::{reason}")
-            print(f"Stage 2 skip {security_id}: intraday history fetch failed")
+            print(f"Monitor skip {security_id}: intraday history fetch failed")
             self._log_progress(total)
             return None, False
 
         intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
         if intraday_frame.empty:
             self._record_fetch_failure("intraday_history_empty")
-            print(f"Stage 2 skip {security_id}: intraday history frame empty")
+            print(f"Monitor skip {security_id}: intraday history frame empty")
             self._log_progress(total)
             return None, False
 
@@ -496,7 +496,7 @@ class Stage2LiquidityGate:
 
         status_text = "PASS" if passed else f"FILTERED ({record['stage2_reason']})"
         print(
-            f"Stage 2 result {security_id}: {status_text} | "
+            f"Monitor result {security_id}: {status_text} | "
             f"spread={record['spread_percent']} "
             f"ticks10={ticks_last_10min} "
             f"ticks30={ticks_last_30min} "
@@ -519,7 +519,7 @@ class Stage2LiquidityGate:
         self.last_heartbeat_ts = time.time()
         self.filter_reasons = Counter()
         self.fetch_failure_reasons = Counter()
-        print("Stage 2 execution plan:")
+        print("Monitor execution plan:")
         print("  1. Load Stage 2 momentum shortlist for current market date")
         print("  2. Validate tick stats freshness, warmup, coverage, and universe sync")
         print("  3. Fetch live quote snapshots and inspect spread availability")
@@ -532,7 +532,7 @@ class Stage2LiquidityGate:
             print(f"TEST MODE: limiting monitor to first {max_stocks} Stage 2 stocks")
         print(f"Loaded {len(stage2_stocks)} Stage 2 shortlisted stock(s) for monitor")
         print(
-            "Stage 2 thresholds: "
+            "Monitor thresholds: "
             f"spread<={self.config.monitor_max_spread_percent}%, "
             f"ticks/10min>={self.config.monitor_min_ticks_last_10min}, "
             f"rvol>={self.config.monitor_min_rvol}"
@@ -555,7 +555,7 @@ class Stage2LiquidityGate:
         )
         tick_activity = self._summarize_tick_activity(tick_map)
         print(
-            "Stage 2 tick activity snapshot [10m]: "
+            "Monitor tick activity snapshot [10m]: "
             f"count={tick_activity['ticks_last_10min']['count']}, "
             f"min={tick_activity['ticks_last_10min']['min']}, "
             f"median={tick_activity['ticks_last_10min']['median']}, "
@@ -564,7 +564,7 @@ class Stage2LiquidityGate:
             f"avg={tick_activity['ticks_last_10min']['avg']}"
         )
         print(
-            "Stage 2 tick activity snapshot [60m/day]: "
+            "Monitor tick activity snapshot [60m/day]: "
             f"ticks60_median={tick_activity['ticks_last_60min']['median']}, "
             f"ticks60_p90={tick_activity['ticks_last_60min']['p90']}, "
             f"ticks60_max={tick_activity['ticks_last_60min']['max']}, "
@@ -680,7 +680,7 @@ class Stage2LiquidityGate:
         self._log_gate_result("quote_snapshot", True, f"quotes_loaded={len(quote_map)}")
         quote_summary = self._summarize_quote_map(quote_map)
         print(
-            "Stage 2 quote snapshot summary: "
+            "Monitor quote snapshot summary: "
             f"quotes={quote_summary['quotes']}, "
             f"ltp_available={quote_summary['last_price_available']}, "
             f"spread_available={quote_summary['spread_available']}, "
@@ -689,11 +689,11 @@ class Stage2LiquidityGate:
 
         total = len(stage2_stocks)
         print(
-            f"Stage 2 historical refinement starting for {total} stock(s) "
+            f"Monitor historical refinement starting for {total} stock(s) "
             f"with {workers} worker(s) and shared rate limit {self.config.historical_rate_limit_per_sec}/sec"
         )
         print(
-            "Stage 2 live processing starting: "
+            "Monitor live processing starting: "
             "each stock will fetch intraday history, compute RVOL, and emit PASS/FILTERED/SKIP"
         )
         all_records: List[Dict[str, Any]] = []
@@ -717,7 +717,7 @@ class Stage2LiquidityGate:
                 except Exception as exc:
                     failed_count += 1
                     self._record_fetch_failure(f"task_error::{type(exc).__name__}")
-                    print(f"Stage 2 task error: {exc}")
+                    print(f"Monitor task error: {exc}")
 
         passed_records.sort(
             key=lambda row: (
@@ -733,7 +733,7 @@ class Stage2LiquidityGate:
             "failed_fetch": failed_count,
             "monitor_passed": len(passed_records),
             "status": "completed",
-            "monitor_filters": self._build_stage2_filters_summary(),
+            "monitor_filters": self._build_monitor_filters_summary(),
             "tick_stats": tick_meta,
             "tick_activity_summary": tick_activity,
             "filter_reason_counts": dict(self.filter_reasons),
@@ -756,13 +756,13 @@ class Stage2LiquidityGate:
         print(f"Saved latest snapshot: {self.config.monitor_latest_path.name}")
 
         if self.filter_reasons:
-            print("\nTop Stage 2 Filter Reasons:")
+            print("\nTop Monitor Filter Reasons:")
             print("-" * 60)
             for reason, count in self.filter_reasons.most_common(5):
                 print(f"{count} -> {reason}")
 
         if self.fetch_failure_reasons:
-            print("\nTop Stage 2 Fetch Failures:")
+            print("\nTop Monitor Fetch Failures:")
             print("-" * 60)
             for reason, count in self.fetch_failure_reasons.most_common(5):
                 print(f"{count} -> {reason}")
