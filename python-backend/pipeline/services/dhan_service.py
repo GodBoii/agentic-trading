@@ -1,3 +1,4 @@
+import json
 import math
 import random
 import time
@@ -11,6 +12,11 @@ from dhanhq import DhanContext, HistoricalData, MarketFeed, dhanhq
 from dotenv import dotenv_values
 
 from pipeline.config import PipelineConfig
+
+try:
+    import fcntl  # type: ignore
+except Exception:  # pragma: no cover - non-posix fallback
+    fcntl = None
 
 
 class DhanService:
@@ -119,6 +125,10 @@ class DhanService:
         return base_delay + jitter + cooldown
 
     def acquire_data_slot(self) -> None:
+        self._acquire_shared_data_slot()
+        self._acquire_local_data_slot()
+
+    def _acquire_local_data_slot(self) -> None:
         with self.rate_condition:
             while True:
                 now = time.time()
@@ -130,6 +140,53 @@ class DhanService:
                     return
                 wait_time = max(0.01, 1.0 - (now - self.request_times[0]))
                 self.rate_condition.wait(timeout=wait_time)
+
+    def _acquire_shared_data_slot(self) -> None:
+        if fcntl is None:
+            return
+
+        state_path = self.config.dhan_rate_limit_state_path
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        if not state_path.exists():
+            state_path.write_text('{"request_times": []}', encoding="utf-8")
+
+        window_seconds = self.config.shared_rate_limit_window_seconds
+        poll_seconds = self.config.shared_rate_limit_poll_seconds
+
+        while True:
+            with state_path.open("r+", encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    raw = handle.read().strip()
+                    payload = json.loads(raw) if raw else {"request_times": []}
+                except json.JSONDecodeError:
+                    payload = {"request_times": []}
+
+                now = time.time()
+                request_times = [
+                    float(item)
+                    for item in payload.get("request_times", [])
+                    if now - float(item) < window_seconds
+                ]
+
+                if len(request_times) < self.config.historical_rate_limit_per_sec:
+                    request_times.append(now)
+                    handle.seek(0)
+                    handle.truncate()
+                    json.dump({"request_times": request_times}, handle)
+                    handle.flush()
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    return
+
+                oldest = request_times[0]
+                wait_time = max(poll_seconds, window_seconds - (now - oldest))
+                handle.seek(0)
+                handle.truncate()
+                json.dump({"request_times": request_times}, handle)
+                handle.flush()
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+            time.sleep(wait_time)
 
     def fetch_daily_history(
         self,
@@ -212,6 +269,7 @@ class DhanService:
         return last_response
 
     def fetch_quote_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        self.acquire_data_slot()
         time.sleep(self.quote_request_gap)
         resp = self.market_api.quote_data({"BSE_EQ": security_ids})
         if str(resp.get("status", "")).lower() != "success":
@@ -227,6 +285,7 @@ class DhanService:
         return parsed
 
     def fetch_ohlc_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        self.acquire_data_slot()
         time.sleep(self.quote_request_gap)
         resp = self.market_api.ohlc_data({"BSE_EQ": security_ids})
         if str(resp.get("status", "")).lower() != "success":

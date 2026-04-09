@@ -14,6 +14,7 @@ class PipelineConfig:
     monitor_latest_path: Path = backend_dir / "monitor_liquidity_latest.json"
     tick_stats_latest_path: Path = backend_dir / "stage2_tick_stats_latest.json"
     tick_stats_history_latest_path: Path = backend_dir / "stage2_tick_stats_history_latest.json"
+    dhan_rate_limit_state_path: Path = backend_dir / "dhan_rate_limit_state.json"
 
     stage1_min_price: float = 100.0
     stage1_max_price: float = 3000.0
@@ -26,6 +27,10 @@ class PipelineConfig:
     stage2_min_volume_acceleration_ratio: float = 1.1
     stage2_opening_range_minutes: int = 15
     stage2_min_breakout_percent: float = 0.0
+    stage2_volume_acceleration_window_minutes: int = 5
+    stage2_volume_acceleration_denominator_floor_fraction: float = 0.35
+    stage2_volume_acceleration_max_ratio: float = 8.0
+    stage2_near_miss_limit: int = 10
     stage2_quote_batch_size: int = 1000
 
     monitor_max_spread_percent: float = 0.30
@@ -49,6 +54,8 @@ class PipelineConfig:
     rate_limit_cooldown_trigger: int = 6
     rate_limit_cooldown_window_seconds: int = 15
     rate_limit_cooldown_seconds: float = 6.0
+    shared_rate_limit_window_seconds: float = 1.0
+    shared_rate_limit_poll_seconds: float = 0.05
     market_timezone: str = "Asia/Calcutta"
     market_open_hour: int = 9
     market_open_minute: int = 15
