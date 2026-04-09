@@ -2,7 +2,7 @@ import threading
 import time
 
 from pipeline.config import PipelineConfig
-from pipeline.runtime.run_backend import wait_for_current_stage2_snapshot
+from pipeline.runtime.run_sorting import wait_for_current_stage2_snapshot
 from pipeline.runtime.run_tick_collector import TickCollector
 from pipeline.stages.stage2_liquidity_gate import Stage2LiquidityGate
 
