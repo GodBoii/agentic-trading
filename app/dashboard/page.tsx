@@ -8,6 +8,7 @@ import TradingStatus from '@/components/trading-status'
 import FundsCard from '@/components/funds-card'
 import HoldingsCard from '@/components/holdings-card'
 import PositionsCard from '@/components/positions-card'
+import ArchitectureSVG from '@/components/architecture-svg'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,6 +159,17 @@ function DashboardContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                     <DhanConnect />
                     <TradingStatus />
+                </div>
+                
+                {/* Architecture Visualizer */}
+                <div className="mb-12">
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="w-3 h-3 bg-[#7C3AED]"></div>
+                        <h2 className="text-3xl font-bold text-brutal-cream uppercase tracking-tight">
+                            Neural Processing Core
+                        </h2>
+                    </div>
+                    <ArchitectureSVG />
                 </div>
 
                 {/* Portfolio Section */}
