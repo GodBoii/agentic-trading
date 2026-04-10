@@ -57,6 +57,15 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
             "/v1/ohlc-batch": lambda body: self.dhan.fetch_ohlc_batch(
                 [int(item) for item in body.get("security_ids", [])]
             ),
+            "/v1/option-chain/expiry-list": lambda body: self.dhan.fetch_option_chain_expiry_list(
+                int(body["under_security_id"]),
+                str(body.get("under_exchange_segment", "IDX_I")),
+            ),
+            "/v1/option-chain": lambda body: self.dhan.fetch_option_chain(
+                int(body["under_security_id"]),
+                str(body.get("under_exchange_segment", "IDX_I")),
+                str(body["expiry"]),
+            ),
         }
 
         if path not in routes:

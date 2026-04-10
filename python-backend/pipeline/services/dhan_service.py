@@ -9,7 +9,7 @@ from typing import Any, DefaultDict, Dict, List, Optional
 
 import pandas as pd
 import requests
-from dhanhq import DhanContext, HistoricalData, MarketFeed, dhanhq
+from dhanhq import DhanContext, HistoricalData, MarketFeed, OptionChain, dhanhq
 from dotenv import dotenv_values
 
 from pipeline.config import PipelineConfig
@@ -40,6 +40,8 @@ class DhanService:
         self.rate_limit_hits = deque()
         self.rate_condition = Condition()
         self.quote_request_gap = 1.1
+        self.option_chain_request_gap = 3.1
+        self.last_option_chain_request_ts = 0.0
         self.prefer_gateway = prefer_gateway
 
         root_env = dotenv_values(config.root_dir / ".env")
@@ -59,6 +61,7 @@ class DhanService:
         self.dhan_context = DhanContext(self.client_id, self.access_token)
         self.market_api = dhanhq(self.dhan_context)
         self.historical_api = HistoricalData(self.dhan_context)
+        self.option_chain_api = OptionChain(self.dhan_context)
         self.login_api = self.dhan_context.get_dhan_login()
         self.gateway_url = (
             self.config.market_data_gateway_url()
@@ -365,6 +368,60 @@ class DhanService:
             except Exception:
                 continue
         return parsed
+
+    def _enforce_option_chain_gap(self) -> None:
+        now = time.time()
+        wait_time = self.option_chain_request_gap - (now - self.last_option_chain_request_ts)
+        if wait_time > 0:
+            time.sleep(wait_time)
+        self.last_option_chain_request_ts = time.time()
+
+    def fetch_option_chain_expiry_list(
+        self,
+        under_security_id: int,
+        under_exchange_segment: str,
+    ) -> Dict[str, Any]:
+        if self.gateway_url:
+            response = self._gateway_post(
+                "/v1/option-chain/expiry-list",
+                {
+                    "under_security_id": under_security_id,
+                    "under_exchange_segment": under_exchange_segment,
+                },
+            )
+            return response if isinstance(response, dict) else {"status": "failure", "data": response}
+
+        self.acquire_data_slot()
+        self._enforce_option_chain_gap()
+        return self.option_chain_api.expiry_list(
+            int(under_security_id),
+            str(under_exchange_segment),
+        )
+
+    def fetch_option_chain(
+        self,
+        under_security_id: int,
+        under_exchange_segment: str,
+        expiry: str,
+    ) -> Dict[str, Any]:
+        if self.gateway_url:
+            response = self._gateway_post(
+                "/v1/option-chain",
+                {
+                    "under_security_id": under_security_id,
+                    "under_exchange_segment": under_exchange_segment,
+                    "expiry": expiry,
+                },
+            )
+            return response if isinstance(response, dict) else {"status": "failure", "data": response}
+
+        self.acquire_data_slot()
+        self._enforce_option_chain_gap()
+        return self.option_chain_api.option_chain(
+            int(under_security_id),
+            str(under_exchange_segment),
+            str(expiry),
+        )
 
     def build_marketfeed(self, instruments: List[tuple]) -> MarketFeed:
         return MarketFeed(self.dhan_context, instruments, version="v2")
