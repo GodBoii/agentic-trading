@@ -15,9 +15,7 @@
     { "name": "nifty_energy", "exchange": "NSE", "symbol": "NIFTY ENERGY" },
     { "name": "nifty_psu_bank", "exchange": "NSE", "symbol": "NIFTY PSU BANK" },
     { "name": "nifty_pvt_bank", "exchange": "NSE", "symbol": "NIFTY PVT BANK" },
-    { "name": "nifty_fin_service", "exchange": "NSE", "symbol": "NIFTY FINSRV25 50" },
-    { "name": "bse_midcap", "exchange": "BSE", "symbol": "MIDCAP" },
-    { "name": "bse_smallcap", "exchange": "BSE", "symbol": "SMLCAP" }
+    { "name": "nifty_fin_service", "exchange": "NSE", "symbol": "NIFTY FINSRV25 50" }
   ],
   "index_futures": [
     { "name": "nifty_future", "exchange": "NSE", "underlying_symbol": "NIFTY" },

@@ -191,6 +191,8 @@ class MarketRegimeAnalyzer:
             "security_id": security_id,
             "symbol": source_meta["symbol"],
             "display_name": source_meta["display_name"],
+            "underlying_symbol": source_meta.get("underlying_symbol"),
+            "expiry_date": source_meta.get("expiry_date"),
             "latest_price": round(latest_price, 4),
             "open_price": round(open_price, 4),
             "intraday_vwap": round(vwap, 4) if vwap is not None else None,
@@ -308,6 +310,9 @@ class MarketRegimeAnalyzer:
             return 0.0
         return sum(1 for row in rows if row.get(key)) / len(rows)
 
+    def _normalized_symbol(self, value: Optional[str]) -> str:
+        return str(value or "").strip().upper().replace(" ", "")
+
     def _classify_regime(
         self,
         session_state: Dict[str, Any],
@@ -351,28 +356,28 @@ class MarketRegimeAnalyzer:
         )
 
         futures_alignment_score = 0.0
+        futures_compared = 0
+        futures_aligned = 0
         if futures:
-            aligned = 0
-            compared = 0
             primary_map = {
-                "NIFTY": next((row for row in directional_indices if row["symbol"] == "NIFTY"), None),
-                "BANKNIFTY": next((row for row in directional_indices if row["symbol"] == "BANKNIFTY"), None),
-                "SENSEX": next((row for row in directional_indices if row["symbol"] == "SENSEX"), None),
-                "MIDCPNIFTY": next((row for row in sector_indices if row["symbol"] == "MIDCPNIFTY"), None),
+                self._normalized_symbol(row.get("symbol")): row
+                for row in directional_indices + sector_indices
             }
             for future_row in futures:
-                underlying = future_row.get("underlying_symbol")
-                spot_row = primary_map.get(str(underlying))
+                underlying = self._normalized_symbol(future_row.get("underlying_symbol"))
+                spot_row = primary_map.get(underlying)
                 if not spot_row:
                     continue
                 future_move = float(future_row.get("day_change_percent") or 0.0)
                 spot_move = float(spot_row.get("day_change_percent") or 0.0)
                 if math.isclose(future_move, 0.0) or math.isclose(spot_move, 0.0):
                     continue
-                compared += 1
+                futures_compared += 1
                 if (future_move > 0 and spot_move > 0) or (future_move < 0 and spot_move < 0):
-                    aligned += 1
-            futures_alignment_score = aligned / compared if compared else 0.0
+                    futures_aligned += 1
+            futures_alignment_score = (
+                futures_aligned / futures_compared if futures_compared else 0.0
+            )
 
         vix_change = float(vix_snapshot.get("day_change_percent") or 0.0) if vix_snapshot else 0.0
         event_input = external_inputs.get("market_news", {})
@@ -419,7 +424,7 @@ class MarketRegimeAnalyzer:
             f"sector_breadth={round(sector_breadth, 4)}, "
             f"avg_sector_change={round(avg_sector_change, 4)}%, "
             f"avg_sector_vwap={round(avg_sector_vwap, 4)}%, "
-            f"futures_alignment={round(futures_alignment_score, 4)}, "
+            f"futures_alignment={round(futures_alignment_score, 4)} ({futures_aligned}/{futures_compared}), "
             f"vix_change={round(vix_change, 4)}%, "
             f"breakout_ratio={round(breakout_ratio, 4)}"
         )
@@ -427,6 +432,21 @@ class MarketRegimeAnalyzer:
             "market_regime": label,
             "confidence": round(confidence, 2),
             "reasoning_summary": summary,
+            "diagnostics": {
+                "avg_primary_change_percent": round(avg_primary_change, 4),
+                "avg_primary_vwap_percent": round(avg_primary_vwap, 4),
+                "primary_above_open_ratio": round(primary_above_open, 4),
+                "primary_above_vwap_ratio": round(primary_above_vwap, 4),
+                "sector_breadth_ratio": round(sector_breadth, 4),
+                "avg_sector_change_percent": round(avg_sector_change, 4),
+                "avg_sector_vwap_percent": round(avg_sector_vwap, 4),
+                "breakout_ratio": round(breakout_ratio, 4),
+                "futures_alignment_ratio": round(futures_alignment_score, 4),
+                "futures_alignment_count": futures_aligned,
+                "futures_compared_count": futures_compared,
+                "vix_change_percent": round(vix_change, 4),
+                "news_severity_score": round(news_severity, 4),
+            },
         }
 
     def _save_payload(self, payload: Dict[str, Any]) -> None:
@@ -499,6 +519,7 @@ class MarketRegimeAnalyzer:
                 "is_actionable": session_state["market_session"] == "live_market"
                 and not session_state["is_discovery_phase"],
                 "reasoning_summary": regime["reasoning_summary"],
+                "diagnostics": regime.get("diagnostics", {}),
             },
             "market_context": {
                 "session_state": session_state,
