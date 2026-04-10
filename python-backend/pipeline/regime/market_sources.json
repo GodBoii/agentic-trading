@@ -1,0 +1,28 @@
+{
+  "primary_indices": [
+    { "name": "nifty_50", "exchange": "NSE", "symbol": "NIFTY" },
+    { "name": "sensex", "exchange": "BSE", "symbol": "SENSEX" },
+    { "name": "bank_nifty", "exchange": "NSE", "symbol": "BANKNIFTY" },
+    { "name": "india_vix", "exchange": "NSE", "symbol": "INDIA VIX" }
+  ],
+  "sector_indices": [
+    { "name": "nifty_it", "exchange": "NSE", "symbol": "NIFTYIT" },
+    { "name": "nifty_pharma", "exchange": "NSE", "symbol": "NIFTY PHARMA" },
+    { "name": "nifty_auto", "exchange": "NSE", "symbol": "NIFTY AUTO" },
+    { "name": "nifty_fmcg", "exchange": "NSE", "symbol": "NIFTY FMCG" },
+    { "name": "nifty_metal", "exchange": "NSE", "symbol": "NIFTY METAL" },
+    { "name": "nifty_realty", "exchange": "NSE", "symbol": "NIFTY REALTY" },
+    { "name": "nifty_energy", "exchange": "NSE", "symbol": "NIFTY ENERGY" },
+    { "name": "nifty_psu_bank", "exchange": "NSE", "symbol": "NIFTY PSU BANK" },
+    { "name": "nifty_pvt_bank", "exchange": "NSE", "symbol": "NIFTY PVT BANK" },
+    { "name": "nifty_fin_service", "exchange": "NSE", "symbol": "NIFTY FINSRV25 50" },
+    { "name": "bse_midcap", "exchange": "BSE", "symbol": "MIDCAP" },
+    { "name": "bse_smallcap", "exchange": "BSE", "symbol": "SMLCAP" }
+  ],
+  "index_futures": [
+    { "name": "nifty_future", "exchange": "NSE", "underlying_symbol": "NIFTY" },
+    { "name": "bank_nifty_future", "exchange": "NSE", "underlying_symbol": "BANKNIFTY" },
+    { "name": "midcp_nifty_future", "exchange": "NSE", "underlying_symbol": "MIDCPNIFTY" },
+    { "name": "sensex_future", "exchange": "BSE", "underlying_symbol": "SENSEX" }
+  ]
+}
