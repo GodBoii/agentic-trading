@@ -2,92 +2,88 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time as dt_time, timedelta, timezone
+import json
 import math
-from statistics import pstdev
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.market_reference_service import MarketReferenceService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
 
 class MarketRegimeAnalyzer:
     """
-    Standalone market-context lane.
-    It consumes a liquid basket sourced from Stage 1, computes market-wide
-    intraday structure diagnostics, classifies the current regime, and saves
-    the result to JSON. It does not modify any other pipeline behavior.
+    Market-context regime analyzer.
+    This lane reads market-wide sources only: indices, sector indices, index futures,
+    and optional externally provided market-summary JSON files for movers/news/attention.
+    It does not consume Stage 1 or any stock-selection output.
     """
+
+    EXTERNAL_INPUT_FILES = {
+        "market_breadth": "market_breadth.json",
+        "market_movers": "market_movers.json",
+        "market_news": "market_news.json",
+        "market_attention": "market_attention.json",
+        "market_derivatives": "market_derivatives.json",
+    }
 
     def __init__(self, config: Optional[PipelineConfig] = None):
         self.config = config or PipelineConfig()
         self.dhan = DhanService(self.config)
         self.market_time = MarketTimeService(self.config)
+        self.references = MarketReferenceService(self.config)
+        self.catalog = self._load_source_catalog()
 
-    def _payload_market_date(self, payload: Optional[Dict[str, Any]]) -> Optional[str]:
-        if not payload:
-            return None
-        summary_market_date = payload.get("summary", {}).get("market_date")
-        if summary_market_date:
-            return str(summary_market_date)
-        return StorageService.snapshot_market_date(payload, self.config.market_timezone)
+    def _load_source_catalog(self) -> Dict[str, Any]:
+        return json.loads(self.config.regime_source_catalog_path.read_text(encoding="utf-8"))
 
-    def _load_stage1_payload(self) -> Optional[Dict[str, Any]]:
-        market_date = self.market_time.market_date_str()
-        daily_path = self.config.stage1_daily_path(market_date)
-        payload = StorageService.load_snapshot(daily_path)
-        if payload:
-            return payload
+    def _session_state(self) -> Dict[str, Any]:
+        now = self.market_time.now()
+        market_open = now.replace(
+            hour=self.config.market_open_hour,
+            minute=self.config.market_open_minute,
+            second=0,
+            microsecond=0,
+        )
+        market_close = now.replace(
+            hour=self.config.market_close_hour,
+            minute=self.config.market_close_minute,
+            second=0,
+            microsecond=0,
+        )
+        minutes_since_open = max(0, int((now - market_open).total_seconds() // 60))
+        minutes_to_close = max(0, int((market_close - now).total_seconds() // 60))
 
-        latest_payload = StorageService.load_snapshot(self.config.stage1_latest_path)
-        if self._payload_market_date(latest_payload) == market_date:
-            print(
-                f"Using latest Stage 1 snapshot for current market date {market_date} "
-                f"from {self.config.stage1_latest_path.name}"
-            )
-            return latest_payload
-        return None
+        if now < market_open:
+            session = "pre_open"
+        elif now <= market_close:
+            session = "live_market"
+        else:
+            session = "post_market"
 
-    def _load_stage2_payload(self) -> Optional[Dict[str, Any]]:
-        market_date = self.market_time.market_date_str()
-        daily_path = self.config.stage2_daily_path(market_date)
-        payload = StorageService.load_snapshot(daily_path)
-        if payload:
-            return payload
-
-        latest_payload = StorageService.load_snapshot(self.config.stage2_latest_path)
-        if self._payload_market_date(latest_payload) == market_date:
-            return latest_payload
-        return None
-
-    def _load_regime_basket(self) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        stage1_payload = self._load_stage1_payload()
-        if not stage1_payload:
-            return [], {
-                "source": "stage1",
-                "status": "waiting_for_stage1_snapshot",
-                "market_date": self.market_time.market_date_str(),
-            }
-
-        stage1_stocks = list(stage1_payload.get("stocks", []))
-        stage1_stocks.sort(key=lambda row: -float(row.get("adv_20_cr") or 0.0))
-        basket = stage1_stocks[: self.config.regime_basket_size]
-
-        return basket, {
-            "source": "stage1",
-            "status": "ready",
-            "market_date": self.market_time.market_date_str(),
-            "stage1_count": len(stage1_stocks),
-            "basket_size": len(basket),
+        return {
+            "market_session": session,
+            "minutes_since_open": minutes_since_open,
+            "minutes_to_close": minutes_to_close,
+            "is_market_hours": session == "live_market",
+            "is_discovery_phase": session == "live_market"
+            and minutes_since_open < self.config.regime_min_minutes_after_open,
         }
+
+    def _resolve_index_source(self, source: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return self.references.find_index(source["symbol"], source["exchange"])
+
+    def _resolve_future_source(self, source: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return self.references.find_front_month_future(source["exchange"], source["underlying_symbol"])
 
     def _today_market_frame(self, frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
             return frame
-
         local_ts = frame["timestamp"].dt.tz_localize("UTC").dt.tz_convert(self.market_time.tz)
         local_frame = frame.copy()
         local_frame["market_timestamp"] = local_ts
@@ -96,14 +92,12 @@ class MarketRegimeAnalyzer:
         return local_frame[local_frame["market_date"] == today].sort_values("market_timestamp")
 
     def _compute_intraday_vwap(self, today_frame: pd.DataFrame) -> Optional[float]:
-        if today_frame.empty or "volume" not in today_frame.columns:
+        if today_frame.empty:
             return None
-
         volume = pd.to_numeric(today_frame["volume"], errors="coerce").fillna(0.0)
         total_volume = float(volume.sum())
         if math.isclose(total_volume, 0.0):
             return None
-
         typical_price = (
             pd.to_numeric(today_frame["high"], errors="coerce").fillna(0.0)
             + pd.to_numeric(today_frame["low"], errors="coerce").fillna(0.0)
@@ -112,9 +106,15 @@ class MarketRegimeAnalyzer:
         vwap = (typical_price * volume).sum() / total_volume
         return float(vwap) if pd.notna(vwap) else None
 
-    def _compute_opening_range(self, today_frame: pd.DataFrame) -> Tuple[Optional[float], Optional[float], bool]:
+    def _compute_opening_range_break(self, today_frame: pd.DataFrame, latest_price: float) -> Dict[str, Optional[float]]:
         if today_frame.empty or "market_timestamp" not in today_frame.columns:
-            return None, None, False
+            return {
+                "opening_range_high": None,
+                "opening_range_low": None,
+                "opening_range_breakout_percent": None,
+                "opening_range_breakdown_percent": None,
+                "opening_range_complete": False,
+            }
 
         open_dt = datetime.combine(
             self.market_time.now().date(),
@@ -126,431 +126,312 @@ class MarketRegimeAnalyzer:
             (today_frame["market_timestamp"] >= open_dt)
             & (today_frame["market_timestamp"] < range_end)
         ]
-
         expected_bars = self.config.regime_opening_range_minutes
-        is_complete = len(opening_slice) >= max(3, expected_bars // 2)
+        opening_range_complete = len(opening_slice) >= max(3, expected_bars // 2)
         if opening_slice.empty:
-            return None, None, False
+            return {
+                "opening_range_high": None,
+                "opening_range_low": None,
+                "opening_range_breakout_percent": None,
+                "opening_range_breakdown_percent": None,
+                "opening_range_complete": False,
+            }
 
         opening_high = float(pd.to_numeric(opening_slice["high"], errors="coerce").max())
         opening_low = float(pd.to_numeric(opening_slice["low"], errors="coerce").min())
-        return opening_high, opening_low, is_complete
+        breakout = ((latest_price - opening_high) / opening_high) * 100.0 if opening_high > 0 else None
+        breakdown = ((opening_low - latest_price) / opening_low) * 100.0 if opening_low > 0 else None
+        return {
+            "opening_range_high": round(opening_high, 4),
+            "opening_range_low": round(opening_low, 4),
+            "opening_range_breakout_percent": round(breakout, 4) if breakout is not None else None,
+            "opening_range_breakdown_percent": round(breakdown, 4) if breakdown is not None else None,
+            "opening_range_complete": opening_range_complete,
+        }
 
-    def _process_stock(self, stock: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-        security_id = int(stock["security_id"])
+    def _fetch_source_snapshot(
+        self,
+        source_key: str,
+        source_meta: Dict[str, Any],
+    ) -> Tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+        exchange_segment = source_meta["exchange_segment"]
+        instrument = source_meta["instrument"]
+        security_id = int(source_meta["security_id"])
         resp = self.dhan.fetch_intraday_history(
             security_id,
             days=self.config.regime_history_days,
             interval=1,
-            exchange_segment="BSE_EQ",
-            instrument_candidates=[stock.get("instrument"), "EQUITY"],
+            exchange_segment=exchange_segment,
+            instrument_candidates=[instrument],
         )
         if not resp or str(resp.get("status", "")).lower() != "success":
-            return None, "intraday_history_failed"
+            return source_key, None, "intraday_history_failed"
 
         frame = self.dhan.intraday_response_to_df(resp)
         if frame.empty:
-            return None, "intraday_history_empty"
+            return source_key, None, "intraday_history_empty"
 
         today_frame = self._today_market_frame(frame)
-        if len(today_frame) < 3:
-            return None, "intraday_today_insufficient"
+        if today_frame.empty:
+            return source_key, None, "intraday_today_empty"
 
         latest_price = float(pd.to_numeric(today_frame["close"], errors="coerce").iloc[-1])
-        session_open = float(pd.to_numeric(today_frame["open"], errors="coerce").iloc[0])
-        session_high = float(pd.to_numeric(today_frame["high"], errors="coerce").max())
-        session_low = float(pd.to_numeric(today_frame["low"], errors="coerce").min())
+        open_price = float(pd.to_numeric(today_frame["open"], errors="coerce").iloc[0])
         vwap = self._compute_intraday_vwap(today_frame)
-        opening_high, opening_low, opening_range_complete = self._compute_opening_range(today_frame)
         rvol = self.dhan.compute_time_of_day_rvol(frame)
-        atr_percent = float(stock.get("atr_percent") or 0.0)
+        day_change_percent = ((latest_price - open_price) / open_price) * 100.0 if open_price > 0 else None
+        price_vs_vwap_percent = ((latest_price - vwap) / vwap) * 100.0 if vwap and vwap > 0 else None
+        opening_range = self._compute_opening_range_break(today_frame, latest_price)
 
-        price_vs_open_percent = None
-        if session_open > 0:
-            price_vs_open_percent = ((latest_price - session_open) / session_open) * 100.0
-
-        price_vs_vwap_percent = None
-        if vwap and vwap > 0:
-            price_vs_vwap_percent = ((latest_price - vwap) / vwap) * 100.0
-
-        opening_range_breakout_percent = None
-        opening_range_breakdown_percent = None
-        if opening_high and opening_high > 0:
-            opening_range_breakout_percent = ((latest_price - opening_high) / opening_high) * 100.0
-        if opening_low and opening_low > 0:
-            opening_range_breakdown_percent = ((opening_low - latest_price) / opening_low) * 100.0
-
-        move_vs_atr_ratio = None
-        if atr_percent > 0 and price_vs_open_percent is not None:
-            move_vs_atr_ratio = abs(price_vs_open_percent) / atr_percent
-
-        adv_20_cr = float(stock.get("adv_20_cr") or 0.0)
-        weight = max(1.0, adv_20_cr)
-
-        return {
+        snapshot = {
+            "name": source_meta["name"],
+            "exchange": source_meta["exchange"],
+            "exchange_segment": exchange_segment,
+            "instrument": instrument,
             "security_id": security_id,
-            "symbol": stock.get("symbol"),
-            "display_name": stock.get("display_name"),
-            "weight": round(weight, 4),
-            "adv_20_cr": round(adv_20_cr, 2),
-            "atr_percent": round(atr_percent, 2),
-            "time_of_day_rvol": round(rvol, 4) if rvol is not None else None,
-            "session_open": round(session_open, 4),
-            "session_high": round(session_high, 4),
-            "session_low": round(session_low, 4),
+            "symbol": source_meta["symbol"],
+            "display_name": source_meta["display_name"],
             "latest_price": round(latest_price, 4),
+            "open_price": round(open_price, 4),
             "intraday_vwap": round(vwap, 4) if vwap is not None else None,
-            "price_vs_open_percent": round(price_vs_open_percent, 4) if price_vs_open_percent is not None else None,
+            "day_change_percent": round(day_change_percent, 4) if day_change_percent is not None else None,
             "price_vs_vwap_percent": round(price_vs_vwap_percent, 4) if price_vs_vwap_percent is not None else None,
-            "opening_range_high": round(opening_high, 4) if opening_high is not None else None,
-            "opening_range_low": round(opening_low, 4) if opening_low is not None else None,
-            "opening_range_complete": opening_range_complete,
-            "opening_range_breakout_percent": (
-                round(opening_range_breakout_percent, 4)
-                if opening_range_breakout_percent is not None
-                else None
-            ),
-            "opening_range_breakdown_percent": (
-                round(opening_range_breakdown_percent, 4)
-                if opening_range_breakdown_percent is not None
-                else None
-            ),
-            "is_above_open": bool(price_vs_open_percent is not None and price_vs_open_percent > 0),
+            "time_of_day_rvol": round(rvol, 4) if rvol is not None else None,
+            "latest_bar_time": today_frame["market_timestamp"].iloc[-1].isoformat(),
+            "is_above_open": bool(day_change_percent is not None and day_change_percent > 0),
             "is_above_vwap": bool(price_vs_vwap_percent is not None and price_vs_vwap_percent > 0),
-            "is_opening_range_breakout": bool(
-                opening_range_breakout_percent is not None and opening_range_breakout_percent > 0
-            ),
-            "is_opening_range_breakdown": bool(
-                opening_range_breakdown_percent is not None and opening_range_breakdown_percent > 0
-            ),
-            "move_vs_atr_ratio": round(move_vs_atr_ratio, 4) if move_vs_atr_ratio is not None else None,
-        }, None
+        }
+        snapshot.update(opening_range)
+        return source_key, snapshot, None
 
-    def _weighted_ratio(self, rows: List[Dict[str, Any]], key: str) -> float:
-        total_weight = sum(float(row.get("weight") or 0.0) for row in rows)
-        if total_weight <= 0:
-            return 0.0
-        positive_weight = sum(
-            float(row.get("weight") or 0.0) for row in rows if bool(row.get(key))
-        )
-        return positive_weight / total_weight
+    def _load_external_market_inputs(self) -> Tuple[Dict[str, Any], Dict[str, str]]:
+        payloads: Dict[str, Any] = {}
+        missing: Dict[str, str] = {}
+        self.config.regime_inputs_dir.mkdir(parents=True, exist_ok=True)
 
-    def _weighted_average(self, rows: List[Dict[str, Any]], key: str) -> Optional[float]:
-        pairs: List[Tuple[float, float]] = []
-        for row in rows:
-            raw_value = row.get(key)
-            if raw_value is None:
+        for key, file_name in self.EXTERNAL_INPUT_FILES.items():
+            path = self.config.regime_inputs_dir / file_name
+            if not path.exists():
+                missing[key] = "not_provided"
                 continue
             try:
-                value = float(raw_value)
-                weight = float(row.get("weight") or 0.0)
-            except Exception:
-                continue
-            pairs.append((value, weight))
+                payloads[key] = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                missing[key] = f"invalid_json::{type(exc).__name__}"
+        return payloads, missing
 
-        if not pairs:
-            return None
+    def _resolve_market_sources(self) -> Dict[str, List[Dict[str, Any]]]:
+        resolved: Dict[str, List[Dict[str, Any]]] = {
+            "primary_indices": [],
+            "sector_indices": [],
+            "index_futures": [],
+        }
 
-        total_weight = sum(weight for _, weight in pairs)
-        if total_weight <= 0:
-            return None
-        return sum(value * weight for value, weight in pairs) / total_weight
+        for item in self.catalog.get("primary_indices", []):
+            resolved_item = self._resolve_index_source(item)
+            if not resolved_item:
+                continue
+            resolved["primary_indices"].append({
+                "name": item["name"],
+                "exchange": item["exchange"],
+                "symbol": item["symbol"],
+                "display_name": resolved_item["display_name"],
+                "exchange_segment": "IDX_I",
+                "instrument": "INDEX",
+                "security_id": resolved_item["security_id"],
+            })
 
-    def _average(self, rows: List[Dict[str, Any]], key: str, absolute: bool = False) -> Optional[float]:
-        values: List[float] = []
-        for row in rows:
-            raw_value = row.get(key)
-            if raw_value is None:
+        sector_items = self.catalog.get("sector_indices", [])[: self.config.regime_sector_limit]
+        for item in sector_items:
+            resolved_item = self._resolve_index_source(item)
+            if not resolved_item:
                 continue
-            try:
-                value = float(raw_value)
-            except Exception:
+            resolved["sector_indices"].append({
+                "name": item["name"],
+                "exchange": item["exchange"],
+                "symbol": item["symbol"],
+                "display_name": resolved_item["display_name"],
+                "exchange_segment": "IDX_I",
+                "instrument": "INDEX",
+                "security_id": resolved_item["security_id"],
+            })
+
+        for item in self.catalog.get("index_futures", []):
+            resolved_item = self._resolve_future_source(item)
+            if not resolved_item:
                 continue
-            values.append(abs(value) if absolute else value)
+            resolved["index_futures"].append({
+                "name": item["name"],
+                "exchange": item["exchange"],
+                "symbol": resolved_item["symbol"],
+                "display_name": resolved_item["display_name"],
+                "exchange_segment": f"{item['exchange']}_FNO" if item["exchange"] in {"NSE", "BSE"} else resolved_item["exchange_segment"],
+                "instrument": "FUTIDX",
+                "security_id": resolved_item["security_id"],
+                "underlying_symbol": item["underlying_symbol"],
+                "expiry_date": resolved_item["expiry_date"].isoformat() if resolved_item.get("expiry_date") else None,
+            })
+        return resolved
+
+    def _fetch_resolved_sources(
+        self,
+        resolved: Dict[str, List[Dict[str, Any]]],
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, str]]:
+        snapshots: Dict[str, Dict[str, Any]] = {}
+        failures: Dict[str, str] = {}
+        work_items: List[Tuple[str, Dict[str, Any]]] = []
+        for group_name, items in resolved.items():
+            for item in items:
+                work_items.append((f"{group_name}.{item['name']}", item))
+
+        with ThreadPoolExecutor(max_workers=self.config.regime_workers) as executor:
+            futures = [
+                executor.submit(self._fetch_source_snapshot, key, item)
+                for key, item in work_items
+            ]
+            for future in as_completed(futures):
+                key, snapshot, failure = future.result()
+                if snapshot:
+                    snapshots[key] = snapshot
+                elif failure:
+                    failures[key] = failure
+        return snapshots, failures
+
+    def _average(self, rows: List[Dict[str, Any]], key: str) -> Optional[float]:
+        values = [float(row[key]) for row in rows if row.get(key) is not None]
         if not values:
             return None
         return sum(values) / len(values)
 
-    def _top_movers(
-        self,
-        rows: List[Dict[str, Any]],
-        key: str,
-        reverse: bool,
-        limit: int = 5,
-    ) -> List[Dict[str, Any]]:
-        filtered = [row for row in rows if row.get(key) is not None]
-        filtered.sort(key=lambda row: float(row.get(key) or 0.0), reverse=reverse)
-        result: List[Dict[str, Any]] = []
-        for row in filtered[:limit]:
-            result.append(
-                {
-                    "security_id": row.get("security_id"),
-                    "display_name": row.get("display_name"),
-                    key: row.get(key),
-                }
-            )
-        return result
-
-    def _minutes_since_market_open(self) -> int:
-        now = self.market_time.now()
-        market_open = now.replace(
-            hour=self.config.market_open_hour,
-            minute=self.config.market_open_minute,
-            second=0,
-            microsecond=0,
-        )
-        return max(0, int((now - market_open).total_seconds() // 60))
-
-    def _confidence_score(
-        self,
-        sorted_scores: List[Tuple[str, float]],
-        coverage_ratio: float,
-        warmed_up: bool,
-    ) -> float:
-        if not sorted_scores:
+    def _ratio(self, rows: List[Dict[str, Any]], key: str) -> float:
+        if not rows:
             return 0.0
-
-        top_score = sorted_scores[0][1]
-        runner_up = sorted_scores[1][1] if len(sorted_scores) > 1 else 0.0
-        margin = max(0.0, top_score - runner_up)
-        confidence = min(100.0, (margin * 0.9) + (coverage_ratio * 35.0) + (20.0 if warmed_up else 0.0))
-        return round(confidence, 2)
-
-    def _build_reasoning_summary(
-        self,
-        regime_label: str,
-        metrics: Dict[str, Optional[float]],
-    ) -> str:
-        weighted_move = metrics.get("weighted_price_vs_open_percent_avg")
-        weighted_vwap = metrics.get("weighted_price_vs_vwap_percent_avg")
-        above_open = metrics.get("above_open_ratio")
-        above_vwap = metrics.get("above_vwap_ratio")
-        breakout = metrics.get("breakout_ratio")
-        breakdown = metrics.get("breakdown_ratio")
-        avg_rvol = metrics.get("avg_rvol")
-
-        if regime_label == "trend_up":
-            return (
-                "Broad liquid-basket participation is skewed upward with positive open-to-current drift, "
-                "positive VWAP positioning, and stronger breakout participation than breakdown pressure."
-            )
-        if regime_label == "trend_down":
-            return (
-                "Broad liquid-basket participation is skewed downward with negative open-to-current drift, "
-                "negative VWAP positioning, and stronger breakdown participation than upside continuation."
-            )
-        if regime_label == "event_risk":
-            return (
-                "Cross-sectional move size and RVOL are elevated versus normal intraday baselines, "
-                "suggesting an unusually volatile or news-heavy session."
-            )
-        if regime_label == "mean_reversion":
-            return (
-                "The basket is rotating around the session anchor rather than persisting away from it, "
-                "with limited net directional edge despite active participation."
-            )
-        if regime_label == "choppy":
-            return (
-                "Directional breadth is mixed and follow-through is weak, pointing to an indecisive session "
-                "with limited structure persistence."
-            )
-        return (
-            "Regime remains provisional while the opening session develops. "
-            f"weighted_move={weighted_move}, weighted_vwap={weighted_vwap}, "
-            f"above_open={above_open}, above_vwap={above_vwap}, "
-            f"breakout={breakout}, breakdown={breakdown}, avg_rvol={avg_rvol}"
-        )
+        return sum(1 for row in rows if row.get(key)) / len(rows)
 
     def _classify_regime(
         self,
-        rows: List[Dict[str, Any]],
-        stage2_payload: Optional[Dict[str, Any]],
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        coverage_ratio = len(rows) / max(1, self.config.regime_basket_size)
-        minutes_since_open = self._minutes_since_market_open()
-        warmed_up = minutes_since_open >= self.config.regime_min_minutes_after_open
+        session_state: Dict[str, Any],
+        primary_indices: List[Dict[str, Any]],
+        sector_indices: List[Dict[str, Any]],
+        futures: List[Dict[str, Any]],
+        external_inputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if session_state["market_session"] == "pre_open":
+            return {
+                "market_regime": "pre_open",
+                "confidence": 100.0,
+                "reasoning_summary": "Market has not opened yet; regime is informationally unavailable until live price discovery starts.",
+            }
+        if session_state["market_session"] == "post_market":
+            return {
+                "market_regime": "post_market",
+                "confidence": 100.0,
+                "reasoning_summary": "Market session is closed; this snapshot is end-of-day context rather than a live trading regime.",
+            }
+        if session_state["is_discovery_phase"]:
+            return {
+                "market_regime": "open_discovery",
+                "confidence": 60.0,
+                "reasoning_summary": "The market is still in the opening discovery window, so structural labels remain provisional.",
+            }
 
-        above_open_ratio = self._weighted_ratio(rows, "is_above_open")
-        above_vwap_ratio = self._weighted_ratio(rows, "is_above_vwap")
-        breakout_ratio = self._weighted_ratio(rows, "is_opening_range_breakout")
-        breakdown_ratio = self._weighted_ratio(rows, "is_opening_range_breakdown")
+        vix_snapshot = next((row for row in primary_indices if row["name"] == "india_vix"), None)
+        directional_indices = [row for row in primary_indices if row["name"] != "india_vix"]
 
-        weighted_price_vs_open = self._weighted_average(rows, "price_vs_open_percent") or 0.0
-        weighted_price_vs_vwap = self._weighted_average(rows, "price_vs_vwap_percent") or 0.0
-        avg_abs_price_vs_open = self._average(rows, "price_vs_open_percent", absolute=True) or 0.0
-        avg_abs_price_vs_vwap = self._average(rows, "price_vs_vwap_percent", absolute=True) or 0.0
-        avg_rvol = self._average(rows, "time_of_day_rvol") or 0.0
-        avg_move_vs_atr = self._average(rows, "move_vs_atr_ratio") or 0.0
-
-        price_vs_open_values = [
-            float(row["price_vs_open_percent"])
-            for row in rows
-            if row.get("price_vs_open_percent") is not None
-        ]
-        price_vs_vwap_values = [
-            float(row["price_vs_vwap_percent"])
-            for row in rows
-            if row.get("price_vs_vwap_percent") is not None
-        ]
-        open_dispersion = pstdev(price_vs_open_values) if len(price_vs_open_values) >= 2 else 0.0
-        vwap_dispersion = pstdev(price_vs_vwap_values) if len(price_vs_vwap_values) >= 2 else 0.0
-
-        direction_balance = 1.0 - min(abs(above_open_ratio - 0.5) / 0.5, 1.0)
-        vwap_balance = 1.0 - min(abs(above_vwap_ratio - 0.5) / 0.5, 1.0)
-        breakout_imbalance = breakout_ratio - breakdown_ratio
-        breakout_symmetry = min(breakout_ratio, breakdown_ratio) * 2.0
-
-        trend_up_score = (
-            min(max(above_open_ratio - 0.5, 0.0) / 0.5, 1.0) * 24.0
-            + min(max(above_vwap_ratio - 0.5, 0.0) / 0.5, 1.0) * 24.0
-            + min(max(weighted_price_vs_open, 0.0) / 1.25, 1.0) * 18.0
-            + min(max(breakout_imbalance, 0.0) / 0.35, 1.0) * 18.0
-            + min(max(avg_rvol - 1.0, 0.0) / 1.5, 1.0) * 16.0
-        )
-        trend_down_score = (
-            min(max((1.0 - above_open_ratio) - 0.5, 0.0) / 0.5, 1.0) * 24.0
-            + min(max((1.0 - above_vwap_ratio) - 0.5, 0.0) / 0.5, 1.0) * 24.0
-            + min(max(-weighted_price_vs_open, 0.0) / 1.25, 1.0) * 18.0
-            + min(max(-breakout_imbalance, 0.0) / 0.35, 1.0) * 18.0
-            + min(max(avg_rvol - 1.0, 0.0) / 1.5, 1.0) * 16.0
-        )
-        mean_reversion_score = (
-            (1.0 - min(abs(weighted_price_vs_vwap) / 0.6, 1.0)) * 26.0
-            + (1.0 - min(abs(weighted_price_vs_open) / 0.8, 1.0)) * 18.0
-            + breakout_symmetry * 18.0
-            + direction_balance * 18.0
-            + min(avg_rvol / 2.0, 1.0) * 12.0
-            + (1.0 - min(abs(breakout_imbalance) / 0.25, 1.0)) * 8.0
-        )
-        choppy_score = (
-            (1.0 - min(avg_abs_price_vs_open / 1.0, 1.0)) * 28.0
-            + (1.0 - min(avg_rvol / 1.5, 1.0)) * 26.0
-            + direction_balance * 20.0
-            + vwap_balance * 14.0
-            + (1.0 - min((breakout_ratio + breakdown_ratio) / 0.35, 1.0)) * 12.0
-        )
-        event_risk_score = (
-            min(avg_move_vs_atr / 1.2, 1.0) * 36.0
-            + min(avg_rvol / 2.5, 1.0) * 28.0
-            + min(open_dispersion / 1.8, 1.0) * 20.0
-            + min(avg_abs_price_vs_open / 1.75, 1.0) * 16.0
+        avg_primary_change = self._average(directional_indices, "day_change_percent") or 0.0
+        avg_primary_vwap = self._average(directional_indices, "price_vs_vwap_percent") or 0.0
+        primary_above_open = self._ratio(directional_indices, "is_above_open")
+        primary_above_vwap = self._ratio(directional_indices, "is_above_vwap")
+        sector_breadth = self._ratio(sector_indices, "is_above_open")
+        avg_sector_change = self._average(sector_indices, "day_change_percent") or 0.0
+        avg_sector_vwap = self._average(sector_indices, "price_vs_vwap_percent") or 0.0
+        breakout_ratio = self._ratio(
+            [row for row in directional_indices + sector_indices if row.get("opening_range_complete")],
+            "is_above_vwap",
         )
 
-        score_map = {
-            "trend_up": round(trend_up_score, 2),
-            "trend_down": round(trend_down_score, 2),
-            "mean_reversion": round(mean_reversion_score, 2),
-            "choppy": round(choppy_score, 2),
-            "event_risk": round(event_risk_score, 2),
-        }
-        sorted_scores = sorted(score_map.items(), key=lambda item: item[1], reverse=True)
-        regime_label = sorted_scores[0][0] if sorted_scores else "unclassified"
-        confidence = self._confidence_score(sorted_scores, coverage_ratio, warmed_up)
+        futures_alignment_score = 0.0
+        if futures:
+            aligned = 0
+            compared = 0
+            primary_map = {
+                "NIFTY": next((row for row in directional_indices if row["symbol"] == "NIFTY"), None),
+                "BANKNIFTY": next((row for row in directional_indices if row["symbol"] == "BANKNIFTY"), None),
+                "SENSEX": next((row for row in directional_indices if row["symbol"] == "SENSEX"), None),
+                "MIDCPNIFTY": next((row for row in sector_indices if row["symbol"] == "MIDCPNIFTY"), None),
+            }
+            for future_row in futures:
+                underlying = future_row.get("underlying_symbol")
+                spot_row = primary_map.get(str(underlying))
+                if not spot_row:
+                    continue
+                future_move = float(future_row.get("day_change_percent") or 0.0)
+                spot_move = float(spot_row.get("day_change_percent") or 0.0)
+                if math.isclose(future_move, 0.0) or math.isclose(spot_move, 0.0):
+                    continue
+                compared += 1
+                if (future_move > 0 and spot_move > 0) or (future_move < 0 and spot_move < 0):
+                    aligned += 1
+            futures_alignment_score = aligned / compared if compared else 0.0
 
-        regime_status = "completed" if warmed_up else "warming_up"
-        if not rows:
-            regime_label = "unclassified"
-            regime_status = "waiting_for_data"
-            confidence = 0.0
+        vix_change = float(vix_snapshot.get("day_change_percent") or 0.0) if vix_snapshot else 0.0
+        event_input = external_inputs.get("market_news", {})
+        news_severity = float(event_input.get("event_severity_score", 0.0) or 0.0)
 
-        metrics = {
-            "above_open_ratio": round(above_open_ratio, 4),
-            "above_vwap_ratio": round(above_vwap_ratio, 4),
-            "breakout_ratio": round(breakout_ratio, 4),
-            "breakdown_ratio": round(breakdown_ratio, 4),
-            "weighted_price_vs_open_percent_avg": round(weighted_price_vs_open, 4),
-            "weighted_price_vs_vwap_percent_avg": round(weighted_price_vs_vwap, 4),
-            "avg_abs_price_vs_open_percent": round(avg_abs_price_vs_open, 4),
-            "avg_abs_price_vs_vwap_percent": round(avg_abs_price_vs_vwap, 4),
-            "avg_rvol": round(avg_rvol, 4),
-            "avg_move_vs_atr_ratio": round(avg_move_vs_atr, 4),
-            "open_dispersion": round(open_dispersion, 4),
-            "vwap_dispersion": round(vwap_dispersion, 4),
-            "coverage_ratio": round(coverage_ratio, 4),
-            "minutes_since_open": minutes_since_open,
-        }
+        if abs(avg_primary_change) >= 0.9 or abs(vix_change) >= 8.0 or news_severity >= 0.7:
+            label = "event_driven"
+        elif (
+            avg_primary_change >= 0.35
+            and avg_primary_vwap >= 0.15
+            and primary_above_open >= 0.66
+            and sector_breadth >= 0.58
+            and futures_alignment_score >= 0.5
+        ):
+            label = "trend_up"
+        elif (
+            avg_primary_change <= -0.35
+            and avg_primary_vwap <= -0.15
+            and primary_above_open <= 0.34
+            and sector_breadth <= 0.42
+            and futures_alignment_score >= 0.5
+        ):
+            label = "trend_down"
+        elif avg_primary_change > 0 and sector_breadth >= 0.58 and vix_change <= 2.0:
+            label = "risk_on"
+        elif avg_primary_change < 0 and sector_breadth <= 0.42 and vix_change >= 2.0:
+            label = "risk_off"
+        elif abs(avg_primary_vwap) <= 0.12 and 0.40 <= sector_breadth <= 0.60:
+            label = "mean_reversion"
+        else:
+            label = "choppy"
 
-        stage2_context = {
-            "available": bool(stage2_payload),
-            "stage2_passed": int(stage2_payload.get("summary", {}).get("stage2_passed", 0))
-            if stage2_payload
-            else 0,
-            "top_stage2_names": [
-                row.get("display_name") or row.get("symbol")
-                for row in (stage2_payload.get("stocks", [])[:5] if stage2_payload else [])
-            ],
+        confidence = min(
+            100.0,
+            45.0
+            + min(abs(avg_primary_change) * 22.0, 22.0)
+            + min(abs(avg_primary_vwap) * 18.0, 18.0)
+            + min(abs(sector_breadth - 0.5) * 40.0, 10.0)
+            + min(futures_alignment_score * 10.0, 10.0),
+        )
+        summary = (
+            f"avg_primary_change={round(avg_primary_change, 4)}%, "
+            f"avg_primary_vwap={round(avg_primary_vwap, 4)}%, "
+            f"sector_breadth={round(sector_breadth, 4)}, "
+            f"avg_sector_change={round(avg_sector_change, 4)}%, "
+            f"avg_sector_vwap={round(avg_sector_vwap, 4)}%, "
+            f"futures_alignment={round(futures_alignment_score, 4)}, "
+            f"vix_change={round(vix_change, 4)}%, "
+            f"breakout_ratio={round(breakout_ratio, 4)}"
+        )
+        return {
+            "market_regime": label,
+            "confidence": round(confidence, 2),
+            "reasoning_summary": summary,
         }
-
-        reasoning_summary = self._build_reasoning_summary(regime_label, metrics)
-        regime = {
-            "status": regime_status,
-            "market_regime": regime_label,
-            "confidence": confidence,
-            "minutes_since_open": minutes_since_open,
-            "is_actionable": warmed_up,
-            "style_inference": regime_label,
-            "score_map": score_map,
-            "reasoning_summary": reasoning_summary,
-            "metrics": metrics,
-            "stage2_context": stage2_context,
-        }
-        diagnostics = {
-            "top_scores": sorted_scores[:3],
-            "top_gainers_from_open": self._top_movers(rows, "price_vs_open_percent", reverse=True),
-            "top_losers_from_open": self._top_movers(rows, "price_vs_open_percent", reverse=False),
-            "top_rvol": self._top_movers(rows, "time_of_day_rvol", reverse=True),
-        }
-        return regime, diagnostics
 
     def _save_payload(self, payload: Dict[str, Any]) -> None:
         StorageService.save_snapshot(self.config.regime_latest_path, payload)
-        StorageService.save_snapshot(
-            self.config.regime_daily_path(self.market_time.market_date_str()),
-            payload,
-        )
-
-    def _build_waiting_payload(self, basket_meta: Dict[str, Any]) -> Dict[str, Any]:
-        now_utc = datetime.now(timezone.utc).isoformat()
-        summary = {
-            "market_date": self.market_time.market_date_str(),
-            "status": basket_meta.get("status", "waiting"),
-            "basket_source": basket_meta.get("source"),
-            "input_stage1_count": basket_meta.get("stage1_count", 0),
-            "configured_basket_size": self.config.regime_basket_size,
-            "analyzed_count": 0,
-            "failed_fetch": 0,
-            "review_interval_seconds": self.config.regime_loop_interval_seconds,
-        }
-        payload = {
-            "stage": "market_regime",
-            "generated_at_utc": now_utc,
-            "summary": summary,
-            "regime": {
-                "status": basket_meta.get("status", "waiting"),
-                "market_regime": "unclassified",
-                "confidence": 0.0,
-                "minutes_since_open": self._minutes_since_market_open(),
-                "is_actionable": False,
-                "style_inference": "unclassified",
-                "score_map": {},
-                "reasoning_summary": "Regime is waiting for Stage 1 liquidity basket data before analysis can begin.",
-                "metrics": {},
-                "stage2_context": {
-                    "available": False,
-                    "stage2_passed": 0,
-                    "top_stage2_names": [],
-                },
-            },
-            "diagnostics": {
-                "top_scores": [],
-                "top_gainers_from_open": [],
-                "top_losers_from_open": [],
-                "top_rvol": [],
-            },
-            "basket": [],
-        }
-        self._save_payload(payload)
-        return payload
+        StorageService.save_snapshot(self.config.regime_daily_path(self.market_time.market_date_str()), payload)
 
     def run(self) -> Dict[str, Any]:
         print("=" * 60)
@@ -558,62 +439,84 @@ class MarketRegimeAnalyzer:
         print("=" * 60)
         print(f"Current market time: {self.market_time.market_status_text()}")
 
-        basket, basket_meta = self._load_regime_basket()
-        if not basket:
-            print("Regime is waiting for Stage 1 to produce the liquid basket.")
-            return self._build_waiting_payload(basket_meta)
+        session_state = self._session_state()
+        resolved = self._resolve_market_sources()
+        source_snapshots, source_failures = self._fetch_resolved_sources(resolved)
+        external_inputs, external_missing = self._load_external_market_inputs()
 
-        print(
-            f"Loaded regime basket: {len(basket)} stock(s) sourced from Stage 1 "
-            f"(configured basket size={self.config.regime_basket_size})"
+        primary_indices = [
+            source_snapshots[key]
+            for key in sorted(source_snapshots)
+            if key.startswith("primary_indices.")
+        ]
+        sector_indices = [
+            source_snapshots[key]
+            for key in sorted(source_snapshots)
+            if key.startswith("sector_indices.")
+        ]
+        futures = [
+            source_snapshots[key]
+            for key in sorted(source_snapshots)
+            if key.startswith("index_futures.")
+        ]
+
+        regime = self._classify_regime(
+            session_state=session_state,
+            primary_indices=primary_indices,
+            sector_indices=sector_indices,
+            futures=futures,
+            external_inputs=external_inputs,
         )
-
-        analyzed_rows: List[Dict[str, Any]] = []
-        failure_counts: Dict[str, int] = {}
-
-        with ThreadPoolExecutor(max_workers=self.config.regime_workers) as executor:
-            futures = [executor.submit(self._process_stock, stock) for stock in basket]
-            for future in as_completed(futures):
-                row, failure_reason = future.result()
-                if row:
-                    analyzed_rows.append(row)
-                elif failure_reason:
-                    failure_counts[failure_reason] = failure_counts.get(failure_reason, 0) + 1
-
-        analyzed_rows.sort(key=lambda row: -float(row.get("weight") or 0.0))
-        stage2_payload = self._load_stage2_payload()
-        regime, diagnostics = self._classify_regime(analyzed_rows, stage2_payload)
-
-        summary = {
-            "market_date": self.market_time.market_date_str(),
-            "status": regime.get("status"),
-            "basket_source": basket_meta.get("source"),
-            "input_stage1_count": basket_meta.get("stage1_count", 0),
-            "configured_basket_size": self.config.regime_basket_size,
-            "analyzed_count": len(analyzed_rows),
-            "failed_fetch": sum(failure_counts.values()),
-            "failure_reason_counts": failure_counts,
-            "review_interval_seconds": self.config.regime_loop_interval_seconds,
-            "next_review_at": (
-                self.market_time.now() + timedelta(seconds=self.config.regime_loop_interval_seconds)
-            ).isoformat(),
-        }
 
         payload = {
             "stage": "market_regime",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-            "summary": summary,
-            "regime": regime,
-            "diagnostics": diagnostics,
-            "basket": analyzed_rows,
+            "summary": {
+                "market_date": self.market_time.market_date_str(),
+                "market_session": session_state["market_session"],
+                "resolved_source_groups": {
+                    "primary_indices": len(resolved["primary_indices"]),
+                    "sector_indices": len(resolved["sector_indices"]),
+                    "index_futures": len(resolved["index_futures"]),
+                },
+                "fetched_source_groups": {
+                    "primary_indices": len(primary_indices),
+                    "sector_indices": len(sector_indices),
+                    "index_futures": len(futures),
+                },
+                "source_failures": source_failures,
+                "external_inputs_missing": external_missing,
+                "review_interval_seconds": self.config.regime_loop_interval_seconds,
+                "next_review_at": (
+                    self.market_time.now() + timedelta(seconds=self.config.regime_loop_interval_seconds)
+                ).isoformat(),
+            },
+            "regime": {
+                "status": session_state["market_session"],
+                "market_regime": regime["market_regime"],
+                "confidence": regime["confidence"],
+                "minutes_since_open": session_state["minutes_since_open"],
+                "is_actionable": session_state["market_session"] == "live_market"
+                and not session_state["is_discovery_phase"],
+                "reasoning_summary": regime["reasoning_summary"],
+            },
+            "market_context": {
+                "session_state": session_state,
+                "primary_indices": primary_indices,
+                "sector_indices": sector_indices,
+                "index_futures": futures,
+                "external_inputs": external_inputs,
+            },
         }
         self._save_payload(payload)
 
         print("\nRegime analysis complete")
-        print(f"Regime status: {regime.get('status')}")
-        print(f"Market regime: {regime.get('market_regime')}")
-        print(f"Confidence: {regime.get('confidence')}")
-        print(f"Analyzed basket count: {len(analyzed_rows)}")
+        print(f"Market session: {session_state['market_session']}")
+        print(f"Market regime: {regime['market_regime']}")
+        print(f"Confidence: {regime['confidence']}")
+        print(f"Primary indices fetched: {len(primary_indices)}")
+        print(f"Sector indices fetched: {len(sector_indices)}")
+        print(f"Index futures fetched: {len(futures)}")
         print(f"Saved latest snapshot: {self.config.regime_latest_path.name}")
         print(f"Saved daily snapshot: {self.config.regime_daily_path(self.market_time.market_date_str()).name}")
         return payload
