@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, time as dt_time, timedelta, timezone
+from datetime import date, datetime, time as dt_time, timedelta, timezone
 import json
 import math
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -80,6 +79,9 @@ class MarketRegimeAnalyzer:
 
     def _resolve_future_source(self, source: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return self.references.find_front_month_future(source["exchange"], source["underlying_symbol"])
+
+    def _resolve_option_chain_source(self, source: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return self.references.find_index(source["symbol"], source["exchange"])
 
     def _today_market_frame(self, frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
@@ -222,11 +224,349 @@ class MarketRegimeAnalyzer:
                 missing[key] = f"invalid_json::{type(exc).__name__}"
         return payloads, missing
 
+    def _coerce_float(self, value: Any) -> Optional[float]:
+        if value is None or value == "":
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            normalized = str(value).replace(",", "").strip()
+            if not normalized:
+                return None
+            return float(normalized)
+        except Exception:
+            return None
+
+    def _coerce_int(self, value: Any) -> Optional[int]:
+        numeric = self._coerce_float(value)
+        if numeric is None:
+            return None
+        try:
+            return int(round(numeric))
+        except Exception:
+            return None
+
+    def _parse_iso_date(self, value: Any) -> Optional[date]:
+        if value in (None, ""):
+            return None
+        try:
+            return date.fromisoformat(str(value).strip())
+        except Exception:
+            return None
+
+    def _extract_expiry_list(self, response: Dict[str, Any]) -> List[str]:
+        data = response.get("data")
+        candidates: List[Any] = []
+        if isinstance(data, list):
+            candidates = data
+        elif isinstance(data, dict):
+            for key in ("expiryList", "expiries", "data"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    candidates = value
+                    break
+
+        expiries: List[str] = []
+        for item in candidates:
+            if isinstance(item, dict):
+                raw = item.get("expiry") or item.get("date") or item.get("value")
+            else:
+                raw = item
+            parsed = self._parse_iso_date(raw)
+            if parsed:
+                expiries.append(parsed.isoformat())
+        return sorted(set(expiries))
+
+    def _extract_option_leg(self, payload: Any, option_type: str) -> Optional[Dict[str, Any]]:
+        if not isinstance(payload, dict):
+            return None
+
+        greeks = payload.get("greeks") if isinstance(payload.get("greeks"), dict) else {}
+        leg = {
+            "option_type": option_type,
+            "last_price": self._coerce_float(
+                payload.get("last_price")
+                or payload.get("ltp")
+                or payload.get("lastTradedPrice")
+                or payload.get("last_price_traded")
+                or payload.get("price")
+            ),
+            "volume": self._coerce_int(payload.get("volume") or payload.get("tradedVolume")),
+            "open_interest": self._coerce_int(
+                payload.get("open_interest")
+                or payload.get("oi")
+                or payload.get("openInterest")
+            ),
+            "change_in_open_interest": self._coerce_int(
+                payload.get("change_in_open_interest")
+                or payload.get("changeInOpenInterest")
+                or payload.get("oi_change")
+                or payload.get("changeOi")
+            ),
+            "implied_volatility": self._coerce_float(
+                payload.get("implied_volatility")
+                or payload.get("iv")
+                or payload.get("impliedVolatility")
+            ),
+            "delta": self._coerce_float(payload.get("delta") or greeks.get("delta")),
+            "gamma": self._coerce_float(payload.get("gamma") or greeks.get("gamma")),
+            "theta": self._coerce_float(payload.get("theta") or greeks.get("theta")),
+            "vega": self._coerce_float(payload.get("vega") or greeks.get("vega")),
+            "bid_price": self._coerce_float(
+                payload.get("bid_price")
+                or payload.get("top_bid_price")
+                or payload.get("bestBidPrice")
+                or payload.get("bidPrice")
+            ),
+            "ask_price": self._coerce_float(
+                payload.get("ask_price")
+                or payload.get("top_ask_price")
+                or payload.get("bestAskPrice")
+                or payload.get("askPrice")
+            ),
+            "bid_quantity": self._coerce_int(
+                payload.get("bid_quantity")
+                or payload.get("top_bid_quantity")
+                or payload.get("bestBidQty")
+                or payload.get("bidQty")
+            ),
+            "ask_quantity": self._coerce_int(
+                payload.get("ask_quantity")
+                or payload.get("top_ask_quantity")
+                or payload.get("bestAskQty")
+                or payload.get("askQty")
+            ),
+            "security_id": self._coerce_int(payload.get("security_id")),
+            "average_price": self._coerce_float(payload.get("average_price")),
+            "previous_open_interest": self._coerce_int(
+                payload.get("previous_oi") or payload.get("previousOpenInterest")
+            ),
+            "previous_volume": self._coerce_int(payload.get("previous_volume")),
+        }
+        if all(value is None or value == option_type for value in leg.values()):
+            return None
+        return leg
+
+    def _flatten_option_chain_rows(
+        self,
+        payload: Any,
+        rows: Optional[List[Dict[str, Any]]] = None,
+        parent_strike: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        rows = rows or []
+        if isinstance(payload, list):
+            for item in payload:
+                self._flatten_option_chain_rows(item, rows, parent_strike)
+            return rows
+
+        if not isinstance(payload, dict):
+            return rows
+
+        if "oc" in payload and isinstance(payload.get("oc"), dict):
+            return self._flatten_option_chain_rows(payload.get("oc"), rows, parent_strike)
+
+        strike = self._coerce_float(
+            payload.get("strike_price")
+            or payload.get("strikePrice")
+            or payload.get("strike")
+            or parent_strike
+        )
+        call_payload = (
+            payload.get("call")
+            or payload.get("CALL")
+            or payload.get("ce")
+            or payload.get("CE")
+            or payload.get("callData")
+        )
+        put_payload = (
+            payload.get("put")
+            or payload.get("PUT")
+            or payload.get("pe")
+            or payload.get("PE")
+            or payload.get("putData")
+        )
+        if strike is not None and (isinstance(call_payload, dict) or isinstance(put_payload, dict)):
+            rows.append(
+                {
+                    "strike_price": strike,
+                    "call": self._extract_option_leg(call_payload, "CALL"),
+                    "put": self._extract_option_leg(put_payload, "PUT"),
+                }
+            )
+            return rows
+
+        for key, value in payload.items():
+            inferred_strike = strike
+            if inferred_strike is None:
+                inferred_strike = self._coerce_float(key)
+            self._flatten_option_chain_rows(value, rows, inferred_strike)
+        return rows
+
+    def _pick_nearest_expiry(self, expiries: List[str]) -> Optional[str]:
+        if not expiries:
+            return None
+        today = self.market_time.now().date()
+        dated = [(self._parse_iso_date(item), item) for item in expiries]
+        valid = [(parsed, raw) for parsed, raw in dated if parsed is not None and parsed >= today]
+        if not valid:
+            return expiries[0]
+        valid.sort(key=lambda item: item[0])
+        return valid[0][1]
+
+    def _option_chain_underlying_price(self, response: Dict[str, Any]) -> Optional[float]:
+        data = response.get("data")
+        if isinstance(data, dict):
+            for key in (
+                "underlyingPrice",
+                "underlying_price",
+                "underlyingValue",
+                "spotPrice",
+                "last_price",
+            ):
+                numeric = self._coerce_float(data.get(key))
+                if numeric is not None:
+                    return numeric
+        return None
+
+    def _option_chain_debug_meta(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        meta: Dict[str, Any] = {
+            "response_status": response.get("status"),
+        }
+        data = response.get("data")
+        if isinstance(data, dict):
+            meta["data_keys"] = sorted(str(key) for key in data.keys())
+            oc = data.get("oc")
+            if isinstance(oc, dict):
+                strike_keys = list(oc.keys())
+                meta["oc_strike_count"] = len(strike_keys)
+                meta["oc_sample_keys"] = strike_keys[:5]
+        return meta
+
+    def _fetch_option_chain_snapshot(
+        self,
+        source_key: str,
+        source_meta: Dict[str, Any],
+    ) -> Tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+        expiry_response = self.dhan.fetch_option_chain_expiry_list(
+            under_security_id=int(source_meta["security_id"]),
+            under_exchange_segment=str(source_meta["exchange_segment"]),
+        )
+        if str(expiry_response.get("status", "")).lower() != "success":
+            return source_key, None, "option_expiry_list_failed"
+
+        expiries = self._extract_expiry_list(expiry_response)
+        selected_expiry = self._pick_nearest_expiry(expiries)
+        if not selected_expiry:
+            return source_key, None, "option_expiry_unavailable"
+
+        chain_response = self.dhan.fetch_option_chain(
+            under_security_id=int(source_meta["security_id"]),
+            under_exchange_segment=str(source_meta["exchange_segment"]),
+            expiry=selected_expiry,
+        )
+        if str(chain_response.get("status", "")).lower() != "success":
+            return source_key, None, "option_chain_failed"
+
+        rows = self._flatten_option_chain_rows(chain_response.get("data"))
+        if not rows:
+            debug_meta = self._option_chain_debug_meta(chain_response)
+            failure_bits = ["option_chain_empty"]
+            if debug_meta.get("data_keys"):
+                failure_bits.append(f"keys={','.join(debug_meta['data_keys'])}")
+            if debug_meta.get("oc_strike_count") is not None:
+                failure_bits.append(f"oc_strikes={debug_meta['oc_strike_count']}")
+            return source_key, None, "::".join(failure_bits)
+
+        rows = [row for row in rows if row.get("strike_price") is not None]
+        rows.sort(key=lambda row: float(row["strike_price"]))
+        underlying_price = self._option_chain_underlying_price(chain_response)
+        if underlying_price is None:
+            directional_spot = next(
+                (
+                    item
+                    for item in (
+                        self.catalog.get("primary_indices", [])
+                        + self.catalog.get("sector_indices", [])
+                    )
+                    if self._normalized_symbol(item.get("symbol"))
+                    == self._normalized_symbol(source_meta.get("symbol"))
+                ),
+                None,
+            )
+            if directional_spot:
+                resolved_spot = self._resolve_index_source(directional_spot)
+                if resolved_spot:
+                    resp = self.dhan.fetch_intraday_history(
+                        int(resolved_spot["security_id"]),
+                        days=self.config.regime_history_days,
+                        interval=1,
+                        exchange_segment="IDX_I",
+                        instrument_candidates=["INDEX"],
+                    )
+                    frame = self.dhan.intraday_response_to_df(resp) if resp else pd.DataFrame()
+                    today_frame = self._today_market_frame(frame) if not frame.empty else pd.DataFrame()
+                    if not today_frame.empty:
+                        underlying_price = self._coerce_float(today_frame["close"].iloc[-1])
+
+        atm_row = None
+        if underlying_price is not None and rows:
+            atm_row = min(
+                rows,
+                key=lambda row: abs(float(row["strike_price"]) - float(underlying_price)),
+            )
+
+        total_call_oi = sum((row.get("call") or {}).get("open_interest") or 0 for row in rows)
+        total_put_oi = sum((row.get("put") or {}).get("open_interest") or 0 for row in rows)
+        total_call_volume = sum((row.get("call") or {}).get("volume") or 0 for row in rows)
+        total_put_volume = sum((row.get("put") or {}).get("volume") or 0 for row in rows)
+        max_call_row = max(rows, key=lambda row: (row.get("call") or {}).get("open_interest") or 0)
+        max_put_row = max(rows, key=lambda row: (row.get("put") or {}).get("open_interest") or 0)
+        atm_call = (atm_row or {}).get("call") or {}
+        atm_put = (atm_row or {}).get("put") or {}
+        atm_call_iv = self._coerce_float(atm_call.get("implied_volatility"))
+        atm_put_iv = self._coerce_float(atm_put.get("implied_volatility"))
+        atm_iv_spread = (
+            round(atm_put_iv - atm_call_iv, 4)
+            if atm_call_iv is not None and atm_put_iv is not None
+            else None
+        )
+        put_call_oi_ratio = round(total_put_oi / total_call_oi, 4) if total_call_oi > 0 else None
+        put_call_volume_ratio = round(total_put_volume / total_call_volume, 4) if total_call_volume > 0 else None
+
+        snapshot = {
+            "name": source_meta["name"],
+            "exchange": source_meta["exchange"],
+            "exchange_segment": source_meta["exchange_segment"],
+            "instrument": "OPTIDX",
+            "security_id": int(source_meta["security_id"]),
+            "symbol": source_meta["symbol"],
+            "display_name": source_meta["display_name"],
+            "selected_expiry": selected_expiry,
+            "available_expiries": expiries[:6],
+            "underlying_price": round(underlying_price, 4) if underlying_price is not None else None,
+            "strike_count": len(rows),
+            "atm_strike": round(float(atm_row["strike_price"]), 4) if atm_row else None,
+            "put_call_oi_ratio": put_call_oi_ratio,
+            "put_call_volume_ratio": put_call_volume_ratio,
+            "total_call_open_interest": int(total_call_oi),
+            "total_put_open_interest": int(total_put_oi),
+            "total_call_volume": int(total_call_volume),
+            "total_put_volume": int(total_put_volume),
+            "max_call_oi_strike": round(float(max_call_row["strike_price"]), 4) if max_call_row else None,
+            "max_put_oi_strike": round(float(max_put_row["strike_price"]), 4) if max_put_row else None,
+            "atm_call": atm_call,
+            "atm_put": atm_put,
+            "atm_iv_spread": atm_iv_spread,
+            "chain_sample": rows[max(0, (len(rows) // 2) - 1): min(len(rows), (len(rows) // 2) + 2)],
+        }
+        return source_key, snapshot, None
+
     def _resolve_market_sources(self) -> Dict[str, List[Dict[str, Any]]]:
         resolved: Dict[str, List[Dict[str, Any]]] = {
             "primary_indices": [],
             "sector_indices": [],
             "index_futures": [],
+            "option_chain_underlyings": [],
         }
 
         for item in self.catalog.get("primary_indices", []):
@@ -273,6 +613,20 @@ class MarketRegimeAnalyzer:
                 "underlying_symbol": item["underlying_symbol"],
                 "expiry_date": resolved_item["expiry_date"].isoformat() if resolved_item.get("expiry_date") else None,
             })
+
+        for item in self.catalog.get("option_chain_underlyings", []):
+            resolved_item = self._resolve_option_chain_source(item)
+            if not resolved_item:
+                continue
+            resolved["option_chain_underlyings"].append({
+                "name": item["name"],
+                "exchange": item["exchange"],
+                "symbol": item["symbol"],
+                "display_name": resolved_item["display_name"],
+                "exchange_segment": "IDX_I",
+                "instrument": "INDEX",
+                "security_id": resolved_item["security_id"],
+            })
         return resolved
 
     def _fetch_resolved_sources(
@@ -282,9 +636,13 @@ class MarketRegimeAnalyzer:
         snapshots: Dict[str, Dict[str, Any]] = {}
         failures: Dict[str, str] = {}
         work_items: List[Tuple[str, Dict[str, Any]]] = []
+        option_chain_items: List[Tuple[str, Dict[str, Any]]] = []
         for group_name, items in resolved.items():
             for item in items:
-                work_items.append((f"{group_name}.{item['name']}", item))
+                if group_name == "option_chain_underlyings":
+                    option_chain_items.append((f"{group_name}.{item['name']}", item))
+                else:
+                    work_items.append((f"{group_name}.{item['name']}", item))
 
         with ThreadPoolExecutor(max_workers=self.config.regime_workers) as executor:
             futures = [
@@ -297,6 +655,17 @@ class MarketRegimeAnalyzer:
                     snapshots[key] = snapshot
                 elif failure:
                     failures[key] = failure
+
+        for key, item in option_chain_items:
+            snapshot, failure = None, None
+            try:
+                _, snapshot, failure = self._fetch_option_chain_snapshot(key, item)
+            except Exception:
+                failure = "option_chain_exception"
+            if snapshot:
+                snapshots[key] = snapshot
+            elif failure:
+                failures[key] = failure
         return snapshots, failures
 
     def _average(self, rows: List[Dict[str, Any]], key: str) -> Optional[float]:
@@ -319,6 +688,7 @@ class MarketRegimeAnalyzer:
         primary_indices: List[Dict[str, Any]],
         sector_indices: List[Dict[str, Any]],
         futures: List[Dict[str, Any]],
+        option_chains: List[Dict[str, Any]],
         external_inputs: Dict[str, Any],
     ) -> Dict[str, Any]:
         if session_state["market_session"] == "pre_open":
@@ -382,6 +752,20 @@ class MarketRegimeAnalyzer:
         vix_change = float(vix_snapshot.get("day_change_percent") or 0.0) if vix_snapshot else 0.0
         event_input = external_inputs.get("market_news", {})
         news_severity = float(event_input.get("event_severity_score", 0.0) or 0.0)
+        option_pcr_values = [
+            float(item["put_call_oi_ratio"])
+            for item in option_chains
+            if item.get("put_call_oi_ratio") is not None
+        ]
+        avg_option_pcr = sum(option_pcr_values) / len(option_pcr_values) if option_pcr_values else None
+        option_iv_spreads = [
+            float(item["atm_iv_spread"])
+            for item in option_chains
+            if item.get("atm_iv_spread") is not None
+        ]
+        avg_option_iv_spread = (
+            sum(option_iv_spreads) / len(option_iv_spreads) if option_iv_spreads else None
+        )
 
         if abs(avg_primary_change) >= 0.9 or abs(vix_change) >= 8.0 or news_severity >= 0.7:
             label = "event_driven"
@@ -426,7 +810,9 @@ class MarketRegimeAnalyzer:
             f"avg_sector_vwap={round(avg_sector_vwap, 4)}%, "
             f"futures_alignment={round(futures_alignment_score, 4)} ({futures_aligned}/{futures_compared}), "
             f"vix_change={round(vix_change, 4)}%, "
-            f"breakout_ratio={round(breakout_ratio, 4)}"
+            f"breakout_ratio={round(breakout_ratio, 4)}, "
+            f"avg_option_pcr={round(avg_option_pcr, 4) if avg_option_pcr is not None else 'na'}, "
+            f"avg_option_iv_spread={round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else 'na'}"
         )
         return {
             "market_regime": label,
@@ -446,6 +832,9 @@ class MarketRegimeAnalyzer:
                 "futures_compared_count": futures_compared,
                 "vix_change_percent": round(vix_change, 4),
                 "news_severity_score": round(news_severity, 4),
+                "option_chain_count": len(option_chains),
+                "avg_option_put_call_oi_ratio": round(avg_option_pcr, 4) if avg_option_pcr is not None else None,
+                "avg_option_atm_iv_spread": round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else None,
             },
         }
 
@@ -479,12 +868,18 @@ class MarketRegimeAnalyzer:
             for key in sorted(source_snapshots)
             if key.startswith("index_futures.")
         ]
+        option_chains = [
+            source_snapshots[key]
+            for key in sorted(source_snapshots)
+            if key.startswith("option_chain_underlyings.")
+        ]
 
         regime = self._classify_regime(
             session_state=session_state,
             primary_indices=primary_indices,
             sector_indices=sector_indices,
             futures=futures,
+            option_chains=option_chains,
             external_inputs=external_inputs,
         )
 
@@ -498,11 +893,13 @@ class MarketRegimeAnalyzer:
                     "primary_indices": len(resolved["primary_indices"]),
                     "sector_indices": len(resolved["sector_indices"]),
                     "index_futures": len(resolved["index_futures"]),
+                    "option_chain_underlyings": len(resolved["option_chain_underlyings"]),
                 },
                 "fetched_source_groups": {
                     "primary_indices": len(primary_indices),
                     "sector_indices": len(sector_indices),
                     "index_futures": len(futures),
+                    "option_chain_underlyings": len(option_chains),
                 },
                 "source_failures": source_failures,
                 "external_inputs_missing": external_missing,
@@ -526,6 +923,7 @@ class MarketRegimeAnalyzer:
                 "primary_indices": primary_indices,
                 "sector_indices": sector_indices,
                 "index_futures": futures,
+                "option_chains": option_chains,
                 "external_inputs": external_inputs,
             },
         }
@@ -538,6 +936,7 @@ class MarketRegimeAnalyzer:
         print(f"Primary indices fetched: {len(primary_indices)}")
         print(f"Sector indices fetched: {len(sector_indices)}")
         print(f"Index futures fetched: {len(futures)}")
+        print(f"Option chains fetched: {len(option_chains)}")
         print(f"Saved latest snapshot: {self.config.regime_latest_path.name}")
         print(f"Saved daily snapshot: {self.config.regime_daily_path(self.market_time.market_date_str()).name}")
         return payload

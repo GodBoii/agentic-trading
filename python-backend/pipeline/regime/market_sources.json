@@ -22,5 +22,10 @@
     { "name": "bank_nifty_future", "exchange": "NSE", "underlying_symbol": "BANKNIFTY" },
     { "name": "midcp_nifty_future", "exchange": "NSE", "underlying_symbol": "MIDCPNIFTY" },
     { "name": "sensex_future", "exchange": "BSE", "underlying_symbol": "SENSEX" }
+  ],
+  "option_chain_underlyings": [
+    { "name": "nifty_options", "exchange": "NSE", "symbol": "NIFTY" },
+    { "name": "bank_nifty_options", "exchange": "NSE", "symbol": "BANKNIFTY" },
+    { "name": "sensex_options", "exchange": "BSE", "symbol": "SENSEX" }
   ]
 }
