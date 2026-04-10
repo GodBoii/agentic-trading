@@ -10,10 +10,13 @@ class PipelineConfig:
     root_dir: Path = backend_dir.parent
 
     bse_list_path: Path = backend_dir / "BSE_LIST.json"
+    security_master_path: Path = root_dir / "security_id_list.csv"
     stage1_latest_path: Path = backend_dir / "stage1_universe_latest.json"
     stage2_latest_path: Path = backend_dir / "stage2_momentum_latest.json"
     monitor_latest_path: Path = backend_dir / "monitor_liquidity_latest.json"
     regime_latest_path: Path = backend_dir / "regime_latest.json"
+    regime_source_catalog_path: Path = backend_dir / "pipeline" / "regime" / "market_sources.json"
+    regime_inputs_dir: Path = backend_dir / "regime_inputs"
     tick_stats_latest_path: Path = backend_dir / "stage2_tick_stats_latest.json"
     tick_stats_history_latest_path: Path = backend_dir / "stage2_tick_stats_history_latest.json"
     dhan_rate_limit_state_path: Path = backend_dir / "dhan_rate_limit_state.json"
@@ -35,9 +38,9 @@ class PipelineConfig:
     stage2_near_miss_limit: int = 10
     stage2_quote_batch_size: int = 1000
     regime_history_days: int = 5
-    regime_basket_size: int = 40
     regime_opening_range_minutes: int = 15
     regime_min_minutes_after_open: int = 30
+    regime_sector_limit: int = 12
 
     monitor_max_spread_percent: float = 0.30
     monitor_min_ticks_last_10min: int = 50
