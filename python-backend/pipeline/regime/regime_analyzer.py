@@ -41,6 +41,71 @@ class MarketRegimeAnalyzer:
     def _load_source_catalog(self) -> Dict[str, Any]:
         return json.loads(self.config.regime_source_catalog_path.read_text(encoding="utf-8"))
 
+    def _print_group_preview(self, title: str, items: List[Dict[str, Any]], extra_keys: Optional[List[str]] = None) -> None:
+        print(f"{title}: {len(items)}")
+        if not items:
+            return
+        preview_parts: List[str] = []
+        for item in items[:5]:
+            label = item.get("name") or item.get("symbol") or "unknown"
+            details: List[str] = []
+            for key in extra_keys or []:
+                value = item.get(key)
+                if value is not None:
+                    details.append(f"{key}={value}")
+            preview_parts.append(f"{label}" + (f" ({', '.join(details)})" if details else ""))
+        print(f"  Preview: {', '.join(preview_parts)}")
+
+    def _print_failure_summary(self, failures: Dict[str, str]) -> None:
+        print(f"Source failures: {len(failures)}")
+        if not failures:
+            print("  None")
+            return
+        for key in sorted(failures):
+            print(f"  {key} -> {failures[key]}")
+
+    def _print_external_input_summary(self, external_inputs: Dict[str, Any], external_missing: Dict[str, str]) -> None:
+        print("External inputs:")
+        provided = sorted(external_inputs.keys())
+        missing = sorted(external_missing.keys())
+        print(f"  Provided: {', '.join(provided) if provided else 'none'}")
+        print(f"  Missing: {', '.join(missing) if missing else 'none'}")
+
+    def _print_option_chain_summary(self, option_chains: List[Dict[str, Any]]) -> None:
+        print(f"Option chain snapshots: {len(option_chains)}")
+        if not option_chains:
+            print("  None")
+            return
+        for chain in option_chains:
+            print(
+                "  "
+                f"{chain['name']} | expiry={chain.get('selected_expiry')} "
+                f"underlying={chain.get('underlying_price')} "
+                f"strikes={chain.get('strike_count')} "
+                f"atm={chain.get('atm_strike')} "
+                f"pcr_oi={chain.get('put_call_oi_ratio')} "
+                f"atm_iv_spread={chain.get('atm_iv_spread')}"
+            )
+            debug_meta = chain.get("debug_meta") or {}
+            if debug_meta:
+                print(f"    debug_meta={json.dumps(debug_meta, ensure_ascii=True)}")
+
+    def _print_debug_payload_summary(self, debug_payloads: Dict[str, Any]) -> None:
+        print(f"Debug payloads captured: {len(debug_payloads)}")
+        if not debug_payloads:
+            print("  None")
+            return
+        for key in sorted(debug_payloads):
+            print(f"  {key}: {json.dumps(debug_payloads[key], ensure_ascii=True)[:1200]}")
+
+    def _print_regime_diagnostics(self, regime: Dict[str, Any]) -> None:
+        diagnostics = regime.get("diagnostics") or {}
+        if not diagnostics:
+            return
+        print("Regime diagnostics:")
+        for key in sorted(diagnostics):
+            print(f"  {key}={diagnostics[key]}")
+
     def _session_state(self) -> Dict[str, Any]:
         now = self.market_time.now()
         market_open = now.replace(
@@ -155,27 +220,37 @@ class MarketRegimeAnalyzer:
         self,
         source_key: str,
         source_meta: Dict[str, Any],
-    ) -> Tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+    ) -> Tuple[str, Optional[Dict[str, Any]], Optional[str], Optional[Dict[str, Any]]]:
         exchange_segment = source_meta["exchange_segment"]
         instrument = source_meta["instrument"]
         security_id = int(source_meta["security_id"])
-        resp = self.dhan.fetch_intraday_history(
-            security_id,
-            days=self.config.regime_history_days,
-            interval=1,
-            exchange_segment=exchange_segment,
-            instrument_candidates=[instrument],
-        )
+        try:
+            resp = self.dhan.fetch_intraday_history(
+                security_id,
+                days=self.config.regime_history_days,
+                interval=1,
+                exchange_segment=exchange_segment,
+                instrument_candidates=[instrument],
+            )
+        except Exception as exc:
+            return source_key, None, f"intraday_history_exception::{type(exc).__name__}::{exc}", None
         if not resp or str(resp.get("status", "")).lower() != "success":
-            return source_key, None, "intraday_history_failed"
+            remarks = str(resp.get("remarks", "") or resp.get("message", "") or "").strip()
+            data_blob = str(resp.get("data", "")).strip()
+            detail = "intraday_history_failed"
+            if remarks:
+                detail += f"::remarks={remarks[:160]}"
+            elif data_blob:
+                detail += f"::data={data_blob[:160]}"
+            return source_key, None, detail, None
 
         frame = self.dhan.intraday_response_to_df(resp)
         if frame.empty:
-            return source_key, None, "intraday_history_empty"
+            return source_key, None, "intraday_history_empty", None
 
         today_frame = self._today_market_frame(frame)
         if today_frame.empty:
-            return source_key, None, "intraday_today_empty"
+            return source_key, None, "intraday_today_empty", None
 
         latest_price = float(pd.to_numeric(today_frame["close"], errors="coerce").iloc[-1])
         open_price = float(pd.to_numeric(today_frame["open"], errors="coerce").iloc[0])
@@ -206,7 +281,7 @@ class MarketRegimeAnalyzer:
             "is_above_vwap": bool(price_vs_vwap_percent is not None and price_vs_vwap_percent > 0),
         }
         snapshot.update(opening_range)
-        return source_key, snapshot, None
+        return source_key, snapshot, None, None
 
     def _load_external_market_inputs(self) -> Tuple[Dict[str, Any], Dict[str, str]]:
         payloads: Dict[str, Any] = {}
@@ -353,7 +428,8 @@ class MarketRegimeAnalyzer:
         rows: Optional[List[Dict[str, Any]]] = None,
         parent_strike: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
-        rows = rows or []
+        if rows is None:
+            rows = []
         if isinstance(payload, list):
             for item in payload:
                 self._flatten_option_chain_rows(item, rows, parent_strike)
@@ -362,8 +438,18 @@ class MarketRegimeAnalyzer:
         if not isinstance(payload, dict):
             return rows
 
+        nested_data = payload.get("data")
+        if isinstance(nested_data, (dict, list)):
+            nested_keys = set(str(key) for key in payload.keys())
+            if nested_keys.issubset({"data", "status", "remarks", "message"}):
+                return self._flatten_option_chain_rows(nested_data, rows, parent_strike)
+
         if "oc" in payload and isinstance(payload.get("oc"), dict):
             return self._flatten_option_chain_rows(payload.get("oc"), rows, parent_strike)
+        if "optionChain" in payload and isinstance(payload.get("optionChain"), dict):
+            return self._flatten_option_chain_rows(payload.get("optionChain"), rows, parent_strike)
+        if "records" in payload and isinstance(payload.get("records"), (dict, list)):
+            return self._flatten_option_chain_rows(payload.get("records"), rows, parent_strike)
 
         strike = self._coerce_float(
             payload.get("strike_price")
@@ -416,6 +502,9 @@ class MarketRegimeAnalyzer:
     def _option_chain_underlying_price(self, response: Dict[str, Any]) -> Optional[float]:
         data = response.get("data")
         if isinstance(data, dict):
+            nested_data = data.get("data")
+            if isinstance(nested_data, dict):
+                data = nested_data
             for key in (
                 "underlyingPrice",
                 "underlying_price",
@@ -435,29 +524,81 @@ class MarketRegimeAnalyzer:
         data = response.get("data")
         if isinstance(data, dict):
             meta["data_keys"] = sorted(str(key) for key in data.keys())
+            nested_data = data.get("data")
+            if isinstance(nested_data, dict):
+                meta["nested_data_keys"] = sorted(str(key) for key in nested_data.keys())
             oc = data.get("oc")
+            if not isinstance(oc, dict) and isinstance(nested_data, dict):
+                oc = nested_data.get("oc")
             if isinstance(oc, dict):
                 strike_keys = list(oc.keys())
                 meta["oc_strike_count"] = len(strike_keys)
                 meta["oc_sample_keys"] = strike_keys[:5]
+                if strike_keys:
+                    first_value = oc.get(strike_keys[0])
+                    if isinstance(first_value, dict):
+                        meta["sample_strike_keys"] = sorted(str(key) for key in first_value.keys())
+                        ce_payload = (
+                            first_value.get("ce")
+                            or first_value.get("CE")
+                            or first_value.get("call")
+                            or first_value.get("CALL")
+                        )
+                        pe_payload = (
+                            first_value.get("pe")
+                            or first_value.get("PE")
+                            or first_value.get("put")
+                            or first_value.get("PUT")
+                        )
+                        if isinstance(ce_payload, dict):
+                            meta["sample_ce_keys"] = sorted(str(key) for key in ce_payload.keys())[:20]
+                        if isinstance(pe_payload, dict):
+                            meta["sample_pe_keys"] = sorted(str(key) for key in pe_payload.keys())[:20]
         return meta
+
+    def _option_chain_debug_payload(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "debug_meta": self._option_chain_debug_meta(response),
+        }
+        data = response.get("data")
+        nested_data = data.get("data") if isinstance(data, dict) else None
+        oc = None
+        if isinstance(data, dict) and isinstance(data.get("oc"), dict):
+            oc = data.get("oc")
+        elif isinstance(nested_data, dict) and isinstance(nested_data.get("oc"), dict):
+            oc = nested_data.get("oc")
+
+        if isinstance(oc, dict) and oc:
+            first_key = next(iter(oc.keys()))
+            first_value = oc.get(first_key)
+            payload["sample_strike_key"] = first_key
+            if isinstance(first_value, dict):
+                sample_payload: Dict[str, Any] = {}
+                for key in list(first_value.keys())[:12]:
+                    value = first_value.get(key)
+                    if isinstance(value, dict):
+                        sample_payload[key] = {sub_key: value.get(sub_key) for sub_key in list(value.keys())[:20]}
+                    else:
+                        sample_payload[key] = value
+                payload["sample_strike_payload"] = sample_payload
+        return payload
 
     def _fetch_option_chain_snapshot(
         self,
         source_key: str,
         source_meta: Dict[str, Any],
-    ) -> Tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+    ) -> Tuple[str, Optional[Dict[str, Any]], Optional[str], Optional[Dict[str, Any]]]:
         expiry_response = self.dhan.fetch_option_chain_expiry_list(
             under_security_id=int(source_meta["security_id"]),
             under_exchange_segment=str(source_meta["exchange_segment"]),
         )
         if str(expiry_response.get("status", "")).lower() != "success":
-            return source_key, None, "option_expiry_list_failed"
+            return source_key, None, "option_expiry_list_failed", {"expiry_response": expiry_response}
 
         expiries = self._extract_expiry_list(expiry_response)
         selected_expiry = self._pick_nearest_expiry(expiries)
         if not selected_expiry:
-            return source_key, None, "option_expiry_unavailable"
+            return source_key, None, "option_expiry_unavailable", {"expiry_response": expiry_response}
 
         chain_response = self.dhan.fetch_option_chain(
             under_security_id=int(source_meta["security_id"]),
@@ -465,7 +606,7 @@ class MarketRegimeAnalyzer:
             expiry=selected_expiry,
         )
         if str(chain_response.get("status", "")).lower() != "success":
-            return source_key, None, "option_chain_failed"
+            return source_key, None, "option_chain_failed", self._option_chain_debug_payload(chain_response)
 
         rows = self._flatten_option_chain_rows(chain_response.get("data"))
         if not rows:
@@ -473,9 +614,11 @@ class MarketRegimeAnalyzer:
             failure_bits = ["option_chain_empty"]
             if debug_meta.get("data_keys"):
                 failure_bits.append(f"keys={','.join(debug_meta['data_keys'])}")
+            if debug_meta.get("nested_data_keys"):
+                failure_bits.append(f"nested_keys={','.join(debug_meta['nested_data_keys'])}")
             if debug_meta.get("oc_strike_count") is not None:
                 failure_bits.append(f"oc_strikes={debug_meta['oc_strike_count']}")
-            return source_key, None, "::".join(failure_bits)
+            return source_key, None, "::".join(failure_bits), self._option_chain_debug_payload(chain_response)
 
         rows = [row for row in rows if row.get("strike_price") is not None]
         rows.sort(key=lambda row: float(row["strike_price"]))
@@ -558,8 +701,9 @@ class MarketRegimeAnalyzer:
             "atm_put": atm_put,
             "atm_iv_spread": atm_iv_spread,
             "chain_sample": rows[max(0, (len(rows) // 2) - 1): min(len(rows), (len(rows) // 2) + 2)],
+            "debug_meta": self._option_chain_debug_meta(chain_response),
         }
-        return source_key, snapshot, None
+        return source_key, snapshot, None, None
 
     def _resolve_market_sources(self) -> Dict[str, List[Dict[str, Any]]]:
         resolved: Dict[str, List[Dict[str, Any]]] = {
@@ -632,9 +776,10 @@ class MarketRegimeAnalyzer:
     def _fetch_resolved_sources(
         self,
         resolved: Dict[str, List[Dict[str, Any]]],
-    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, str]]:
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, str], Dict[str, Any]]:
         snapshots: Dict[str, Dict[str, Any]] = {}
         failures: Dict[str, str] = {}
+        debug_payloads: Dict[str, Any] = {}
         work_items: List[Tuple[str, Dict[str, Any]]] = []
         option_chain_items: List[Tuple[str, Dict[str, Any]]] = []
         for group_name, items in resolved.items():
@@ -650,23 +795,28 @@ class MarketRegimeAnalyzer:
                 for key, item in work_items
             ]
             for future in as_completed(futures):
-                key, snapshot, failure = future.result()
+                key, snapshot, failure, debug_payload = future.result()
                 if snapshot:
                     snapshots[key] = snapshot
                 elif failure:
                     failures[key] = failure
+                if debug_payload is not None:
+                    debug_payloads[key] = debug_payload
 
         for key, item in option_chain_items:
             snapshot, failure = None, None
+            debug_payload = None
             try:
-                _, snapshot, failure = self._fetch_option_chain_snapshot(key, item)
+                _, snapshot, failure, debug_payload = self._fetch_option_chain_snapshot(key, item)
             except Exception:
                 failure = "option_chain_exception"
             if snapshot:
                 snapshots[key] = snapshot
             elif failure:
                 failures[key] = failure
-        return snapshots, failures
+            if debug_payload is not None:
+                debug_payloads[key] = debug_payload
+        return snapshots, failures, debug_payloads
 
     def _average(self, rows: List[Dict[str, Any]], key: str) -> Optional[float]:
         values = [float(row[key]) for row in rows if row.get(key) is not None]
@@ -708,6 +858,31 @@ class MarketRegimeAnalyzer:
                 "market_regime": "open_discovery",
                 "confidence": 60.0,
                 "reasoning_summary": "The market is still in the opening discovery window, so structural labels remain provisional.",
+            }
+
+        if not primary_indices and not sector_indices and not futures:
+            return {
+                "market_regime": "data_unavailable",
+                "confidence": 0.0,
+                "reasoning_summary": "Core market context sources were unavailable for this cycle, so regime classification is suspended.",
+                "diagnostics": {
+                    "avg_primary_change_percent": None,
+                    "avg_primary_vwap_percent": None,
+                    "primary_above_open_ratio": None,
+                    "primary_above_vwap_ratio": None,
+                    "sector_breadth_ratio": None,
+                    "avg_sector_change_percent": None,
+                    "avg_sector_vwap_percent": None,
+                    "breakout_ratio": None,
+                    "futures_alignment_ratio": None,
+                    "futures_alignment_count": 0,
+                    "futures_compared_count": 0,
+                    "vix_change_percent": None,
+                    "news_severity_score": 0.0,
+                    "option_chain_count": len(option_chains),
+                    "avg_option_put_call_oi_ratio": None,
+                    "avg_option_atm_iv_spread": None,
+                },
             }
 
         vix_snapshot = next((row for row in primary_indices if row["name"] == "india_vix"), None)
@@ -850,7 +1025,13 @@ class MarketRegimeAnalyzer:
 
         session_state = self._session_state()
         resolved = self._resolve_market_sources()
-        source_snapshots, source_failures = self._fetch_resolved_sources(resolved)
+        print("Resolved source groups:")
+        self._print_group_preview("  Primary indices", resolved["primary_indices"], ["symbol", "security_id"])
+        self._print_group_preview("  Sector indices", resolved["sector_indices"], ["symbol", "security_id"])
+        self._print_group_preview("  Index futures", resolved["index_futures"], ["underlying_symbol", "security_id"])
+        self._print_group_preview("  Option chain underlyings", resolved["option_chain_underlyings"], ["symbol", "security_id"])
+
+        source_snapshots, source_failures, debug_payloads = self._fetch_resolved_sources(resolved)
         external_inputs, external_missing = self._load_external_market_inputs()
 
         primary_indices = [
@@ -883,6 +1064,17 @@ class MarketRegimeAnalyzer:
             external_inputs=external_inputs,
         )
 
+        print("Fetched source groups:")
+        print(f"  Primary indices: {len(primary_indices)}")
+        print(f"  Sector indices: {len(sector_indices)}")
+        print(f"  Index futures: {len(futures)}")
+        print(f"  Option chains: {len(option_chains)}")
+        self._print_failure_summary(source_failures)
+        self._print_external_input_summary(external_inputs, external_missing)
+        self._print_option_chain_summary(option_chains)
+        self._print_debug_payload_summary(debug_payloads)
+        self._print_regime_diagnostics(regime)
+
         payload = {
             "stage": "market_regime",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -902,6 +1094,7 @@ class MarketRegimeAnalyzer:
                     "option_chain_underlyings": len(option_chains),
                 },
                 "source_failures": source_failures,
+                "debug_payloads": debug_payloads,
                 "external_inputs_missing": external_missing,
                 "review_interval_seconds": self.config.regime_loop_interval_seconds,
                 "next_review_at": (
