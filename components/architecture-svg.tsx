@@ -176,7 +176,7 @@ export default function ArchitectureSVG() {
         <g transform="translate(250, 440)">
            <rect x="0" y="0" width="220" height="140" rx="6" fill="#050505" stroke="#111" strokeWidth="2" />
            <g transform="translate(15, 25)">
-              <text x="0" y="0" fill="#06B6D4" fontSize="11" fontFamily="monospace" fontWeight="bold">> ANALYZING ENTIRE MARKET...</text>
+              <text x="0" y="0" fill="#06B6D4" fontSize="11" fontFamily="monospace" fontWeight="bold">{'>'} ANALYZING ENTIRE MARKET...</text>
               <line x1="0" y1="8" x2="190" y2="8" stroke="#222" strokeWidth="1" />
               <text x="0" y="25" fill="#888" fontSize="11" fontFamily="monospace">market_regime: <tspan fill="#10B981" fontWeight="bold">TREND</tspan></text>
               <text x="0" y="45" fill="#888" fontSize="11" fontFamily="monospace">trade_perm:    <tspan fill="#10B981" fontWeight="bold">ALLOWED</tspan></text>

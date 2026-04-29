@@ -63,14 +63,17 @@ export default function TradingStatus() {
             setError(null)
 
             const newStatus = !tradingKeys.is_trading_enabled
+            const response = await fetch('/api/ai-trading/toggle', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ enabled: newStatus }),
+            })
 
-            const { error: updateError } = await supabase
-                .from('user_trading_keys')
-                .update({ is_trading_enabled: newStatus })
-                .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-
-            if (updateError) {
-                throw updateError
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null)
+                throw new Error(payload?.error || 'Failed to update trading status')
             }
 
             setTradingKeys({
