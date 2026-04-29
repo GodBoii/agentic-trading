@@ -21,6 +21,21 @@ export default function TradingStatus() {
         fetchTradingStatus()
     }, [])
 
+    const syncAnalyzerState = async (enabled: boolean) => {
+        const response = await fetch('/api/ai-trading/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enabled }),
+        })
+
+        if (!response.ok) {
+            const payload = await response.json().catch(() => null)
+            throw new Error(payload?.error || 'Failed to sync AI trading state')
+        }
+    }
+
     const fetchTradingStatus = async () => {
         try {
             setLoading(true)
@@ -46,6 +61,12 @@ export default function TradingStatus() {
                 }
             } else {
                 setTradingKeys(data)
+                try {
+                    await syncAnalyzerState(Boolean(data.is_trading_enabled))
+                } catch (syncError) {
+                    console.error('Error syncing analyzer state:', syncError)
+                    setError('Failed to sync analyzer state')
+                }
             }
         } catch (err) {
             console.error('Error:', err)
@@ -63,18 +84,7 @@ export default function TradingStatus() {
             setError(null)
 
             const newStatus = !tradingKeys.is_trading_enabled
-            const response = await fetch('/api/ai-trading/toggle', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ enabled: newStatus }),
-            })
-
-            if (!response.ok) {
-                const payload = await response.json().catch(() => null)
-                throw new Error(payload?.error || 'Failed to update trading status')
-            }
+            await syncAnalyzerState(newStatus)
 
             setTradingKeys({
                 ...tradingKeys,
