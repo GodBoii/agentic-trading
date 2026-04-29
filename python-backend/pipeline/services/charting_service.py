@@ -143,10 +143,15 @@ class CandlestickChartService:
         ax_volume.set_facecolor("#0b0b0b")
         ax_cvd.set_facecolor("#0b0b0b")
 
-        date_numbers = mdates.date2num(frame.index.to_pydatetime())
+        # Make the index timezone-naive so matplotlib plots the local time exactly as-is
+        plot_frame = frame.copy()
+        if plot_frame.index.tz is not None:
+            plot_frame.index = plot_frame.index.tz_localize(None)
+
+        date_numbers = mdates.date2num(plot_frame.index.to_pydatetime())
         candle_width = self._candle_width(date_numbers)
 
-        for index, (_, row) in enumerate(frame.iterrows()):
+        for index, (_, row) in enumerate(plot_frame.iterrows()):
             x = date_numbers[index]
             open_price = float(row["open"])
             close_price = float(row["close"])
@@ -172,39 +177,39 @@ class CandlestickChartService:
             ax_volume.bar(x, volume, width=candle_width, color=color, alpha=0.8)
 
         # Plot VWAP Overlay
-        if "vwap" in frame.columns and not frame["vwap"].isna().all():
-            ax_price.plot(date_numbers, frame["vwap"], color="#f59e0b", linewidth=1.8, label="VWAP")
+        if "vwap" in plot_frame.columns and not plot_frame["vwap"].isna().all():
+            ax_price.plot(date_numbers, plot_frame["vwap"], color="#f59e0b", linewidth=1.8, label="VWAP")
             ax_price.legend(loc="upper left", facecolor="#0b0b0b", edgecolor="#4a4a4a", labelcolor="#d4d4d4")
 
         # Plot CVD
-        if "cvd" in frame.columns and not frame["cvd"].isna().all():
-            ax_cvd.plot(date_numbers, frame["cvd"], color="#3b82f6", linewidth=1.5)
+        if "cvd" in plot_frame.columns and not plot_frame["cvd"].isna().all():
+            ax_cvd.plot(date_numbers, plot_frame["cvd"], color="#3b82f6", linewidth=1.5)
             # Fill area for CVD
             ax_cvd.fill_between(
                 date_numbers, 
-                frame["cvd"], 
+                plot_frame["cvd"], 
                 0, 
-                where=(frame["cvd"] >= 0), 
+                where=(plot_frame["cvd"] >= 0), 
                 color="#3b82f6", 
                 alpha=0.3,
                 interpolate=True
             )
             ax_cvd.fill_between(
                 date_numbers, 
-                frame["cvd"], 
+                plot_frame["cvd"], 
                 0, 
-                where=(frame["cvd"] < 0), 
+                where=(plot_frame["cvd"] < 0), 
                 color="#ef4444", 
                 alpha=0.3,
                 interpolate=True
             )
             ax_cvd.axhline(0, color="#4a4a4a", linestyle="--", linewidth=1)
 
-        # Enhance Title with ATR & VWAP Data
-        latest_vwap = frame["vwap"].iloc[-1] if "vwap" in frame.columns and not frame["vwap"].isna().all() else 0.0
-        latest_atr = frame["atr"].iloc[-1] if "atr" in frame.columns and not frame["atr"].isna().all() else 0.0
+        # Enhance Title with ATR, VWAP, and Currency Data
+        latest_vwap = plot_frame["vwap"].iloc[-1] if "vwap" in plot_frame.columns and not plot_frame["vwap"].isna().all() else 0.0
+        latest_atr = plot_frame["atr"].iloc[-1] if "atr" in plot_frame.columns and not plot_frame["atr"].isna().all() else 0.0
         
-        full_title = f"{title} | VWAP: {latest_vwap:.2f} | ATR(14): {latest_atr:.2f}"
+        full_title = f"{title} | VWAP: Rs. {latest_vwap:.2f} | ATR(14): Rs. {latest_atr:.2f} | Note: Indian Currency (Rs., Crores)"
         ax_price.set_title(full_title, color="#f8f4e9", fontsize=16, pad=12)
         
         ax_price.grid(color="#2a2a2a", linestyle="--", linewidth=0.6, alpha=0.8)
@@ -222,7 +227,7 @@ class CandlestickChartService:
         ax_cvd.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         
         ax_volume.set_ylabel("Vol", color="#d4d4d4")
-        ax_price.set_ylabel("Price", color="#d4d4d4")
+        ax_price.set_ylabel("Price (Rs.)", color="#d4d4d4")
         ax_cvd.set_ylabel("CVD", color="#d4d4d4")
         
         # Ensure x-axis correctly scales to data
