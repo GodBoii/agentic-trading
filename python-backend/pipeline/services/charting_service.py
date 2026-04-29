@@ -67,11 +67,33 @@ class CandlestickChartService:
         filtered = frame[frame["timestamp"].dt.date == market_day].copy()
         return filtered.set_index("timestamp")
 
+    def _add_base_indicators(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame
+        df = frame.copy()
+        
+        # VWAP
+        df['typical_price'] = (df['high'] + df['low'] + df['close']) / 3.0
+        df['vp'] = df['typical_price'] * df['volume']
+        df['cum_vp'] = df['vp'].cumsum()
+        df['cum_vol'] = df['volume'].cumsum()
+        df['vwap'] = df['cum_vp'] / df['cum_vol']
+        
+        # Estimated CVD (Cumulative Volume Delta)
+        df['delta'] = df['volume']
+        df.loc[df['close'] < df['open'], 'delta'] = -df['volume']
+        df['cvd'] = df['delta'].cumsum()
+        
+        return df
+
     def _resample_frame(self, frame: pd.DataFrame, timeframe_minutes: int) -> pd.DataFrame:
         rule = f"{timeframe_minutes}min"
+        
+        df = self._add_base_indicators(frame)
+        
         ohlcv = (
-            frame[["open", "high", "low", "close", "volume"]]
-            .resample(rule, label="right", closed="right")
+            df[["open", "high", "low", "close", "volume", "vwap", "cvd"]]
+            .resample(rule, label="left", closed="left")
             .agg(
                 {
                     "open": "first",
@@ -79,10 +101,23 @@ class CandlestickChartService:
                     "low": "min",
                     "close": "last",
                     "volume": "sum",
+                    "vwap": "last",
+                    "cvd": "last",
                 }
             )
             .dropna(subset=["open", "high", "low", "close"])
         )
+        
+        # Calculate ATR (14 period) on resampled data
+        high_low = ohlcv['high'] - ohlcv['low']
+        high_close_prev = (ohlcv['high'] - ohlcv['close'].shift(1)).abs()
+        low_close_prev = (ohlcv['low'] - ohlcv['close'].shift(1)).abs()
+        true_range = pd.concat([high_low, high_close_prev, low_close_prev], axis=1).max(axis=1)
+        ohlcv['atr'] = true_range.rolling(window=14).mean()
+        
+        # Fill missing ATR values for initial rows (or backward fill if needed)
+        ohlcv['atr'] = ohlcv['atr'].bfill()
+        
         return ohlcv.tail(80)
 
     def _render_chart(self, frame: pd.DataFrame, title: str, output_path: Path) -> None:
@@ -96,16 +131,17 @@ class CandlestickChartService:
         if frame.empty:
             raise ValueError(f"Cannot render empty chart for {title}.")
 
-        fig, (ax_price, ax_volume) = plt.subplots(
-            2,
+        fig, (ax_price, ax_volume, ax_cvd) = plt.subplots(
+            3,
             1,
-            figsize=(12, 8),
+            figsize=(12, 10),
             sharex=True,
-            gridspec_kw={"height_ratios": [4, 1]},
+            gridspec_kw={"height_ratios": [4, 1, 1]},
         )
         fig.patch.set_facecolor("#0b0b0b")
         ax_price.set_facecolor("#0b0b0b")
         ax_volume.set_facecolor("#0b0b0b")
+        ax_cvd.set_facecolor("#0b0b0b")
 
         date_numbers = mdates.date2num(frame.index.to_pydatetime())
         candle_width = self._candle_width(date_numbers)
@@ -135,16 +171,63 @@ class CandlestickChartService:
             )
             ax_volume.bar(x, volume, width=candle_width, color=color, alpha=0.8)
 
-        ax_price.set_title(title, color="#f8f4e9", fontsize=16, pad=12)
+        # Plot VWAP Overlay
+        if "vwap" in frame.columns and not frame["vwap"].isna().all():
+            ax_price.plot(date_numbers, frame["vwap"], color="#f59e0b", linewidth=1.8, label="VWAP")
+            ax_price.legend(loc="upper left", facecolor="#0b0b0b", edgecolor="#4a4a4a", labelcolor="#d4d4d4")
+
+        # Plot CVD
+        if "cvd" in frame.columns and not frame["cvd"].isna().all():
+            ax_cvd.plot(date_numbers, frame["cvd"], color="#3b82f6", linewidth=1.5)
+            # Fill area for CVD
+            ax_cvd.fill_between(
+                date_numbers, 
+                frame["cvd"], 
+                0, 
+                where=(frame["cvd"] >= 0), 
+                color="#3b82f6", 
+                alpha=0.3,
+                interpolate=True
+            )
+            ax_cvd.fill_between(
+                date_numbers, 
+                frame["cvd"], 
+                0, 
+                where=(frame["cvd"] < 0), 
+                color="#ef4444", 
+                alpha=0.3,
+                interpolate=True
+            )
+            ax_cvd.axhline(0, color="#4a4a4a", linestyle="--", linewidth=1)
+
+        # Enhance Title with ATR & VWAP Data
+        latest_vwap = frame["vwap"].iloc[-1] if "vwap" in frame.columns and not frame["vwap"].isna().all() else 0.0
+        latest_atr = frame["atr"].iloc[-1] if "atr" in frame.columns and not frame["atr"].isna().all() else 0.0
+        
+        full_title = f"{title} | VWAP: {latest_vwap:.2f} | ATR(14): {latest_atr:.2f}"
+        ax_price.set_title(full_title, color="#f8f4e9", fontsize=16, pad=12)
+        
         ax_price.grid(color="#2a2a2a", linestyle="--", linewidth=0.6, alpha=0.8)
         ax_volume.grid(color="#2a2a2a", linestyle="--", linewidth=0.4, alpha=0.6)
+        ax_cvd.grid(color="#2a2a2a", linestyle="--", linewidth=0.4, alpha=0.6)
+        
         ax_price.tick_params(colors="#d4d4d4")
         ax_volume.tick_params(colors="#d4d4d4")
+        ax_cvd.tick_params(colors="#d4d4d4")
+        
         ax_price.spines[:].set_color("#4a4a4a")
         ax_volume.spines[:].set_color("#4a4a4a")
-        ax_volume.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        ax_cvd.spines[:].set_color("#4a4a4a")
+        
+        ax_cvd.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        
         ax_volume.set_ylabel("Vol", color="#d4d4d4")
         ax_price.set_ylabel("Price", color="#d4d4d4")
+        ax_cvd.set_ylabel("CVD", color="#d4d4d4")
+        
+        # Ensure x-axis correctly scales to data
+        ax_price.set_xlim([date_numbers[0] - candle_width, date_numbers[-1] + candle_width])
+        
         fig.autofmt_xdate()
         plt.tight_layout()
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
