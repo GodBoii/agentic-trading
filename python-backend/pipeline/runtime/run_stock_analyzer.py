@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pipeline.analyzer import StockAnalyzerAgent
 from pipeline.config import PipelineConfig
@@ -14,7 +15,7 @@ from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
 
-class SingleStockAnalyzerRunner:
+class MultiStockAnalyzerRunner:
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
         self.market_time = MarketTimeService(self.config)
@@ -43,78 +44,45 @@ class SingleStockAnalyzerRunner:
         if not monitor_payload:
             monitor_payload = self.storage.load_snapshot(self.config.monitor_latest_path)
 
-        candidate_record, candidate_source = self._select_candidate(stage2_payload, monitor_payload)
-        candidate_packet = self._build_candidate_packet(
-            market_date=market_date,
-            candidate_record=candidate_record,
-            candidate_source=candidate_source,
-            stage2_payload=stage2_payload,
-            monitor_payload=monitor_payload,
-            regime_payload=regime_payload,
-        )
+        selected_candidates, candidate_source = self._select_candidates(stage2_payload, monitor_payload)
+        if not selected_candidates:
+            raise RuntimeError("stock_analyzer_no_candidates_selected")
+
+        candidate_packets = [
+            self._build_candidate_packet(
+                market_date=market_date,
+                candidate_record=candidate_record,
+                candidate_source=candidate_source,
+                stage2_payload=stage2_payload,
+                monitor_payload=monitor_payload,
+                regime_payload=regime_payload,
+            )
+            for candidate_record in selected_candidates
+        ]
 
         existing = self.storage.load_snapshot(self.config.stock_analyzer_latest_path)
-        if not self._should_refresh(existing, candidate_packet):
-            print(
-                f"Stock analyzer report is still fresh for {candidate_packet['symbol']}."
-            )
+        if not self._should_refresh(existing, candidate_packets):
+            print("Stock analyzer batch is still fresh.")
             return existing
 
-        intraday_resp = self.dhan.fetch_intraday_history(
-            int(candidate_record["security_id"]),
-            days=5,
-            interval=1,
-            exchange_segment="BSE_EQ",
-            instrument_candidates=[candidate_record.get("instrument"), "EQUITY"],
-        )
-        if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
-            raise RuntimeError("stock_analyzer_intraday_history_failed")
-
-        intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
-        artifacts_dir = (
-            self.config.stock_analyzer_artifacts_dir
-            / market_date
-            / self._slugify(candidate_packet["display_name"])
-        )
-        chart_bundle = self.charting.build_intraday_chart_set(
-            frame=intraday_frame,
-            display_name=candidate_packet["display_name"],
-            market_date=market_date,
-            output_dir=artifacts_dir,
-        )
-        candidate_packet["chart_artifacts"] = chart_bundle
-
-        chart_paths = [
-            chart_bundle["charts"]["5m"]["path"],
-            chart_bundle["charts"]["15m"]["path"],
-        ]
-        print(
-            f"Analyzing {candidate_packet['display_name']} using {len(chart_paths)} chart images..."
-        )
-        analysis = self.agent.analyze(candidate_packet, chart_paths)
-
+        reports = self._analyze_candidates(candidate_packets)
         payload = {
             "stage": "stock_analyzer",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
             "summary": {
                 "market_date": market_date,
                 "candidate_source": candidate_source,
-                "security_id": candidate_packet["security_id"],
-                "symbol": candidate_packet["symbol"],
-                "display_name": candidate_packet["display_name"],
                 "status": "completed",
-                "trade_bias": analysis.get("trade_bias"),
-                "confidence": analysis.get("confidence"),
-                "source_snapshots": candidate_packet["source_snapshots"],
-                "chart_count": chart_bundle.get("chart_count"),
+                "selected_count": len(reports),
+                "selected_symbols": [report["candidate"]["symbol"] for report in reports],
+                "selected_security_ids": [report["candidate"]["security_id"] for report in reports],
+                "source_snapshots": reports[0]["candidate"]["source_snapshots"],
+                "chart_count": sum(int(report["candidate"]["chart_artifacts"].get("chart_count", 0)) for report in reports),
             },
-            "candidate": candidate_packet,
-            "analysis": analysis,
+            "reports": reports,
         }
         self._save_payload(payload)
-        print(
-            f"Saved stock analyzer snapshot for {candidate_packet['display_name']} ({candidate_packet['symbol']})."
-        )
+        print(f"Saved stock analyzer batch snapshot for {len(reports)} stock(s).")
         return payload
 
     def _load_required_snapshot(self, daily_path: Path, latest_path: Path, label: str) -> Dict[str, Any]:
@@ -126,18 +94,122 @@ class SingleStockAnalyzerRunner:
             return payload
         raise FileNotFoundError(f"{label} snapshot not found for stock analyzer.")
 
-    def _select_candidate(
+    def _select_candidates(
         self,
         stage2_payload: Dict[str, Any],
         monitor_payload: Optional[Dict[str, Any]],
-    ) -> tuple[Dict[str, Any], str]:
-        if monitor_payload and isinstance(monitor_payload.get("stocks"), list) and monitor_payload["stocks"]:
-            return monitor_payload["stocks"][0], "monitor"
+    ) -> tuple[List[Dict[str, Any]], str]:
+        top_n = max(1, int(self.config.stock_analyzer_top_n))
 
-        stage2_stocks = stage2_payload.get("stocks") or []
-        if not stage2_stocks:
+        monitor_stocks = monitor_payload.get("stocks") if monitor_payload else None
+        if isinstance(monitor_stocks, list) and monitor_stocks:
+            return monitor_stocks[:top_n], "monitor"
+
+        stage2_stocks = list(stage2_payload.get("stocks") or [])
+        if len(stage2_stocks) >= top_n:
+            return stage2_stocks[:top_n], "stage2"
+
+        near_misses = list(stage2_payload.get("summary", {}).get("near_misses") or [])
+        combined: List[Dict[str, Any]] = []
+        seen_security_ids: set[int] = set()
+        for row in stage2_stocks + near_misses:
+            try:
+                security_id = int(row.get("security_id"))
+            except Exception:
+                continue
+            if security_id in seen_security_ids:
+                continue
+            seen_security_ids.add(security_id)
+            combined.append(row)
+            if len(combined) >= top_n:
+                break
+
+        if not combined:
             raise RuntimeError("stock_analyzer_no_stage2_candidates")
-        return stage2_stocks[0], "stage2"
+        return combined, "stage2_fallback"
+
+    def _analyze_candidates(self, candidate_packets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        max_workers = min(len(candidate_packets), max(1, int(self.config.stock_analyzer_top_n)))
+        reports: Dict[int, Dict[str, Any]] = {}
+        failures: List[Dict[str, Any]] = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {
+                executor.submit(self._analyze_single_candidate, index, packet): index
+                for index, packet in enumerate(candidate_packets)
+            }
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                try:
+                    reports[index] = future.result()
+                except Exception as exc:
+                    packet = candidate_packets[index]
+                    failures.append(
+                        {
+                            "rank": index + 1,
+                            "security_id": packet.get("security_id"),
+                            "symbol": packet.get("symbol"),
+                            "display_name": packet.get("display_name"),
+                            "error": f"{type(exc).__name__}: {exc}",
+                        }
+                    )
+
+        if failures:
+            print(f"Stock analyzer skipped {len(failures)} candidate(s): {failures}")
+
+        ordered_reports = [reports[index] for index in sorted(reports.keys())]
+        if ordered_reports:
+            return ordered_reports
+
+        auth_failures = [item for item in failures if "stock_analyzer_auth_invalid::" in str(item.get("error"))]
+        if auth_failures:
+            raise RuntimeError(auth_failures[0]["error"])
+
+        raise RuntimeError(f"stock_analyzer_all_candidates_failed::{failures}")
+
+    def _analyze_single_candidate(self, index: int, candidate_packet: Dict[str, Any]) -> Dict[str, Any]:
+        intraday_resp = self.dhan.fetch_intraday_history(
+            int(candidate_packet["security_id"]),
+            days=5,
+            interval=1,
+            exchange_segment="BSE_EQ",
+            instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
+        )
+        if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
+            remarks = intraday_resp.get("remarks") if isinstance(intraday_resp, dict) else None
+            if self.dhan.is_auth_invalid(intraday_resp):
+                raise RuntimeError(f"stock_analyzer_auth_invalid::{remarks}")
+            raise RuntimeError(
+                f"stock_analyzer_intraday_history_failed::{candidate_packet['security_id']}::{remarks}"
+            )
+
+        intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
+        artifacts_dir = (
+            self.config.stock_analyzer_artifacts_dir
+            / candidate_packet["market_date"]
+            / self._slugify(candidate_packet["display_name"])
+        )
+        chart_bundle = self.charting.build_intraday_chart_set(
+            frame=intraday_frame,
+            display_name=candidate_packet["display_name"],
+            market_date=candidate_packet["market_date"],
+            output_dir=artifacts_dir,
+        )
+        candidate_packet["chart_artifacts"] = chart_bundle
+
+        chart_paths = [
+            chart_bundle["charts"]["5m"]["path"],
+            chart_bundle["charts"]["15m"]["path"],
+        ]
+        print(
+            f"[rank {index + 1}] Analyzing {candidate_packet['display_name']} using {len(chart_paths)} chart images..."
+        )
+        analysis = self.agent.analyze(candidate_packet, chart_paths)
+        return {
+            "rank": index + 1,
+            "candidate": candidate_packet,
+            "analysis": analysis,
+        }
 
     def _build_candidate_packet(
         self,
@@ -159,21 +231,23 @@ class SingleStockAnalyzerRunner:
             "security_id": security_id,
             "symbol": candidate_record.get("symbol"),
             "display_name": candidate_record.get("display_name"),
+            "instrument": candidate_record.get("instrument"),
             "stock": {
                 "price": candidate_record.get("price"),
                 "adv_20_cr": stage2_record.get("adv_20_cr") if stage2_record else candidate_record.get("adv_20_cr"),
                 "atr_percent": stage2_record.get("atr_percent") if stage2_record else candidate_record.get("atr_percent"),
             },
             "stage2": {
-                "score": stage2_record.get("stage2_score") if stage2_record else None,
-                "time_of_day_rvol": stage2_record.get("time_of_day_rvol") if stage2_record else None,
-                "price_vs_vwap_percent": stage2_record.get("price_vs_vwap_percent") if stage2_record else None,
+                "score": stage2_record.get("stage2_score") if stage2_record else candidate_record.get("stage2_score"),
+                "time_of_day_rvol": stage2_record.get("time_of_day_rvol") if stage2_record else candidate_record.get("time_of_day_rvol"),
+                "price_vs_vwap_percent": stage2_record.get("price_vs_vwap_percent") if stage2_record else candidate_record.get("price_vs_vwap_percent"),
                 "opening_range_breakout_percent": (
-                    stage2_record.get("opening_range_breakout_percent") if stage2_record else None
+                    stage2_record.get("opening_range_breakout_percent") if stage2_record else candidate_record.get("opening_range_breakout_percent")
                 ),
                 "volume_acceleration_ratio": (
-                    stage2_record.get("volume_acceleration_ratio") if stage2_record else None
+                    stage2_record.get("volume_acceleration_ratio") if stage2_record else candidate_record.get("volume_acceleration_ratio")
                 ),
+                "stage2_reason": stage2_record.get("stage2_reason") if stage2_record else candidate_record.get("stage2_reason"),
             },
             "monitor": {
                 "passed": bool(monitor_record),
@@ -212,18 +286,21 @@ class SingleStockAnalyzerRunner:
                 continue
         return {}
 
-    def _should_refresh(self, existing: Optional[Dict[str, Any]], candidate_packet: Dict[str, Any]) -> bool:
+    def _should_refresh(self, existing: Optional[Dict[str, Any]], candidate_packets: List[Dict[str, Any]]) -> bool:
         if not existing:
             return True
 
         summary = existing.get("summary") or {}
-        if summary.get("market_date") != candidate_packet.get("market_date"):
+        if summary.get("market_date") != candidate_packets[0].get("market_date"):
             return True
-        if int(summary.get("security_id") or 0) != int(candidate_packet.get("security_id") or 0):
+
+        expected_ids = [int(packet["security_id"]) for packet in candidate_packets]
+        actual_ids = [int(item) for item in summary.get("selected_security_ids") or []]
+        if actual_ids != expected_ids:
             return True
 
         existing_sources = summary.get("source_snapshots") or {}
-        if existing_sources != candidate_packet.get("source_snapshots"):
+        if existing_sources != candidate_packets[0].get("source_snapshots"):
             return True
 
         generated_at = existing.get("generated_at_utc")
@@ -249,12 +326,13 @@ class SingleStockAnalyzerRunner:
 
 def main() -> None:
     config = PipelineConfig()
-    runner = SingleStockAnalyzerRunner(config)
+    runner = MultiStockAnalyzerRunner(config)
 
     print("=" * 60)
     print("STOCK ANALYZER")
     print("=" * 60)
     print(f"Loop interval: {config.stock_analyzer_loop_interval_seconds} seconds")
+    print(f"Top N candidates: {config.stock_analyzer_top_n}")
 
     while True:
         try:
