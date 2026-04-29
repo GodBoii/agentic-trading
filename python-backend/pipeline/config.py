@@ -17,6 +17,7 @@ class PipelineConfig:
     regime_latest_path: Path = backend_dir / "regime_latest.json"
     ai_trading_state_path: Path = backend_dir / "ai_trading_state.json"
     stock_analyzer_latest_path: Path = backend_dir / "stock_analyzer_latest.json"
+    risk_analyzer_latest_path: Path = backend_dir / "risk_analyzer_latest.json"
     stock_analyzer_artifacts_dir: Path = backend_dir / "stock_analyzer_artifacts"
     regime_source_catalog_path: Path = backend_dir / "pipeline" / "regime" / "market_sources.json"
     regime_inputs_dir: Path = backend_dir / "regime_inputs"
@@ -63,6 +64,9 @@ class PipelineConfig:
     regime_loop_interval_seconds: int = 900
     stock_analyzer_loop_interval_seconds: int = 30
     stock_analyzer_report_refresh_seconds: int = 300
+    stock_analyzer_top_n: int = 3
+    risk_analyzer_loop_interval_seconds: int = 30
+    risk_analyzer_report_refresh_seconds: int = 300
     tick_stats_save_interval_seconds: int = 30
     tick_stats_history_save_interval_seconds: int = 600
     rate_limit_backoff_base_seconds: float = 0.5
@@ -96,6 +100,9 @@ class PipelineConfig:
 
     def stock_analyzer_daily_path(self, market_date: str) -> Path:
         return self.backend_dir / f"stock-analyzer-{market_date}.json"
+
+    def risk_analyzer_daily_path(self, market_date: str) -> Path:
+        return self.backend_dir / f"risk-analyzer-{market_date}.json"
 
     def tick_stats_daily_path(self, market_date: Optional[str] = None) -> Path:
         if market_date:

@@ -84,3 +84,22 @@ services:
       - ./python-backend:/app/python-backend
       - ./:/app
     restart: unless-stopped
+
+  risk_analyzer:
+    build:
+      context: .
+      dockerfile: python-backend/Dockerfile
+    env_file:
+      - python-backend/.env
+      - .env
+    working_dir: /app/python-backend
+    environment:
+      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
+    command: python -m pipeline.runtime.run_risk_analyzer
+    depends_on:
+      - market-data-gateway
+      - stock_analyzer
+    volumes:
+      - ./python-backend:/app/python-backend
+      - ./:/app
+    restart: unless-stopped
