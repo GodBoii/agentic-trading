@@ -9,8 +9,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from pipeline.config import PipelineConfig
+from pipeline.regime.regime_analyzer_agent import RegimeNewsAnalyzerAgent
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_reference_service import MarketReferenceService
+from pipeline.services.regime_news_service import RegimeNewsService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
@@ -35,6 +37,8 @@ class MarketRegimeAnalyzer:
         self.config = config or PipelineConfig()
         self.dhan = DhanService(self.config)
         self.market_time = MarketTimeService(self.config)
+        self.news_service = RegimeNewsService(self.config, self.market_time)
+        self.news_agent = RegimeNewsAnalyzerAgent()
         self.references = MarketReferenceService(self.config)
         self.catalog = self._load_source_catalog()
 
@@ -298,6 +302,175 @@ class MarketRegimeAnalyzer:
             except Exception as exc:
                 missing[key] = f"invalid_json::{type(exc).__name__}"
         return payloads, missing
+
+    def _refresh_market_news_input(self) -> Optional[Dict[str, Any]]:
+        self.config.regime_inputs_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            collected = self.news_service.collect_market_news_payload()
+            headlines = collected.get("headlines") or []
+            agno_error: Optional[str] = None
+            analysis_engine = "heuristic"
+
+            if headlines:
+                agent_analysis, agno_error = self.news_agent.analyze(headlines)
+                if agent_analysis is not None and not agno_error:
+                    analysis = agent_analysis
+                    analysis_engine = "agno"
+                else:
+                    analysis = self.news_service.analyze_with_heuristics(headlines)
+            else:
+                analysis = self.news_service.analyze_with_heuristics([])
+
+            payload = self.news_service.finalize_market_news_payload(
+                collected=collected,
+                analysis=analysis,
+                analysis_engine=analysis_engine,
+                agno_error=agno_error,
+            )
+            StorageService.save_snapshot(self.config.regime_market_news_path, payload)
+            return payload
+        except Exception as exc:
+            print(f"Market news refresh failed: {type(exc).__name__}: {exc}")
+            return None
+
+    def _derive_operational_controls(
+        self,
+        session_state: Dict[str, Any],
+        regime: Dict[str, Any],
+        external_inputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        market_regime = str(regime.get("market_regime") or "data_unavailable")
+        confidence = float(regime.get("confidence") or 0.0)
+        news_input = external_inputs.get("market_news") or {}
+        news_severity = float(news_input.get("event_severity_score") or 0.0)
+        news_caution = str(news_input.get("trade_caution_level") or "medium").lower()
+
+        control_map: Dict[str, Dict[str, Any]] = {
+            "trend_up": {
+                "trade_permission": "allowed",
+                "preferred_style": "trend_following",
+                "long_bias": 0.70,
+                "short_bias": 0.30,
+                "position_size_multiplier": 1.0,
+                "max_concurrent_positions": 3,
+            },
+            "trend_down": {
+                "trade_permission": "allowed",
+                "preferred_style": "trend_following",
+                "long_bias": 0.30,
+                "short_bias": 0.70,
+                "position_size_multiplier": 1.0,
+                "max_concurrent_positions": 3,
+            },
+            "risk_on": {
+                "trade_permission": "allowed",
+                "preferred_style": "trend_following",
+                "long_bias": 0.65,
+                "short_bias": 0.35,
+                "position_size_multiplier": 0.85,
+                "max_concurrent_positions": 3,
+            },
+            "risk_off": {
+                "trade_permission": "reduced",
+                "preferred_style": "defensive_selective",
+                "long_bias": 0.35,
+                "short_bias": 0.65,
+                "position_size_multiplier": 0.55,
+                "max_concurrent_positions": 2,
+            },
+            "mean_reversion": {
+                "trade_permission": "reduced",
+                "preferred_style": "mean_reversion",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.70,
+                "max_concurrent_positions": 2,
+            },
+            "choppy": {
+                "trade_permission": "reduced",
+                "preferred_style": "observer_only",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.35,
+                "max_concurrent_positions": 1,
+            },
+            "event_driven": {
+                "trade_permission": "reduced",
+                "preferred_style": "observer_only",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.25,
+                "max_concurrent_positions": 1,
+            },
+            "open_discovery": {
+                "trade_permission": "blocked",
+                "preferred_style": "observer_only",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.0,
+                "max_concurrent_positions": 0,
+            },
+            "pre_open": {
+                "trade_permission": "blocked",
+                "preferred_style": "observer_only",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.0,
+                "max_concurrent_positions": 0,
+            },
+            "post_market": {
+                "trade_permission": "blocked",
+                "preferred_style": "observer_only",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.0,
+                "max_concurrent_positions": 0,
+            },
+            "data_unavailable": {
+                "trade_permission": "blocked",
+                "preferred_style": "observer_only",
+                "long_bias": 0.50,
+                "short_bias": 0.50,
+                "position_size_multiplier": 0.0,
+                "max_concurrent_positions": 0,
+            },
+        }
+        controls = dict(control_map.get(market_regime, control_map["data_unavailable"]))
+        notes: List[str] = [f"base_policy={market_regime}"]
+
+        if confidence < 55.0 and controls["trade_permission"] != "blocked":
+            controls["trade_permission"] = "reduced"
+            controls["position_size_multiplier"] = round(
+                min(float(controls["position_size_multiplier"]), 0.5),
+                2,
+            )
+            controls["max_concurrent_positions"] = min(int(controls["max_concurrent_positions"]), 2)
+            notes.append("regime_confidence_low")
+
+        if (news_severity >= 0.75 or news_caution == "high") and controls["trade_permission"] != "blocked":
+            controls["trade_permission"] = "reduced"
+            controls["preferred_style"] = "observer_only"
+            controls["position_size_multiplier"] = 0.25
+            controls["max_concurrent_positions"] = min(int(controls["max_concurrent_positions"]), 1)
+            notes.append("news_risk_escalation")
+        elif (news_severity >= 0.45 or news_caution == "medium") and controls["trade_permission"] == "allowed":
+            controls["trade_permission"] = "reduced"
+            controls["position_size_multiplier"] = round(
+                min(float(controls["position_size_multiplier"]), 0.6),
+                2,
+            )
+            controls["max_concurrent_positions"] = min(int(controls["max_concurrent_positions"]), 2)
+            notes.append("news_caution_moderate")
+
+        if session_state.get("is_discovery_phase", False):
+            controls["trade_permission"] = "blocked"
+            controls["preferred_style"] = "observer_only"
+            controls["position_size_multiplier"] = 0.0
+            controls["max_concurrent_positions"] = 0
+            notes.append("opening_discovery_gate")
+
+        controls["notes"] = notes
+        return controls
 
     def _coerce_float(self, value: Any) -> Optional[float]:
         if value is None or value == "":
@@ -829,6 +1002,28 @@ class MarketRegimeAnalyzer:
             return 0.0
         return sum(1 for row in rows if row.get(key)) / len(rows)
 
+    def _summarize_news_input(self, news_input: Dict[str, Any]) -> Dict[str, Any]:
+        overlay = news_input.get("llm_regime_overlay")
+        if not isinstance(overlay, dict):
+            overlay = {}
+        return {
+            "analysis_scope": news_input.get("analysis_scope"),
+            "analysis_engine": news_input.get("analysis_engine"),
+            "headline_count": news_input.get("headline_count"),
+            "market_sentiment": news_input.get("market_sentiment"),
+            "confidence_score": news_input.get("confidence_score"),
+            "event_severity_score": news_input.get("event_severity_score"),
+            "trade_caution_level": news_input.get("trade_caution_level"),
+            "risk_of_abnormal_volatility": news_input.get("risk_of_abnormal_volatility"),
+            "affected_sectors": news_input.get("affected_sectors"),
+            "event_clusters": news_input.get("event_clusters"),
+            "headline_summary": news_input.get("headline_summary"),
+            "structured_reasoning": news_input.get("structured_reasoning"),
+            "llm_regime_overlay": overlay,
+            "market_signal_distribution": news_input.get("market_signal_distribution"),
+            "agno_error": news_input.get("agno_error"),
+        }
+
     def _normalized_symbol(self, value: Optional[str]) -> str:
         return str(value or "").strip().upper().replace(" ", "")
 
@@ -927,6 +1122,9 @@ class MarketRegimeAnalyzer:
         vix_change = float(vix_snapshot.get("day_change_percent") or 0.0) if vix_snapshot else 0.0
         event_input = external_inputs.get("market_news", {})
         news_severity = float(event_input.get("event_severity_score", 0.0) or 0.0)
+        news_overlay = event_input.get("llm_regime_overlay") or {}
+        news_bias = str(news_overlay.get("regime_bias") or "neutral")
+        news_horizon = str(news_overlay.get("impact_horizon") or "unclear")
         option_pcr_values = [
             float(item["put_call_oi_ratio"])
             for item in option_chains
@@ -987,7 +1185,9 @@ class MarketRegimeAnalyzer:
             f"vix_change={round(vix_change, 4)}%, "
             f"breakout_ratio={round(breakout_ratio, 4)}, "
             f"avg_option_pcr={round(avg_option_pcr, 4) if avg_option_pcr is not None else 'na'}, "
-            f"avg_option_iv_spread={round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else 'na'}"
+            f"avg_option_iv_spread={round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else 'na'}, "
+            f"news_bias={news_bias}, "
+            f"news_horizon={news_horizon}"
         )
         return {
             "market_regime": label,
@@ -1031,7 +1231,11 @@ class MarketRegimeAnalyzer:
         self._print_group_preview("  Index futures", resolved["index_futures"], ["underlying_symbol", "security_id"])
         self._print_group_preview("  Option chain underlyings", resolved["option_chain_underlyings"], ["symbol", "security_id"])
 
-        source_snapshots, source_failures, debug_payloads = self._fetch_resolved_sources(resolved)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            source_future = executor.submit(self._fetch_resolved_sources, resolved)
+            news_future = executor.submit(self._refresh_market_news_input)
+            source_snapshots, source_failures, debug_payloads = source_future.result()
+            refreshed_market_news = news_future.result()
         external_inputs, external_missing = self._load_external_market_inputs()
 
         primary_indices = [
@@ -1063,6 +1267,11 @@ class MarketRegimeAnalyzer:
             option_chains=option_chains,
             external_inputs=external_inputs,
         )
+        controls = self._derive_operational_controls(
+            session_state=session_state,
+            regime=regime,
+            external_inputs=external_inputs,
+        )
 
         print("Fetched source groups:")
         print(f"  Primary indices: {len(primary_indices)}")
@@ -1071,6 +1280,13 @@ class MarketRegimeAnalyzer:
         print(f"  Option chains: {len(option_chains)}")
         self._print_failure_summary(source_failures)
         self._print_external_input_summary(external_inputs, external_missing)
+        if refreshed_market_news:
+            print(
+                "Market news refresh: "
+                f"engine={refreshed_market_news.get('analysis_engine')} "
+                f"headlines={refreshed_market_news.get('headline_count')} "
+                f"severity={refreshed_market_news.get('event_severity_score')}"
+            )
         self._print_option_chain_summary(option_chains)
         self._print_debug_payload_summary(debug_payloads)
         self._print_regime_diagnostics(regime)
@@ -1096,6 +1312,12 @@ class MarketRegimeAnalyzer:
                 "source_failures": source_failures,
                 "debug_payloads": debug_payloads,
                 "external_inputs_missing": external_missing,
+                "market_news_refresh": {
+                    "performed": refreshed_market_news is not None,
+                    "analysis_engine": (refreshed_market_news or {}).get("analysis_engine"),
+                    "headline_count": (refreshed_market_news or {}).get("headline_count"),
+                    "event_severity_score": (refreshed_market_news or {}).get("event_severity_score"),
+                },
                 "review_interval_seconds": self.config.regime_loop_interval_seconds,
                 "next_review_at": (
                     self.market_time.now() + timedelta(seconds=self.config.regime_loop_interval_seconds)
@@ -1110,6 +1332,14 @@ class MarketRegimeAnalyzer:
                 and not session_state["is_discovery_phase"],
                 "reasoning_summary": regime["reasoning_summary"],
                 "diagnostics": regime.get("diagnostics", {}),
+                "trade_permission": controls["trade_permission"],
+                "preferred_style": controls["preferred_style"],
+                "long_bias": controls["long_bias"],
+                "short_bias": controls["short_bias"],
+                "position_size_multiplier": controls["position_size_multiplier"],
+                "max_concurrent_positions": controls["max_concurrent_positions"],
+                "control_notes": controls["notes"],
+                "news_analysis": self._summarize_news_input(external_inputs.get("market_news") or {}),
             },
             "market_context": {
                 "session_state": session_state,
