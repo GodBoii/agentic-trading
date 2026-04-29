@@ -15,8 +15,12 @@ class PipelineConfig:
     stage2_latest_path: Path = backend_dir / "stage2_momentum_latest.json"
     monitor_latest_path: Path = backend_dir / "monitor_liquidity_latest.json"
     regime_latest_path: Path = backend_dir / "regime_latest.json"
+    ai_trading_state_path: Path = backend_dir / "ai_trading_state.json"
+    stock_analyzer_latest_path: Path = backend_dir / "stock_analyzer_latest.json"
+    stock_analyzer_artifacts_dir: Path = backend_dir / "stock_analyzer_artifacts"
     regime_source_catalog_path: Path = backend_dir / "pipeline" / "regime" / "market_sources.json"
     regime_inputs_dir: Path = backend_dir / "regime_inputs"
+    regime_market_news_path: Path = backend_dir / "regime_inputs" / "market_news.json"
     tick_stats_latest_path: Path = backend_dir / "stage2_tick_stats_latest.json"
     tick_stats_history_latest_path: Path = backend_dir / "stage2_tick_stats_history_latest.json"
     dhan_rate_limit_state_path: Path = backend_dir / "dhan_rate_limit_state.json"
@@ -57,6 +61,8 @@ class PipelineConfig:
     stage2_loop_interval_seconds: int = 600
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
+    stock_analyzer_loop_interval_seconds: int = 30
+    stock_analyzer_report_refresh_seconds: int = 300
     tick_stats_save_interval_seconds: int = 30
     tick_stats_history_save_interval_seconds: int = 600
     rate_limit_backoff_base_seconds: float = 0.5
@@ -87,6 +93,9 @@ class PipelineConfig:
 
     def regime_daily_path(self, market_date: str) -> Path:
         return self.backend_dir / f"regime-{market_date}.json"
+
+    def stock_analyzer_daily_path(self, market_date: str) -> Path:
+        return self.backend_dir / f"stock-analyzer-{market_date}.json"
 
     def tick_stats_daily_path(self, market_date: Optional[str] = None) -> Path:
         if market_date:
