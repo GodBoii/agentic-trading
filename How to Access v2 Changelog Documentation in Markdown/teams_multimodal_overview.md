@@ -1,0 +1,307 @@
+# Multimodal Agents
+
+Search...
+
+Ctrl K
+
+Agno agents support text, image, audio and video inputs and can generate text, image, audio and video outputs. For a complete overview, please checkout the [compatibility matrix]().
+
+To get started, feel free to checkout the [multimodal examples]().
+
+## Multimodal inputs to an agent
+
+Let’s create an agent that can understand images and make tool calls as needed
+
+### Agent with Image Understanding
+
+image\_agent.py
+
+    from agno.agent import Agent
+    from agno.media import Image
+    from agno.models.openai import OpenAIChat
+    from agno.tools.duckduckgo import DuckDuckGoTools
+    
+    agent = Agent(
+        model=OpenAIChat(id="gpt-5-mini"),
+        tools=[DuckDuckGoTools()],
+        markdown=True,
+    )
+    
+    agent.print_response(
+        "Tell me about this image and give me the latest news about it.",
+        images=[
+            Image(
+                url="https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg"
+            )
+        ],
+        stream=True,
+    )
+
+Run the agent:
+
+    python image_agent.py
+
+Similar to images, you can also use audio and video as an input.
+
+### Agent with Audio Understanding
+
+audio\_agent.py
+
+    import base64
+    
+    import requests
+    from agno.agent import Agent, RunOutput  # noqa
+    from agno.media import Audio
+    from agno.models.openai import OpenAIChat
+    
+    # Fetch the audio file and convert it to a base64 encoded string
+    url = "https://openaiassets.blob.core.windows.net/$web/API/docs/audio/alloy.wav"
+    response = requests.get(url)
+    response.raise_for_status()
+    wav_data = response.content
+    
+    agent = Agent(
+        model=OpenAIChat(id="gpt-5-mini-audio-preview", modalities=["text"]),
+        markdown=True,
+    )
+    agent.print_response(
+        "What is in this audio?", audio=[Audio(content=wav_data, format="wav")]
+    )
+
+### Agent with Video Understanding
+
+video\_agent.py
+
+    from pathlib import Path
+    
+    from agno.agent import Agent
+    from agno.media import Video
+    from agno.models.google import Gemini
+    
+    agent = Agent(
+        model=Gemini(id="gemini-2.0-flash-001"),
+        markdown=True,
+    )
+    
+    # Please download "GreatRedSpot.mp4" using
+    # wget https://storage.googleapis.com/generativeai-downloads/images/GreatRedSpot.mp4
+    video_path = Path(__file__).parent.joinpath("GreatRedSpot.mp4")
+    
+    agent.print_response("Tell me about this video", videos=[Video(filepath=video_path)])
+
+## Multimodal outputs from an agent
+
+Similar to providing multimodal inputs, you can also get multimodal outputs from an agent. You can either use tools to generate image/audio/video or use the agent’s model to generate them (if the model supports this capability).The following example demonstrates how to generate an image using an OpenAI tool with an agent.
+
+image\_agent.py
+
+    from agno.agent import Agent
+    from agno.models.openai import OpenAIChat
+    from agno.tools.openai import OpenAITools
+    from agno.utils.media import save_base64_data
+    
+    agent = Agent(
+        model=OpenAIChat(id="gpt-5-mini"),
+        tools=[OpenAITools(image_model="gpt-image-1")],
+        markdown=True,
+    )
+    
+    response = agent.run(
+        "Generate a photorealistic image of a cozy coffee shop interior",
+    )
+    
+    if response.images and response.images[0].content:
+        save_base64_data(str(response.images[0].content), "tmp/coffee_shop.png")
+
+The output of the tool generating a media also goes to the model’s input as a message so it has access to the media (image, audio, video) and can use it in the response. For example, if you say “Generate an image of a dog and tell me its color.” the model will have access to the image and can use it to describe the dog’s color in the response in the same run.
+
+### Image Model Response
+
+The following example demonstrates how some models can directly generate images as part of their response.
+
+image\_agent.py
+
+    from io import BytesIO
+    
+    from agno.agent import Agent, RunOutput  # noqa
+    from agno.models.google import Gemini
+    from PIL import Image
+    
+    # No system message should be provided
+    agent = Agent(
+        model=Gemini(
+            id="gemini-2.0-flash-exp-image-generation",
+            response_modalities=["Text", "Image"], # This means to generate both images and text
+        )
+    )
+    
+    # Print the response in the terminal
+    run_response = agent.run("Make me an image of a cat in a tree.")
+    
+    if run_response and isinstance(run_response, RunOutput) and run_response.images:
+        for image_response in run_response.images:
+            image_bytes = image_response.content
+            if image_bytes:
+                image = Image.open(BytesIO(image_bytes))
+                image.show()
+                # Save the image to a file
+                # image.save("generated_image.png")
+    else:
+        print("No images found in run response")
+    
+
+You can find all generated images in the `RunOutput.images` list.
+
+The following example demonstrates how to generate an audio using the ElevenLabs tool with an agent. See [Eleven Labs]() for more details.
+
+audio\_agent.py
+
+    import base64
+    
+    from agno.agent import Agent
+    from agno.models.google import Gemini
+    from agno.tools.eleven_labs import ElevenLabsTools
+    from agno.utils.media import save_base64_data
+    
+    audio_agent = Agent(
+        model=Gemini(id="gemini-2.5-pro"),
+        tools=[
+            ElevenLabsTools(
+                voice_id="21m00Tcm4TlvDq8ikWAM",
+                model_id="eleven_multilingual_v2",
+                target_directory="audio_generations",
+            )
+        ],
+        description="You are an AI agent that can generate audio using the ElevenLabs API.",
+        instructions=[
+            "When the user asks you to generate audio, use the `generate_audio` tool to generate the audio.",
+            "You\"ll generate the appropriate prompt to send to the tool to generate audio.",
+            "You don\"t need to find the appropriate voice first, I already specified the voice to user."
+            "Return the audio file name in your response. Don\"t convert it to markdown.",
+            "The audio should be long and detailed.",
+        ],
+        markdown=True,
+    )
+    
+    response = audio_agent.run(
+        "Generate a very long audio of history of french revolution and tell me which subject it belongs to.",
+        debug_mode=True,
+    )
+    
+    if response.audio:
+        print("Agent response:", response.content)
+        base64_audio = base64.b64encode(response.audio[0].content).decode("utf-8")
+        save_base64_data(base64_audio, "tmp/french_revolution.mp3")
+        print("Successfully saved generated speech to tmp/french_revolution.mp3")
+    
+    
+    audio_agent.print_response("Generate a kick sound effect")
+    
+
+### Audio Model Response
+
+The following example demonstrates how some models can directly generate audio as part of their response.
+
+audio\_agent.py
+
+    from agno.agent import Agent, RunOutput
+    from agno.models.openai import OpenAIChat
+    from agno.utils.audio import write_audio_to_file
+    
+    agent = Agent(
+        model=OpenAIChat(
+            id="gpt-5-mini-audio-preview",
+            modalities=["text", "audio"],
+            audio={"voice": "alloy", "format": "wav"},
+        ),
+        markdown=True,
+    )
+    response: RunOutput = agent.run("Tell me a 5 second scary story")
+    
+    # Save the response audio to a file
+    if response.response_audio is not None:
+        write_audio_to_file(
+            audio=agent.run_response.response_audio.content, filename="tmp/scary_story.wav"
+        )
+    
+
+The following example demonstrates how to generate a video using `FalTools` with an agent. See [FAL]() for more details.
+
+video\_agent.py
+
+    from agno.agent import Agent
+    from agno.models.openai import OpenAIChat
+    from agno.tools.fal import FalTools
+    
+    fal_agent = Agent(
+        name="Fal Video Generator Agent",
+        model=OpenAIChat(id="gpt-5-mini"),
+        tools=[
+            FalTools(
+                model="fal-ai/hunyuan-video",
+                enable_generate_media=True,
+            )
+        ],
+        description="You are an AI agent that can generate videos using the Fal API.",
+        instructions=[
+            "When the user asks you to create a video, use the `generate_media` tool to create the video.",
+            "Return the URL as raw to the user.",
+            "Don\"t convert video URL to markdown or anything else.",
+        ],
+        markdown=True,
+    )
+    
+    fal_agent.print_response("Generate video of balloon in the ocean")
+    
+    
+
+## Multimodal inputs and outputs together
+
+You can create agents that can take multimodal inputs and return multimodal outputs. The following example demonstrates how to provide a combination of audio and text inputs to an agent and obtain both text and audio outputs.
+
+### Audio input and Audio output
+
+audio\_agent.py
+
+    import requests
+    from agno.agent import Agent
+    from agno.media import Audio
+    from agno.models.openai import OpenAIChat
+    from agno.utils.audio import write_audio_to_file
+    from rich.pretty import pprint
+    
+    # Fetch the audio file and convert it to a base64 encoded string
+    url = "https://openaiassets.blob.core.windows.net/$web/API/docs/audio/alloy.wav"
+    response = requests.get(url)
+    response.raise_for_status()
+    wav_data = response.content
+    
+    agent = Agent(
+        model=OpenAIChat(
+            id="gpt-5-mini-audio-preview",
+            modalities=["text", "audio"],
+            audio={"voice": "sage", "format": "wav"},
+        ),
+        markdown=True,
+    )
+    
+    run_response = agent.run(
+        "What\"s in these recording?",
+        audio=[Audio(content=wav_data, format="wav")],
+    )
+    
+    if run_response.response_audio is not None:
+        pprint(run_response.content)
+        write_audio_to_file(
+            audio=run_response.response_audio.content, filename="tmp/result.wav"
+        )
+
+## Developer Resources
+
+*   View more [Examples]()
+*   View [Cookbook]()
+
+Was this page helpful?
+
+YesNo
+
