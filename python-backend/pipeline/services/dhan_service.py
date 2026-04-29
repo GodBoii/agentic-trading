@@ -113,6 +113,27 @@ class DhanService:
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
+    def fetch_holdings(self) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_holdings()
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": []}
+
+    def fetch_positions(self) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_positions()
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": []}
+
+    def fetch_fund_limits(self) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_fund_limits()
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
     def _gateway_post(self, path: str, payload: Dict[str, Any]) -> Any:
         if not self.gateway_url or not self.gateway_session:
             raise RuntimeError("Market data gateway is not configured.")
@@ -501,4 +522,21 @@ class DhanService:
             or "904" in data_blob
             or "805" in remarks
             or "805" in data_blob
+        )
+
+    def is_auth_invalid(self, resp: Optional[Dict[str, Any]]) -> bool:
+        if not isinstance(resp, dict):
+            return False
+        remarks = resp.get("remarks")
+        if isinstance(remarks, dict):
+            joined = " ".join(str(value) for value in remarks.values()).lower()
+        else:
+            joined = str(remarks or "").lower()
+        data_blob = str(resp.get("data", "")).lower()
+        return (
+            "dh-901" in joined
+            or "invalid_authentication" in joined
+            or "invalid or expired" in joined
+            or "access token is invalid" in joined
+            or "expired" in data_blob and "token" in data_blob
         )
