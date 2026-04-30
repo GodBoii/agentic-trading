@@ -231,11 +231,20 @@ class RiskAnalyzerRunner:
         }
 
     def _extract_header_value(self, report_text: str, header: str, default: str = "") -> str:
-        pattern = rf"(?im)^\s*{re.escape(header)}\s*:\s*(.+?)\s*$"
+        next_headers = [
+            "Decision",
+            "Selected Symbol",
+            "Selected Display Name",
+            "Selected Security ID",
+            "Trade Side",
+            "Conviction",
+        ]
+        alternatives = "|".join(re.escape(item) for item in next_headers)
+        pattern = rf"(?is){re.escape(header)}\s*:\s*(.+?)(?=\s*(?:{alternatives})\s*:|\Z)"
         match = re.search(pattern, report_text)
         if not match:
             return default
-        return match.group(1).strip()
+        return " ".join(match.group(1).strip().split())
 
     def _should_refresh(self, existing: Optional[Dict[str, Any]], risk_packet: Dict[str, Any]) -> bool:
         if not existing:
