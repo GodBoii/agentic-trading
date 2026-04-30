@@ -134,6 +134,134 @@ class DhanService:
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
+    def fetch_order_book(self) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_order_list()
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": []}
+
+    def fetch_order_by_id(self, order_id: str) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_order_by_id(order_id)
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def fetch_order_by_correlation_id(self, correlation_id: str) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_order_by_correlationID(correlation_id)
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def fetch_trade_book(self, order_id: Optional[str] = None) -> Dict[str, Any]:
+        try:
+            response = self.market_api.get_trade_book(order_id)
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": []}
+
+    def place_order(
+        self,
+        *,
+        security_id: int,
+        exchange_segment: str,
+        transaction_type: str,
+        quantity: int,
+        order_type: str,
+        product_type: str,
+        price: float,
+        trigger_price: float = 0.0,
+        disclosed_quantity: int = 0,
+        after_market_order: bool = False,
+        validity: str = "DAY",
+        amo_time: str = "OPEN",
+        bo_profit_value: Optional[float] = None,
+        bo_stop_loss_value: Optional[float] = None,
+        correlation_id: Optional[str] = None,
+        should_slice: bool = False,
+    ) -> Dict[str, Any]:
+        try:
+            response = self.market_api.place_order(
+                security_id=str(security_id),
+                exchange_segment=exchange_segment,
+                transaction_type=transaction_type,
+                quantity=int(quantity),
+                order_type=order_type,
+                product_type=product_type,
+                price=float(price),
+                trigger_price=float(trigger_price),
+                disclosed_quantity=int(disclosed_quantity),
+                after_market_order=after_market_order,
+                validity=validity,
+                amo_time=amo_time,
+                bo_profit_value=bo_profit_value,
+                bo_stop_loss_Value=bo_stop_loss_value,
+                tag=correlation_id,
+                should_slice=should_slice,
+            )
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def modify_order(
+        self,
+        *,
+        order_id: str,
+        order_type: str,
+        quantity: int,
+        price: float,
+        trigger_price: float = 0.0,
+        disclosed_quantity: int = 0,
+        validity: str = "DAY",
+        leg_name: str = "",
+    ) -> Dict[str, Any]:
+        try:
+            response = self.market_api.modify_order(
+                order_id=order_id,
+                order_type=order_type,
+                leg_name=leg_name,
+                quantity=int(quantity),
+                price=float(price),
+                trigger_price=float(trigger_price),
+                disclosed_quantity=int(disclosed_quantity),
+                validity=validity,
+            )
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def cancel_order(self, order_id: str) -> Dict[str, Any]:
+        try:
+            response = self.market_api.cancel_order(order_id)
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def convert_position(
+        self,
+        *,
+        from_product_type: str,
+        exchange_segment: str,
+        position_type: str,
+        security_id: int,
+        convert_qty: int,
+        to_product_type: str,
+    ) -> Dict[str, Any]:
+        try:
+            response = self.market_api.convert_position(
+                from_product_type=from_product_type,
+                exchange_segment=exchange_segment,
+                position_type=position_type,
+                security_id=str(security_id),
+                convert_qty=int(convert_qty),
+                to_product_type=to_product_type,
+            )
+            return {"status": "success", "data": response}
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
     def _gateway_post(self, path: str, payload: Dict[str, Any]) -> Any:
         if not self.gateway_url or not self.gateway_session:
             raise RuntimeError("Market data gateway is not configured.")
