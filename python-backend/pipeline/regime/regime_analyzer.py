@@ -333,145 +333,6 @@ class MarketRegimeAnalyzer:
             print(f"Market news refresh failed: {type(exc).__name__}: {exc}")
             return None
 
-    def _derive_operational_controls(
-        self,
-        session_state: Dict[str, Any],
-        regime: Dict[str, Any],
-        external_inputs: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        market_regime = str(regime.get("market_regime") or "data_unavailable")
-        confidence = float(regime.get("confidence") or 0.0)
-        news_input = external_inputs.get("market_news") or {}
-        news_severity = float(news_input.get("event_severity_score") or 0.0)
-        news_caution = str(news_input.get("trade_caution_level") or "medium").lower()
-
-        control_map: Dict[str, Dict[str, Any]] = {
-            "trend_up": {
-                "trade_permission": "allowed",
-                "preferred_style": "trend_following",
-                "long_bias": 0.70,
-                "short_bias": 0.30,
-                "position_size_multiplier": 1.0,
-                "max_concurrent_positions": 3,
-            },
-            "trend_down": {
-                "trade_permission": "allowed",
-                "preferred_style": "trend_following",
-                "long_bias": 0.30,
-                "short_bias": 0.70,
-                "position_size_multiplier": 1.0,
-                "max_concurrent_positions": 3,
-            },
-            "risk_on": {
-                "trade_permission": "allowed",
-                "preferred_style": "trend_following",
-                "long_bias": 0.65,
-                "short_bias": 0.35,
-                "position_size_multiplier": 0.85,
-                "max_concurrent_positions": 3,
-            },
-            "risk_off": {
-                "trade_permission": "reduced",
-                "preferred_style": "defensive_selective",
-                "long_bias": 0.35,
-                "short_bias": 0.65,
-                "position_size_multiplier": 0.55,
-                "max_concurrent_positions": 2,
-            },
-            "mean_reversion": {
-                "trade_permission": "reduced",
-                "preferred_style": "mean_reversion",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.70,
-                "max_concurrent_positions": 2,
-            },
-            "choppy": {
-                "trade_permission": "reduced",
-                "preferred_style": "observer_only",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.35,
-                "max_concurrent_positions": 1,
-            },
-            "event_driven": {
-                "trade_permission": "reduced",
-                "preferred_style": "observer_only",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.25,
-                "max_concurrent_positions": 1,
-            },
-            "open_discovery": {
-                "trade_permission": "blocked",
-                "preferred_style": "observer_only",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.0,
-                "max_concurrent_positions": 0,
-            },
-            "pre_open": {
-                "trade_permission": "blocked",
-                "preferred_style": "observer_only",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.0,
-                "max_concurrent_positions": 0,
-            },
-            "post_market": {
-                "trade_permission": "blocked",
-                "preferred_style": "observer_only",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.0,
-                "max_concurrent_positions": 0,
-            },
-            "data_unavailable": {
-                "trade_permission": "blocked",
-                "preferred_style": "observer_only",
-                "long_bias": 0.50,
-                "short_bias": 0.50,
-                "position_size_multiplier": 0.0,
-                "max_concurrent_positions": 0,
-            },
-        }
-        controls = dict(control_map.get(market_regime, control_map["data_unavailable"]))
-        notes: List[str] = [f"base_policy={market_regime}"]
-
-        if confidence < 55.0 and controls["trade_permission"] != "blocked":
-            controls["trade_permission"] = "reduced"
-            controls["position_size_multiplier"] = round(
-                min(float(controls["position_size_multiplier"]), 0.5),
-                2,
-            )
-            controls["max_concurrent_positions"] = min(int(controls["max_concurrent_positions"]), 2)
-            notes.append("regime_confidence_low")
-
-        if (news_severity >= 0.75 or news_caution == "high") and controls["trade_permission"] != "blocked":
-            controls["trade_permission"] = "reduced"
-            controls["preferred_style"] = "observer_only"
-            controls["position_size_multiplier"] = 0.25
-            controls["max_concurrent_positions"] = min(int(controls["max_concurrent_positions"]), 1)
-            notes.append("news_risk_escalation")
-        elif (news_severity >= 0.45 or news_caution == "medium") and controls["trade_permission"] == "allowed":
-            controls["trade_permission"] = "reduced"
-            controls["position_size_multiplier"] = round(
-                min(float(controls["position_size_multiplier"]), 0.6),
-                2,
-            )
-            controls["max_concurrent_positions"] = min(int(controls["max_concurrent_positions"]), 2)
-            notes.append("news_caution_moderate")
-
-        if session_state.get("is_discovery_phase", False):
-            controls["trade_permission"] = "blocked"
-            controls["preferred_style"] = "observer_only"
-            controls["position_size_multiplier"] = 0.0
-            controls["max_concurrent_positions"] = 0
-            notes.append("opening_discovery_gate")
-
-        controls["notes"] = notes
-        return controls
-
     def _coerce_float(self, value: Any) -> Optional[float]:
         if value is None or value == "":
             return None
@@ -1003,23 +864,23 @@ class MarketRegimeAnalyzer:
         return sum(1 for row in rows if row.get(key)) / len(rows)
 
     def _summarize_news_input(self, news_input: Dict[str, Any]) -> Dict[str, Any]:
-        overlay = news_input.get("llm_regime_overlay")
-        if not isinstance(overlay, dict):
-            overlay = {}
+        birds_eye_view = news_input.get("birds_eye_view")
+        if not isinstance(birds_eye_view, dict):
+            birds_eye_view = {}
         return {
             "analysis_scope": news_input.get("analysis_scope"),
             "analysis_engine": news_input.get("analysis_engine"),
+            "generated_at_utc": news_input.get("generated_at_utc"),
             "headline_count": news_input.get("headline_count"),
             "market_sentiment": news_input.get("market_sentiment"),
             "confidence_score": news_input.get("confidence_score"),
             "event_severity_score": news_input.get("event_severity_score"),
-            "trade_caution_level": news_input.get("trade_caution_level"),
             "risk_of_abnormal_volatility": news_input.get("risk_of_abnormal_volatility"),
             "affected_sectors": news_input.get("affected_sectors"),
             "event_clusters": news_input.get("event_clusters"),
             "headline_summary": news_input.get("headline_summary"),
             "structured_reasoning": news_input.get("structured_reasoning"),
-            "llm_regime_overlay": overlay,
+            "birds_eye_view": birds_eye_view,
             "market_signal_distribution": news_input.get("market_signal_distribution"),
             "agno_error": news_input.get("agno_error"),
         }
@@ -1122,9 +983,9 @@ class MarketRegimeAnalyzer:
         vix_change = float(vix_snapshot.get("day_change_percent") or 0.0) if vix_snapshot else 0.0
         event_input = external_inputs.get("market_news", {})
         news_severity = float(event_input.get("event_severity_score", 0.0) or 0.0)
-        news_overlay = event_input.get("llm_regime_overlay") or {}
-        news_bias = str(news_overlay.get("regime_bias") or "neutral")
-        news_horizon = str(news_overlay.get("impact_horizon") or "unclear")
+        birds_eye_view = event_input.get("birds_eye_view") or {}
+        news_scope = str(birds_eye_view.get("scope") or "mixed")
+        news_horizon = str(birds_eye_view.get("impact_horizon") or "unclear")
         option_pcr_values = [
             float(item["put_call_oi_ratio"])
             for item in option_chains
@@ -1186,7 +1047,7 @@ class MarketRegimeAnalyzer:
             f"breakout_ratio={round(breakout_ratio, 4)}, "
             f"avg_option_pcr={round(avg_option_pcr, 4) if avg_option_pcr is not None else 'na'}, "
             f"avg_option_iv_spread={round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else 'na'}, "
-            f"news_bias={news_bias}, "
+            f"news_scope={news_scope}, "
             f"news_horizon={news_horizon}"
         )
         return {
@@ -1267,12 +1128,6 @@ class MarketRegimeAnalyzer:
             option_chains=option_chains,
             external_inputs=external_inputs,
         )
-        controls = self._derive_operational_controls(
-            session_state=session_state,
-            regime=regime,
-            external_inputs=external_inputs,
-        )
-
         print("Fetched source groups:")
         print(f"  Primary indices: {len(primary_indices)}")
         print(f"  Sector indices: {len(sector_indices)}")
@@ -1332,13 +1187,6 @@ class MarketRegimeAnalyzer:
                 and not session_state["is_discovery_phase"],
                 "reasoning_summary": regime["reasoning_summary"],
                 "diagnostics": regime.get("diagnostics", {}),
-                "trade_permission": controls["trade_permission"],
-                "preferred_style": controls["preferred_style"],
-                "long_bias": controls["long_bias"],
-                "short_bias": controls["short_bias"],
-                "position_size_multiplier": controls["position_size_multiplier"],
-                "max_concurrent_positions": controls["max_concurrent_positions"],
-                "control_notes": controls["notes"],
                 "news_analysis": self._summarize_news_input(external_inputs.get("market_news") or {}),
             },
             "market_context": {

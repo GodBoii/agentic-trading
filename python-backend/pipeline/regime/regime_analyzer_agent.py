@@ -47,22 +47,21 @@ class RegimeNewsAnalyzerAgent:
                 name=self.agent_name,
                 description=(
                     "Analyze BSE-originated disclosures and determine whether they imply "
-                    "isolated stock activity, sector-level pressure, or broad intraday regime risk."
+                    "isolated stock activity, sector-level pressure, or broad market context."
                 ),
                 model=OpenRouter(id=self.openrouter_model_id),
                 instructions=[
                     "Use only the supplied BSE-originated evidence.",
-                    "Focus on intraday regime implications for Indian equities.",
+                    "Focus on latest stock-related news, overall market sentiment, and a concise birds-eye view for Indian equities.",
                     "Separate isolated company filings from repeated or broad event clusters.",
                     "Reserve high severity for broad, repeated, or clearly destabilizing signals.",
-                    "Do not give trading tips, targets, or narrative fluff.",
+                    "Do not give trading tips, targets, trade permission, position sizing, or execution advice.",
                     "Return only valid JSON matching the requested schema.",
                 ],
                 expected_output=(
                     "A valid JSON object with headline_summary, market_sentiment, confidence_score, "
                     "event_severity_score, affected_sectors, event_clusters, "
-                    "risk_of_abnormal_volatility, trade_caution_level, llm_regime_overlay, "
-                    "and structured_reasoning."
+                    "risk_of_abnormal_volatility, birds_eye_view, and structured_reasoning."
                 ),
                 add_datetime_to_context=True,
                 markdown=False,
@@ -101,7 +100,7 @@ class RegimeNewsAnalyzerAgent:
         return (
             "You are the regime news analyst inside a stock-market execution stack.\n"
             "A separate deterministic regime analyzer is evaluating price, breadth, futures, and options.\n"
-            "Your job is only to interpret the BSE-originated disclosure/news stream and return a structured overlay.\n"
+            "Your job is only to interpret the BSE-originated disclosure/news stream as context.\n"
             "Output ONLY valid JSON with this exact schema:\n"
             "{"
             '"headline_summary": "string", '
@@ -111,8 +110,7 @@ class RegimeNewsAnalyzerAgent:
             '"affected_sectors": ["string"], '
             '"event_clusters": ["string"], '
             '"risk_of_abnormal_volatility": "low|medium|high", '
-            '"trade_caution_level": "low|medium|high", '
-            '"llm_regime_overlay": {"regime_bias":"event_driven|risk_on|risk_off|mixed|neutral","impact_horizon":"immediate_intraday|same_day|multi_day|unclear","breadth_signal":"broad|sectoral|isolated|mixed"}, '
+            '"birds_eye_view": {"scope":"broad|sectoral|isolated|mixed","impact_horizon":"immediate_intraday|same_day|multi_day|unclear","summary":"string"}, '
             '"structured_reasoning": "string"'
             "}\n"
             "Calibration rules:\n"
@@ -120,7 +118,8 @@ class RegimeNewsAnalyzerAgent:
             "- Use only the provided BSE evidence; do not invent macro headlines.\n"
             "- Many corporate filings are routine. Do not overstate their regime importance.\n"
             "- High severity requires broad, repeated, or materially destabilizing signals.\n"
-            "- Keep structured_reasoning concise and about regime relevance.\n"
+            "- Keep structured_reasoning concise and about market context.\n"
+            "- Do not output trade decisions, trade permission, trade caution, recommended bias, targets, or position sizing.\n"
             "- Do not include markdown fences or commentary outside JSON.\n\n"
             f"BSE items JSON:\n{json.dumps(preview, ensure_ascii=True)}"
         )
@@ -163,7 +162,6 @@ class RegimeNewsAnalyzerAgent:
         severity = self._float01(parsed.get("event_severity_score"), 0.0)
         confidence = self._float01(parsed.get("confidence_score"), 0.0)
         volatility_risk = self._normalize_choice(parsed.get("risk_of_abnormal_volatility"), {"low", "medium", "high"}, "medium")
-        caution = self._normalize_choice(parsed.get("trade_caution_level"), {"low", "medium", "high"}, "medium")
 
         sectors = parsed.get("affected_sectors")
         if not isinstance(sectors, list):
@@ -175,25 +173,21 @@ class RegimeNewsAnalyzerAgent:
             clusters = []
         clusters = [self._compact_text(str(item)) for item in clusters if self._compact_text(str(item))]
 
-        raw_overlay = parsed.get("llm_regime_overlay")
-        if not isinstance(raw_overlay, dict):
-            raw_overlay = {}
-        overlay = {
-            "regime_bias": self._normalize_choice(
-                raw_overlay.get("regime_bias"),
-                {"event_driven", "risk_on", "risk_off", "mixed", "neutral"},
-                "neutral",
-            ),
-            "impact_horizon": self._normalize_choice(
-                raw_overlay.get("impact_horizon"),
-                {"immediate_intraday", "same_day", "multi_day", "unclear"},
-                "unclear",
-            ),
-            "breadth_signal": self._normalize_choice(
-                raw_overlay.get("breadth_signal"),
+        raw_view = parsed.get("birds_eye_view")
+        if not isinstance(raw_view, dict):
+            raw_view = {}
+        birds_eye_view = {
+            "scope": self._normalize_choice(
+                raw_view.get("scope"),
                 {"broad", "sectoral", "isolated", "mixed"},
                 "mixed",
             ),
+            "impact_horizon": self._normalize_choice(
+                raw_view.get("impact_horizon"),
+                {"immediate_intraday", "same_day", "multi_day", "unclear"},
+                "unclear",
+            ),
+            "summary": self._compact_text(str(raw_view.get("summary") or "")),
         }
 
         summary = self._compact_text(str(parsed.get("headline_summary") or ""))
@@ -209,12 +203,11 @@ class RegimeNewsAnalyzerAgent:
             "event_severity_score": severity,
             "confidence_score": confidence,
             "risk_of_abnormal_volatility": volatility_risk,
-            "trade_caution_level": caution,
             "affected_sectors": sectors[:8],
             "event_clusters": clusters[:8],
             "headline_summary": summary,
             "structured_reasoning": reasoning,
-            "llm_regime_overlay": overlay,
+            "birds_eye_view": birds_eye_view,
         }
 
     def _float01(self, value: Any, default: float) -> float:
