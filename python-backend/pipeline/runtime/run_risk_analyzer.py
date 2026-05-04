@@ -172,9 +172,23 @@ class RiskAnalyzerRunner:
                     "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
                 },
             },
-            "regime": regime_payload.get("regime") or {},
+            "market_context": self._build_market_context(regime_payload),
             "account_context": account_context,
             "stock_reports": compact_reports,
+        }
+
+    def _build_market_context(self, regime_payload: Dict[str, Any]) -> Dict[str, Any]:
+        regime = regime_payload.get("regime") or {}
+        return {
+            "market_regime": regime.get("market_regime"),
+            "confidence": regime.get("confidence"),
+            "status": regime.get("status"),
+            "minutes_since_open": regime.get("minutes_since_open"),
+            "is_actionable": regime.get("is_actionable"),
+            "reasoning_summary": regime.get("reasoning_summary"),
+            "diagnostics": regime.get("diagnostics", {}),
+            "news_analysis": regime.get("news_analysis", {}),
+            "generated_at_utc": regime_payload.get("generated_at_utc"),
         }
 
     def _collect_chart_paths(self, stock_reports: List[Dict[str, Any]]) -> List[str]:

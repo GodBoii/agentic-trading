@@ -223,7 +223,7 @@ class MultiStockAnalyzerRunner:
         security_id = int(candidate_record["security_id"])
         stage2_record = self._find_stock(stage2_payload, security_id)
         monitor_record = self._find_stock(monitor_payload, security_id) if monitor_payload else None
-        regime = regime_payload.get("regime") or {}
+        market_context = self._build_market_context(regime_payload)
 
         return {
             "market_date": market_date,
@@ -256,23 +256,27 @@ class MultiStockAnalyzerRunner:
                 "time_of_day_rvol": monitor_record.get("time_of_day_rvol") if monitor_record else None,
                 "intraday_value_cr": monitor_record.get("intraday_value_cr") if monitor_record else None,
             },
-            "regime": {
-                "market_regime": regime.get("market_regime"),
-                "confidence": regime.get("confidence"),
-                "trade_permission": regime.get("trade_permission"),
-                "preferred_style": regime.get("preferred_style"),
-                "long_bias": regime.get("long_bias"),
-                "short_bias": regime.get("short_bias"),
-                "position_size_multiplier": regime.get("position_size_multiplier"),
-                "max_concurrent_positions": regime.get("max_concurrent_positions"),
-                "reasoning_summary": regime.get("reasoning_summary"),
-            },
+            "market_context": market_context,
             "source_snapshots": {
                 "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
                 "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
                 "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
             },
             "chart_artifacts": {},
+        }
+
+    def _build_market_context(self, regime_payload: Dict[str, Any]) -> Dict[str, Any]:
+        regime = regime_payload.get("regime") or {}
+        return {
+            "market_regime": regime.get("market_regime"),
+            "confidence": regime.get("confidence"),
+            "status": regime.get("status"),
+            "minutes_since_open": regime.get("minutes_since_open"),
+            "is_actionable": regime.get("is_actionable"),
+            "reasoning_summary": regime.get("reasoning_summary"),
+            "diagnostics": regime.get("diagnostics", {}),
+            "news_analysis": regime.get("news_analysis", {}),
+            "generated_at_utc": regime_payload.get("generated_at_utc"),
         }
 
     def _find_stock(self, payload: Optional[Dict[str, Any]], security_id: int) -> Dict[str, Any]:
