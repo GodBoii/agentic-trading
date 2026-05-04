@@ -71,12 +71,11 @@ class RegimeNewsService:
                 "market_sentiment": analysis.get("market_sentiment", "neutral"),
                 "confidence_score": float(analysis.get("confidence_score", 0.0) or 0.0),
                 "risk_of_abnormal_volatility": analysis.get("risk_of_abnormal_volatility", "medium"),
-                "trade_caution_level": analysis.get("trade_caution_level", "medium"),
                 "affected_sectors": analysis.get("affected_sectors", []),
                 "event_clusters": analysis.get("event_clusters", []),
                 "headline_summary": analysis.get("headline_summary", ""),
                 "structured_reasoning": analysis.get("structured_reasoning", ""),
-                "llm_regime_overlay": analysis.get("llm_regime_overlay", {}),
+                "birds_eye_view": analysis.get("birds_eye_view", {}),
             }
         )
         if agno_error:
@@ -91,15 +90,14 @@ class RegimeNewsService:
                 "event_severity_score": 0.0,
                 "confidence_score": 0.0,
                 "risk_of_abnormal_volatility": "medium",
-                "trade_caution_level": "medium",
                 "affected_sectors": [],
                 "event_clusters": [],
                 "headline_summary": "No BSE-originated market disclosures were available this cycle.",
                 "structured_reasoning": "Heuristic mode used because no BSE feed items were available.",
-                "llm_regime_overlay": {
-                    "regime_bias": "neutral",
+                "birds_eye_view": {
+                    "scope": "mixed",
                     "impact_horizon": "unclear",
-                    "breadth_signal": "mixed",
+                    "summary": "No current BSE disclosure context available.",
                 },
             }
 
@@ -164,37 +162,23 @@ class RegimeNewsService:
 
         if severity >= 0.66:
             risk = "high"
-            caution = "high"
         elif severity >= 0.33:
             risk = "medium"
-            caution = "medium"
         else:
             risk = "low"
-            caution = "low"
 
         top_sectors = sorted(sector_hits.items(), key=lambda item: item[1], reverse=True)
         affected = [name for name, _ in top_sectors[:6]]
         top_sections = sorted(section_hits.items(), key=lambda item: item[1], reverse=True)
         event_clusters = [name for name, _ in top_sections[:4]]
 
-        if severity >= 0.65:
-            regime_bias = "event_driven"
-        elif sentiment == "bullish":
-            regime_bias = "risk_on"
-        elif sentiment == "bearish":
-            regime_bias = "risk_off"
-        elif sentiment == "mixed":
-            regime_bias = "mixed"
-        else:
-            regime_bias = "neutral"
-
-        breadth_signal = "isolated"
+        scope = "isolated"
         if len(affected) >= 3:
-            breadth_signal = "sectoral"
+            scope = "sectoral"
         if active_sections >= 3 and len(affected) >= 4:
-            breadth_signal = "broad"
+            scope = "broad"
         elif sentiment == "mixed":
-            breadth_signal = "mixed"
+            scope = "mixed"
 
         impact_horizon = "unclear"
         if severity >= 0.7:
@@ -215,15 +199,14 @@ class RegimeNewsService:
             "event_severity_score": round(severity, 4),
             "confidence_score": round(confidence, 4),
             "risk_of_abnormal_volatility": risk,
-            "trade_caution_level": caution,
             "affected_sectors": affected,
             "event_clusters": event_clusters,
             "headline_summary": summary,
             "structured_reasoning": reasoning,
-            "llm_regime_overlay": {
-                "regime_bias": regime_bias,
+            "birds_eye_view": {
+                "scope": scope,
                 "impact_horizon": impact_horizon,
-                "breadth_signal": breadth_signal,
+                "summary": summary,
             },
         }
 
