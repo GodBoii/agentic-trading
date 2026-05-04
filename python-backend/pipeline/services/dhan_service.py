@@ -70,6 +70,52 @@ class DhanService:
         )
         self.gateway_timeout_seconds = self.config.market_data_gateway_timeout_seconds
         self.gateway_session = requests.Session() if self.gateway_url else None
+        self.base_url = "https://api.dhan.co/v2"
+
+    def _headers(self) -> Dict[str, str]:
+        return {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "access-token": str(self.access_token),
+        }
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        payload: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        try:
+            response = requests.request(
+                method=method,
+                url=f"{self.base_url}{path}",
+                headers=self._headers(),
+                json=payload,
+                params=params,
+                timeout=30,
+            )
+            if response.status_code == 202 and not response.content:
+                return {"status": "success", "data": {"http_status": 202}}
+            try:
+                body: Any = response.json()
+            except ValueError:
+                body = response.text
+            if response.ok:
+                return {"status": "success", "data": body}
+            return {
+                "status": "failure",
+                "remarks": f"http_{response.status_code}",
+                "data": body,
+            }
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def _with_client_id(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = {"dhanClientId": str(self.client_id)}
+        enriched.update(payload)
+        return enriched
 
     def _normalize_historical_instruments(self, instrument_candidates: Optional[List[str]]) -> List[str]:
         # Dhan historical API accepts Dhan instrument names (e.g. EQUITY), not exchange-type tags like ES.
@@ -204,6 +250,257 @@ class DhanService:
             return {"status": "success", "data": response}
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def place_slice_order(
+        self,
+        *,
+        security_id: int,
+        exchange_segment: str,
+        transaction_type: str,
+        quantity: int,
+        order_type: str,
+        product_type: str,
+        price: float,
+        trigger_price: float = 0.0,
+        disclosed_quantity: int = 0,
+        after_market_order: bool = False,
+        validity: str = "DAY",
+        amo_time: str = "OPEN",
+        bo_profit_value: Optional[float] = None,
+        bo_stop_loss_value: Optional[float] = None,
+        correlation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = self._with_client_id(
+            {
+                "correlationId": correlation_id,
+                "transactionType": transaction_type,
+                "exchangeSegment": exchange_segment,
+                "productType": product_type,
+                "orderType": order_type,
+                "validity": validity,
+                "securityId": str(security_id),
+                "quantity": int(quantity),
+                "disclosedQuantity": int(disclosed_quantity),
+                "price": float(price),
+                "triggerPrice": float(trigger_price),
+                "afterMarketOrder": bool(after_market_order),
+                "amoTime": amo_time,
+                "boProfitValue": bo_profit_value,
+                "boStopLossValue": bo_stop_loss_value,
+            }
+        )
+        return self._request("POST", "/orders/slicing", payload=payload)
+
+    def calculate_margin_requirement(
+        self,
+        *,
+        security_id: int,
+        exchange_segment: str,
+        transaction_type: str,
+        quantity: int,
+        product_type: str,
+        price: float,
+        trigger_price: float = 0.0,
+    ) -> Dict[str, Any]:
+        payload = self._with_client_id(
+            {
+                "exchangeSegment": exchange_segment,
+                "transactionType": transaction_type,
+                "quantity": int(quantity),
+                "productType": product_type,
+                "securityId": str(security_id),
+                "price": float(price),
+                "triggerPrice": float(trigger_price),
+            }
+        )
+        return self._request("POST", "/margincalculator", payload=payload)
+
+    def activate_kill_switch(self) -> Dict[str, Any]:
+        return self._request("POST", "/killswitch", params={"killSwitchStatus": "ACTIVATE"})
+
+    def deactivate_kill_switch(self) -> Dict[str, Any]:
+        return self._request("POST", "/killswitch", params={"killSwitchStatus": "DEACTIVATE"})
+
+    def place_super_order(
+        self,
+        *,
+        security_id: int,
+        exchange_segment: str,
+        transaction_type: str,
+        quantity: int,
+        order_type: str,
+        product_type: str,
+        price: float,
+        target_price: float,
+        stop_loss_price: float,
+        trailing_jump: float = 0.0,
+        correlation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = self._with_client_id(
+            {
+                "correlationId": correlation_id,
+                "transactionType": transaction_type,
+                "exchangeSegment": exchange_segment,
+                "productType": product_type,
+                "orderType": order_type,
+                "securityId": str(security_id),
+                "quantity": int(quantity),
+                "price": float(price),
+                "targetPrice": float(target_price),
+                "stopLossPrice": float(stop_loss_price),
+                "trailingJump": float(trailing_jump),
+            }
+        )
+        return self._request("POST", "/super/orders", payload=payload)
+
+    def modify_super_order(
+        self,
+        *,
+        order_id: str,
+        leg_name: str,
+        order_type: Optional[str] = None,
+        quantity: Optional[int] = None,
+        price: Optional[float] = None,
+        target_price: Optional[float] = None,
+        stop_loss_price: Optional[float] = None,
+        trailing_jump: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = self._with_client_id({"orderId": order_id, "legName": leg_name})
+        optional_fields = {
+            "orderType": order_type,
+            "quantity": quantity,
+            "price": price,
+            "targetPrice": target_price,
+            "stopLossPrice": stop_loss_price,
+            "trailingJump": trailing_jump,
+        }
+        payload.update({key: value for key, value in optional_fields.items() if value is not None})
+        return self._request("PUT", f"/super/orders/{order_id}", payload=payload)
+
+    def cancel_super_order(self, order_id: str, order_leg: str = "ENTRY_LEG") -> Dict[str, Any]:
+        return self._request("DELETE", f"/super/orders/{order_id}/{order_leg}")
+
+    def fetch_super_orders(self) -> Dict[str, Any]:
+        return self._request("GET", "/super/orders")
+
+    def place_forever_order(
+        self,
+        *,
+        security_id: int,
+        exchange_segment: str,
+        transaction_type: str,
+        quantity: int,
+        order_flag: str,
+        order_type: str,
+        product_type: str,
+        price: float,
+        trigger_price: float,
+        validity: str = "DAY",
+        disclosed_quantity: int = 0,
+        price1: Optional[float] = None,
+        trigger_price1: Optional[float] = None,
+        quantity1: Optional[int] = None,
+        correlation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = self._with_client_id(
+            {
+                "correlationId": correlation_id,
+                "orderFlag": order_flag,
+                "transactionType": transaction_type,
+                "exchangeSegment": exchange_segment,
+                "productType": product_type,
+                "orderType": order_type,
+                "validity": validity,
+                "securityId": str(security_id),
+                "quantity": int(quantity),
+                "disclosedQuantity": int(disclosed_quantity),
+                "price": float(price),
+                "triggerPrice": float(trigger_price),
+            }
+        )
+        if order_flag.upper() == "OCO":
+            payload.update({"price1": price1, "triggerPrice1": trigger_price1, "quantity1": quantity1})
+        return self._request("POST", "/forever/orders", payload=payload)
+
+    def modify_forever_order(
+        self,
+        *,
+        order_id: str,
+        order_flag: str,
+        leg_name: str,
+        order_type: str,
+        quantity: int,
+        price: float,
+        trigger_price: float,
+        validity: str = "DAY",
+        disclosed_quantity: int = 0,
+    ) -> Dict[str, Any]:
+        payload = self._with_client_id(
+            {
+                "orderId": order_id,
+                "orderFlag": order_flag,
+                "orderType": order_type,
+                "legName": leg_name,
+                "quantity": int(quantity),
+                "price": float(price),
+                "disclosedQuantity": int(disclosed_quantity),
+                "triggerPrice": float(trigger_price),
+                "validity": validity,
+            }
+        )
+        return self._request("PUT", f"/forever/orders/{order_id}", payload=payload)
+
+    def cancel_forever_order(self, order_id: str) -> Dict[str, Any]:
+        return self._request("DELETE", f"/forever/orders/{order_id}")
+
+    def fetch_forever_orders(self) -> Dict[str, Any]:
+        return self._request("GET", "/forever/all")
+
+    def place_conditional_trigger(self, *, condition: Dict[str, Any], orders: List[Dict[str, Any]]) -> Dict[str, Any]:
+        return self._request("POST", "/alerts/orders", payload=self._with_client_id({"condition": condition, "orders": orders}))
+
+    def modify_conditional_trigger(
+        self,
+        *,
+        alert_id: str,
+        condition: Dict[str, Any],
+        orders: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        payload = self._with_client_id({"alertId": alert_id, "condition": condition, "orders": orders})
+        return self._request("PUT", f"/alerts/orders/{alert_id}", payload=payload)
+
+    def delete_conditional_trigger(self, alert_id: str) -> Dict[str, Any]:
+        return self._request("DELETE", f"/alerts/orders/{alert_id}")
+
+    def fetch_conditional_trigger(self, alert_id: str) -> Dict[str, Any]:
+        return self._request("GET", f"/alerts/orders/{alert_id}")
+
+    def fetch_conditional_triggers(self) -> Dict[str, Any]:
+        return self._request("GET", "/alerts/orders")
+
+    def generate_edis_tpin(self) -> Dict[str, Any]:
+        return self._request("GET", "/edis/tpin")
+
+    def generate_edis_form(
+        self,
+        *,
+        isin: str,
+        qty: int,
+        exchange: str = "BSE",
+        segment: str = "EQ",
+        bulk: bool = False,
+    ) -> Dict[str, Any]:
+        payload = {"isin": isin, "qty": int(qty), "exchange": exchange, "segment": segment, "bulk": bool(bulk)}
+        return self._request("POST", "/edis/form", payload=payload)
+
+    def fetch_edis_status(self, isin: str = "ALL") -> Dict[str, Any]:
+        return self._request("GET", f"/edis/inquire/{isin}")
+
+    def fetch_ledger_report(self, from_date: str, to_date: str) -> Dict[str, Any]:
+        return self._request("GET", "/ledger", params={"from-date": from_date, "to-date": to_date})
+
+    def fetch_trade_history(self, from_date: str, to_date: str, page: int = 0) -> Dict[str, Any]:
+        return self._request("GET", f"/trades/{from_date}/{to_date}/{int(page)}")
 
     def modify_order(
         self,
