@@ -34,15 +34,16 @@ class StockAnalyzerAgent:
             ),
             instructions=[
                 "You are the first stock analyzer in an intraday trading pipeline.",
-                "Use only the provided stock facts, regime context, and chart images.",
+                "Use only the provided stock facts, market context, and chart images.",
                 "Focus on intraday trading quality, not swing trading.",
                 "Treat chart images as evidence to validate price structure, candle behavior, momentum continuation quality, and risk warnings.",
                 "Do not invent indicators or data that were not provided.",
                 "If evidence is mixed, clearly say so instead of forcing a trade.",
+                "Treat the market context as background information only; make your own independent stock assessment from the supplied evidence.",
                 "Write a compact but detailed analyst report in normal text.",
                 "Use this exact section structure:",
                 "1. Verdict",
-                "2. Regime Fit",
+                "2. Market Context",
                 "3. Chart Read",
                 "4. Strengths",
                 "5. Risks",
@@ -70,14 +71,17 @@ class StockAnalyzerAgent:
             "stock": candidate_packet.get("stock"),
             "stage2": candidate_packet.get("stage2"),
             "monitor": candidate_packet.get("monitor"),
-            "regime": candidate_packet.get("regime"),
             "chart_artifacts": candidate_packet.get("chart_artifacts"),
         }
+        market_context = candidate_packet.get("market_context") or candidate_packet.get("regime") or {}
         return (
             "Analyze the supplied intraday stock candidate.\n"
             "Your downstream reader is a risk agent, so be precise, concrete, and usable.\n"
             "Interpret the two chart images as 5-minute and 15-minute candlestick charts.\n"
             "The monitor stage already screened for live tradability; still mention any warning signs you infer from the charts.\n"
+            "<context>\n"
+            f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
+            "</context>\n"
             "Candidate packet JSON:\n"
             f"{json.dumps(compact_packet, ensure_ascii=True)}"
         )

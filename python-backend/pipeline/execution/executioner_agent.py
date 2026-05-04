@@ -33,14 +33,10 @@ class ExecutionerAgent:
             tools=[self.toolkit],
             instructions=[
                 "You are the final execution layer in an intraday trading pipeline.",
-                "You receive one chosen stock, its analyzer report, the risk report, regime context, user Dhan account context, and two chart images.",
+                "You receive one chosen stock, its analyzer report, the risk report, market context, user Dhan account context, and two chart images.",
                 "Reason carefully and step by step, but only provide the final actionable answer.",
-                "Use the provided Dhan tools when you need fresher account, order, or trade information before making the decision.",
-                "Before any live order, use calculate_margin_requirement when you have a concrete security, side, quantity, and reference price.",
-                "Prefer place_protected_intraday_super_order for new intraday trades because it places entry, target, stop loss, and optional trailing stop together.",
-                "Use place_intraday_equity_order only for intentional fallback cases such as explicit exits or when a protected order cannot be used.",
-                "Only place an order if all of the following are true: regime allows trading, account has usable balance, there is no dangerous position overlap, the stock setup is still attractive from the images, and quantity is positive.",
-                "For BUY Super Orders require stop_loss_price below entry_price and target_price above entry_price. For SELL Super Orders require target_price below entry_price and stop_loss_price above entry_price.",
+                "Treat the market context as background information only; make your own independent execution decision from the supplied evidence.",
+                "Only place an order if account has usable balance, there is no dangerous position overlap, the stock setup is still attractive from the images, and quantity is positive.",
                 "If any of those checks fail, do not place an order.",
                 "If live order placement, Super Order placement, static IP whitelisting, or margin validation blocks the trade, treat that as an execution block and do not pretend an order was sent.",
                 "Do not invent order ids, correlation ids, funds, or quantities.",
@@ -82,15 +78,28 @@ class ExecutionerAgent:
             "stock_analysis": execution_packet.get("stock_analysis"),
             "risk_decision": execution_packet.get("risk_decision"),
             "risk_report_text": execution_packet.get("risk_report_text"),
-            "regime": execution_packet.get("regime"),
             "account_context": execution_packet.get("account_context"),
             "user_profile": execution_packet.get("user_profile"),
+        }
+        market_context = execution_packet.get("market_context") or execution_packet.get("regime") or {}
+        tool_instructions = {
+            "freshness": "Use the provided Dhan tools when you need fresher account, order, or trade information before making the decision.",
+            "margin": "Before any live order, use calculate_margin_requirement when you have a concrete security, side, quantity, and reference price.",
+            "preferred_order": "Prefer place_protected_intraday_super_order for new intraday trades because it places entry, target, stop loss, and optional trailing stop together.",
+            "fallback_order": "Use place_intraday_equity_order only for intentional fallback cases such as explicit exits or when a protected order cannot be used.",
+            "super_order_validation": "For BUY Super Orders require stop_loss_price below entry_price and target_price above entry_price. For SELL Super Orders require target_price below entry_price and stop_loss_price above entry_price.",
         }
         return (
             "Make the final intraday execution decision for the supplied stock.\n"
             "Interpret the two chart images as the 5-minute and 15-minute candlestick charts for the same stock.\n"
             "The execution layer may avoid trading, plan a trade, or place a trade using the available Dhan tools.\n"
             "Use the stock analyzer report for setup quality, the risk report for cross-stock selection context, and the account context for feasibility.\n"
+            "<context>\n"
+            f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
+            "</context>\n"
+            "<tools>\n"
+            f"{json.dumps(tool_instructions, ensure_ascii=True)}\n"
+            "</tools>\n"
             "Execution packet JSON:\n"
             f"{json.dumps(compact_packet, ensure_ascii=True)}"
         )
