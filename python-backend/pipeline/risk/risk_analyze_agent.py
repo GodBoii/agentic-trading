@@ -8,6 +8,7 @@ from agno.agent import Agent
 from agno.media import Image
 from agno.models.groq import Groq
 from agno.models.openrouter import OpenRouter
+from agno.models.google import Gemini
 
 
 class RiskAnalyzeAgent:
@@ -24,7 +25,7 @@ class RiskAnalyzeAgent:
 
         agent = Agent(
             name=self.agent_name,
-            model=OpenRouter(id="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"),
+            model=Gemini(id="gemini-2.5-flash"),
             description=(
                 "Compare three intraday stock analysis reports against regime and account-risk context, then choose the single best tradable candidate."
             ),
@@ -35,7 +36,6 @@ class RiskAnalyzeAgent:
                 "Respect available funds, position overlap, concentration, and regime controls.",
                 "If the account context, regime controls, or chart evidence make all trades unattractive, recommend avoid.",
                 "Use only the supplied facts and images.",
-                "Write a normal text report, not JSON.",
                 "Start the report with these exact header lines so the runtime can read your decision:",
                 "Decision: <TRADE or AVOID>",
                 "Selected Symbol: <symbol or NONE>",
@@ -49,6 +49,7 @@ class RiskAnalyzeAgent:
                 "3. Account And Risk Constraints",
                 "4. Execution Notes",
                 "If available funds are effectively zero or trading should not happen, make that explicit.",
+                "NOTE :- currently im testing this system and i have connected my dhan account which has 0 balance but because we are in testing mode you have to provide one stock and ignore funds and other things for now so provide proper response with one stock",
             ],
             markdown=False,
             add_datetime_to_context=True,
