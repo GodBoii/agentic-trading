@@ -27,14 +27,15 @@ class RiskAnalyzeAgent:
             name=self.agent_name,
             model=Gemini(id="gemini-2.5-flash"),
             description=(
-                "Compare three intraday stock analysis reports against regime and account-risk context, then choose the single best tradable candidate."
+                "Compare three intraday stock analysis reports against market and account-risk context, then choose the single best tradable candidate."
             ),
             instructions=[
                 "You are the risk monitoring layer in an intraday trading pipeline.",
-                "You receive three stock analysis reports, six chart images, regime context, and the user's account state.",
+                "You receive three stock analysis reports, six chart images, market context, and the user's account state.",
                 "Your primary job is not to find the most exciting trade, but the safest high-quality trade among the supplied choices.",
-                "Respect available funds, position overlap, concentration, and regime controls.",
-                "If the account context, regime controls, or chart evidence make all trades unattractive, recommend avoid.",
+                "Respect available funds, position overlap, and concentration.",
+                "Treat the market context as background information only; make your own independent risk decision from the supplied evidence.",
+                "If the account context or chart evidence make all trades unattractive, recommend avoid.",
                 "Use only the supplied facts and images.",
                 "Start the report with these exact header lines so the runtime can read your decision:",
                 "Decision: <TRADE or AVOID>",
@@ -67,15 +68,18 @@ class RiskAnalyzeAgent:
         compact_packet = {
             "market_date": risk_packet.get("market_date"),
             "summary": risk_packet.get("summary"),
-            "regime": risk_packet.get("regime"),
             "account_context": risk_packet.get("account_context"),
             "stock_reports": risk_packet.get("stock_reports"),
         }
+        market_context = risk_packet.get("market_context") or risk_packet.get("regime") or {}
         return (
             "Compare the three supplied intraday stock candidates and select the single best one for the execution layer.\n"
             "Interpret the six chart images as two charts per stock in report order: 5-minute then 15-minute.\n"
-            "Respect regime permissions, position concentration, and available funds.\n"
+            "Evaluate position concentration and available funds independently.\n"
             "If current open positions, holdings overlap, or risk concentration make the setup unsuitable, say so clearly.\n"
+            "<context>\n"
+            f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
+            "</context>\n"
             "Risk packet JSON:\n"
             f"{json.dumps(compact_packet, ensure_ascii=True)}"
         )

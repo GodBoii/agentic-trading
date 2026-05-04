@@ -121,7 +121,7 @@ class ExecutionerRunner:
             "stock_analysis": self._normalize_stock_analysis(analysis_payload),
             "risk_decision": decision,
             "risk_report_text": risk_payload.get("report_text"),
-            "regime": risk_packet.get("regime") or {},
+            "market_context": risk_packet.get("market_context") or risk_packet.get("regime") or {},
             "account_context": risk_packet.get("account_context") or {},
             "user_profile": self.dhan.fetch_user_profile(),
         }
