@@ -23,7 +23,7 @@ class ExecutionerRunner:
         self.toolkit = DhanExecutionToolkit(self.dhan)
         self.agent = ExecutionerAgent(self.toolkit)
 
-    def run_cycle(self) -> Optional[Dict[str, Any]]:
+    def run_cycle(self, force: bool = False) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Executioner is idling.")
             return None
@@ -45,7 +45,7 @@ class ExecutionerRunner:
             return self._save_no_trade_payload(market_date, risk_payload, "No selected stock from risk analyzer.")
 
         existing = self.storage.load_snapshot(self.config.executioner_latest_path)
-        if not self._should_refresh(existing, execution_packet):
+        if not force and not self._should_refresh(existing, execution_packet):
             print("Executioner report is still fresh.")
             return existing
 
