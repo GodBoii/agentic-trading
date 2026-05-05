@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface TradingKeys {
@@ -10,29 +11,59 @@ interface TradingKeys {
     token_expiry: string
 }
 
+interface AgentRunStatus {
+    status: string
+    current_stage: string
+    updated_at_utc?: string
+    error?: string | null
+    stages?: Record<string, { status: string; summary?: any }>
+}
+
 export default function TradingStatus() {
+    const router = useRouter()
     const [tradingKeys, setTradingKeys] = useState<TradingKeys | null>(null)
     const [loading, setLoading] = useState(true)
     const [updating, setUpdating] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
     const supabase = createClient()
 
     useEffect(() => {
         fetchTradingStatus()
+        fetchRunStatus()
     }, [])
 
-    const syncAnalyzerState = async (enabled: boolean) => {
+    useEffect(() => {
+        const timer = setInterval(fetchRunStatus, 3000)
+        return () => clearInterval(timer)
+    }, [])
+
+    const startAITrading = async () => {
         const response = await fetch('/api/ai-trading/toggle', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ enabled }),
+            body: JSON.stringify({ enabled: true }),
         })
 
         if (!response.ok) {
             const payload = await response.json().catch(() => null)
-            throw new Error(payload?.error || 'Failed to sync AI trading state')
+            throw new Error(payload?.error || 'Failed to start AI trading')
+        }
+        const payload = await response.json()
+        await fetchRunStatus()
+        router.push(`/dashboard/ai-trading?run=${encodeURIComponent(payload?.request?.request_id || '')}`)
+    }
+
+    const fetchRunStatus = async () => {
+        try {
+            const response = await fetch('/api/ai-trading/toggle', { method: 'GET' })
+            if (response.ok) {
+                setRunStatus(await response.json())
+            }
+        } catch (statusError) {
+            console.error('Error fetching AI trading run status:', statusError)
         }
     }
 
@@ -61,12 +92,6 @@ export default function TradingStatus() {
                 }
             } else {
                 setTradingKeys(data)
-                try {
-                    await syncAnalyzerState(Boolean(data.is_trading_enabled))
-                } catch (syncError) {
-                    console.error('Error syncing analyzer state:', syncError)
-                    setError('Failed to sync analyzer state')
-                }
             }
         } catch (err) {
             console.error('Error:', err)
@@ -76,23 +101,22 @@ export default function TradingStatus() {
         }
     }
 
-    const handleToggle = async () => {
+    const handleStart = async () => {
         if (!tradingKeys) return
 
         try {
             setUpdating(true)
             setError(null)
 
-            const newStatus = !tradingKeys.is_trading_enabled
-            await syncAnalyzerState(newStatus)
+            await startAITrading()
 
             setTradingKeys({
                 ...tradingKeys,
-                is_trading_enabled: newStatus,
+                is_trading_enabled: true,
             })
         } catch (err) {
-            console.error('Error toggling trading:', err)
-            setError('Failed to update trading status')
+            console.error('Error starting AI trading:', err)
+            setError('Failed to start AI trading')
         } finally {
             setUpdating(false)
         }
@@ -138,6 +162,13 @@ export default function TradingStatus() {
     }
 
     const tokenExpired = isTokenExpired()
+    const isRunning = runStatus?.status === 'running'
+    const stageLabels: Record<string, string> = {
+        stage2: 'Stage 2',
+        stock_analyzer: 'Stock Analyzer',
+        risk_analyzer: 'Risk Analyzer',
+        executioner: 'Executioner',
+    }
 
     return (
         <div className="brutal-box p-8 space-y-6">
@@ -152,7 +183,7 @@ export default function TradingStatus() {
                             Trading Status
                         </h3>
                         <p className="text-sm text-brutal-cream/60 font-mono mt-1">
-                            {tradingKeys.is_trading_enabled ? 'ACTIVE' : 'DISABLED'}
+                            {isRunning ? 'RUNNING' : tradingKeys.is_trading_enabled ? 'READY' : 'IDLE'}
                         </p>
                     </div>
                 </div>
@@ -191,28 +222,61 @@ export default function TradingStatus() {
                                 AI Trading
                             </p>
                             <p className="text-xs text-brutal-cream/50 font-mono">
-                                {tradingKeys.is_trading_enabled
-                                    ? 'AI can execute trades'
-                                    : 'Trading is disabled'}
+                                {isRunning
+                                    ? 'Agents are running in order'
+                                    : tradingKeys.is_trading_enabled
+                                        ? 'Ready for the next user-started run'
+                                        : 'Press start to run the agent chain'}
                             </p>
                         </div>
                         <button
-                            onClick={handleToggle}
-                            disabled={updating || tokenExpired}
-                            className={`relative inline-flex h-10 w-20 items-center border-4 border-brutal-black transition-all disabled:opacity-50 disabled:cursor-not-allowed ${tradingKeys.is_trading_enabled
-                                    ? 'bg-brutal-green'
-                                    : 'bg-brutal-cream/20'
-                                }`}
-                            aria-label={`Toggle AI trading ${tradingKeys.is_trading_enabled ? 'off' : 'on'}`}
-                            aria-pressed={tradingKeys.is_trading_enabled}
+                            onClick={handleStart}
+                            disabled={updating || tokenExpired || isRunning}
+                            className="brutal-btn px-5 py-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Start AI trading"
                         >
-                            <span
-                                className={`inline-block h-6 w-6 transform bg-brutal-black border-3 border-brutal-cream transition-transform ${tradingKeys.is_trading_enabled ? 'translate-x-11' : 'translate-x-1'
-                                    }`}
-                            />
+                            {updating ? 'Starting...' : isRunning ? 'Running...' : 'Start AI Trading'}
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-5 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                    <p className="text-xs font-bold text-brutal-cream/60 uppercase tracking-wider font-mono">
+                        Agent Run
+                    </p>
+                    <p className="text-xs text-brutal-cream/60 font-mono uppercase">
+                        {runStatus?.status || 'idle'}
+                    </p>
+                </div>
+
+                <div className="space-y-3">
+                    {Object.entries(stageLabels).map(([stage, label]) => {
+                        const status = runStatus?.stages?.[stage]?.status || 'pending'
+                        const active = status === 'running'
+                        const complete = status === 'completed'
+                        return (
+                            <div key={stage} className="flex items-center justify-between gap-4 border-t-3 border-brutal-cream/10 pt-3 first:border-t-0 first:pt-0">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-3 h-3 ${complete ? 'bg-brutal-green' : active ? 'bg-brutal-yellow' : 'bg-brutal-cream/30'}`}></div>
+                                    <p className="text-sm text-brutal-cream font-mono font-bold uppercase">
+                                        {label}
+                                    </p>
+                                </div>
+                                <p className="text-xs text-brutal-cream/60 font-mono uppercase">
+                                    {status}
+                                </p>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                {runStatus?.error && (
+                    <p className="text-xs text-brutal-red font-mono font-bold uppercase">
+                        {runStatus.error}
+                    </p>
+                )}
             </div>
 
             <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
@@ -221,7 +285,7 @@ export default function TradingStatus() {
                     <div className="text-xs text-brutal-cream/70 font-mono leading-relaxed">
                         <p className="font-bold mb-2 uppercase tracking-wide">Safety First</p>
                         <p>
-                            You can disable AI trading at any time. The system will only trade when enabled.
+                            AI trading runs only when you press start. The agents execute once in order: stock analyzer, risk analyzer, then executioner.
                         </p>
                     </div>
                 </div>

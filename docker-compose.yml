@@ -67,59 +67,22 @@ services:
       - ./:/app
     restart: unless-stopped
 
-  stock_analyzer:
+  ai-trading-agents:
     build:
       context: .
       dockerfile: python-backend/Dockerfile
+    container_name: trader-ai-trading-agents
     env_file:
       - python-backend/.env
       - .env
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    command: python -m pipeline.runtime.run_stock_analyzer
+    command: python -m pipeline.runtime.run_ai_trading_orchestrator
     depends_on:
       - market-data-gateway
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
-
-  risk_analyzer:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
-    env_file:
-      - python-backend/.env
-      - .env
-    working_dir: /app/python-backend
-    environment:
-      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    command: python -m pipeline.runtime.run_risk_analyzer
-    depends_on:
-      - market-data-gateway
-      - stock_analyzer
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
-
-  executioner:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
-    container_name: trader-executioner
-    env_file:
-      - python-backend/.env
-      - .env
-    working_dir: /app/python-backend
-    environment:
-      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    command: python -m pipeline.runtime.run_executioner
-    depends_on:
-      - market-data-gateway
-      - stock_analyzer
-      - risk_analyzer
+    ports:
+      - "8020:8020"
     volumes:
       - ./python-backend:/app/python-backend
       - ./:/app
