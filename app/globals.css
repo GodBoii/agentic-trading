@@ -218,4 +218,14 @@ body {
   ::-webkit-scrollbar-thumb:hover {
     background: var(--brutal-green);
   }
-}
+
+  /* Float animation for hero accents */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+}

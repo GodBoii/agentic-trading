@@ -50,7 +50,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brutal-black flex items-center justify-center p-6">
+    <div className="min-h-screen bg-brutal-black flex flex-col">
+      {/* Back to home bar */}
+      <div className="border-b-4 border-brutal-white/20 px-6 py-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-brutal-cream/60 hover:text-brutal-cream font-mono text-sm uppercase tracking-wider transition-colors"
+          aria-label="Back to home page"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+            <path strokeLinecap="square" strokeLinejoin="miter" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Home
+        </Link>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
         <div className="brutal-box-lg p-10 space-y-8 animate-pop">
           {/* Header */}
@@ -176,6 +191,7 @@ export default function LoginPage() {
             Create Account
           </Link>
         </div>
+      </div>
       </div>
     </div>
   )
