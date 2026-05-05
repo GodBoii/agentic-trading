@@ -3,12 +3,12 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import DhanConnect from '@/components/dhan-connect'
 import TradingStatus from '@/components/trading-status'
 import FundsCard from '@/components/funds-card'
 import HoldingsCard from '@/components/holdings-card'
 import PositionsCard from '@/components/positions-card'
-import ArchitectureSVG from '@/components/architecture-svg'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +66,7 @@ function DashboardContent() {
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
-        router.push('/login')
+        router.push('/')
     }
 
     if (loading) {
@@ -108,33 +108,35 @@ function DashboardContent() {
 
             {/* Header */}
             <header className="bg-brutal-black border-b-4 border-brutal-white sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 py-5">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-brutal-cream border-4 border-brutal-black flex items-center justify-center p-2">
+                        {/* Logo — links back to homepage */}
+                        <Link href="/" className="flex items-center gap-4 group" aria-label="Go to home page">
+                            <div className="w-14 h-14 bg-brutal-cream border-4 border-brutal-black flex items-center justify-center p-2 group-hover:shadow-brutal-sm transition-all">
                                 <img src="/icon.png" alt="Logo" className="w-full h-full object-contain" />
                             </div>
                             <div>
-                                <h1 className="text-4xl font-bold text-brutal-cream uppercase tracking-tight">
+                                <h1 className="text-3xl font-bold text-brutal-cream uppercase tracking-tight group-hover:text-brutal-green transition-colors">
                                     Agentic Trading
                                 </h1>
-                                <p className="text-brutal-cream/70 font-mono text-sm uppercase tracking-wider mt-1">
+                                <p className="text-brutal-cream/50 font-mono text-xs uppercase tracking-widest mt-0.5">
                                     AI-Powered Platform
                                 </p>
                             </div>
-                        </div>
+                        </Link>
 
                         <div className="flex items-center gap-6">
-                            <div className="text-right">
-                                <p className="text-brutal-cream/60 font-mono text-xs uppercase tracking-wider">Logged in</p>
-                                <p className="text-brutal-cream font-mono font-bold">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-brutal-cream/60 font-mono text-xs uppercase tracking-wider">Logged in as</p>
+                                <p className="text-brutal-cream font-mono font-bold text-sm truncate max-w-[200px]">
                                     {user?.email}
                                 </p>
                             </div>
                             <button
                                 onClick={handleSignOut}
+                                id="dashboard-signout-btn"
                                 className="brutal-btn px-6 py-3 text-sm"
-                                aria-label="Sign out"
+                                aria-label="Sign out of your account"
                             >
                                 Sign Out
                             </button>
@@ -154,22 +156,10 @@ function DashboardContent() {
                         Manage your trading account
                     </p>
                 </div>
-
-                {/* Grid Layout */}
+                {/* Connect & Trading Status */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                     <DhanConnect />
                     <TradingStatus />
-                </div>
-                
-                {/* Architecture Visualizer */}
-                <div className="mb-12">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="w-3 h-3 bg-[#7C3AED]"></div>
-                        <h2 className="text-3xl font-bold text-brutal-cream uppercase tracking-tight">
-                            Neural Processing Core
-                        </h2>
-                    </div>
-                    <ArchitectureSVG />
                 </div>
 
                 {/* Portfolio Section */}
@@ -188,96 +178,6 @@ function DashboardContent() {
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                         <HoldingsCard />
                         <PositionsCard />
-                    </div>
-                </div>
-
-                {/* Info Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                    <div className="brutal-box p-8">
-                        <div className="flex items-start gap-4 mb-4">
-                            <div className="w-4 h-4 bg-brutal-green flex-shrink-0 mt-1"></div>
-                            <h3 className="text-2xl font-bold text-brutal-cream uppercase">
-                                AI-Powered
-                            </h3>
-                        </div>
-                        <p className="text-brutal-cream/70 leading-relaxed font-mono text-sm">
-                            Multi-agent system analyzes markets 24/7 using technical and sentiment analysis
-                        </p>
-                    </div>
-
-                    <div className="brutal-box p-8">
-                        <div className="flex items-start gap-4 mb-4">
-                            <div className="w-4 h-4 bg-brutal-cream flex-shrink-0 mt-1"></div>
-                            <h3 className="text-2xl font-bold text-brutal-cream uppercase">
-                                Secure
-                            </h3>
-                        </div>
-                        <p className="text-brutal-cream/70 leading-relaxed font-mono text-sm">
-                            Bank-level encryption with Supabase RLS ensures your credentials are protected
-                        </p>
-                    </div>
-
-                    <div className="brutal-box p-8">
-                        <div className="flex items-start gap-4 mb-4">
-                            <div className="w-4 h-4 bg-brutal-yellow flex-shrink-0 mt-1"></div>
-                            <h3 className="text-2xl font-bold text-brutal-cream uppercase">
-                                Automated
-                            </h3>
-                        </div>
-                        <p className="text-brutal-cream/70 leading-relaxed font-mono text-sm">
-                            Set it and forget it. The AI executes trades automatically when opportunities arise
-                        </p>
-                    </div>
-                </div>
-
-                {/* How It Works Section */}
-                <div className="brutal-box-lg p-10">
-                    <h3 className="text-3xl font-bold text-brutal-cream mb-10 uppercase tracking-tight">
-                        How It Works
-                    </h3>
-
-                    <div className="space-y-8">
-                        <div className="flex gap-6">
-                            <div className="flex-shrink-0 w-12 h-12 bg-brutal-cream text-brutal-black flex items-center justify-center font-bold text-xl border-3 border-brutal-black">
-                                1
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-brutal-cream mb-2 text-xl uppercase">
-                                    Connect Your Account
-                                </h4>
-                                <p className="text-brutal-cream/70 font-mono">
-                                    Enter your Dhan Client ID and securely link your trading account
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-6">
-                            <div className="flex-shrink-0 w-12 h-12 bg-brutal-green text-brutal-black flex items-center justify-center font-bold text-xl border-3 border-brutal-black">
-                                2
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-brutal-cream mb-2 text-xl uppercase">
-                                    Enable AI Trading
-                                </h4>
-                                <p className="text-brutal-cream/70 font-mono">
-                                    Toggle the trading switch to allow the AI to execute trades on your behalf
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-6">
-                            <div className="flex-shrink-0 w-12 h-12 bg-brutal-yellow text-brutal-black flex items-center justify-center font-bold text-xl border-3 border-brutal-black">
-                                3
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-brutal-cream mb-2 text-xl uppercase">
-                                    Sit Back & Relax
-                                </h4>
-                                <p className="text-brutal-cream/70 font-mono">
-                                    Our multi-agent AI system analyzes the market and executes profitable trades automatically
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </main>

@@ -30,14 +30,20 @@ export async function middleware(request: NextRequest) {
     // Refresh session if expired
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Protect routes - redirect to login if not authenticated
-    if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup') && !request.nextUrl.pathname.startsWith('/auth')) {
+    // Public routes — no auth required
+    const publicPaths = ['/', '/login', '/signup', '/auth']
+    const isPublic = publicPaths.some(p =>
+        p === '/' ? request.nextUrl.pathname === '/' : request.nextUrl.pathname.startsWith(p)
+    )
+
+    // Protect private routes - redirect to login if not authenticated
+    if (!user && !isPublic) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect authenticated users away from login/signup pages
+    // Redirect authenticated users away from login/signup to the homepage
     if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/'
