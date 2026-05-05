@@ -16,6 +16,8 @@ class PipelineConfig:
     monitor_latest_path: Path = backend_dir / "monitor_liquidity_latest.json"
     regime_latest_path: Path = backend_dir / "regime_latest.json"
     ai_trading_state_path: Path = backend_dir / "ai_trading_state.json"
+    ai_trading_request_path: Path = backend_dir / "ai_trading_request.json"
+    ai_trading_run_status_path: Path = backend_dir / "ai_trading_run_status.json"
     stock_analyzer_latest_path: Path = backend_dir / "stock_analyzer_latest.json"
     risk_analyzer_latest_path: Path = backend_dir / "risk_analyzer_latest.json"
     executioner_latest_path: Path = backend_dir / "executioner_latest.json"
@@ -63,6 +65,7 @@ class PipelineConfig:
     stage2_loop_interval_seconds: int = 600
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
+    regime_schedule_times: tuple[str, ...] = ("09:15", "09:45", "12:30")
     stock_analyzer_loop_interval_seconds: int = 30
     stock_analyzer_report_refresh_seconds: int = 300
     stock_analyzer_top_n: int = 3
@@ -83,6 +86,8 @@ class PipelineConfig:
     market_data_gateway_host: str = "0.0.0.0"
     market_data_gateway_port: int = 8010
     market_data_gateway_timeout_seconds: float = 30.0
+    ai_trading_gateway_host: str = "0.0.0.0"
+    ai_trading_gateway_port: int = 8020
     market_timezone: str = "Asia/Calcutta"
     market_open_hour: int = 9
     market_open_minute: int = 15
