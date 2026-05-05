@@ -21,7 +21,7 @@ class RiskAnalyzerRunner:
         self.dhan = DhanService(self.config, prefer_gateway=False)
         self.agent = RiskAnalyzeAgent()
 
-    def run_cycle(self) -> Optional[Dict[str, Any]]:
+    def run_cycle(self, force: bool = False) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Risk analyzer is idling.")
             return None
@@ -51,7 +51,7 @@ class RiskAnalyzerRunner:
         )
 
         existing = self.storage.load_snapshot(self.config.risk_analyzer_latest_path)
-        if not self._should_refresh(existing, risk_packet):
+        if not force and not self._should_refresh(existing, risk_packet):
             print("Risk analyzer report is still fresh.")
             return existing
 
