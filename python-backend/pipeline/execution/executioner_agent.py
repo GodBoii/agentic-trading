@@ -47,6 +47,7 @@ class ExecutionerAgent:
                 "2. place_protected_intraday_super_order: Prefer this tool for placing new intraday trades because it places entry, target, and stop-loss together in a single call.",
                 "3. place_intraday_equity_order: Use this tool only for fallback cases, such as manual exits or when a protected super order cannot be used.",
                 "4. Live queries: Use tools to check order/position lists or funds if you need fresher information before committing to a decision.",
+                "When calling calculate_margin_requirement, pass only these named arguments exactly: security_id, side, quantity, reference_price, product_type, exchange_segment, trigger_price. Use product_type INTRADAY for intraday equity margin checks. Do not include extra_kwargs or XML/parameter tags.",
                 "Validate Super Orders strictly: for BUY orders, the stop_loss_price must be below entry_price, and target_price must be above entry_price. For SELL orders, target_price must be below entry_price, and stop_loss_price must be above entry_price.",
                 "Do not write a long analysis report. Your job is to decide and act, not to produce commentary.",
                 "After acting or deciding not to act, output only a concise execution outcome in normal markdown/text.",
@@ -81,6 +82,7 @@ class ExecutionerAgent:
             "preferred_order": "Prefer place_protected_intraday_super_order for new intraday trades because it places entry, target, stop loss, and optional trailing stop together.",
             "fallback_order": "Use place_intraday_equity_order only for intentional fallback cases such as explicit exits or when a protected order cannot be used.",
             "super_order_validation": "For BUY Super Orders require stop_loss_price below entry_price and target_price above entry_price. For SELL Super Orders require target_price below entry_price and stop_loss_price above entry_price.",
+            "margin_call_format": "For calculate_margin_requirement pass only security_id, side, quantity, reference_price, product_type, exchange_segment, and trigger_price. Do not pass any other arguments or XML-style parameter tags.",
         }
         return (
             "Make the final intraday execution decision for the supplied stock.\n"
