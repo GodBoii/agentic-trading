@@ -37,7 +37,7 @@ class RiskAnalyzeAgent:
                 "Treat the market context as background information only; it is not trade permission, a trade veto, or position-size instruction.",
                 "Choose from the pre-shortlisted candidates using stock evidence, chart quality, account feasibility, and concentration risk.",
                 "Use only the supplied facts and images.",
-                "Use a starting capital of ₹100 for trading calculations.",
+                "Use a starting capital of ₹200 for trading calculations.",
                 "Output ONLY a valid JSON object matching the requested schema. Do not include markdown code block formatting (like ```json) or explanation outside the JSON.",
             ],
             expected_output=(
