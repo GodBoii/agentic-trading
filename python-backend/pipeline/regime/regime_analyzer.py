@@ -312,12 +312,11 @@ class MarketRegimeAnalyzer:
             analysis_engine = "heuristic"
 
             if headlines:
+                analysis = self.news_service.analyze_with_heuristics(headlines)
                 agent_analysis, agno_error = self.news_agent.analyze(headlines)
                 if agent_analysis is not None and not agno_error:
-                    analysis = agent_analysis
-                    analysis_engine = "agno"
-                else:
-                    analysis = self.news_service.analyze_with_heuristics(headlines)
+                    analysis.update(agent_analysis)
+                    analysis_engine = "agno_markdown_plus_heuristic"
             else:
                 analysis = self.news_service.analyze_with_heuristics([])
 
@@ -881,6 +880,8 @@ class MarketRegimeAnalyzer:
             "headline_summary": news_input.get("headline_summary"),
             "structured_reasoning": news_input.get("structured_reasoning"),
             "birds_eye_view": birds_eye_view,
+            "institutional_flows": news_input.get("institutional_flows", {}),
+            "llm_markdown_analysis": news_input.get("llm_markdown_analysis", ""),
             "market_signal_distribution": news_input.get("market_signal_distribution"),
             "agno_error": news_input.get("agno_error"),
         }
@@ -986,6 +987,20 @@ class MarketRegimeAnalyzer:
         birds_eye_view = event_input.get("birds_eye_view") or {}
         news_scope = str(birds_eye_view.get("scope") or "mixed")
         news_horizon = str(birds_eye_view.get("impact_horizon") or "unclear")
+        institutional_flows = event_input.get("institutional_flows") or {}
+        fii_net_cash = self._coerce_float(institutional_flows.get("fii_net_cash_cr"))
+        dii_net_cash = self._coerce_float(institutional_flows.get("dii_net_cash_cr"))
+        net_institutional_cash = self._coerce_float(institutional_flows.get("net_fii_dii_cash_cr"))
+        flow_context = "unavailable"
+        if net_institutional_cash is not None:
+            if net_institutional_cash >= 2500:
+                flow_context = "net_supportive"
+            elif net_institutional_cash <= -2500:
+                flow_context = "net_withdrawal"
+            elif fii_net_cash is not None and dii_net_cash is not None and fii_net_cash < 0 < dii_net_cash:
+                flow_context = "fii_selling_dii_absorption"
+            else:
+                flow_context = "balanced"
         option_pcr_values = [
             float(item["put_call_oi_ratio"])
             for item in option_chains
@@ -1048,7 +1063,11 @@ class MarketRegimeAnalyzer:
             f"avg_option_pcr={round(avg_option_pcr, 4) if avg_option_pcr is not None else 'na'}, "
             f"avg_option_iv_spread={round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else 'na'}, "
             f"news_scope={news_scope}, "
-            f"news_horizon={news_horizon}"
+            f"news_horizon={news_horizon}, "
+            f"flow_context={flow_context}, "
+            f"fii_net_cash_cr={round(fii_net_cash, 2) if fii_net_cash is not None else 'na'}, "
+            f"dii_net_cash_cr={round(dii_net_cash, 2) if dii_net_cash is not None else 'na'}, "
+            f"net_institutional_cash_cr={round(net_institutional_cash, 2) if net_institutional_cash is not None else 'na'}"
         )
         return {
             "market_regime": label,
@@ -1071,6 +1090,10 @@ class MarketRegimeAnalyzer:
                 "option_chain_count": len(option_chains),
                 "avg_option_put_call_oi_ratio": round(avg_option_pcr, 4) if avg_option_pcr is not None else None,
                 "avg_option_atm_iv_spread": round(avg_option_iv_spread, 4) if avg_option_iv_spread is not None else None,
+                "fii_net_cash_cr": round(fii_net_cash, 2) if fii_net_cash is not None else None,
+                "dii_net_cash_cr": round(dii_net_cash, 2) if dii_net_cash is not None else None,
+                "net_institutional_cash_cr": round(net_institutional_cash, 2) if net_institutional_cash is not None else None,
+                "institutional_flow_context": flow_context,
             },
         }
 

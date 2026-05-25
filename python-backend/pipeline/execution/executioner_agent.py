@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 
 from agno.agent import Agent
 from agno.media import Image
-from agno.models.groq import Groq
 
+from pipeline.llm import create_mimo_model
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 
 
@@ -26,7 +26,7 @@ class ExecutionerAgent:
 
         agent = Agent(
             name=self.agent_name,
-            model=Groq(id="meta-llama/llama-4-scout-17b-16e-instruct"),
+            model=create_mimo_model(),
             description=(
                 "Make the final intraday execution decision for one shortlisted stock using charts, prior reports, risk context, and Dhan trading tools."
             ),
@@ -35,31 +35,24 @@ class ExecutionerAgent:
                 "You are the final execution layer in an intraday trading pipeline.",
                 "You receive one chosen stock, its analyzer report, the risk report, market context, user Dhan account context, and two chart images.",
                 "Reason carefully and step by step, but only provide the final actionable answer.",
-                "Treat the market context as background information only; make your own independent execution decision from the supplied evidence.",
+                "Treat the market context as background information only; it is not trade permission, a trade veto, or position-size instruction.",
+                "Do not reject the selected stock solely because the broader market context is bearish, bullish, mixed, volatile, event-driven, or neutral.",
+                "Only avoid because of concrete execution checks: insufficient usable balance or margin, dangerous position overlap, invalid quantity, tool/API block, stale or contradictory selected-stock evidence, or chart setup deterioration.",
                 "Only place an order if account has usable balance, there is no dangerous position overlap, the stock setup is still attractive from the images, and quantity is positive.",
                 "If any of those checks fail, do not place an order.",
                 "If live order placement, Super Order placement, static IP whitelisting, or margin validation blocks the trade, treat that as an execution block and do not pretend an order was sent.",
                 "Do not invent order ids, correlation ids, funds, or quantities.",
-                "Start your response with these exact header lines:",
-                "Decision: <TRADE or AVOID>",
-                "Execution Status: <PLANNED or PLACED or SKIPPED or BLOCKED or FAILED>",
-                "Selected Security ID: <security id or 0>",
-                "Selected Display Name: <display name or NONE>",
-                "Trade Side: <BUY, SELL, or AVOID>",
-                "Order Type: <MARKET, LIMIT, STOP_LOSS, STOP_LOSS_MARKET, or NONE>",
-                "Protection Type: <SUPER_ORDER, BASIC_ORDER, EXIT_ORDER, or NONE>",
-                "Quantity: <integer>",
-                "Reference Price: <number>",
-                "Correlation ID: <value or NONE>",
-                "Order ID: <value or NONE>",
-                "After the headers, use these sections:",
-                "1. Final Assessment",
-                "2. Execution Checks",
-                "3. Order Plan",
-                "4. Risks And Fallbacks",
-                "Inside Order Plan, explicitly include entry logic, stop logic, target logic, and whether the trade was actually sent or only planned.",
+                "To execute a trade or query data, you must use the provided Dhan tools:",
+                "1. calculate_margin_requirement: Before placing any live order, call this to validate that the margin requirement is satisfied for your specific security, side, quantity, and reference price.",
+                "2. place_protected_intraday_super_order: Prefer this tool for placing new intraday trades because it places entry, target, and stop-loss together in a single call.",
+                "3. place_intraday_equity_order: Use this tool only for fallback cases, such as manual exits or when a protected super order cannot be used.",
+                "4. Live queries: Use tools to check order/position lists or funds if you need fresher information before committing to a decision.",
+                "Validate Super Orders strictly: for BUY orders, the stop_loss_price must be below entry_price, and target_price must be above entry_price. For SELL orders, target_price must be below entry_price, and stop_loss_price must be above entry_price.",
+                "Do not write a long analysis report. Your job is to decide and act, not to produce commentary.",
+                "After acting or deciding not to act, output only a concise execution outcome in normal markdown/text.",
+                "Include actual order id, correlation id, side, quantity, and reference price only when they are known from tools or supplied context.",
             ],
-            markdown=False,
+            markdown=True,
             add_datetime_to_context=True,
             debug_mode=True,
         )
@@ -94,6 +87,8 @@ class ExecutionerAgent:
             "Interpret the two chart images as the 5-minute and 15-minute candlestick charts for the same stock.\n"
             "The execution layer may avoid trading, plan a trade, or place a trade using the available Dhan tools.\n"
             "Use the stock analyzer report for setup quality, the risk report for cross-stock selection context, and the account context for feasibility.\n"
+            "Use market context as background only; do not treat regime labels or news tone as standalone permission or prohibition.\n"
+            "Output only the final execution outcome. Do not produce a sectioned report or JSON object.\n"
             "<context>\n"
             f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
             "</context>\n"
