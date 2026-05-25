@@ -15,16 +15,20 @@ from pipeline.services.market_time_service import MarketTimeService
 
 class RegimeNewsService:
     """
-    Collects and normalizes BSE-only disclosure/news inputs for the regime lane.
+    Collects and normalizes market-context disclosure/news inputs for the regime lane.
 
-    This class owns exchange-side collection and deterministic fallback analysis.
+    This class owns exchange-side collection, Kotak market-context collection,
+    and deterministic fallback analysis.
     The Agno agent runtime is deliberately kept outside this file so the regime
     orchestrator can run the logic branch and the LLM branch as peers.
     """
 
     BSE_MOBILE_CORPORATES_URL = "https://m.bseindia.com/corporates.aspx"
     BSE_MOBILE_BASE_URL = "https://m.bseindia.com/"
-    BSE_ANALYSIS_SCOPE = "bse_only"
+    KOTAK_FII_DII_URL = "https://www.kotakneo.com/share-market-today/fii-dii-data/"
+    KOTAK_NEWS_URL = "https://www.kotakneo.com/news/"
+    ANALYSIS_SCOPE = "market_context_sources"
+    BSE_ANALYSIS_SCOPE = ANALYSIS_SCOPE
 
     def __init__(self, config: PipelineConfig, market_time: MarketTimeService):
         self.config = config
@@ -43,15 +47,21 @@ class RegimeNewsService:
 
     def collect_market_news_payload(self) -> Dict[str, Any]:
         fetched, source_status = self._fetch_headlines()
+        kotak_news = self._fetch_kotak_news(source_status)
+        fii_dii = self._fetch_fii_dii_flow(source_status)
         enriched = self._enrich_bse_announcement_details(fetched)
-        deduped = self._deduplicate_headlines(enriched)
+        combined = enriched + kotak_news
+        if fii_dii:
+            combined.append(self._flow_payload_to_headline(fii_dii))
+        deduped = self._deduplicate_headlines(combined)
         prioritized = self._prioritize_headlines(deduped)
         sliced = prioritized[: self.max_headlines]
         return {
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-            "analysis_scope": self.BSE_ANALYSIS_SCOPE,
+            "analysis_scope": self.ANALYSIS_SCOPE,
             "headline_count": len(sliced),
             "headlines": sliced,
+            "institutional_flows": fii_dii,
             "source_status": source_status,
             "market_signal_distribution": self._build_section_distribution(sliced),
         }
@@ -76,6 +86,8 @@ class RegimeNewsService:
                 "headline_summary": analysis.get("headline_summary", ""),
                 "structured_reasoning": analysis.get("structured_reasoning", ""),
                 "birds_eye_view": analysis.get("birds_eye_view", {}),
+                "llm_markdown_analysis": analysis.get("llm_markdown_analysis", ""),
+                "institutional_flows": collected.get("institutional_flows", {}),
             }
         )
         if agno_error:
@@ -92,8 +104,8 @@ class RegimeNewsService:
                 "risk_of_abnormal_volatility": "medium",
                 "affected_sectors": [],
                 "event_clusters": [],
-                "headline_summary": "No BSE-originated market disclosures were available this cycle.",
-                "structured_reasoning": "Heuristic mode used because no BSE feed items were available.",
+                "headline_summary": "No supplied market-context disclosures or news items were available this cycle.",
+                "structured_reasoning": "Heuristic mode used because no market-context feed items were available.",
                 "birds_eye_view": {
                     "scope": "mixed",
                     "impact_horizon": "unclear",
@@ -128,6 +140,15 @@ class RegimeNewsService:
             blob = f"{row.get('title', '')} {row.get('detail_text', '')}".lower()
             section = str(row.get("section") or "unknown")
             section_hits[section] = section_hits.get(section, 0) + 1
+            if row.get("source") == "kotak_fii_dii":
+                net_flow = self._coerce_float(row.get("net_fii_dii_cash_cr"))
+                fii_net = self._coerce_float(row.get("fii_net_cash_cr"))
+                if fii_net is not None and fii_net < -3000:
+                    neg_hits += 1
+                elif fii_net is not None and fii_net > 3000:
+                    pos_hits += 1
+                if net_flow is not None and abs(net_flow) >= 5000:
+                    severe_hits += 1
             for term in positive_terms:
                 if term in blob:
                     pos_hits += 1
@@ -188,13 +209,13 @@ class RegimeNewsService:
 
         summary = self._heuristic_summary(rows, sentiment, severity)
         reasoning = (
-            f"Heuristic aggregation over {len(rows)} BSE-originated items. "
+            f"Heuristic aggregation over {len(rows)} supplied market-context items. "
             f"positive_hits={pos_hits}, negative_hits={neg_hits}, severe_hits={severe_hits}, "
             f"sentiment={sentiment}, severity={round(severity, 3)}."
         )
 
         return {
-            "analysis_scope": self.BSE_ANALYSIS_SCOPE,
+            "analysis_scope": self.ANALYSIS_SCOPE,
             "market_sentiment": sentiment,
             "event_severity_score": round(severity, 4),
             "confidence_score": round(confidence, 4),
@@ -225,6 +246,40 @@ class RegimeNewsService:
             }
         return rows, status
 
+    def _fetch_kotak_news(self, status: Dict[str, Any]) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        try:
+            html_text = self._fetch_html(self.KOTAK_NEWS_URL)
+            rows = self._parse_kotak_news(html_text)
+            status["kotak_news"] = {"ok": True, "count": len(rows), "url": self.KOTAK_NEWS_URL}
+        except Exception as exc:
+            status["kotak_news"] = {
+                "ok": False,
+                "count": 0,
+                "url": self.KOTAK_NEWS_URL,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        return rows
+
+    def _fetch_fii_dii_flow(self, status: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            html_text = self._fetch_html(self.KOTAK_FII_DII_URL)
+            parsed = self._parse_kotak_fii_dii(html_text)
+            status["kotak_fii_dii"] = {
+                "ok": bool(parsed),
+                "count": 1 if parsed else 0,
+                "url": self.KOTAK_FII_DII_URL,
+            }
+            return parsed
+        except Exception as exc:
+            status["kotak_fii_dii"] = {
+                "ok": False,
+                "count": 0,
+                "url": self.KOTAK_FII_DII_URL,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+            return {}
+
     def _fetch_html(self, url: str) -> str:
         response = self.session.get(
             url,
@@ -233,6 +288,89 @@ class RegimeNewsService:
         )
         response.raise_for_status()
         return response.text
+
+    def _parse_kotak_news(self, html_text: str) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for match in re.finditer(
+            r'<a[^>]+href="(?P<href>/news/[^"]+)"[^>]+title="(?P<title>[^"]+)"',
+            html_text,
+            re.IGNORECASE,
+        ):
+            title = self._compact_text(html.unescape(match.group("title")))
+            href = html.unescape(match.group("href"))
+            if not title or title.lower() in seen:
+                continue
+            seen.add(title.lower())
+            context = html_text[match.start() : min(len(html_text), match.end() + 1200)]
+            date_match = re.search(r"(\d{1,2}\s+[A-Z][a-z]+\s+\d{4})", self._clean_html_fragment(context))
+            category_match = re.search(r">(Stock News|Share Market News)<", context, re.IGNORECASE)
+            rows.append(
+                {
+                    "source": "kotak_news",
+                    "section": "market_news",
+                    "title": title,
+                    "url": urljoin("https://www.kotakneo.com/", href),
+                    "published_at_utc": None,
+                    "event_date": date_match.group(1) if date_match else None,
+                    "company_name": None,
+                    "detail_title": title,
+                    "detail_subtitle": category_match.group(1) if category_match else None,
+                    "detail_text": title,
+                    "attachment_url": None,
+                    "signal_weight": 0.70,
+                }
+            )
+            if len(rows) >= 20:
+                break
+        return rows
+
+    def _parse_kotak_fii_dii(self, html_text: str) -> Dict[str, Any]:
+        text = self._clean_html_fragment(html_text.replace("<!-- -->", " "))
+        date_match = re.search(r"FII\s*&\s*DII\s+Trading\s+Activity\s*:\s*([0-9]{1,2}-[A-Z]{3}-[0-9]{4})", text)
+        fii_match = re.search(r"FII\s+₹\s*([+-]?[0-9,]+(?:\.[0-9]+)?)\s*Cr", text)
+        dii_match = re.search(r"DII\s+₹\s*([+-]?[0-9,]+(?:\.[0-9]+)?)\s*Cr", text)
+        if not (date_match and fii_match and dii_match):
+            return {}
+
+        fii_net = self._coerce_float(fii_match.group(1))
+        dii_net = self._coerce_float(dii_match.group(1))
+        net_combined = None
+        if fii_net is not None and dii_net is not None:
+            net_combined = round(fii_net + dii_net, 2)
+
+        return {
+            "source": "kotak_fii_dii",
+            "url": self.KOTAK_FII_DII_URL,
+            "as_of_date": date_match.group(1),
+            "segment": "cash",
+            "fii_net_cash_cr": fii_net,
+            "dii_net_cash_cr": dii_net,
+            "net_fii_dii_cash_cr": net_combined,
+            "summary": (
+                f"FII net cash flow {fii_net} Cr; DII net cash flow {dii_net} Cr; "
+                f"combined net flow {net_combined} Cr as of {date_match.group(1)}."
+            ),
+        }
+
+    def _flow_payload_to_headline(self, flow: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "source": "kotak_fii_dii",
+            "section": "institutional_flows",
+            "title": flow.get("summary") or "FII/DII cash-flow context unavailable.",
+            "url": flow.get("url"),
+            "published_at_utc": None,
+            "event_date": flow.get("as_of_date"),
+            "company_name": None,
+            "detail_title": "FII/DII cash market flow",
+            "detail_subtitle": flow.get("segment"),
+            "detail_text": flow.get("summary"),
+            "attachment_url": None,
+            "signal_weight": 0.85,
+            "fii_net_cash_cr": flow.get("fii_net_cash_cr"),
+            "dii_net_cash_cr": flow.get("dii_net_cash_cr"),
+            "net_fii_dii_cash_cr": flow.get("net_fii_dii_cash_cr"),
+        }
 
     def _parse_bse_mobile_corporates(self, html_text: str) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
@@ -378,6 +516,14 @@ class RegimeNewsService:
     def _clean_html_fragment(self, value: str) -> str:
         return self._compact_text(html.unescape(re.sub(r"<[^>]+>", " ", value)))
 
+    def _coerce_float(self, value: Any) -> Optional[float]:
+        if value in (None, ""):
+            return None
+        try:
+            return float(str(value).replace(",", "").strip())
+        except Exception:
+            return None
+
     def _extract_bse_datetime_from_title(self, title: str) -> Optional[str]:
         match = re.search(r"([A-Z][a-z]{2}\s+\d{1,2}\s+\d{4})\s*,\s*(\d{1,2}:\d{2}\s*[AP]M)$", title)
         if not match:
@@ -497,4 +643,4 @@ class RegimeNewsService:
         lead_titles = [self._compact_text(str(item.get("title") or "")) for item in rows[:4]]
         lead_titles = [item for item in lead_titles if item]
         head = " | ".join(lead_titles[:3]) if lead_titles else "No headline previews."
-        return f"Sentiment={sentiment}; event_severity={round(severity, 3)}. Top BSE items: {head}"
+        return f"Sentiment={sentiment}; event_severity={round(severity, 3)}. Top market-context items: {head}"
