@@ -51,7 +51,7 @@ class ExecutionerRunner:
 
         chart_paths = execution_packet["selected_stock"]["chart_paths"]
         report_text = self.agent.analyze(execution_packet, chart_paths)
-        decision = self._parse_execution_report(report_text)
+        decision = self._parse_execution_report(report_text, execution_packet)
 
         payload = {
             "stage": "executioner",
@@ -241,7 +241,12 @@ class ExecutionerRunner:
     def _normalize_text(self, value: str) -> str:
         return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
-    def _parse_execution_report(self, report_text: str) -> Dict[str, Any]:
+    def _parse_execution_report(
+        self,
+        report_text: str,
+        execution_packet: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        selected_stock = (execution_packet or {}).get("selected_stock") or {}
         selected_security_id_raw = self._extract_header_value(report_text, "Selected Security ID", default="0")
         quantity_raw = self._extract_header_value(report_text, "Quantity", default="0")
         reference_price_raw = self._extract_header_value(report_text, "Reference Price", default="0")
@@ -253,7 +258,7 @@ class ExecutionerRunner:
         try:
             selected_security_id = int(re.findall(r"-?\d+", selected_security_id_raw)[0])
         except Exception:
-            selected_security_id = 0
+            selected_security_id = int(selected_stock.get("security_id") or 0)
 
         try:
             quantity = int(re.findall(r"-?\d+", quantity_raw)[0])
@@ -267,15 +272,15 @@ class ExecutionerRunner:
 
         action = action_raw.strip().lower()
         if action not in {"trade", "avoid"}:
-            action = "avoid"
+            action = self._infer_action(report_text)
 
         execution_status = execution_status_raw.strip().lower()
         if execution_status not in {"planned", "placed", "skipped", "blocked", "failed"}:
-            execution_status = "skipped"
+            execution_status = self._infer_execution_status(report_text)
 
         trade_side = trade_side_raw.strip().lower()
         if trade_side not in {"buy", "sell", "avoid"}:
-            trade_side = "avoid"
+            trade_side = self._infer_trade_side(report_text)
 
         order_type = order_type_raw.strip().upper()
         if order_type not in {"MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_MARKET", "NONE"}:
@@ -283,7 +288,11 @@ class ExecutionerRunner:
 
         return {
             "selected_security_id": selected_security_id,
-            "selected_display_name": self._extract_header_value(report_text, "Selected Display Name", default="NONE"),
+            "selected_display_name": self._extract_header_value(
+                report_text,
+                "Selected Display Name",
+                default=str(selected_stock.get("display_name") or "NONE"),
+            ),
             "action": action,
             "execution_status": execution_status,
             "trade_side": trade_side,
@@ -293,6 +302,34 @@ class ExecutionerRunner:
             "correlation_id": self._extract_header_value(report_text, "Correlation ID", default="NONE"),
             "order_id": self._extract_header_value(report_text, "Order ID", default="NONE"),
         }
+
+    def _infer_action(self, report_text: str) -> str:
+        text = report_text.lower()
+        if any(term in text for term in ("avoid", "skipped", "blocked", "failed", "not placed", "no order")):
+            return "avoid"
+        if any(term in text for term in ("placed", "order id", "planned", "trade", "executed")):
+            return "trade"
+        return "avoid"
+
+    def _infer_execution_status(self, report_text: str) -> str:
+        text = report_text.lower()
+        if "placed" in text or "order id" in text or "executed" in text:
+            return "placed"
+        if "blocked" in text:
+            return "blocked"
+        if "failed" in text or "rejected" in text:
+            return "failed"
+        if "planned" in text:
+            return "planned"
+        return "skipped"
+
+    def _infer_trade_side(self, report_text: str) -> str:
+        text = report_text.lower()
+        if "buy" in text or "long" in text:
+            return "buy"
+        if "sell" in text or "short" in text:
+            return "sell"
+        return "avoid"
 
     def _extract_header_value(self, report_text: str, header: str, default: str = "") -> str:
         next_headers = [

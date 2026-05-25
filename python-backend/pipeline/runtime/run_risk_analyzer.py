@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import time
 from datetime import datetime, timezone
@@ -56,8 +57,83 @@ class RiskAnalyzerRunner:
             return existing
 
         chart_paths = self._collect_chart_paths(stock_reports)
-        report_text = self.agent.analyze(risk_packet, chart_paths)
-        decision = self._parse_decision_report(report_text)
+        raw_report = self.agent.analyze(risk_packet, chart_paths)
+
+        is_json = False
+        parsed_json = None
+        try:
+            clean_text = raw_report.strip()
+            if clean_text.startswith("```"):
+                start = clean_text.find("{")
+                end = clean_text.rfind("}")
+                if start >= 0 and end > start:
+                    clean_text = clean_text[start:end+1]
+            parsed_json = json.loads(clean_text)
+            is_json = True
+        except Exception:
+            pass
+
+        if is_json and parsed_json:
+            selected_symbol = str(parsed_json.get("selected_symbol") or "NONE").strip()
+            try:
+                sec_id = int(parsed_json.get("selected_security_id") or 0)
+            except Exception:
+                sec_id = 0
+
+            action = "avoid"
+            if selected_symbol != "NONE" and sec_id > 0:
+                action = "trade"
+
+            trade_side = "avoid"
+            selected_report = None
+            if action == "trade":
+                for report in stock_reports:
+                    candidate = report.get("candidate") or {}
+                    try:
+                        if int(candidate.get("security_id") or 0) == sec_id:
+                            selected_report = report
+                            break
+                    except Exception:
+                        continue
+
+                trade_side = "long"
+                if selected_report:
+                    analysis_text = str(selected_report.get("analysis_report") or "").lower()
+                    analysis_raw = str(selected_report.get("analysis") or "").lower()
+                    if "short" in analysis_text or "bearish" in analysis_text or "short" in analysis_raw or "bearish" in analysis_raw:
+                        trade_side = "short"
+
+            try:
+                conv = float(parsed_json.get("conviction") or 0.0)
+            except Exception:
+                conv = 0.0
+
+            decision = {
+                "selected_symbol": selected_symbol,
+                "selected_display_name": str(parsed_json.get("selected_display_name") or "NONE").strip(),
+                "selected_security_id": sec_id,
+                "action": action,
+                "trade_side": trade_side,
+                "conviction": max(0.0, min(1.0, conv)),
+            }
+
+            report_text = f"""1. Why This Choice
+{parsed_json.get('why_this_choice', '')}
+
+2. Ranking Across The Three Stocks
+{parsed_json.get('ranking_across_three_stocks', '')}
+
+3. Account And Risk Constraints
+{parsed_json.get('account_and_risk_constraints', '')}
+
+4. Execution Notes
+{parsed_json.get('execution_notes', '')}
+
+5. Deep Analysis Report
+{parsed_json.get('deep_analysis_report', '')}"""
+        else:
+            report_text = raw_report
+            decision = self._parse_decision_report(report_text)
 
         selected_report = self._match_selected_report(stock_reports, decision)
         payload = {
