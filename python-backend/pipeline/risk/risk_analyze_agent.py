@@ -6,9 +6,8 @@ from typing import Any, Dict, List
 
 from agno.agent import Agent
 from agno.media import Image
-from agno.models.groq import Groq
-from agno.models.openrouter import OpenRouter
-from agno.models.google import Gemini
+
+from pipeline.llm import create_mimo_model
 
 
 class RiskAnalyzeAgent:
@@ -25,33 +24,36 @@ class RiskAnalyzeAgent:
 
         agent = Agent(
             name=self.agent_name,
-            model=Gemini(id="gemini-2.5-flash"),
+            model=create_mimo_model(),
             description=(
                 "Compare three intraday stock analysis reports against market and account-risk context, then choose the single best tradable candidate."
             ),
             instructions=[
                 "You are the risk monitoring layer in an intraday trading pipeline.",
                 "You receive three stock analysis reports, six chart images, market context, and the user's account state.",
-                "Your primary job is not to find the most exciting trade, but the safest high-quality trade among the supplied choices.",
+                "Act as a purely logical risk monitoring system free from human emotions, greed, or behavioral biases. Perform objective mathematical and logical analysis to identify the safest, highest-quality trade with the best risk-to-reward ratio among the supplied choices.",
+                "Analyze the risk-to-reward ratio for each potential trade, seeking optimal setups (e.g., 1:2, 1:3, or better) based on the entry, invalidation, and profit objective levels.",
                 "Respect available funds, position overlap, and concentration.",
-                "Treat the market context as background information only; make your own independent risk decision from the supplied evidence.",
-                "If the account context or chart evidence make all trades unattractive, recommend avoid.",
+                "Treat the market context as background information only; it is not trade permission, a trade veto, or position-size instruction.",
+                "Choose from the pre-shortlisted candidates using stock evidence, chart quality, account feasibility, and concentration risk.",
                 "Use only the supplied facts and images.",
-                "Start the report with these exact header lines so the runtime can read your decision:",
-                "Decision: <TRADE or AVOID>",
-                "Selected Symbol: <symbol or NONE>",
-                "Selected Display Name: <display name or NONE>",
-                "Selected Security ID: <security id or 0>",
-                "Trade Side: <LONG, SHORT, or AVOID>",
-                "Conviction: <0.00 to 1.00>",
-                "After those lines, write the report using these sections:",
-                "1. Why This Choice",
-                "2. Ranking Across The Three Stocks",
-                "3. Account And Risk Constraints",
-                "4. Execution Notes",
-                "If available funds are effectively zero or trading should not happen, make that explicit.",
-                "NOTE :- currently im testing this system and i have connected my dhan account which has 0 balance but because we are in testing mode you have to provide one stock and ignore funds and other things for now so provide proper response with one stock",
+                "Use a starting capital of ₹100 for trading calculations.",
+                "Output ONLY a valid JSON object matching the requested schema. Do not include markdown code block formatting (like ```json) or explanation outside the JSON.",
             ],
+            expected_output=(
+                "A valid JSON object matching this schema:\n"
+                "{\n"
+                '  "selected_symbol": "symbol or NONE",\n'
+                '  "selected_display_name": "display name or NONE",\n'
+                '  "selected_security_id": security_id_or_0,\n'
+                '  "conviction": conviction_score_between_0.0_and_1.0,\n'
+                '  "why_this_choice": "detailed markdown text explaining why this stock was chosen (Section 1)",\n'
+                '  "ranking_across_three_stocks": "detailed markdown text ranking the three stocks (Section 2)",\n'
+                '  "account_and_risk_constraints": "detailed markdown text analyzing the account constraints and risk parameters (Section 3)",\n'
+                '  "execution_notes": "detailed markdown text outlining execution notes and trade setup details (Section 4)",\n'
+                '  "deep_analysis_report": "detailed mathematical and logical deep analysis of the stock setups, risk/reward, and charts (Section 5)"\n'
+                "}"
+            ),
             markdown=False,
             add_datetime_to_context=True,
             debug_mode=True,
@@ -77,6 +79,8 @@ class RiskAnalyzeAgent:
             "Interpret the six chart images as two charts per stock in report order: 5-minute then 15-minute.\n"
             "Evaluate position concentration and available funds independently.\n"
             "If current open positions, holdings overlap, or risk concentration make the setup unsuitable, say so clearly.\n"
+            "Use market context only to describe backdrop; do not treat regime labels or news tone as standalone permission or prohibition.\n"
+            "Output ONLY a valid JSON object matching the requested schema. Do not include markdown code block formatting (like ```json) or explanation outside the JSON.\n"
             "<context>\n"
             f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
             "</context>\n"

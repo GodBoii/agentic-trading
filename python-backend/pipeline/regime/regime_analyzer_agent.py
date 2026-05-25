@@ -6,18 +6,19 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from agno.agent import Agent
-    from agno.models.openrouter import OpenRouter
+
+    from pipeline.llm import create_mimo_model
 
     AGNO_AVAILABLE = True
 except Exception:  # pragma: no cover - optional runtime dependency
     AGNO_AVAILABLE = False
     Agent = None  # type: ignore
-    OpenRouter = None  # type: ignore
+    create_mimo_model = None  # type: ignore
 
 
 class RegimeNewsAnalyzerAgent:
     """
-    Dedicated Agno agent wrapper for BSE news/disclosure interpretation.
+    Dedicated Agno agent wrapper for market-context news/disclosure interpretation.
 
     This module exists so the regime orchestrator can run the deterministic
     market-logic branch and the LLM news-analysis branch independently.
@@ -25,14 +26,13 @@ class RegimeNewsAnalyzerAgent:
 
     def __init__(self) -> None:
         self.use_agno = os.getenv("REGIME_NEWS_USE_AGNO", "1").strip() not in {"0", "false", "False"}
-        self.openrouter_model_id = os.getenv("REGIME_NEWS_AGNO_MODEL_ID", "inclusionai/ling-2.6-1t:free")
         self.agent_name = os.getenv("REGIME_NEWS_AGNO_AGENT_NAME", "REGIME_NEWS_AGENT")
 
     def is_enabled(self) -> bool:
         return self.use_agno
 
     def is_available(self) -> bool:
-        return AGNO_AVAILABLE and Agent is not None and OpenRouter is not None
+        return AGNO_AVAILABLE and Agent is not None and create_mimo_model is not None
 
     def analyze(self, rows: List[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         if not rows:
@@ -46,25 +46,24 @@ class RegimeNewsAnalyzerAgent:
             agent = Agent(
                 name=self.agent_name,
                 description=(
-                    "Analyze BSE-originated disclosures and determine whether they imply "
-                    "isolated stock activity, sector-level pressure, or broad market context."
+                    "Analyze supplied Indian-equity market context and explain whether it points to "
+                    "isolated stock activity, sector-level pressure, institutional-flow pressure, or broad context."
                 ),
-                model=OpenRouter(id=self.openrouter_model_id),
+                model=create_mimo_model(),
                 instructions=[
-                    "Use only the supplied BSE-originated evidence.",
-                    "Focus on latest stock-related news, overall market sentiment, and a concise birds-eye view for Indian equities.",
-                    "Separate isolated company filings from repeated or broad event clusters.",
-                    "Reserve high severity for broad, repeated, or clearly destabilizing signals.",
-                    "Do not give trading tips, targets, trade permission, position sizing, or execution advice.",
-                    "Return only valid JSON matching the requested schema.",
+                    "Use only the supplied evidence from the payload.",
+                    "Focus on latest stock-related news, institutional FII/DII flow context, overall market tone, and a concise birds-eye view for Indian equities.",
+                    "Separate isolated company filings/headlines from repeated, sectoral, or broad event clusters.",
+                    "Treat this as market context only; do not decide whether a shortlisted intraday stock should be traded.",
+                    "Do not give trading tips, targets, trade permission, trade caution levels, position sizing, or execution advice.",
+                    "Return a compact markdown report in normal prose.",
                 ],
                 expected_output=(
-                    "A valid JSON object with headline_summary, market_sentiment, confidence_score, "
-                    "event_severity_score, affected_sectors, event_clusters, "
-                    "risk_of_abnormal_volatility, birds_eye_view, and structured_reasoning."
+                    "A compact markdown report with: headline summary, market tone, FII/DII context, "
+                    "event clusters, affected sectors, abnormal-volatility context, and birds-eye view."
                 ),
                 add_datetime_to_context=True,
-                markdown=False,
+                markdown=True,
                 debug_mode=True,
             )
             response = agent.run(self._build_prompt(rows))
@@ -73,10 +72,9 @@ class RegimeNewsAnalyzerAgent:
                 response_message = self._extract_text(response)
                 return None, f"agno_run_error::{response_message or 'unknown_error'}"
             raw_text = self._extract_text(response)
-            parsed = self._safe_parse_json(raw_text)
-            if not isinstance(parsed, dict):
-                return None, "agno_invalid_json"
-            return self._normalize_analysis_dict(parsed, rows), None
+            if not raw_text.strip():
+                return None, "agno_empty_markdown"
+            return {"llm_markdown_analysis": raw_text.strip()}, None
         except Exception as exc:
             return None, f"agno_failure::{type(exc).__name__}::{exc}"
 
@@ -98,30 +96,24 @@ class RegimeNewsAnalyzerAgent:
             for row in rows[:25]
         ]
         return (
-            "You are the regime news analyst inside a stock-market execution stack.\n"
-            "A separate deterministic regime analyzer is evaluating price, breadth, futures, and options.\n"
-            "Your job is only to interpret the BSE-originated disclosure/news stream as context.\n"
-            "Output ONLY valid JSON with this exact schema:\n"
-            "{"
-            '"headline_summary": "string", '
-            '"market_sentiment": "bullish|bearish|mixed|neutral", '
-            '"confidence_score": 0.0, '
-            '"event_severity_score": 0.0, '
-            '"affected_sectors": ["string"], '
-            '"event_clusters": ["string"], '
-            '"risk_of_abnormal_volatility": "low|medium|high", '
-            '"birds_eye_view": {"scope":"broad|sectoral|isolated|mixed","impact_horizon":"immediate_intraday|same_day|multi_day|unclear","summary":"string"}, '
-            '"structured_reasoning": "string"'
-            "}\n"
-            "Calibration rules:\n"
-            "- confidence_score and event_severity_score must be floats between 0 and 1.\n"
-            "- Use only the provided BSE evidence; do not invent macro headlines.\n"
-            "- Many corporate filings are routine. Do not overstate their regime importance.\n"
-            "- High severity requires broad, repeated, or materially destabilizing signals.\n"
-            "- Keep structured_reasoning concise and about market context.\n"
-            "- Do not output trade decisions, trade permission, trade caution, recommended bias, targets, or position sizing.\n"
-            "- Do not include markdown fences or commentary outside JSON.\n\n"
-            f"BSE items JSON:\n{json.dumps(preview, ensure_ascii=True)}"
+            "You are the REGIME_NEWS_AGENT inside an Indian-equity intraday system.\n"
+            "A separate deterministic analyzer evaluates price, breadth, futures, options, and volatility.\n"
+            "Your job is only to explain the supplied news/disclosure/institutional-flow context.\n\n"
+            "Important boundaries:\n"
+            "- The downstream stock, risk, and execution agents receive pre-shortlisted intraday candidates.\n"
+            "- Do not say whether trading is safe, unsafe, allowed, reduced, blocked, or preferred.\n"
+            "- Do not recommend a trade side, entry, stop, target, quantity, or position size.\n"
+            "- A bearish or volatile market can still contain valid intraday long/short candidates; your output is context, not a veto.\n"
+            "- Use only the supplied evidence. If data is stale, missing, or routine, say that clearly.\n\n"
+            "Return normal markdown with these short sections:\n"
+            "## Headline Summary\n"
+            "## Market Tone\n"
+            "## FII/DII Flow Context\n"
+            "## Event Clusters\n"
+            "## Affected Sectors\n"
+            "## Abnormal Volatility Context\n"
+            "## Birds-Eye View\n\n"
+            f"Supplied market-context items JSON:\n{json.dumps(preview, ensure_ascii=True)}"
         )
 
     def _extract_text(self, response: Any) -> str:
@@ -225,7 +217,7 @@ class RegimeNewsAnalyzerAgent:
         lead_titles = [self._compact_text(str(item.get("title") or "")) for item in rows[:3]]
         lead_titles = [item for item in lead_titles if item]
         joined = " | ".join(lead_titles) if lead_titles else "No BSE headline previews."
-        return f"Sentiment={sentiment}; event_severity={round(severity, 3)}. Top BSE items: {joined}"
+        return f"Sentiment={sentiment}; event_severity={round(severity, 3)}. Top market-context items: {joined}"
 
     def _compact_text(self, value: str) -> str:
         return " ".join(str(value or "").split()).strip()
