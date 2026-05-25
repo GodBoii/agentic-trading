@@ -17,13 +17,11 @@ from agno.tools import tool
 from agno.run.team import TeamRunEvent
 from agno.run.agent import RunEvent
 from agno.db.postgres import PostgresDb
-from agno.models.google import Gemini
-from agno.models.groq import Groq
 
 # Tool Imports
 from agno.tools import Toolkit
 from agno.tools.googlesearch import GoogleSearchTools
-from agno.models.openrouter import OpenRouter
+from pipeline.llm import create_mimo_model
 
 # Other Imports
 from supabase_client import supabase_client
@@ -68,7 +66,7 @@ def get_llm_os(
     chronos_agent = Agent(
         name="CHRONOS",
         role="Historical Data Analysis Agent - Historical pattern recognition, support/resistance identification, volume profile analysis, statistical properties",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -78,7 +76,7 @@ def get_llm_os(
     athena_agent = Agent(
         name="ATHENA",
         role="Technical Analysis Agent - Multi-timeframe technical indicators, trend and momentum analysis, chart pattern recognition, indicator confluence detection",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -88,7 +86,7 @@ def get_llm_os(
     quant_agent = Agent(
         name="QUANT",
         role="Quantitative Analysis Agent - Statistical arbitrage calculations, factor modeling, machine learning predictions, risk metrics computation",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -98,7 +96,7 @@ def get_llm_os(
     apollo_agent = Agent(
         name="APOLLO",
         role="Fundamental Analysis Agent - Valuation metrics, corporate actions screening, financial health check, earnings calendar monitoring",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -108,7 +106,7 @@ def get_llm_os(
     hermes_agent = Agent(
         name="HERMES",
         role="News & Sentiment Analysis Agent - Real-time news aggregation, sentiment scoring, event detection, social media analysis",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -118,7 +116,7 @@ def get_llm_os(
     strategist_agent = Agent(
         name="STRATEGIST",
         role="Strategy & Pattern Selector Agent - Market regime identification, strategy selection from library, indicator combination optimization, pattern recognition and matching",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -128,7 +126,7 @@ def get_llm_os(
     depth_agent = Agent(
         name="DEPTH",
         role="Order Flow & Microstructure Agent - Level 2 market depth analysis, footprint/cluster chart analysis, cumulative delta calculation, liquidity and order book imbalance, time & sales analysis",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         tools=[],
         instructions=[],
         markdown=True,
@@ -138,7 +136,7 @@ def get_llm_os(
     # Create Analysis Team with all TIER 1 agents
     analysis_team = Team(
         name="Analysis_Team",
-        model=OpenRouter(id="x-ai/grok-4.1-fast:free"),
+        model=create_mimo_model(),
         members=[chronos_agent, athena_agent, quant_agent, apollo_agent, hermes_agent, strategist_agent, depth_agent],
         tools=[],
         instructions=[
@@ -162,7 +160,7 @@ def get_llm_os(
     # This allows the `db` object to automatically handle session persistence.
     llm_os_team = Team(
         name="Aetheria_AI_Trader",
-        model=Gemini(id="gemini-2.5-flash"),
+        model=create_mimo_model(),
         members=main_team_members,
         tools=direct_tools,
         instructions=aetheria_instructions,

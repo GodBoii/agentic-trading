@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 
 from agno.agent import Agent
 from agno.media import Image
-from agno.models.groq import Groq
-from agno.models.openrouter import OpenRouter
+
+from pipeline.llm import create_mimo_model
 
 
 class StockAnalyzerAgent:
@@ -28,7 +28,7 @@ class StockAnalyzerAgent:
 
         agent = Agent(
             name=self.agent_name,
-            model=Groq(id="meta-llama/llama-4-scout-17b-16e-instruct"),
+            model=create_mimo_model(),
             description=(
                 "Analyze one shortlisted intraday stock using structured market context and supplied candlestick charts."
             ),
@@ -37,20 +37,21 @@ class StockAnalyzerAgent:
                 "Use only the provided stock facts, market context, and chart images.",
                 "Focus on intraday trading quality, not swing trading.",
                 "Treat chart images as evidence to validate price structure, candle behavior, momentum continuation quality, and risk warnings.",
-                "Do not invent indicators or data that were not provided.",
-                "If evidence is mixed, clearly say so instead of forcing a trade.",
-                "Treat the market context as background information only; make your own independent stock assessment from the supplied evidence.",
-                "Write a compact but detailed analyst report in normal text.",
+                "Treat the market context as background information only; it is not trade permission, a trade veto, or a reason by itself to reject a shortlisted candidate.",
+                "The monitor/stage-2 pipeline already shortlisted this stock for intraday eligibility; judge the stock setup from its own evidence first.",
+                "A bearish, bullish, volatile, or event-driven market can still contain valid long or short intraday setups.",
+                "Do not say 'do not trade' only because of market regime/news context; only flag concrete stock-level chart, liquidity, or data-quality problems.",
+                "Write a compact but detailed analyst report in markdown.",
                 "Use this exact section structure:",
                 "1. Verdict",
-                "2. Market Context",
+                "2. Context Fit",
                 "3. Chart Read",
                 "4. Strengths",
                 "5. Risks",
                 "6. Trade Plan",
                 "Inside Trade Plan, explicitly include Bias, Entry Zone, Invalidation, and Profit Objective.",
             ],
-            markdown=False,
+            markdown=True,
             add_datetime_to_context=True,
             debug_mode=True,
         )
@@ -79,6 +80,7 @@ class StockAnalyzerAgent:
             "Your downstream reader is a risk agent, so be precise, concrete, and usable.\n"
             "Interpret the two chart images as 5-minute and 15-minute candlestick charts.\n"
             "The monitor stage already screened for live tradability; still mention any warning signs you infer from the charts.\n"
+            "Use market context to describe background pressure or tailwind/headwind only, not to decide trade permission.\n"
             "<context>\n"
             f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
             "</context>\n"
