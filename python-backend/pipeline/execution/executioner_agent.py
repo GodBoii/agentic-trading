@@ -20,16 +20,29 @@ class ExecutionerAgent:
     def is_enabled(self) -> bool:
         return self.use_agno
 
-    def analyze(self, execution_packet: Dict[str, Any], chart_paths: List[str]) -> str:
+    def analyze(self, execution_packet: Dict[str, Any], chart_paths: List[str], trade_config: Dict[str, Any] = None) -> str:
         if not self.is_enabled():
             raise RuntimeError("executioner_disabled")
 
-        max_trade_value = os.getenv("EXECUTIONER_MAX_TRADE_VALUE_RUPEES", "").strip()
-        capital_instruction = (
-            f"Do not place a new order whose approximate notional value exceeds Rs {max_trade_value}."
-            if max_trade_value
-            else "Size trades from available balance, margin validation, supplied risk context, and any explicit capital cap in these instructions."
-        )
+        # Build capital instruction dynamically from trade_config
+        trade_mode = str((trade_config or {}).get("trade_mode") or "auto").lower()
+        trade_amount = (trade_config or {}).get("trade_amount")
+
+        if trade_mode == "manual" and trade_amount:
+            capital_instruction = f"Do not place a new order whose approximate notional value exceeds Rs {trade_amount}. Trade with a budget of exactly Rs {trade_amount}."
+            trade_range_instruction = f"Trade only within a budget of ₹{trade_amount}. Do not exceed this amount."
+        elif trade_mode == "auto":
+            capital_instruction = "Size trades from available balance, margin validation, supplied risk context, and any explicit capital cap in these instructions."
+            trade_range_instruction = "Size trades based on the user's available account balance. Use the full available balance for position sizing."
+        else:
+            # Fallback to env var
+            max_trade_value = os.getenv("EXECUTIONER_MAX_TRADE_VALUE_RUPEES", "").strip()
+            capital_instruction = (
+                f"Do not place a new order whose approximate notional value exceeds Rs {max_trade_value}."
+                if max_trade_value
+                else "Size trades from available balance, margin validation, supplied risk context, and any explicit capital cap in these instructions."
+            )
+            trade_range_instruction = f"Trade between ₹100 to ₹{max_trade_value}" if max_trade_value else "Size trades from available balance."
 
         agent = Agent(
             name=self.agent_name,
@@ -60,7 +73,7 @@ class ExecutionerAgent:
                 "Do not write a long analysis report. Your job is to decide and act, not to produce commentary.",
                 "After acting or deciding not to act, output only a concise execution outcome in normal markdown/text.",
                 "Include actual order id, correlation id, side, quantity, and reference price only when they are known from tools or supplied context.",
-                "Dont take trade of more than ₹500 trade between ₹100 to ₹500",
+                trade_range_instruction,
                 capital_instruction,
             ],
             markdown=True,
