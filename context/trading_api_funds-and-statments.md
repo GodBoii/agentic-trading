@@ -8,6 +8,7 @@ Users can get details about the fund requirements or available funds (with margi
 |--------|----------|-------------|
 | POST | /margincalculator | Margin requirement for any order |
 | GET | /fundlimit | Retrieve trading account fund information |
+| POST | /margincalculator/multi | Calculate Margin for Multiple Orders |
 
 ---
 
@@ -80,6 +81,100 @@ curl --request POST \
 | insufficientBalance | float | Insufficient amount in trading account (Available Balance - Total Margin) |
 | brokerage | float | Brokerage charges for executing order |
 | leverage | string | Margin leverage provided for the order as per product type |
+
+---
+
+### Multi Order Margin Calculator
+
+The Multi Order Margin Calculator API allows users to calculate margin requirements for multiple scripts in a single request, including span, exposure, equity, F&O, and commodity margins.
+
+> **Note:**
+> Margin values returned are indicative and valid only for the current trading session.
+
+**Endpoint:** `POST https://api.dhan.co/v2/margincalculator/multi`
+
+**cURL Example:**
+```bash
+curl --request POST \
+  --url https://api.dhan.co/v2/margincalculator/multi \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header 'access-token: JWT' \
+  --data '{
+  "includePosition": true,
+  "includeOrders": true,
+  "scripts": [
+    {
+      "exchangeSegment": "NSE_EQ",
+      "transactionType": "BUY",
+      "quantity": 100,
+      "productType": "CNC",
+      "securityId": "12345",
+      "price": 250.50
+    }
+  ]
+}'
+```
+
+**Request Structure:**
+```json
+{
+  "includePosition": true,
+  "includeOrders": true,
+  "scripts": [
+    {
+      "exchangeSegment": "NSE_EQ",
+      "transactionType": "BUY",
+      "quantity": 100,
+      "productType": "CNC",
+      "securityId": "12345",
+      "price": 250.50
+    }
+  ]
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Data Type | Description |
+|---|---|---|
+| includePosition | boolean | Include existing positions in margin calculation |
+| includeOrders | boolean | Include open orders in margin calculation |
+| scripts | array[object] | List of scripts to calculate margin for |
+| scripts[].exchangeSegment | string | Exchange & segment (e.g. `NSE_EQ`, `NSE_FNO`) |
+| scripts[].transactionType | string | Trading transaction side: `BUY`, `SELL` |
+| scripts[].quantity | integer | Order quantity |
+| scripts[].productType | string | Product Type: `CNC`, `INTRADAY`, `MARGIN`, `MTF` |
+| scripts[].securityId | string | Exchange standard ID for each scrip |
+| scripts[].price | float | Order price |
+| scripts[].triggerPrice | float | Trigger price (if applicable) |
+
+**Response Structure:**
+```json
+{
+  "total_margin": "150000.00",
+  "span_margin": "50000.00",
+  "exposure_margin": "30000.00",
+  "equity_margin": "70000.00",
+  "fo_margin": "0.00",
+  "commodity_margin": "0.00",
+  "currency": "INR",
+  "hedge_benefit": ""
+}
+```
+
+**Response Parameters:**
+
+| Parameter | Data Type | Description |
+|---|---|---|
+| total_margin | string (float) | Total margin required |
+| span_margin | string (float) | SPAN margin required |
+| exposure_margin | string (float) | Exposure margin required |
+| equity_margin | string (float) | Equity margin required |
+| fo_margin | string (float) | F&O margin required |
+| commodity_margin | string (float) | Commodity margin required |
+| currency | string | Currency (typically `INR`) |
+| hedge_benefit | string | Benefit received due to hedging, if any |
 
 ---
 
