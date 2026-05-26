@@ -26,6 +26,7 @@ class AITradingOrchestrator:
         self.risk_analyzer = RiskAnalyzerRunner(self.config)
         self.executioner = ExecutionerRunner(self.config)
         self.last_request_id: Optional[str] = None
+        self._boot_time_utc = datetime.now(timezone.utc)
 
     def run_forever(self) -> None:
         print("=" * 60)
@@ -55,6 +56,16 @@ class AITradingOrchestrator:
             return None
         if request.get("action") != "start":
             return None
+        # Ignore stale requests from before this container booted
+        requested_at = request.get("requested_at_utc")
+        if requested_at:
+            try:
+                req_dt = datetime.fromisoformat(str(requested_at).replace("Z", "+00:00"))
+                if req_dt < self._boot_time_utc:
+                    self.last_request_id = request_id  # Mark as seen so we don't log repeatedly
+                    return None
+            except (ValueError, TypeError):
+                pass
         return request
 
     def submit_start_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
@@ -64,6 +75,8 @@ class AITradingOrchestrator:
             "user_id": request.get("user_id"),
             "email": request.get("email"),
             "requested_at_utc": request.get("requested_at_utc") or datetime.now(timezone.utc).isoformat(),
+            "trade_mode": request.get("trade_mode") or "auto",
+            "trade_amount": request.get("trade_amount"),
         }
         self.storage.save_snapshot(self.config.ai_trading_request_path, request_payload)
         return request_payload
@@ -148,12 +161,15 @@ class AITradingOrchestrator:
     def _run_request(self, request: Dict[str, Any]) -> None:
         self.last_request_id = str(request.get("request_id"))
         user_id = str(request.get("user_id") or "")
+        trade_mode = str(request.get("trade_mode") or "auto").strip().lower()
+        trade_amount = request.get("trade_amount")
 
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             self._save_status("blocked", "requested", request, "AI trading is not enabled for any user.")
             return
 
         print(f"Starting AI trading run {self.last_request_id} for user {user_id or 'unknown'}...")
+        print(f"Trade mode: {trade_mode}, Trade amount: {trade_amount}")
         self._save_status(
             "waiting",
             "stage2",
@@ -167,10 +183,15 @@ class AITradingOrchestrator:
             or {"generated_at_utc": None, "summary": {"status": "ready", "market_date": market_date}},
         }
 
+        trade_config = {
+            "trade_mode": trade_mode,
+            "trade_amount": float(trade_amount) if trade_amount else None,
+        }
+
         stages = [
-            ("stock_analyzer", self.stock_analyzer.run_cycle),
-            ("risk_analyzer", self.risk_analyzer.run_cycle),
-            ("executioner", self.executioner.run_cycle),
+            ("stock_analyzer", lambda force: self.stock_analyzer.run_cycle(force=force, trade_config=trade_config)),
+            ("risk_analyzer", lambda force: self.risk_analyzer.run_cycle(force=force, trade_config=trade_config)),
+            ("executioner", lambda force: self.executioner.run_cycle(force=force, trade_config=trade_config)),
         ]
 
         for stage_name, runner in stages:

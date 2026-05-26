@@ -24,7 +24,7 @@ class MultiStockAnalyzerRunner:
         self.charting = CandlestickChartService(self.config.market_timezone)
         self.agent = StockAnalyzerAgent()
 
-    def run_cycle(self, force: bool = False) -> Optional[Dict[str, Any]]:
+    def run_cycle(self, force: bool = False, trade_config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Stock analyzer is idling.")
             return None
@@ -44,7 +44,7 @@ class MultiStockAnalyzerRunner:
         if not monitor_payload:
             monitor_payload = self.storage.load_snapshot(self.config.monitor_latest_path)
 
-        selected_candidates, candidate_source = self._select_candidates(stage2_payload, monitor_payload)
+        selected_candidates, candidate_source = self._select_candidates(stage2_payload, monitor_payload, trade_config)
         if not selected_candidates:
             raise RuntimeError("stock_analyzer_no_candidates_selected")
 
@@ -98,14 +98,28 @@ class MultiStockAnalyzerRunner:
         self,
         stage2_payload: Dict[str, Any],
         monitor_payload: Optional[Dict[str, Any]],
+        trade_config: Optional[Dict[str, Any]] = None,
     ) -> tuple[List[Dict[str, Any]], str]:
         top_n = max(1, int(self.config.stock_analyzer_top_n))
 
         monitor_stocks = monitor_payload.get("stocks") if monitor_payload else None
         if isinstance(monitor_stocks, list) and monitor_stocks:
+            filtered = self._filter_by_trade_budget(monitor_stocks, trade_config)
+            if filtered:
+                return filtered[:top_n], "monitor"
             return monitor_stocks[:top_n], "monitor"
 
         stage2_stocks = list(stage2_payload.get("stocks") or [])
+
+        # Filter by trade budget: pick stocks whose price is within the user's budget
+        filtered_stocks = self._filter_by_trade_budget(stage2_stocks, trade_config)
+        if filtered_stocks and len(filtered_stocks) >= top_n:
+            return filtered_stocks[:top_n], "stage2"
+
+        # If filtered gives enough, use them; otherwise fall back to unfiltered
+        if filtered_stocks:
+            return filtered_stocks[:top_n], "stage2"
+
         if len(stage2_stocks) >= top_n:
             return stage2_stocks[:top_n], "stage2"
 
@@ -127,6 +141,32 @@ class MultiStockAnalyzerRunner:
         if not combined:
             raise RuntimeError("stock_analyzer_no_stage2_candidates")
         return combined, "stage2_fallback"
+
+    def _filter_by_trade_budget(
+        self,
+        stocks: List[Dict[str, Any]],
+        trade_config: Optional[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Filter stocks whose price is within the trade budget so at least 1 share can be bought."""
+        if not trade_config:
+            return []
+        trade_mode = str(trade_config.get("trade_mode") or "auto").lower()
+        trade_amount = trade_config.get("trade_amount")
+
+        if trade_mode == "manual" and trade_amount:
+            budget = float(trade_amount)
+        elif trade_mode == "auto":
+            # In auto mode, use account balance fetched by risk analyzer later.
+            # At stock selection stage, we don't filter since balance isn't known yet.
+            return []
+        else:
+            return []
+
+        # Filter stocks where at least 1 share can be purchased within the budget
+        affordable = [s for s in stocks if float(s.get("price") or 0) <= budget and float(s.get("price") or 0) > 0]
+        # Sort by stage2_score descending (best first) to pick highest momentum affordable stocks
+        affordable.sort(key=lambda s: float(s.get("stage2_score") or 0), reverse=True)
+        return affordable
 
     def _analyze_candidates(self, candidate_packets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         max_workers = min(len(candidate_packets), max(1, int(self.config.stock_analyzer_top_n)))
