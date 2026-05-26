@@ -256,6 +256,25 @@ function AITradingChatContent() {
                             </div>
                         </div>
                     )}
+
+                    {runStatus?.status === 'completed' && (
+                        <div className="flex justify-end animate-chat-rise">
+                            <div className="flex gap-4">
+                                <Link
+                                    href="/dashboard"
+                                    className="brutal-btn px-6 py-3 text-xs"
+                                >
+                                    Back to Dashboard
+                                </Link>
+                                <button
+                                    onClick={() => window.location.href = '/dashboard'}
+                                    className="border-4 border-brutal-green bg-brutal-green text-brutal-black px-6 py-3 font-mono text-xs font-bold uppercase hover:shadow-brutal-sm transition-all"
+                                >
+                                    Trade Again
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     <div ref={bottomRef}></div>
                 </div>
             </main>

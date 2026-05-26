@@ -1,121 +1,577 @@
-2026-05-26 10:40:02.701 | DEBUG Creating new sync OpenAI client for model mimo-v2.5                       
-2026-05-26 10:40:14.952 | DEBUG ======================== assistant =========================              
-2026-05-26 10:40:14.953 | DEBUG I will now calculate the margin requirement for a single share of Adani   
-2026-05-26 10:40:14.953 |       Power at the entry price of 240.00 to ensure the trade is feasible within 
-2026-05-26 10:40:14.953 |       the account limits.                                                       
-2026-05-26 10:40:14.955 | DEBUG Tool Calls:                                                               
-2026-05-26 10:40:14.955 |         - ID: 'call_b482ad11e51544e6805f0f4c'                                   
-2026-05-26 10:40:14.955 |           Name: 'calculate_margin_requirement'                                  
-2026-05-26 10:40:14.955 |           Arguments: 'security_id: 533096, side: BUY, quantity: 1,              
-2026-05-26 10:40:14.955 |       reference_price: 240, product_type: INTRADAY, exchange_segment: BSE_EQ,   
-2026-05-26 10:40:14.955 |       trigger_price: 237.5'                                                     
-2026-05-26 10:40:14.955 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:40:14.957 | DEBUG * Tokens:                      input=16345, output=137, total=16482,      
-2026-05-26 10:40:14.957 |       cached=512                                                                
-2026-05-26 10:40:14.957 | DEBUG * Duration:                    12.2501s                                   
-2026-05-26 10:40:14.958 | DEBUG * Tokens per second:           11.1836 tokens/s                           
-2026-05-26 10:40:14.959 | DEBUG * Time to first token:         12.2501s                                   
-2026-05-26 10:40:14.960 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:40:14.961 | DEBUG Running: calculate_margin_requirement(...)                                
-2026-05-26 10:40:15.029 | DEBUG =========================== tool ===========================              
-2026-05-26 10:40:15.029 | DEBUG Tool call Id: call_b482ad11e51544e6805f0f4c                               
-2026-05-26 10:40:15.031 | DEBUG {"status": "success", "data": {"totalMargin": 48.0, "spanMargin": 0.0,    
-2026-05-26 10:40:15.031 |       "exposureMargin": 0.0, "availableBalance": 911.18, "variableMargin":      
-2026-05-26 10:40:15.031 |       21.37, "insufficientBalance": 863.18, "brokerage": 0.0, "leverage":       
-2026-05-26 10:40:15.031 |       "5.00X"}}                                                                 
-2026-05-26 10:40:20.668 | DEBUG ======================== assistant =========================              
-2026-05-26 10:40:20.669 | DEBUG Tool Calls:                                                               
-2026-05-26 10:40:20.669 |         - ID: 'call_25e5b058d1ea45cca13f0a6d'                                   
-2026-05-26 10:40:20.669 |           Name: 'place_protected_intraday_super_order'                          
-2026-05-26 10:40:20.669 |           Arguments: 'security_id: 533096, side: BUY, quantity: 1, entry_price: 
-2026-05-26 10:40:20.669 |       240, target_price: 245.5, stop_loss_price: 237.5, product_type: INTRADAY, 
-2026-05-26 10:40:20.669 |       exchange_segment: BSE_EQ'                                                 
-2026-05-26 10:40:20.670 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:40:20.671 | DEBUG * Tokens:                      input=16587, output=117, total=16704,      
-2026-05-26 10:40:20.671 |       cached=16320                                                              
-2026-05-26 10:40:20.672 | DEBUG * Duration:                    5.6361s                                    
-2026-05-26 10:40:20.673 | DEBUG * Tokens per second:           20.7590 tokens/s                           
-2026-05-26 10:40:20.673 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:40:20.674 | DEBUG Running: place_protected_intraday_super_order(...)                        
-2026-05-26 10:40:20.731 | DEBUG =========================== tool ===========================              
-2026-05-26 10:40:20.732 | DEBUG Tool call Id: call_25e5b058d1ea45cca13f0a6d                               
-2026-05-26 10:40:20.733 | DEBUG {"correlation_id": "exec-so-360441625e", "status": "failure", "remarks":  
-2026-05-26 10:40:20.733 |       "http_400", "data": {"errorType": "Input_Exception", "errorCode":         
-2026-05-26 10:40:20.733 |       "DH-905", "errorMessage": "Invalid IP"}}                                  
-2026-05-26 10:40:30.942 | DEBUG ======================== assistant =========================              
-2026-05-26 10:40:30.943 | DEBUG Tool Calls:                                                               
-2026-05-26 10:40:30.943 |         - ID: 'call_96c66aa3ff1847a8bf977cc3'                                   
-2026-05-26 10:40:30.943 |           Name: 'place_intraday_equity_order'                                   
-2026-05-26 10:40:30.943 |           Arguments: 'security_id: 533096, side: BUY, quantity: 1, order_type:  
-2026-05-26 10:40:30.943 |       LIMIT, price: 240, product_type: INTRADAY, exchange_segment: BSE_EQ'      
-2026-05-26 10:40:30.944 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:40:30.945 | DEBUG * Tokens:                      input=16779, output=95, total=16874,       
-2026-05-26 10:40:30.945 |       cached=16576                                                              
-2026-05-26 10:40:30.946 | DEBUG * Duration:                    7.4758s                                    
-2026-05-26 10:40:30.946 | DEBUG * Tokens per second:           12.7076 tokens/s                           
-2026-05-26 10:40:30.947 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:40:30.948 | DEBUG Running: place_intraday_equity_order(...)                                 
-2026-05-26 10:40:31.008 | DEBUG =========================== tool ===========================              
-2026-05-26 10:40:31.009 | DEBUG Tool call Id: call_96c66aa3ff1847a8bf977cc3                               
-2026-05-26 10:40:31.011 | DEBUG {"correlation_id": "exec-91d8aed93575", "status": "success", "data":      
-2026-05-26 10:40:31.011 |       {"status": "failure", "remarks": {"error_code": "DH-905", "error_type":   
-2026-05-26 10:40:31.011 |       "Input_Exception", "error_message": "Invalid IP"}, "data": ""}}           
-2026-05-26 10:41:05.334 | DEBUG ======================== assistant =========================              
-2026-05-26 10:41:05.335 | DEBUG Tool Calls:                                                               
-2026-05-26 10:41:05.335 |         - ID: 'call_590c9048861c4e6dad31adeb'                                   
-2026-05-26 10:41:05.335 |           Name: 'get_static_ips'                                                
-2026-05-26 10:41:05.335 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:41:05.337 | DEBUG * Tokens:                      input=16956, output=13, total=16969,       
-2026-05-26 10:41:05.337 |       cached=16768                                                              
-2026-05-26 10:41:05.338 | DEBUG * Duration:                    31.5797s                                   
-2026-05-26 10:41:05.338 | DEBUG * Tokens per second:           0.4117 tokens/s                            
-2026-05-26 10:41:05.339 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:41:05.340 | DEBUG Running: get_static_ips()                                                 
-2026-05-26 10:41:05.477 | DEBUG =========================== tool ===========================              
-2026-05-26 10:41:05.477 | DEBUG Tool call Id: call_590c9048861c4e6dad31adeb                               
-2026-05-26 10:41:05.479 | DEBUG {"status": "success", "data": [{"message": "Something went wrong",        
-2026-05-26 10:41:05.479 |       "status": "ERROR"}]}                                                      
-2026-05-26 10:41:12.215 | DEBUG ======================== assistant =========================              
-2026-05-26 10:41:12.216 | DEBUG Tool Calls:                                                               
-2026-05-26 10:41:12.216 |         - ID: 'call_6eca09c1bddc47d2a4cdc1e4'                                   
-2026-05-26 10:41:12.216 |           Name: 'check_edis_status'                                             
-2026-05-26 10:41:12.216 |           Arguments: 'isin: INE752E01039'                                       
-2026-05-26 10:41:12.217 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:41:12.218 | DEBUG * Tokens:                      input=17006, output=33, total=17039,       
-2026-05-26 10:41:12.218 |       cached=16896                                                              
-2026-05-26 10:41:12.218 | DEBUG * Duration:                    6.7357s                                    
-2026-05-26 10:41:12.219 | DEBUG * Tokens per second:           4.8993 tokens/s                            
-2026-05-26 10:41:12.220 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:41:12.220 | DEBUG Running: check_edis_status(isin=INE752E01039)                             
-2026-05-26 10:41:12.272 | DEBUG =========================== tool ===========================              
-2026-05-26 10:41:12.273 | DEBUG Tool call Id: call_6eca09c1bddc47d2a4cdc1e4                               
-2026-05-26 10:41:12.275 | DEBUG {"status": "failure", "remarks": "http_500", "data": {"errorType":        
-2026-05-26 10:41:12.275 |       "EDIS_ERROR", "errorCode": "DH-0035", "errorMessage": "No Data Found!"}}  
-2026-05-26 10:41:19.671 | DEBUG ======================== assistant =========================              
-2026-05-26 10:41:19.673 | DEBUG ### Execution Outcome: **Trade Aborted (IP Block)**                       
-2026-05-26 10:41:19.673 |                                                                                 
-2026-05-26 10:41:19.673 |       I attempted to place a **BUY** order for **Adani Power (533096)**:        
-2026-05-26 10:41:19.673 |       - **Quantity**: 1                                                         
-2026-05-26 10:41:19.673 |       - **Entry**: 240.00                                                       
-2026-05-26 10:41:19.673 |       - **Stop Loss**: 237.50                                                   
-2026-05-26 10:41:19.673 |       - **Target**: 245.50                                                      
-2026-05-26 10:41:19.673 |       - **Budget Used**: ₹48.00 (well within ₹400 limit)                        
-2026-05-26 10:41:19.673 |       - **Margin Check**: Passed                                                
-2026-05-26 10:41:19.673 |                                                                                 
-2026-05-26 10:41:19.673 |       **Result**: The order was rejected by the broker with error **DH-905:     
-2026-05-26 10:41:19.673 |       Invalid IP**. This indicates a security configuration issue (Static IP    
-2026-05-26 10:41:19.673 |       mismatch or not whitelisted) on the user's Dhan account, which blocks     
-2026-05-26 10:41:19.673 |       order execution from the current network. No further orders can be placed 
-2026-05-26 10:41:19.673 |       until this is resolved.                                                   
-2026-05-26 10:41:19.674 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:41:19.675 | DEBUG * Tokens:                      input=17100, output=175, total=17275,      
-2026-05-26 10:41:19.675 |       cached=16960                                                              
-2026-05-26 10:41:19.676 | DEBUG * Duration:                    7.3952s                                    
-2026-05-26 10:41:19.677 | DEBUG * Tokens per second:           23.6641 tokens/s                           
-2026-05-26 10:41:19.677 | DEBUG * Time to first token:         7.3952s                                    
-2026-05-26 10:41:19.678 | DEBUG ************************  METRICS  *************************              
-2026-05-26 10:41:19.679 | DEBUG ------------------ MiMo Chat Response End ------------------              
-2026-05-26 10:41:19.680 | DEBUG Added RunOutput to Agent Session                                          
-2026-05-26 10:41:20.495 | DEBUG *** Agent Run End: 51b6e2cc-8d7d-4dac-8088-cb491bd44775 ****              
-2026-05-26 10:41:20.501 | Saved executioner snapshot. Decision: avoid Adani Power (skipped).
-2026-05-26 10:41:20.503 | Completed AI trading run 1779772133992-40a4c297-d2ce-49d9-aee4-464604ff063c.
+2026-05-26 10:49:53.576 | ============================================================
+2026-05-26 10:49:53.576 | AI TRADING ORCHESTRATOR
+2026-05-26 10:49:53.576 | ============================================================
+2026-05-26 10:49:53.576 | Waiting for user start requests...
+2026-05-26 10:49:53.578 | AI trading gateway listening on port 8020.
+2026-05-26 10:50:24.368 | Starting AI trading run 1779772821583-40a4c297-d2ce-49d9-aee4-464604ff063c for user 40a4c297-d2ce-49d9-aee4-464604ff063c...
+2026-05-26 10:50:24.368 | Trade mode: manual, Trade amount: 400
+2026-05-26 10:50:24.372 | Stage 2 daily output found: stage2-2026-05-26.json. Using it for the current market date.
+2026-05-26 10:50:24.381 | Running stock_analyzer...
+2026-05-26 10:50:31.826 | [rank 1] Analyzing Adani Power using 2 chart images...
+2026-05-26 10:50:31.845 | DEBUG ***************** Agent ID: stock-analyzer *****************              
+2026-05-26 10:50:31.846 | DEBUG Creating new AgentSession: 09c4b914-b06e-4dac-934f-f1070fabf197           
+2026-05-26 10:50:31.850 | DEBUG ** Agent Run Start: af62a8df-78b8-4bf1-b3e7-05f7e54161e0 ***              
+2026-05-26 10:50:31.854 | DEBUG ----------------- MiMo Chat Response Start -----------------              
+2026-05-26 10:50:31.856 | DEBUG --------------------- Model: mimo-v2.5 ---------------------              
+2026-05-26 10:50:31.857 | DEBUG ========================== system ==========================              
+2026-05-26 10:50:31.863 | DEBUG Analyze one shortlisted intraday stock using structured market context and
+2026-05-26 10:50:31.863 |       supplied candlestick charts.                                              
+2026-05-26 10:50:31.864 |       - You are the first stock analyzer in an intraday trading pipeline.       
+2026-05-26 10:50:31.864 |       - Use only the provided stock facts, market context, and chart images.    
+2026-05-26 10:50:31.864 |       - Focus on intraday trading quality, not swing trading.                   
+2026-05-26 10:50:31.864 |       - Treat chart images as evidence to validate price structure, candle      
+2026-05-26 10:50:31.864 |       behavior, momentum continuation quality, and risk warnings.               
+2026-05-26 10:50:31.864 |       - Treat the market context as background information only; it is not trade
+2026-05-26 10:50:31.864 |       permission, a trade veto, or a reason by itself to reject a shortlisted   
+2026-05-26 10:50:31.864 |       candidate.                                                                
+2026-05-26 10:50:31.864 |       - The monitor/stage-2 pipeline already shortlisted this stock for intraday
+2026-05-26 10:50:31.864 |       eligibility; judge the stock setup from its own evidence first.           
+2026-05-26 10:50:31.864 |       - A bearish, bullish, volatile, or event-driven market can still contain  
+2026-05-26 10:50:31.864 |       valid long or short intraday setups.                                      
+2026-05-26 10:50:31.864 |       - Do not say 'do not trade' only because of market regime/news context;   
+2026-05-26 10:50:31.864 |       only flag concrete stock-level chart, liquidity, or data-quality problems.
+2026-05-26 10:50:31.864 |       - Write a compact but detailed analyst report in markdown.                
+2026-05-26 10:50:31.864 |       - Use this exact section structure:                                       
+2026-05-26 10:50:31.864 |       - 1. Verdict                                                              
+2026-05-26 10:50:31.864 |       - 2. Context Fit                                                          
+2026-05-26 10:50:31.864 |       - 3. Chart Read                                                           
+2026-05-26 10:50:31.864 |       - 4. Strengths                                                            
+2026-05-26 10:50:31.864 |       - 5. Risks                                                                
+2026-05-26 10:50:31.864 |       - 6. Trade Plan                                                           
+2026-05-26 10:50:31.864 |       - Inside Trade Plan, explicitly include Bias, Entry Zone, Invalidation,   
+2026-05-26 10:50:31.864 |       and Profit Objective.                                                     
+2026-05-26 10:50:31.864 |       <additional_information>                                                  
+2026-05-26 10:50:31.864 |       - Use markdown to format your answers.                                    
+2026-05-26 10:50:31.864 |       - The current time is 2026-05-26 05:20:31.850684.                         
+2026-05-26 10:50:31.864 |       </additional_information>                                                 
+2026-05-26 10:50:31.871 | DEBUG =========================== user ===========================              
+2026-05-26 10:50:31.904 | DEBUG Analyze the supplied intraday stock candidate.                            
+2026-05-26 10:50:31.904 |       Your downstream reader is a risk agent, so be precise, concrete, and      
+2026-05-26 10:50:31.904 |       usable.                                                                   
+2026-05-26 10:50:31.904 |       Interpret the two chart images as 5-minute and 15-minute candlestick      
+2026-05-26 10:50:31.904 |       charts.                                                                   
+2026-05-26 10:50:31.904 |       The monitor stage already screened for live tradability; still mention any
+2026-05-26 10:50:31.904 |       warning signs you infer from the charts.                                  
+2026-05-26 10:50:31.904 |       Use market context to describe background pressure or tailwind/headwind   
+2026-05-26 10:50:31.904 |       only, not to decide trade permission.                                     
+2026-05-26 10:50:31.904 |       <context>                                                                 
+2026-05-26 10:50:31.904 |       {"market_context": {"market_regime": "risk_on", "confidence": 73.93,      
+2026-05-26 10:50:31.904 |       "status": "live_market", "minutes_since_open": 80, "is_actionable": true, 
+2026-05-26 10:50:31.904 |       "reasoning_summary": "avg_primary_change=0.3461%,                         
+2026-05-26 10:50:31.904 |       avg_primary_vwap=0.1844%, sector_breadth=0.7, avg_sector_change=0.3096%,  
+2026-05-26 10:50:31.904 |       avg_sector_vwap=0.1742%, futures_alignment=1.0 (3/3), vix_change=-6.0479%,
+2026-05-26 10:50:31.904 |       breakout_ratio=0.7692, avg_option_pcr=1.2329, avg_option_iv_spread=1.5784,
+2026-05-26 10:50:31.904 |       news_scope=sectoral, news_horizon=unclear, flow_context=net_supportive,   
+2026-05-26 10:50:31.904 |       fii_net_cash_cr=821.75, dii_net_cash_cr=3856.88,                          
+2026-05-26 10:50:31.904 |       net_institutional_cash_cr=4678.63", "diagnostics":                        
+2026-05-26 10:50:31.904 |       {"avg_primary_change_percent": 0.3461, "avg_primary_vwap_percent": 0.1844,
+2026-05-26 10:50:31.904 |       "primary_above_open_ratio": 1.0, "primary_above_vwap_ratio": 1.0,         
+2026-05-26 10:50:31.904 |       "sector_breadth_ratio": 0.7, "avg_sector_change_percent": 0.3096,         
+2026-05-26 10:50:31.904 |       "avg_sector_vwap_percent": 0.1742, "breakout_ratio": 0.7692,              
+2026-05-26 10:50:31.904 |       "futures_alignment_ratio": 1.0, "futures_alignment_count": 3,             
+2026-05-26 10:50:31.904 |       "futures_compared_count": 3, "vix_change_percent": -6.0479,               
+2026-05-26 10:50:31.904 |       "news_severity_score": 0.13, "option_chain_count": 3,                     
+2026-05-26 10:50:31.904 |       "avg_option_put_call_oi_ratio": 1.2329, "avg_option_atm_iv_spread":       
+2026-05-26 10:50:31.904 |       1.5784, "fii_net_cash_cr": 821.75, "dii_net_cash_cr": 3856.88,            
+2026-05-26 10:50:31.904 |       "net_institutional_cash_cr": 4678.63, "institutional_flow_context":       
+2026-05-26 10:50:31.904 |       "net_supportive"}, "news_analysis": {"analysis_scope":                    
+2026-05-26 10:50:31.904 |       "market_context_sources", "analysis_engine":                              
+2026-05-26 10:50:31.904 |       "agno_markdown_plus_heuristic", "generated_at_utc":                       
+2026-05-26 10:50:31.904 |       "2026-05-26T05:05:44.224196+00:00", "headline_count": 40,                 
+2026-05-26 10:50:31.904 |       "market_sentiment": "bullish", "confidence_score": 0.85,                  
+2026-05-26 10:50:31.904 |       "event_severity_score": 0.13, "risk_of_abnormal_volatility": "low",       
+2026-05-26 10:50:31.904 |       "affected_sectors": ["energy", "pharma", "banking"], "event_clusters":    
+2026-05-26 10:50:31.904 |       ["market_news", "offers", "corporate_announcements", "corporate_actions"],
+2026-05-26 10:50:31.904 |       "headline_summary": "Sentiment=bullish; event_severity=0.13. Top          
+2026-05-26 10:50:31.904 |       market-context items: Roni Households Ltd -Board Meeting Intimation for   
+2026-05-26 10:50:31.904 |       Consideration Of Audited Standalone & Consolidated Financial Results Of   
+2026-05-26 10:50:31.904 |       The Company For The Half Year And Year Ended On March 31, 2026 And Audited
+2026-05-26 10:50:31.904 |       Financial Statement Of The Company For Year Ended On March 31, 2026. , May
+2026-05-26 10:50:31.904 |       26 2026 , 10:31AM | Omnitech Engineering Ltd -Announcement under          
+2026-05-26 10:50:31.904 |       Regulation 30 (LODR)-Newspaper Publication , May 26 2026 , 10:34AM |      
+2026-05-26 10:50:31.904 |       Centerac Technologies Ltd -Announcement under Regulation 30               
+2026-05-26 10:50:31.904 |       (LODR)-Newspaper Publication , May 26 2026 , 10:34AM",                    
+2026-05-26 10:50:31.904 |       "structured_reasoning": "Heuristic aggregation over 40 supplied           
+2026-05-26 10:50:31.904 |       market-context items. positive_hits=2, negative_hits=1, severe_hits=0,    
+2026-05-26 10:50:31.904 |       sentiment=bullish, severity=0.13.", "birds_eye_view": {"scope":           
+2026-05-26 10:50:31.904 |       "sectoral", "impact_horizon": "unclear", "summary": "Sentiment=bullish;   
+2026-05-26 10:50:31.904 |       event_severity=0.13. Top market-context items: Roni Households Ltd -Board 
+2026-05-26 10:50:31.904 |       Meeting Intimation for Consideration Of Audited Standalone & Consolidated 
+2026-05-26 10:50:31.904 |       Financial Results Of The Company For The Half Year And Year Ended On March
+2026-05-26 10:50:31.904 |       31, 2026 And Audited Financial Statement Of The Company For Year Ended On 
+2026-05-26 10:50:31.904 |       March 31, 2026. , May 26 2026 , 10:31AM | Omnitech Engineering Ltd        
+2026-05-26 10:50:31.904 |       -Announcement under Regulation 30 (LODR)-Newspaper Publication , May 26   
+2026-05-26 10:50:31.904 |       2026 , 10:34AM | Centerac Technologies Ltd -Announcement under Regulation 
+2026-05-26 10:50:31.904 |       30 (LODR)-Newspaper Publication , May 26 2026 , 10:34AM"},                
+2026-05-26 10:50:31.904 |       "institutional_flows": {"source": "kotak_fii_dii", "url":                 
+2026-05-26 10:50:31.904 |       "https://www.kotakneo.com/share-market-today/fii-dii-data/", "as_of_date":
+2026-05-26 10:50:31.904 |       "25-MAY-2026", "segment": "cash", "fii_net_cash_cr": 821.75,              
+2026-05-26 10:50:31.904 |       "dii_net_cash_cr": 3856.88, "net_fii_dii_cash_cr": 4678.63, "summary":    
+2026-05-26 10:50:31.904 |       "FII net cash flow 821.75 Cr; DII net cash flow 3856.88 Cr; combined net  
+2026-05-26 10:50:31.904 |       flow 4678.63 Cr as of 25-MAY-2026."}, "llm_markdown_analysis": "##        
+2026-05-26 10:50:31.904 |       Headline Summary\nMarket tone is marginally negative with the Sensex down 
+2026-05-26 10:50:31.904 |       ~150 points and Nifty 50 trading below 24,000. Corporate news is dominated
+2026-05-26 10:50:31.904 |       by routine post-result disclosures and announcements, with no major       
+2026-05-26 10:50:31.904 |       single-stock shock. Institutional flows show a strong combined net inflow 
+2026-05-26 10:50:31.904 |       driven by DIIs.\n\n## Market Tone\nThe broad market is experiencing a mild
+2026-05-26 10:50:31.904 |       pullback, with headline indices trading lower. This appears to be a       
+2026-05-26 10:50:31.904 |       continuation of recent activity rather than a reaction to a new,          
+2026-05-26 10:50:31.904 |       market-wide event. The context is characterized by the release of numerous
+2026-05-26 10:50:31.904 |       company-specific results and regulatory filings.\n\n## FII/DII Flow       
+2026-05-26 10:50:31.904 |       Context\nFor the trading day ended May 25, 2026, institutional flows were 
+2026-05-26 10:50:31.904 |       strongly positive. Foreign Institutional Investors (FIIs) were net buyers 
+2026-05-26 10:50:31.904 |       to the tune of \u20b9821.75 Crore. Domestic Institutional Investors (DIIs)
+2026-05-26 10:50:31.904 |       were significantly larger net buyers, with a flow of \u20b93,856.88 Crore.
+2026-05-26 10:50:31.904 |       The combined net inflow for the day was \u20b94,678.63 Crore, indicating  
+2026-05-26 10:50:31.904 |       robust domestic institutional support.\n\n## Event Clusters\nThe provided 
+2026-05-26 10:50:31.904 |       evidence shows two primary, distinct event clusters:\n1.  **Post-Results  
+2026-05-26 10:50:31.904 |       Season Cluster:** A high volume of company-specific announcements are     
+2026-05-26 10:50:31.904 |       related to the dissemination of audited financial results for FY2026. This
+2026-05-26 10:50:31.904 |       includes newspaper publications, earnings call transcripts, and board     
+2026-05-26 10:50:31.904 |       meeting intimations for upcoming results (e.g., Roni Households). This is 
+2026-05-26 10:50:31.904 |       a routine procedural cluster typical for the post-results period.\n2.     
+2026-05-26 10:50:31.904 |       **Market Structure & Investment Flows Cluster:** News items include SEBI  
+2026-05-26 10:50:31.904 |       defining \"significant indices\" with an AUM threshold, government        
+2026-05-26 10:50:31.904 |       preparations for a FY27 divestment drive via OFS in specific PSUs (Coal   
+2026-05-26 10:50:31.904 |       India, LIC, IOB, IRFC), and a large DII purchase by LIC in Central Bank of
+2026-05-26 10:50:31.904 |       India. These items are isolated headlines but collectively relate to      
+2026-05-26 10:50:31.904 |       market structure and large-scale capital flow dynamics.\n\n## Affected    
+2026-05-26 10:50:31.904 |       Sectors\nNo single sector is under uniform pressure or experiencing a     
+2026-05-26 10:50:31.904 |       broad-based rally based on the supplied evidence. The news items are      
+2026-05-26 10:50:31.904 |       cross-sectoral. Specific mentions include:\n*   **Telecom/IT:** HFCL stock
+2026-05-26 10:50:31.904 |       is highlighted for a recent rally driven by strong Q4 results.\n*         
+2026-05-26 10:50:31.904 |       **Automobiles:** Hero MotoCorp has an analyst/investor meet.\n*           
+2026-05-26 10:50:31.904 |       **Banking/Financial Services:** LIC's stake purchase in Central Bank of   
+2026-05-26 10:50:31.904 |       India, the FIH Mauritius open offer for IIFL Capital, and the government's
+2026-05-26 10:50:31.904 |       OFS plans in LIC, IOB, and IRFC are key events.\n*                        
+2026-05-26 10:50:31.904 |       **Infrastructure/Energy:** Adani's green data center initiative is noted  
+2026-05-26 10:50:31.904 |       as a positive for energy stocks.\n\n## Abnormal Volatility Context\nThe   
+2026-05-26 10:50:31.904 |       supplied data does not indicate abnormal market-wide volatility. The news 
+2026-05-26 10:50:31.904 |       items that could affect specific stock volatility are isolated: HFCL's    
+2026-05-26 10:50:31.904 |       recent 37% price jump over five days (a historical move, not intraday),   
+2026-05-26 10:50:31.904 |       and KPIT Technologies' post-results slide of over 4%. These are           
+2026-05-26 10:50:31.904 |       company-specific reactions, not indicators of a broad volatility          
+2026-05-26 10:50:31.904 |       regime.\n\n## Birds-Eye View\nThe Indian equity market context is that of 
+2026-05-26 10:50:31.904 |       a marginally lower session following a period of strong institutional     
+2026-05-26 10:50:31.904 |       buying. The primary activity is the operational processing of quarterly   
+2026-05-26 10:50:31.904 |       and annual results by numerous listed companies. Institutional            
+2026-05-26 10:50:31.904 |       participation remains robust, with DIIs providing substantial support. Key
+2026-05-26 10:50:31.904 |       market-moving headlines are scattered across specific corporate actions   
+2026-05-26 10:50:31.904 |       (M&A, stake purchases) and regulatory updates, rather than stemming from a
+2026-05-26 10:50:31.904 |       single macroeconomic or geopolitical event. The overall environment is one
+2026-05-26 10:50:31.904 |       of stock-specific news flow within a broadly stable but slightly softer   
+2026-05-26 10:50:31.904 |       market tone.", "market_signal_distribution": {"corporate_announcements":  
+2026-05-26 10:50:31.904 |       10, "market_news": 12, "forthcoming_results": 1, "institutional_flows": 1,
+2026-05-26 10:50:31.904 |       "corporate_actions": 5, "offers": 11}, "agno_error": null},               
+2026-05-26 10:50:31.904 |       "generated_at_utc": "2026-05-26T05:06:14.761488+00:00"}}                  
+2026-05-26 10:50:31.904 |       </context>                                                                
+2026-05-26 10:50:31.904 |       Candidate packet JSON:                                                    
+2026-05-26 10:50:31.904 |       {"candidate_source": "stage2", "market_date": "2026-05-26", "symbol":     
+2026-05-26 10:50:31.904 |       "ADANI POWER LTD.", "display_name": "Adani Power", "stock": {"price":     
+2026-05-26 10:50:31.904 |       241.45, "adv_20_cr": 63.31, "atr_percent": 3.81}, "stage2": {"score":     
+2026-05-26 10:50:31.904 |       193.18, "time_of_day_rvol": 2.495, "price_vs_vwap_percent": 1.5013,       
+2026-05-26 10:50:31.904 |       "opening_range_breakout_percent": 1.6204, "volume_acceleration_ratio":    
+2026-05-26 10:50:31.904 |       2.562, "stage2_reason": null}, "monitor": {"passed": false,               
+2026-05-26 10:50:31.904 |       "spread_percent": null, "ticks_last_10min": null, "time_of_day_rvol":     
+2026-05-26 10:50:31.904 |       null, "intraday_value_cr": null}, "chart_artifacts": {"market_date":      
+2026-05-26 10:50:31.904 |       "2026-05-26", "chart_count": 2, "charts": {"5m": {"timeframe_minutes": 5, 
+2026-05-26 10:50:31.904 |       "path":                                                                   
+2026-05-26 10:50:31.904 |       "/app/python-backend/stock_analyzer_artifacts/2026-05-26/adani-power/adani
+2026-05-26 10:50:31.904 |       -power-2026-05-26-5m.png", "candles": 20}, "15m": {"timeframe_minutes":   
+2026-05-26 10:50:31.904 |       15, "path":                                                               
+2026-05-26 10:50:31.904 |       "/app/python-backend/stock_analyzer_artifacts/2026-05-26/adani-power/adani
+2026-05-26 10:50:31.904 |       -power-2026-05-26-15m.png", "candles": 7}}}}                              
+2026-05-26 10:50:31.909 | DEBUG Images added: 2                                                           
+2026-05-26 10:50:31.911 | DEBUG Creating new sync OpenAI client for model mimo-v2.5                       
+2026-05-26 10:50:51.683 | DEBUG ======================== assistant =========================              
+2026-05-26 10:50:51.692 | DEBUG ### 1. Verdict                                                            
+2026-05-26 10:50:51.692 |       **Conditional Long** on Mean Reversion.                                   
+2026-05-26 10:50:51.692 |                                                                                 
+2026-05-26 10:50:51.692 |       Adani Power exhibits a classic "Power Move and Pause" structure. The stock
+2026-05-26 10:50:51.692 |       surged with high volume around 10:04 AM, leading to a sharp deviation from
+2026-05-26 10:50:51.692 |       the VWAP. Currently, it is undergoing a low-volume drift back towards the 
+2026-05-26 10:50:51.692 |       VWAP, which is presenting a high-probability mean reversion entry for a   
+2026-05-26 10:50:51.692 |       bounce. The setup is valid for a quick intraday scalp, but requires strict
+2026-05-26 10:50:51.692 |       adherence to the VWAP as the pivot.                                       
+2026-05-26 10:50:51.692 |                                                                                 
+2026-05-26 10:50:51.692 |       ### 2. Context Fit                                                        
+2026-05-26 10:50:51.692 |       *   **Market Regime:** Risk-On (Confidence: 73.93%). The market background
+2026-05-26 10:50:51.692 |       is favorable for long positions, particularly in momentum leaders.        
+2026-05-26 10:50:51.692 |       *   **Liquidity & Flow:** FII/DII combined net inflow is strong (+4,678   
+2026-05-26 10:50:51.692 |       Cr), providing a supportive liquidity backdrop.                           
+2026-05-26 10:50:51.692 |       *   **Volatility:** VIX is down ~6%, suggesting a stable environment for  
+2026-05-26 10:50:51.692 |       directional trades rather than chaotic chopping.                          
+2026-05-26 10:50:51.692 |       *   **Fit:** High. The stock is aligned with the broader market's risk    
+2026-05-26 10:50:51.692 |       appetite.                                                                 
+2026-05-26 10:50:51.692 |                                                                                 
+2026-05-26 10:50:51.692 |       ### 3. Chart Read                                                         
+2026-05-26 10:50:51.692 |       *   **5-Minute Chart:**                                                   
+2026-05-26 10:50:51.692 |           *   **Momentum:** A significant impulsive move occurred at 10:04 AM,  
+2026-05-26 10:50:51.692 |       pushing price from ~237.50 to a high of 242.80.                           
+2026-05-26 10:50:51.692 |           *   **Correction:** Since 10:15 AM, the stock has entered a           
+2026-05-26 10:50:51.692 |       consolidation/correction phase with smaller red bodies and wicks on both  
+2026-05-26 10:50:51.692 |       sides, indicating indecision and a lack of aggressive selling pressure (no
+2026-05-26 10:50:51.692 |       panic dumping).                                                           
+2026-05-26 10:50:51.692 |           *   **VWAP Relationship:** The price is currently at 241.45, resting  
+2026-05-26 10:50:51.692 |       well above the rising VWAP (238.07). The gap suggests the stock is        
+2026-05-26 10:50:51.692 |       stretched but supported by the trend.                                     
+2026-05-26 10:50:51.692 |       *   **15-Minute Chart:**                                                  
+2026-05-26 10:50:51.692 |           *   **Structure:** The 15m candles show a strong bullish base. The    
+2026-05-26 10:50:51.692 |       recent candles are consolidating the gains from the 10:00-10:15 breakout. 
+2026-05-26 10:50:51.692 |           *   **Volume:** Volume spiked on the breakout and is tapering off     
+2026-05-26 10:50:51.692 |       during the pullback (visible in the 5m volume histogram), which is a      
+2026-05-26 10:50:51.692 |       healthy sign for a trend continuation.                                    
+2026-05-26 10:50:51.692 |                                                                                 
+2026-05-26 10:50:51.692 |       ### 4. Strengths                                                          
+2026-05-26 10:50:51.692 |       *   **Volume-Price Confirmation:** The major move up (10:04 AM) was backed
+2026-05-26 10:50:51.692 |       by the highest volume of the session.                                     
+2026-05-26 10:50:51.692 |       *   **Strong CVD (Cumulative Volume Delta):** The CVD indicator remains   
+2026-05-26 10:50:51.692 |       elevated, suggesting that the net buying aggression is still intact       
+2026-05-26 10:50:51.692 |       despite the minor price pullback.                                         
+2026-05-26 10:50:51.692 |       *   **Technical Distance:** The stock has successfully decoupled from the 
+2026-05-26 10:50:51.692 |       opening range and established a higher high.                              
+2026-05-26 10:50:51.692 |                                                                                 
+2026-05-26 10:50:51.692 |       ### 5. Risks                                                              
+2026-05-26 10:50:51.692 |       *   **Mean Reversion Drawdown:** There is risk of a "gap fill" down to the
+2026-05-26 10:50:51.692 |       VWAP at 238.00 if buying pressure dries up completely.                    
+2026-05-26 10:50:51.692 |       *   **Profit Taking:** After a 2.5+ point move on a ~240 stock, intraday  
+2026-05-26 10:50:51.692 |       traders will look to book profits, creating overhead resistance around    
+2026-05-26 10:50:51.692 |       242.00.                                                                   
+2026-05-26 10:50:51.692 |       *   **Liquidity Warning:** The `stage2` data indicates `passed: false` for
+2026-05-26 10:50:51.692 |       monitor (likely due to spread or tick data not populating in the raw      
+2026-05-26 10:50:51.692 |       JSON), so the agent must assume a standard tick size is being respected.  
+2026-05-26 10:50:51.692 |                                                                                 
+2026-05-26 10:50:51.692 |       ### 6. Trade Plan                                                         
+2026-05-26 10:50:51.692 |       *   **Bias:** Long (Trend Continuation / Pullback Buy).                   
+2026-05-26 10:50:51.692 |       *   **Entry Zone:** **240.50 - 241.00**. (Targeting a limit buy on the    
+2026-05-26 10:50:51.692 |       drift).                                                                   
+2026-05-26 10:50:51.692 |       *   **Invalidation:** Close below **238.00** on a 5-minute candle. (Break 
+2026-05-26 10:50:51.692 |       of VWAP invalidates the bullish thesis).                                  
+2026-05-26 10:50:51.692 |       *   **Profit Objective:**                                                 
+2026-05-26 10:50:51.692 |           *   **Target 1 (Scalp):** 242.80 (Re-test of session highs).          
+2026-05-26 10:50:51.692 |           *   **Target 2 (Extension):** 244.00 (Psychological resistance).      
+2026-05-26 10:50:51.693 | DEBUG ************************  METRICS  *************************              
+2026-05-26 10:50:51.694 | DEBUG * Tokens:                      input=8114, output=867, total=8981         
+2026-05-26 10:50:51.695 | DEBUG * Duration:                    17.0278s                                   
+2026-05-26 10:50:51.695 | DEBUG * Tokens per second:           50.9167 tokens/s                           
+2026-05-26 10:50:51.696 | DEBUG * Time to first token:         17.0278s                                   
+2026-05-26 10:50:51.697 | DEBUG ************************  METRICS  *************************              
+2026-05-26 10:50:51.698 | DEBUG ------------------ MiMo Chat Response End ------------------              
+2026-05-26 10:50:51.699 | DEBUG Added RunOutput to Agent Session                                          
+2026-05-26 10:50:52.608 | DEBUG *** Agent Run End: af62a8df-78b8-4bf1-b3e7-05f7e54161e0 ****              
+2026-05-26 10:50:52.613 | Saved stock analyzer batch snapshot for 1 stock(s).
+2026-05-26 10:50:52.616 | Running risk_analyzer...
+2026-05-26 10:50:52.781 | DEBUG ***** Session ID: 106717b8-ae45-4ddb-b7f1-facb813d0be5 *****              
+2026-05-26 10:50:52.782 | DEBUG ***************** Agent ID: risk-analyzer ******************              
+2026-05-26 10:50:52.783 | DEBUG Creating new AgentSession: 106717b8-ae45-4ddb-b7f1-facb813d0be5           
+2026-05-26 10:50:52.784 | DEBUG ** Agent Run Start: 376743ce-1fa8-42a4-9b8e-52028985574c ***              
+2026-05-26 10:50:52.785 | DEBUG ----------------- MiMo Chat Response Start -----------------              
+2026-05-26 10:50:52.785 | DEBUG --------------------- Model: mimo-v2.5 ---------------------              
+2026-05-26 10:50:52.786 | DEBUG ========================== system ==========================              
+2026-05-26 10:50:52.794 | DEBUG Compare three intraday stock analysis reports against market and          
+2026-05-26 10:50:52.794 |       account-risk context, then choose the single best tradable candidate.     
+2026-05-26 10:50:52.794 |       - You are the risk monitoring layer in an intraday trading pipeline.      
+2026-05-26 10:50:52.794 |       - You receive three stock analysis reports, six chart images, market      
+2026-05-26 10:50:52.794 |       context, and the user's account state.                                    
+2026-05-26 10:50:52.794 |       - Act as a purely logical risk monitoring system free from human emotions,
+2026-05-26 10:50:52.794 |       greed, or behavioral biases. Perform objective mathematical and logical   
+2026-05-26 10:50:52.794 |       analysis to identify the safest, highest-quality trade with the best      
+2026-05-26 10:50:52.794 |       risk-to-reward ratio among the supplied choices.                          
+2026-05-26 10:50:52.794 |       - Analyze the risk-to-reward ratio for each potential trade, seeking      
+2026-05-26 10:50:52.794 |       optimal setups (e.g., 1:2, 1:3, or better) based on the entry,            
+2026-05-26 10:50:52.794 |       invalidation, and profit objective levels.                                
+2026-05-26 10:50:52.794 |       - Respect available funds, position overlap, and concentration.           
+2026-05-26 10:50:52.794 |       - Treat the market context as background information only; it is not trade
+2026-05-26 10:50:52.794 |       permission, a trade veto, or position-size instruction.                   
+2026-05-26 10:50:52.794 |       - Choose from the pre-shortlisted candidates using stock evidence, chart  
+2026-05-26 10:50:52.794 |       quality, account feasibility, and concentration risk.                     
+2026-05-26 10:50:52.794 |       - Use only the supplied facts and images.                                 
+2026-05-26 10:50:52.794 |       - Use a starting capital of exactly ₹400.0 for trading calculations. Do   
+2026-05-26 10:50:52.794 |       not exceed this budget.                                                   
+2026-05-26 10:50:52.794 |       - Output ONLY a valid JSON object matching the requested schema. Do not   
+2026-05-26 10:50:52.794 |       include markdown code block formatting (like ```json) or explanation      
+2026-05-26 10:50:52.794 |       outside the JSON.                                                         
+2026-05-26 10:50:52.794 |       <additional_information>                                                  
+2026-05-26 10:50:52.794 |       - The current time is 2026-05-26 05:20:52.784016.                         
+2026-05-26 10:50:52.794 |       </additional_information>                                                 
+2026-05-26 10:50:52.794 |                                                                                 
+2026-05-26 10:50:52.794 |       <expected_output>                                                         
+2026-05-26 10:50:52.794 |       A valid JSON object matching this schema:                                 
+2026-05-26 10:50:52.794 |       {                                                                         
+2026-05-26 10:50:52.794 |         "selected_symbol": "symbol or NONE",                                    
+2026-05-26 10:50:52.794 |         "selected_display_name": "display name or NONE",                        
+2026-05-26 10:50:52.794 |         "selected_security_id": security_id_or_0,                               
+2026-05-26 10:50:52.794 |         "conviction": conviction_score_between_0.0_and_1.0,                     
+2026-05-26 10:50:52.794 |         "why_this_choice": "detailed markdown text explaining why this stock was
+2026-05-26 10:50:52.794 |       chosen (Section 1)",                                                      
+2026-05-26 10:50:52.794 |         "ranking_across_three_stocks": "detailed markdown text ranking the three
+2026-05-26 10:50:52.794 |       stocks (Section 2)",                                                      
+2026-05-26 10:50:52.794 |         "account_and_risk_constraints": "detailed markdown text analyzing the   
+2026-05-26 10:50:52.794 |       account constraints and risk parameters (Section 3)",                     
+2026-05-26 10:50:52.794 |         "execution_notes": "detailed markdown text outlining execution notes and
+2026-05-26 10:50:52.794 |       trade setup details (Section 4)",                                         
+2026-05-26 10:50:52.794 |         "deep_analysis_report": "detailed mathematical and logical deep analysis
+2026-05-26 10:50:52.794 |       of the stock setups, risk/reward, and charts (Section 5)"                 
+2026-05-26 10:50:52.794 |       }                                                                         
+2026-05-26 10:50:52.794 |       </expected_output>                                                        
+2026-05-26 10:50:52.795 | DEBUG =========================== user ===========================              
+2026-05-26 10:50:52.824 | DEBUG Compare the three supplied intraday stock candidates and select the single
+2026-05-26 10:50:52.824 |       best one for the execution layer.                                         
+2026-05-26 10:50:52.824 |       Interpret the six chart images as two charts per stock in report order:   
+2026-05-26 10:50:52.824 |       5-minute then 15-minute.                                                  
+2026-05-26 10:50:52.824 |       Evaluate position concentration and available funds independently.        
+2026-05-26 10:50:52.824 |       If current open positions, holdings overlap, or risk concentration make   
+2026-05-26 10:50:52.824 |       the setup unsuitable, say so clearly.                                     
+2026-05-26 10:50:52.824 |       Use market context only to describe backdrop; do not treat regime labels  
+2026-05-26 10:50:52.824 |       or news tone as standalone permission or prohibition.                     
+2026-05-26 10:50:52.824 |       Output ONLY a valid JSON object matching the requested schema. Do not     
+2026-05-26 10:50:52.824 |       include markdown code block formatting (like ```json) or explanation      
+2026-05-26 10:50:52.824 |       outside the JSON.                                                         
+2026-05-26 10:50:52.824 |       <context>                                                                 
+2026-05-26 10:50:52.824 |       {"market_context": {"market_regime": "risk_on", "confidence": 71.03,      
+2026-05-26 10:50:52.824 |       "status": "live_market", "minutes_since_open": 94, "is_actionable": true, 
+2026-05-26 10:50:52.824 |       "reasoning_summary": "avg_primary_change=0.313%, avg_primary_vwap=0.1375%,
+2026-05-26 10:50:52.824 |       sector_breadth=0.9, avg_sector_change=0.2995%, avg_sector_vwap=0.1445%,   
+2026-05-26 10:50:52.824 |       futures_alignment=0.6667 (2/3), vix_change=-6.0479%,                      
+2026-05-26 10:50:52.824 |       breakout_ratio=0.9231, avg_option_pcr=1.2697, avg_option_iv_spread=1.7218,
+2026-05-26 10:50:52.824 |       news_scope=broad, news_horizon=unclear, flow_context=net_supportive,      
+2026-05-26 10:50:52.824 |       fii_net_cash_cr=821.75, dii_net_cash_cr=3856.88,                          
+2026-05-26 10:50:52.824 |       net_institutional_cash_cr=4678.63", "diagnostics":                        
+2026-05-26 10:50:52.824 |       {"avg_primary_change_percent": 0.313, "avg_primary_vwap_percent": 0.1375, 
+2026-05-26 10:50:52.824 |       "primary_above_open_ratio": 1.0, "primary_above_vwap_ratio": 1.0,         
+2026-05-26 10:50:52.824 |       "sector_breadth_ratio": 0.9, "avg_sector_change_percent": 0.2995,         
+2026-05-26 10:50:52.824 |       "avg_sector_vwap_percent": 0.1445, "breakout_ratio": 0.9231,              
+2026-05-26 10:50:52.824 |       "futures_alignment_ratio": 0.6667, "futures_alignment_count": 2,          
+2026-05-26 10:50:52.824 |       "futures_compared_count": 3, "vix_change_percent": -6.0479,               
+2026-05-26 10:50:52.824 |       "news_severity_score": 0.13, "option_chain_count": 3,                     
+2026-05-26 10:50:52.824 |       "avg_option_put_call_oi_ratio": 1.2697, "avg_option_atm_iv_spread":       
+2026-05-26 10:50:52.824 |       1.7218, "fii_net_cash_cr": 821.75, "dii_net_cash_cr": 3856.88,            
+2026-05-26 10:50:52.824 |       "net_institutional_cash_cr": 4678.63, "institutional_flow_context":       
+2026-05-26 10:50:52.824 |       "net_supportive"}, "news_analysis": {"analysis_scope":                    
+2026-05-26 10:50:52.824 |       "market_context_sources", "analysis_engine":                              
+2026-05-26 10:50:52.824 |       "agno_markdown_plus_heuristic", "generated_at_utc":                       
+2026-05-26 10:50:52.824 |       "2026-05-26T05:20:00.671444+00:00", "headline_count": 40,                 
+2026-05-26 10:50:52.824 |       "market_sentiment": "bullish", "confidence_score": 0.85,                  
+2026-05-26 10:50:52.824 |       "event_severity_score": 0.13, "risk_of_abnormal_volatility": "low",       
+2026-05-26 10:50:52.824 |       "affected_sectors": ["energy", "auto", "it", "banking"], "event_clusters":
+2026-05-26 10:50:52.824 |       ["market_news", "offers", "corporate_announcements", "corporate_actions"],
+2026-05-26 10:50:52.824 |       "headline_summary": "Sentiment=bullish; event_severity=0.13. Top          
+2026-05-26 10:50:52.824 |       market-context items: NIS Management Ltd -Announcement under Regulation 30
+2026-05-26 10:50:52.824 |       (LODR)-Award_of_Order_Receipt_of_Order , May 26 2026 , 10:49AM | Athena   
+2026-05-26 10:50:52.824 |       Global Technologies Ltd-$ -Board Meeting Intimation for Considering And   
+2026-05-26 10:50:52.824 |       Approving The Audited Standalone And Consolidated Financial Results Of The
+2026-05-26 10:50:52.824 |       Company For The Fourth Quarter And Year Ended 31St March 2026 And Any     
+2026-05-26 10:50:52.824 |       Other Matter As May Be Considered Necessary By The Board , May 26 2026 ,  
+2026-05-26 10:50:52.824 |       10:46AM | GS Auto International Ltd -Board Meeting Intimation for Board   
+2026-05-26 10:50:52.824 |       Meeting Intimation For Approval Of The Audited Financial Results Of The   
+2026-05-26 10:50:52.824 |       Company For The Quarter And Financial Year Ended 31St March, 2026 Along   
+2026-05-26 10:50:52.824 |       With The Auditors' Report Thereon , May 26 2026 , 10:44AM",               
+2026-05-26 10:50:52.824 |       "structured_reasoning": "Heuristic aggregation over 40 supplied           
+2026-05-26 10:50:52.824 |       market-context items. positive_hits=3, negative_hits=1, severe_hits=0,    
+2026-05-26 10:50:52.824 |       sentiment=bullish, severity=0.13.", "birds_eye_view": {"scope": "broad",  
+2026-05-26 10:50:52.824 |       "impact_horizon": "unclear", "summary": "Sentiment=bullish;               
+2026-05-26 10:50:52.824 |       event_severity=0.13. Top market-context items: NIS Management Ltd         
+2026-05-26 10:50:52.824 |       -Announcement under Regulation 30 (LODR)-Award_of_Order_Receipt_of_Order ,
+2026-05-26 10:50:52.824 |       May 26 2026 , 10:49AM | Athena Global Technologies Ltd-$ -Board Meeting   
+2026-05-26 10:50:52.824 |       Intimation for Considering And Approving The Audited Standalone And       
+2026-05-26 10:50:52.824 |       Consolidated Financial Results Of The Company For The Fourth Quarter And  
+2026-05-26 10:50:52.824 |       Year Ended 31St March 2026 And Any Other Matter As May Be Considered      
+2026-05-26 10:50:52.824 |       Necessary By The Board , May 26 2026 , 10:46AM | GS Auto International Ltd
+2026-05-26 10:50:52.824 |       -Board Meeting Intimation for Board Meeting Intimation For Approval Of The
+2026-05-26 10:50:52.824 |       Audited Financial Results Of The Company For The Quarter And Financial    
+2026-05-26 10:50:52.824 |       Year Ended 31St March, 2026 Along With The Auditors' Report Thereon , May 
+2026-05-26 10:50:52.824 |       26 2026 , 10:44AM"}, "institutional_flows": {"source": "kotak_fii_dii",   
+2026-05-26 10:50:52.824 |       "url": "https://www.kotakneo.com/share-market-today/fii-dii-data/",       
+2026-05-26 10:50:52.824 |       "as_of_date": "25-MAY-2026", "segment": "cash", "fii_net_cash_cr": 821.75,
+2026-05-26 10:50:52.824 |       "dii_net_cash_cr": 3856.88, "net_fii_dii_cash_cr": 4678.63, "summary":    
+2026-05-26 10:50:52.824 |       "FII net cash flow 821.75 Cr; DII net cash flow 3856.88 Cr; combined net  
+2026-05-26 10:50:52.824 |       flow 4678.63 Cr as of 25-MAY-2026."}, "llm_markdown_analysis": "##        
+2026-05-26 10:50:52.824 |       Headline Summary\nThe market context is dominated by a combination of     
+2026-05-26 10:50:52.824 |       broad market weakness, sector-specific news, and routine corporate        
+2026-05-26 10:50:52.824 |       announcements. Key headlines include a dip in major indices, mixed        
+2026-05-26 10:50:52.824 |       sectoral performance (IT and energy on opposite ends), significant        
+2026-05-26 10:50:52.824 |       institutional buying, and a regulatory update from SEBI. The morning also 
+2026-05-26 10:50:52.824 |       features standard corporate filings for board meetings, compliance        
+2026-05-26 10:50:52.824 |       reports, and order wins.\n\n## Market Tone\nThe tone is mildly negative   
+2026-05-26 10:50:52.824 |       for the broader market. A stock market update indicates the Sensex is down
+2026-05-26 10:50:52.824 |       150 points with the Nifty 50 trading below the 24,000 level. This suggests
+2026-05-26 10:50:52.824 |       early-session weakness across major benchmarks. However, the market is not
+2026-05-26 10:50:52.824 |       uniformly bearish, as specific sectors (like energy) are showing positive 
+2026-05-26 10:50:52.824 |       momentum due to company- and policy-specific news.\n\n## FII/DII Flow     
+2026-05-26 10:50:52.824 |       Context\nInstitutional flows are strongly positive. Data for May 25, 2026,
+2026-05-26 10:50:52.824 |       shows Foreign Institutional Investors (FIIs) were net buyers with a cash  
+2026-05-26 10:50:52.824 |       flow of \u20b9821.75 crore. Domestic Institutional Investors (DIIs) were  
+2026-05-26 10:50:52.824 |       significantly more active, with a net cash inflow of \u20b93,856.88 crore.
+2026-05-26 10:50:52.825 |       The combined net institutional flow was a robust positive \u20b94,678.63  
+2026-05-26 10:50:52.825 |       crore, indicating strong domestic support despite the negative session    
+2026-05-26 10:50:52.825 |       tone. Separately, a headline notes LIC has increased its stake in Central 
+2026-05-26 10:50:52.825 |       Bank of India.\n\n## Event Clusters\nThe supplied data reveals distinct   
+2026-05-26 10:50:52.825 |       event clusters:\n\n1.  **Market & Sector News Cluster:** This includes the
+2026-05-26 10:50:52.825 |       overall market update (Sensex/Nifty decline), sector-specific stories (IT 
+2026-05-26 10:50:52.825 |       stocks sinking, energy stocks rallying), and individual stock moves driven
+2026-05-26 10:50:52.825 |       by results or orders (HFCL, KPIT). This cluster represents the primary    
+2026-05-26 10:50:52.825 |       market-moving information.\n2.  **Corporate Results Season Cluster:** Two 
+2026-05-26 10:50:52.825 |       companies (Athena Global Technologies, GS Auto International) have        
+2026-05-26 10:50:52.825 |       intimated board meetings to approve Q4 and FY26 financial results. This is
+2026-05-26 10:50:52.825 |       a standard seasonal event.\n3.  **Routine Regulatory & Compliance         
+2026-05-26 10:50:52.825 |       Cluster:** This is the most voluminous cluster, containing standard       
+2026-05-26 10:50:52.825 |       filings: annual secretarial compliance reports (Alphalogic Techsys, Keto  
+2026-05-26 10:50:52.825 |       Motors), a mutual fund NAV declaration (Arudha funds), and a corporate    
+2026-05-26 10:50:52.825 |       action (redemption/roll over). These are routine and isolated to specific 
+2026-05-26 10:50:52.825 |       entities.\n\n## Affected Sectors\n*   **IT Services:** Sector under       
+2026-05-26 10:50:52.825 |       pressure, as highlighted by headlines mentioning that IT stocks including 
+2026-05-26 10:50:52.825 |       Infosys and TCS are sinking.\n*   **Oil & Gas/Energy:** Sector seeing     
+2026-05-26 10:50:52.825 |       positive momentum, with headlines noting jumps in ONGC and Oil India      
+2026-05-26 10:50:52.825 |       shares following a government policy change (cut in upstream royalty      
+2026-05-26 10:50:52.825 |       rates) and broader Adani-related energy stock rallies.\n*   **Telecom/IT  
+2026-05-26 10:50:52.825 |       Hardware:** Noted in the context of HFCL's stock jump due to orders and   
+2026-05-26 10:50:52.825 |       results.\n\n## Abnormal Volatility Context\nThe data points to sources of 
+2026-05-26 10:50:52.825 |       abnormal, stock-specific volatility rather than broad-market volatility.  
+2026-05-26 10:50:52.825 |       HFCL's stock is highlighted as jumping 37% over five days, and KPIT       
+2026-05-26 10:50:52.825 |       Technologies' shares are sliding over 4% post-results. These are          
+2026-05-26 10:50:52.825 |       company-specific volatility events. No information is provided to suggest 
+2026-05-26 10:50:52.825 |       volatility in index futures or options.\n\n## Birds-Eye View\nThe Indian  
+2026-05-26 10:50:52.825 |       equity market context is characterized by a bifurcated landscape. The     
+2026-05-26 10:50:52.825 |       broad indices are experiencing mild early weakness, but this is offset by 
+2026-05-26 10:50:52.825 |       very strong net institutional buying, primarily from DIIs. The newsflow is
+2026-05-26 10:50:52.825 |       mixed, with negative sectoral pressure in IT countered by positive,       
+2026-05-26 10:50:52.825 |       policy-driven momentum in the energy space. A significant portion of the  
+2026-05-26 10:50:52.825 |       morning's filings is routine corporate compliance, indicating no          
+2026-05-26 10:50:52.825 |       widespread systemic concerns. The immediate context suggests market action
+2026-05-26 10:50:52.825 |       will be highly selective, driven by sectoral themes (energy vs. IT),      
+2026-05-26 10:50:52.825 |       individual stock results, and specific corporate events, rather than a    
+2026-05-26 10:50:52.825 |       uniform directional trend.", "market_signal_distribution":                
+2026-05-26 10:50:52.825 |       {"corporate_announcements": 10, "market_news": 12, "forthcoming_results": 
+2026-05-26 10:50:52.825 |       1, "institutional_flows": 1, "corporate_actions": 5, "offers": 11},       
+2026-05-26 10:50:52.825 |       "agno_error": null}, "generated_at_utc":                                  
+2026-05-26 10:50:52.825 |       "2026-05-26T05:20:29.334551+00:00"}}                                      
+2026-05-26 10:50:52.825 |       </context>                                                                
+2026-05-26 10:50:52.825 |       Risk packet JSON:                                                         
+2026-05-26 10:50:52.825 |       {"market_date": "2026-05-26", "summary": {"stock_report_count": 1,        
+2026-05-26 10:50:52.825 |       "chart_count": 2, "source_snapshots": {"stock_analyzer_generated_at_utc": 
+2026-05-26 10:50:52.825 |       "2026-05-26T05:20:52.608705+00:00", "regime_generated_at_utc":            
+2026-05-26 10:50:52.825 |       "2026-05-26T05:20:29.334551+00:00"}}, "account_context": {"holdings":     
+2026-05-26 10:50:52.825 |       {"status": "success", "count": 0, "items": []}, "positions": {"status":   
+2026-05-26 10:50:52.825 |       "success", "count": 0, "open_intraday_count": 0, "items": []}, "funds":   
+2026-05-26 10:50:52.825 |       {"status": "success", "data": {"dhanClientId": "1102524211",              
+2026-05-26 10:50:52.825 |       "availabelBalance": 911.18, "sodLimit": 511.18, "collateralAmount": 0.0,  
+2026-05-26 10:50:52.825 |       "receiveableAmount": 0.0, "utilizedAmount": 0.0, "blockedPayoutAmount":   
+2026-05-26 10:50:52.825 |       0.0, "withdrawableBalance": 511.18}}, "fetch_status": {"holdings":        
+2026-05-26 10:50:52.825 |       "success", "positions": "success", "funds": "success"}}, "stock_reports": 
+2026-05-26 10:50:52.825 |       [{"rank": 1, "security_id": 533096, "symbol": "ADANI POWER LTD.",         
+2026-05-26 10:50:52.825 |       "display_name": "Adani Power", "candidate_source": "stage2", "stock":     
+2026-05-26 10:50:52.825 |       {"price": 241.45, "adv_20_cr": 63.31, "atr_percent": 3.81}, "stage2":     
+2026-05-26 10:50:52.825 |       {"score": 193.18, "time_of_day_rvol": 2.495, "price_vs_vwap_percent":     
+2026-05-26 10:50:52.825 |       1.5013, "opening_range_breakout_percent": 1.6204,                         
+2026-05-26 10:50:52.825 |       "volume_acceleration_ratio": 2.562, "stage2_reason": null}, "monitor":    
+2026-05-26 10:50:52.825 |       {"passed": false, "spread_percent": null, "ticks_last_10min": null,       
+2026-05-26 10:50:52.825 |       "time_of_day_rvol": null, "intraday_value_cr": null}, "analysis_report":  
+2026-05-26 10:50:52.825 |       "### 1. Verdict\n**Conditional Long** on Mean Reversion.\n\nAdani Power   
+2026-05-26 10:50:52.825 |       exhibits a classic \"Power Move and Pause\" structure. The stock surged   
+2026-05-26 10:50:52.825 |       with high volume around 10:04 AM, leading to a sharp deviation from the   
+2026-05-26 10:50:52.825 |       VWAP. Currently, it is undergoing a low-volume drift back towards the     
+2026-05-26 10:50:52.825 |       VWAP, which is presenting a high-probability mean reversion entry for a   
+2026-05-26 10:50:52.825 |       bounce. The setup is valid for a quick intraday scalp, but requires strict
+2026-05-26 10:50:52.825 |       adherence to the VWAP as the pivot.\n\n### 2. Context Fit\n*   **Market   
+2026-05-26 10:50:52.825 |       Regime:** Risk-On (Confidence: 73.93%). The market background is favorable
+2026-05-26 10:50:52.825 |       for long positions, particularly in momentum leaders.\n*   **Liquidity &  
+2026-05-26 10:50:52.825 |       Flow:** FII/DII combined net inflow is strong (+4,678 Cr), providing a    
+2026-05-26 10:50:52.825 |       supportive liquidity backdrop.\n*   **Volatility:** VIX is down ~6%,      
+2026-05-26 10:50:52.825 |       suggesting a stable environment for directional trades rather than chaotic
+2026-05-26 10:50:52.825 |       chopping.\n*   **Fit:** High. The stock is aligned with the broader       
+2026-05-26 10:50:52.825 |       market's risk appetite.\n\n### 3. Chart Read\n*   **5-Minute Chart:**\n   
+2026-05-26 10:50:52.825 |       *   **Momentum:** A significant impulsive move occurred at 10:04 AM,      
+2026-05-26 10:50:52.825 |       pushing price from ~237.50 to a high of 242.80.\n    *   **Correction:**  
+2026-05-26 10:50:52.825 |       Since 10:15 AM, the stock has entered a consolidation/correction phase    
+2026-05-26 10:50:52.825 |       with smaller red bodies and wicks on both sides, indicating indecision and
+2026-05-26 10:50:52.825 |       a lack of aggressive selling pressure (no panic dumping).\n    *   **VWAP 
+2026-05-26 10:50:52.825 |       Relationship:** The price is currently at 241.45, resting well above the  
+2026-05-26 10:50:52.825 |       rising VWAP (238.07). The gap suggests the stock is stretched but         
+2026-05-26 10:50:52.825 |       supported by the trend.\n*   **15-Minute Chart:**\n    *   **Structure:** 
+2026-05-26 10:50:52.825 |       The 15m candles show a strong bullish base. The recent candles are        
+2026-05-26 10:50:52.825 |       consolidating the gains from the 10:00-10:15 breakout.\n    *             
+2026-05-26 10:50:52.825 |       **Volume:** Volume spiked on the breakout and is tapering off during the  
+2026-05-26 10:50:52.825 |       pullback (visible in the 5m volume histogram), which is a healthy sign for
+2026-05-26 10:50:52.825 |       a trend continuation.\n\n### 4. Strengths\n*   **Volume-Price             
+2026-05-26 10:50:52.825 |       Confirmation:** The major move up (10:04 AM) was backed by the highest    
+2026-05-26 10:50:52.825 |       volume of the session.\n*   **Strong CVD (Cumulative Volume Delta):** The 
+2026-05-26 10:50:52.825 |       CVD indicator remains elevated, suggesting that the net buying aggression 
+2026-05-26 10:50:52.826 |       is still intact despite the minor price pullback.\n*   **Technical        
+2026-05-26 10:50:52.826 |       Distance:** The stock has successfully decoupled from the opening range   
+2026-05-26 10:50:52.826 |       and established a higher high.\n\n### 5. Risks\n*   **Mean Reversion      
+2026-05-26 10:50:52.826 |       Drawdown:** There is risk of a \"gap fill\" down to the VWAP at 238.00 if 
+2026-05-26 10:50:52.826 |       buying pressure dries up completely.\n*   **Profit Taking:** After a 2.5+ 
+2026-05-26 10:50:52.826 |       point move on a ~240 stock, intraday traders will look to book profits,   
+2026-05-26 10:50:52.826 |       creating overhead resistance around 242.00.\n*   **Liquidity Warning:**   
+2026-05-26 10:50:52.826 |       The `stage2` data indicates `passed: false` for monitor (likely due to    
+2026-05-26 10:50:52.826 |       spread or tick data not populating in the raw JSON), so the agent must    
+2026-05-26 10:50:52.826 |       assume a standard tick size is being respected.\n\n### 6. Trade Plan\n*   
+2026-05-26 10:50:52.826 |       **Bias:** Long (Trend Continuation / Pullback Buy).\n*   **Entry Zone:**  
+2026-05-26 10:50:52.826 |       **240.50 - 241.00**. (Targeting a limit buy on the drift).\n*             
+2026-05-26 10:50:52.826 |       **Invalidation:** Close below **238.00** on a 5-minute candle. (Break of  
+2026-05-26 10:50:52.826 |       VWAP invalidates the bullish thesis).\n*   **Profit Objective:**\n    *   
+2026-05-26 10:50:52.826 |       **Target 1 (Scalp):** 242.80 (Re-test of session highs).\n    *   **Target
+2026-05-26 10:50:52.826 |       2 (Extension):** 244.00 (Psychological resistance).", "chart_artifacts":  
+2026-05-26 10:50:52.826 |       {"market_date": "2026-05-26", "chart_count": 2, "charts": {"5m":          
+2026-05-26 10:50:52.826 |       {"timeframe_minutes": 5, "path":                                          
+2026-05-26 10:50:52.826 |       "/app/python-backend/stock_analyzer_artifacts/2026-05-26/adani-power/adani
+2026-05-26 10:50:52.826 |       -power-2026-05-26-5m.png", "candles": 20}, "15m": {"timeframe_minutes":   
+2026-05-26 10:50:52.826 |       15, "path":                                                               
+2026-05-26 10:50:52.826 |       "/app/python-backend/stock_analyzer_artifacts/2026-05-26/adani-power/adani
+2026-05-26 10:50:52.826 |       -power-2026-05-26-15m.png", "candles": 7}}}}]}                            
+2026-05-26 10:50:52.828 | DEBUG Images added: 2                                                           
+2026-05-26 10:50:52.829 | DEBUG Creating new sync OpenAI client for model mimo-v2.5                       
+2026-05-26 10:51:06.271 | DEBUG ======================== assistant =========================              
+2026-05-26 10:51:06.277 | DEBUG {                                                                         
+2026-05-26 10:51:06.277 |         "selected_symbol": "NONE",                                              
+2026-05-26 10:51:06.277 |         "selected_display_name": "NONE",                                        
+2026-05-26 10:51:06.277 |         "selected_security_id": 0,                                              
+2026-05-26 10:51:06.277 |         "conviction": 0.0,                                                      
+2026-05-26 10:51:06.277 |         "why_this_choice": "The system was provided with only one stock         
+2026-05-26 10:51:06.277 |       candidate (Adani Power) instead of the required three for comparison.     
+2026-05-26 10:51:06.277 |       Furthermore, Adani Power (Price: 241.45) exceeds the available capital    
+2026-05-26 10:51:06.277 |       limit of ₹400.0, making it mathematically impossible to execute as a      
+2026-05-26 10:51:06.277 |       cash-equity trade. Consequently, no actionable candidate could be         
+2026-05-26 10:51:06.277 |       selected.",                                                               
+2026-05-26 10:51:06.277 |         "ranking_across_three_stocks": "Ranking could not be performed as only  
+2026-05-26 10:51:06.277 |       one stock (Adani Power) was supplied in the risk packet. Adani Power is   
+2026-05-26 10:51:06.277 |       disqualified solely due to account infeasibility.",                       
+2026-05-26 10:51:06.277 |         "account_and_risk_constraints": "The user has a starting capital limit  
+2026-05-26 10:51:06.277 |       of ₹400.0. The only candidate, Adani Power, trades at ~₹241.45. While this
+2026-05-26 10:51:06.277 |       fits within the nominal limit, the 'account_state' indicates a 'sodLimit' 
+2026-05-26 10:51:06.277 |       of ₹511.18, which is the likely strict constraint for this session. Since 
+2026-05-26 10:51:06.277 |       ₹511.18 < ₹241.45 (Entry) + ₹241.45 (MARGIN/Total Cost approx for full    
+2026-05-26 10:51:06.277 |       share), the position cannot be fully funded or initiated under the sod    
+2026-05-26 10:51:06.277 |       limit constraint.",                                                       
+2026-05-26 10:51:06.277 |         "execution_notes": "No execution notes are applicable as the trade setup
+2026-05-26 10:51:06.277 |       is invalid due to insufficient funds relative to the single share price   
+2026-05-26 10:51:06.277 |       and lack of comparative candidates.",                                     
+2026-05-26 10:51:06.277 |         "deep_analysis_report": "Deep analysis reveals a critical data anomaly: 
+2026-05-26 10:51:06.277 |       the risk packet contains only one stock instead of three. Focusing on the 
+2026-05-26 10:51:06.277 |       single available candidate, Adani Power (241.45), the technical setup is a
+2026-05-26 10:51:06.277 |       'Mean Reversion' play following a sharp rise. \n\n1. **Risk/Reward**:     
+2026-05-26 10:51:06.277 |       Entry at 240.50-241.00 with Invalidation at 238.00 (Risk ~3 pts). Target 1
+2026-05-26 10:51:06.277 |       at 242.80 (Reward ~1.8 pts). This results in a sub-optimal Risk/Reward    
+2026-05-26 10:51:06.277 |       ratio of approx 1:0.6.\n2. **Account Feasibility**: The price of a single 
+2026-05-26 10:51:06.277 |       share is ₹241.45. The SOD (Start of Day) limit is ₹511.18. While 2 shares 
+2026-05-26 10:51:06.277 |       would cost ~₹483, which is numerically below the SOD limit, typical       
+2026-05-26 10:51:06.277 |       intraday margin requirements or risk limits would prevent buying a full   
+2026-05-26 10:51:06.277 |       lot here, and the risk of being fully concentrated in one illiquid or     
+2026-05-26 10:51:06.277 |       volatile asset is high.\n3. **Chart Analysis**: The 5m chart shows high   
+2026-05-26 10:51:06.277 |       volume exhaustion on the upside (red bars appearing). The 15m chart shows 
+2026-05-26 10:51:06.277 |       a potential topping tail. The technical setup is weak compared to the     
+2026-05-26 10:51:06.277 |       capital requirements."                                                    
+2026-05-26 10:51:06.277 |       }                                                                         
+2026-05-26 10:51:06.277 | DEBUG ************************  METRICS  *************************              
+2026-05-26 10:51:06.278 | DEBUG * Tokens:                      input=9646, output=620, total=10266        
+2026-05-26 10:51:06.279 | DEBUG * Duration:                    13.4418s                                   
+2026-05-26 10:51:06.280 | DEBUG * Tokens per second:           46.1248 tokens/s                           
+2026-05-26 10:51:06.281 | DEBUG * Time to first token:         13.4418s                                   
+2026-05-26 10:51:06.282 | DEBUG ************************  METRICS  *************************              
+2026-05-26 10:51:06.283 | DEBUG ------------------ MiMo Chat Response End ------------------              
+2026-05-26 10:51:06.285 | DEBUG Added RunOutput to Agent Session                                          
+2026-05-26 10:51:07.154 | DEBUG *** Agent Run End: 376743ce-1fa8-42a4-9b8e-52028985574c ****              
+2026-05-26 10:51:07.159 | Saved risk analyzer snapshot. Decision: avoid NONE.
+2026-05-26 10:51:07.162 | Running executioner...
+2026-05-26 10:51:07.182 | Executioner skipped: No selected stock from risk analyzer.
+2026-05-26 10:51:07.185 | Completed AI trading run 1779772821583-40a4c297-d2ce-49d9-aee4-464604ff063c.
