@@ -21,6 +21,8 @@ except Exception:  # pragma: no cover - non-posix fallback
 
 
 class DhanService:
+    RATE_LIMIT_ERROR_CODES = {"dh-904", "dh-805"}
+    FOREVER_ORDER_LIST_ENDPOINTS = ("/forever/all", "/forever/orders")
     VALID_HISTORICAL_INSTRUMENTS = {
         "INDEX",
         "FUTIDX",
@@ -86,18 +88,50 @@ class DhanService:
         *,
         payload: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         try:
+            headers = self._headers()
+            if extra_headers:
+                headers.update(extra_headers)
             response = requests.request(
                 method=method,
                 url=f"{self.base_url}{path}",
-                headers=self._headers(),
+                headers=headers,
                 json=payload,
                 params=params,
                 timeout=30,
             )
             if response.status_code == 202 and not response.content:
                 return {"status": "success", "data": {"http_status": 202}}
+            try:
+                body: Any = response.json()
+            except ValueError:
+                body = response.text
+            if response.ok:
+                return {"status": "success", "data": body}
+            return {
+                "status": "failure",
+                "remarks": f"http_{response.status_code}",
+                "data": body,
+            }
+        except Exception as exc:
+            return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def _auth_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        try:
+            response = requests.request(
+                method=method,
+                url=f"https://auth.dhan.co{path}",
+                params=params,
+                timeout=30,
+            )
             try:
                 body: Any = response.json()
             except ValueError:
@@ -153,11 +187,34 @@ class DhanService:
         if self.gateway_url:
             response = self._gateway_post("/v1/user-profile", {})
             return response if isinstance(response, dict) else {"status": "failure", "remarks": "invalid_gateway_response"}
-        try:
-            response = self.login_api.user_profile(self.access_token)
-            return {"status": "success", "data": response}
-        except Exception as exc:
-            return {"status": "failure", "remarks": str(exc), "data": None}
+        return self._request("GET", "/profile")
+
+    def renew_access_token(self) -> Dict[str, Any]:
+        return self._request("GET", "/RenewToken", extra_headers={"dhanClientId": str(self.client_id)})
+
+    def generate_access_token(self, *, pin: str, totp: str) -> Dict[str, Any]:
+        return self._auth_request(
+            "POST",
+            "/app/generateAccessToken",
+            params={"dhanClientId": str(self.client_id), "pin": str(pin), "totp": str(totp)},
+        )
+
+    def set_static_ip(self, *, ip: str, ip_flag: str) -> Dict[str, Any]:
+        return self._request(
+            "POST",
+            "/ip/setIP",
+            payload=self._with_client_id({"ip": str(ip), "ipFlag": str(ip_flag).strip().upper()}),
+        )
+
+    def modify_static_ip(self, *, ip: str, ip_flag: str) -> Dict[str, Any]:
+        return self._request(
+            "PUT",
+            "/ip/modifyIP",
+            payload=self._with_client_id({"ip": str(ip), "ipFlag": str(ip_flag).strip().upper()}),
+        )
+
+    def fetch_static_ips(self) -> Dict[str, Any]:
+        return self._request("GET", "/ip/getIP")
 
     def fetch_holdings(self) -> Dict[str, Any]:
         try:
@@ -315,11 +372,66 @@ class DhanService:
         )
         return self._request("POST", "/margincalculator", payload=payload)
 
+    def calculate_multi_order_margin(
+        self,
+        *,
+        scripts: List[Dict[str, Any]],
+        include_position: bool = True,
+        include_orders: bool = True,
+    ) -> Dict[str, Any]:
+        normalized_scripts: List[Dict[str, Any]] = []
+        for script in scripts:
+            normalized: Dict[str, Any] = {
+                "exchangeSegment": str(script.get("exchangeSegment", "")).strip().upper(),
+                "transactionType": str(script.get("transactionType", "")).strip().upper(),
+                "quantity": int(script.get("quantity", 0)),
+                "productType": str(script.get("productType", "")).strip().upper(),
+                "securityId": str(script.get("securityId", "")),
+                "price": float(script.get("price", 0.0)),
+            }
+            if script.get("triggerPrice") is not None:
+                normalized["triggerPrice"] = float(script.get("triggerPrice") or 0.0)
+            normalized_scripts.append(normalized)
+
+        payload = self._with_client_id(
+            {
+                "includePosition": bool(include_position),
+                "includeOrders": bool(include_orders),
+                "scripts": normalized_scripts,
+            }
+        )
+        return self._request("POST", "/margincalculator/multi", payload=payload)
+
     def activate_kill_switch(self) -> Dict[str, Any]:
         return self._request("POST", "/killswitch", params={"killSwitchStatus": "ACTIVATE"})
 
     def deactivate_kill_switch(self) -> Dict[str, Any]:
         return self._request("POST", "/killswitch", params={"killSwitchStatus": "DEACTIVATE"})
+
+    def fetch_kill_switch_status(self) -> Dict[str, Any]:
+        return self._request("GET", "/killswitch")
+
+    def configure_pnl_exit(
+        self,
+        *,
+        profit_value: float,
+        loss_value: float,
+        product_types: Optional[List[str]] = None,
+        enable_kill_switch: bool = False,
+    ) -> Dict[str, Any]:
+        payload = {
+            "profitValue": float(profit_value),
+            "lossValue": float(loss_value),
+            "productType": [str(item).strip().upper() for item in (product_types or ["INTRADAY"])],
+            "enableKillSwitch": bool(enable_kill_switch),
+        }
+        return self._request("POST", "/pnlExit", payload=payload)
+
+    def disable_pnl_exit(self) -> Dict[str, Any]:
+        return self._request("DELETE", "/pnlExit")
+
+    def fetch_pnl_exit(self) -> Dict[str, Any]:
+        return self._request("GET", "/pnlExit")
 
     def place_super_order(
         self,
@@ -402,13 +514,20 @@ class DhanService:
         quantity1: Optional[int] = None,
         correlation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        normalized_product_type = str(product_type).strip().upper()
+        if normalized_product_type not in {"CNC", "MTF"}:
+            return {
+                "status": "failure",
+                "remarks": "invalid_forever_product_type",
+                "data": {"allowed": ["CNC", "MTF"], "received": product_type},
+            }
         payload = self._with_client_id(
             {
                 "correlationId": correlation_id,
                 "orderFlag": order_flag,
                 "transactionType": transaction_type,
                 "exchangeSegment": exchange_segment,
-                "productType": product_type,
+                "productType": normalized_product_type,
                 "orderType": order_type,
                 "validity": validity,
                 "securityId": str(security_id),
@@ -454,7 +573,14 @@ class DhanService:
         return self._request("DELETE", f"/forever/orders/{order_id}")
 
     def fetch_forever_orders(self) -> Dict[str, Any]:
-        return self._request("GET", "/forever/all")
+        last_response: Dict[str, Any] = {"status": "failure", "remarks": "not_requested", "data": None}
+        for endpoint in self.FOREVER_ORDER_LIST_ENDPOINTS:
+            last_response = self._request("GET", endpoint)
+            if last_response.get("status") == "success":
+                return last_response
+            if str(last_response.get("remarks", "")).lower() != "http_404":
+                return last_response
+        return last_response
 
     def place_conditional_trigger(self, *, condition: Dict[str, Any], orders: List[Dict[str, Any]]) -> Dict[str, Any]:
         return self._request("POST", "/alerts/orders", payload=self._with_client_id({"condition": condition, "orders": orders}))
@@ -769,9 +895,12 @@ class DhanService:
 
         return last_response
 
-    def fetch_quote_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+    def fetch_quote_batch(self, security_ids: List[int], exchange_segment: str = "BSE_EQ") -> Dict[int, Dict[str, Any]]:
         if self.gateway_url:
-            response = self._gateway_post("/v1/quote-batch", {"security_ids": security_ids})
+            response = self._gateway_post(
+                "/v1/quote-batch",
+                {"security_ids": security_ids, "exchange_segment": exchange_segment},
+            )
             return {
                 int(raw_security_id): value
                 for raw_security_id, value in (response or {}).items()
@@ -779,11 +908,12 @@ class DhanService:
 
         self.acquire_data_slot()
         time.sleep(self.quote_request_gap)
-        resp = self.market_api.quote_data({"BSE_EQ": security_ids})
+        normalized_exchange_segment = str(exchange_segment).strip().upper()
+        resp = self.market_api.quote_data({normalized_exchange_segment: security_ids})
         if str(resp.get("status", "")).lower() != "success":
             return {}
 
-        data = resp.get("data", {}).get("data", {}).get("BSE_EQ", {})
+        data = resp.get("data", {}).get("data", {}).get(normalized_exchange_segment, {})
         parsed: Dict[int, Dict[str, Any]] = {}
         for raw_security_id, value in data.items():
             try:
@@ -792,9 +922,12 @@ class DhanService:
                 continue
         return parsed
 
-    def fetch_ohlc_batch(self, security_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+    def fetch_ohlc_batch(self, security_ids: List[int], exchange_segment: str = "BSE_EQ") -> Dict[int, Dict[str, Any]]:
         if self.gateway_url:
-            response = self._gateway_post("/v1/ohlc-batch", {"security_ids": security_ids})
+            response = self._gateway_post(
+                "/v1/ohlc-batch",
+                {"security_ids": security_ids, "exchange_segment": exchange_segment},
+            )
             return {
                 int(raw_security_id): value
                 for raw_security_id, value in (response or {}).items()
@@ -802,11 +935,12 @@ class DhanService:
 
         self.acquire_data_slot()
         time.sleep(self.quote_request_gap)
-        resp = self.market_api.ohlc_data({"BSE_EQ": security_ids})
+        normalized_exchange_segment = str(exchange_segment).strip().upper()
+        resp = self.market_api.ohlc_data({normalized_exchange_segment: security_ids})
         if str(resp.get("status", "")).lower() != "success":
             return {}
 
-        data = resp.get("data", {}).get("data", {}).get("BSE_EQ", {})
+        data = resp.get("data", {}).get("data", {}).get(normalized_exchange_segment, {})
         parsed: Dict[int, Dict[str, Any]] = {}
         for raw_security_id, value in data.items():
             try:
@@ -938,15 +1072,11 @@ class DhanService:
     def _is_rate_limited(self, resp: Dict[str, Any]) -> bool:
         remarks = str(resp.get("remarks", "")).lower()
         data_blob = str(resp.get("data", "")).lower()
+        joined = f"{remarks} {data_blob}"
         return (
-            "too many requests" in remarks
-            or "too many requests" in data_blob
-            or "dh-904" in remarks
-            or "dh-904" in data_blob
-            or "904" in remarks
-            or "904" in data_blob
-            or "805" in remarks
-            or "805" in data_blob
+            "too many requests" in joined
+            or "rate limit" in joined
+            or any(code in joined for code in self.RATE_LIMIT_ERROR_CODES)
         )
 
     def is_auth_invalid(self, resp: Optional[Dict[str, Any]]) -> bool:
@@ -960,8 +1090,13 @@ class DhanService:
         data_blob = str(resp.get("data", "")).lower()
         return (
             "dh-901" in joined
+            or "dh-901" in data_blob
             or "invalid_authentication" in joined
+            or "invalid_authentication" in data_blob
             or "invalid or expired" in joined
+            or "invalid or expired" in data_blob
             or "access token is invalid" in joined
-            or "expired" in data_blob and "token" in data_blob
+            or "access token is invalid" in data_blob
+            or ("expired" in joined and "token" in joined)
+            or ("expired" in data_blob and "token" in data_blob)
         )

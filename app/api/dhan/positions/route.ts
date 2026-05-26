@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { decryptDhanAccessToken, dhanApiHeaders, readDhanError } from '../_utils'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -36,24 +37,15 @@ export async function GET(request: NextRequest) {
         // 3. Fetch positions from Dhan API
         const dhanResponse = await fetch('https://api.dhan.co/v2/positions', {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'access-token': tradingKeys.dhan_access_token,
-                'dhan-client-id': tradingKeys.dhan_client_id,
-            },
+            headers: dhanApiHeaders(decryptDhanAccessToken(tradingKeys.dhan_access_token)),
         })
 
         if (!dhanResponse.ok) {
-            const errorText = await dhanResponse.text()
+            const { errorText, errorJson, errorMessage } = await readDhanError(dhanResponse, 'Failed to fetch positions from Dhan')
             console.error('Dhan API error:', errorText)
 
-            // Try to parse error text as JSON to get a cleaner message if possible
-            let errorMessage = 'Failed to fetch positions from Dhan'
-            try {
-                const errorJson = JSON.parse(errorText)
-                errorMessage = errorJson.errorMessage || errorJson.message || JSON.stringify(errorJson)
-            } catch (e) {
-                errorMessage = `Dhan API Error: ${errorText.substring(0, 100)}`
+            if (errorJson.errorCode === 'DH-1111' || errorJson.errorMessage === 'No positions available') {
+                return NextResponse.json([])
             }
 
             return NextResponse.json(
