@@ -52,10 +52,12 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
                 instrument_candidates=body.get("instrument_candidates"),
             ),
             "/v1/quote-batch": lambda body: self.dhan.fetch_quote_batch(
-                [int(item) for item in body.get("security_ids", [])]
+                [int(item) for item in body.get("security_ids", [])],
+                exchange_segment=str(body.get("exchange_segment", "BSE_EQ")),
             ),
             "/v1/ohlc-batch": lambda body: self.dhan.fetch_ohlc_batch(
-                [int(item) for item in body.get("security_ids", [])]
+                [int(item) for item in body.get("security_ids", [])],
+                exchange_segment=str(body.get("exchange_segment", "BSE_EQ")),
             ),
             "/v1/option-chain/expiry-list": lambda body: self.dhan.fetch_option_chain_expiry_list(
                 int(body["under_security_id"]),
