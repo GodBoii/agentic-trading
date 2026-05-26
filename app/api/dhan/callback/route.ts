@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { encryptDhanAccessToken, parseDhanExpiryIso } from '../_utils'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -73,16 +74,21 @@ export async function GET(request: NextRequest) {
         console.log('[DhanCb] Dhan Data Keys:', Object.keys(dhanData))
 
         // Validate the response
-        if (!dhanData.accessToken || !dhanData.dhanClientId) {
+        if (!dhanData.accessToken || !dhanData.dhanClientId || !dhanData.expiryTime) {
             console.error('[DhanCb] Invalid Response Structure:', dhanData)
             return NextResponse.redirect(
                 new URL('/dashboard?error=invalid_response_structure', request.url)
             )
         }
 
-        // 5. Calculate token expiry (Dhan tokens typically last 30 days)
-        const tokenExpiry = new Date()
-        tokenExpiry.setDate(tokenExpiry.getDate() + 30)
+        // 5. Use Dhan's authoritative IST expiry timestamp.
+        const tokenExpiryIso = parseDhanExpiryIso(dhanData.expiryTime)
+        if (!tokenExpiryIso) {
+            console.error('[DhanCb] Invalid expiryTime from Dhan:', dhanData.expiryTime)
+            return NextResponse.redirect(
+                new URL('/dashboard?error=invalid_expiry_time', request.url)
+            )
+        }
 
         // 6. Store credentials in Supabase using UPSERT
         console.log('[DhanCb] Upserting to Supabase...')
@@ -91,8 +97,8 @@ export async function GET(request: NextRequest) {
             .upsert({
                 user_id: user.id,
                 dhan_client_id: dhanData.dhanClientId,
-                dhan_access_token: dhanData.accessToken,
-                token_expiry: tokenExpiry.toISOString(),
+                dhan_access_token: encryptDhanAccessToken(dhanData.accessToken),
+                token_expiry: tokenExpiryIso,
                 is_trading_enabled: false, // Default to disabled for safety
                 updated_at: new Date().toISOString(),
             }, {

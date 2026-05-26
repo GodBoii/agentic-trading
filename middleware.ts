@@ -30,8 +30,8 @@ export async function middleware(request: NextRequest) {
     // Refresh session if expired
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Public routes — no auth required
-    const publicPaths = ['/', '/login', '/signup', '/auth']
+    // Public routes - no auth required
+    const publicPaths = ['/', '/login', '/signup', '/auth', '/api/dhan/callback', '/api/dhan/postback']
     const isPublic = publicPaths.some(p =>
         p === '/' ? request.nextUrl.pathname === '/' : request.nextUrl.pathname.startsWith(p)
     )
