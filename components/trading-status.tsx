@@ -26,6 +26,8 @@ export default function TradingStatus() {
     const [updating, setUpdating] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
+    const [tradeMode, setTradeMode] = useState<'auto' | 'manual'>('auto')
+    const [tradeAmount, setTradeAmount] = useState<string>('')
     const supabase = createClient()
 
     useEffect(() => {
@@ -39,21 +41,30 @@ export default function TradingStatus() {
     }, [])
 
     const startAITrading = async () => {
+        const payload: Record<string, any> = { enabled: true, trade_mode: tradeMode }
+        if (tradeMode === 'manual') {
+            const amount = parseFloat(tradeAmount)
+            if (!amount || amount <= 0) {
+                throw new Error('Please enter a valid trade amount')
+            }
+            payload.trade_amount = amount
+        }
+
         const response = await fetch('/api/ai-trading/toggle', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ enabled: true }),
+            body: JSON.stringify(payload),
         })
 
         if (!response.ok) {
-            const payload = await response.json().catch(() => null)
-            throw new Error(payload?.error || 'Failed to start AI trading')
+            const errPayload = await response.json().catch(() => null)
+            throw new Error(errPayload?.error || 'Failed to start AI trading')
         }
-        const payload = await response.json()
+        const resPayload = await response.json()
         await fetchRunStatus()
-        router.push(`/dashboard/ai-trading?run=${encodeURIComponent(payload?.request?.request_id || '')}`)
+        router.push(`/dashboard/ai-trading?run=${encodeURIComponent(resPayload?.request?.request_id || '')}`)
     }
 
     const fetchRunStatus = async () => {
@@ -216,6 +227,49 @@ export default function TradingStatus() {
                 </div>
 
                 <div className="border-t-3 border-brutal-cream/20 pt-4">
+                    <div className="mb-4">
+                        <p className="text-xs font-bold text-brutal-cream/60 mb-3 uppercase tracking-wider font-mono">
+                            Trade Amount
+                        </p>
+                        <div className="flex items-center gap-3 mb-3">
+                            <button
+                                onClick={() => setTradeMode('auto')}
+                                className={`px-4 py-2 text-xs font-mono font-bold uppercase border-3 transition-all ${tradeMode === 'auto'
+                                    ? 'border-brutal-green bg-brutal-green text-brutal-black'
+                                    : 'border-brutal-cream/30 text-brutal-cream/70 hover:border-brutal-cream/50'
+                                    }`}
+                            >
+                                Auto
+                            </button>
+                            <button
+                                onClick={() => setTradeMode('manual')}
+                                className={`px-4 py-2 text-xs font-mono font-bold uppercase border-3 transition-all ${tradeMode === 'manual'
+                                    ? 'border-brutal-green bg-brutal-green text-brutal-black'
+                                    : 'border-brutal-cream/30 text-brutal-cream/70 hover:border-brutal-cream/50'
+                                    }`}
+                            >
+                                Manual
+                            </button>
+                        </div>
+                        {tradeMode === 'manual' ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-brutal-cream font-mono text-sm font-bold">₹</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={tradeAmount}
+                                    onChange={(e) => setTradeAmount(e.target.value)}
+                                    placeholder="Enter amount (e.g. 500)"
+                                    className="w-full bg-brutal-black border-3 border-brutal-cream/30 text-brutal-cream font-mono text-sm px-4 py-2 placeholder:text-brutal-cream/30 focus:border-brutal-green focus:outline-none"
+                                />
+                            </div>
+                        ) : (
+                            <p className="text-xs text-brutal-cream/50 font-mono">
+                                Uses your available account balance to select stocks and size trades automatically.
+                            </p>
+                        )}
+                    </div>
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-bold text-brutal-cream/60 mb-1 uppercase tracking-wider font-mono">
@@ -231,7 +285,7 @@ export default function TradingStatus() {
                         </div>
                         <button
                             onClick={handleStart}
-                            disabled={updating || tokenExpired || isRunning}
+                            disabled={updating || tokenExpired || isRunning || (tradeMode === 'manual' && (!tradeAmount || parseFloat(tradeAmount) <= 0))}
                             className="brutal-btn px-5 py-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Start AI trading"
                         >
