@@ -66,8 +66,12 @@ async function loadState(): Promise<ToggleStatePayload> {
 }
 
 async function saveState(state: ToggleStatePayload) {
-  await fs.mkdir(path.dirname(stateFilePath), { recursive: true })
-  await fs.writeFile(stateFilePath, JSON.stringify(state, null, 2), 'utf8')
+  try {
+    await fs.mkdir(path.dirname(stateFilePath), { recursive: true })
+    await fs.writeFile(stateFilePath, JSON.stringify(state, null, 2), 'utf8')
+  } catch (error) {
+    console.warn('[Toggle API] Failed to write state file (normal on read-only environments like Vercel):', error)
+  }
 }
 
 async function writeStartRequest(user: { id: string; email?: string | null }) {
@@ -78,8 +82,12 @@ async function writeStartRequest(user: { id: string; email?: string | null }) {
     email: user.email ?? null,
     requested_at_utc: new Date().toISOString(),
   }
-  await fs.mkdir(path.dirname(requestFilePath), { recursive: true })
-  await fs.writeFile(requestFilePath, JSON.stringify(request, null, 2), 'utf8')
+  try {
+    await fs.mkdir(path.dirname(requestFilePath), { recursive: true })
+    await fs.writeFile(requestFilePath, JSON.stringify(request, null, 2), 'utf8')
+  } catch (error) {
+    console.warn('[Toggle API] Failed to write start request file (normal on read-only environments like Vercel):', error)
+  }
   return request
 }
 

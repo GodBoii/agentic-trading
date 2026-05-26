@@ -52,6 +52,7 @@ class ExecutionerAgent:
                 "Do not write a long analysis report. Your job is to decide and act, not to produce commentary.",
                 "After acting or deciding not to act, output only a concise execution outcome in normal markdown/text.",
                 "Include actual order id, correlation id, side, quantity, and reference price only when they are known from tools or supplied context.",
+                "Trade with 300 Rs amount and 1 quantity we are doing testing so i dont want to use more than 300 Rs of capital",
             ],
             markdown=True,
             add_datetime_to_context=True,
