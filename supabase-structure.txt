@@ -37,3 +37,23 @@ using (auth.uid() = user_id);
 -- This helps the Python Backend instantly find all users who have turned "ON" trading
 create index idx_active_traders on public.user_trading_keys(is_trading_enabled) 
 where is_trading_enabled = true;
+
+-- 5. Optional table for Dhan postback/webhook order updates
+-- The /api/dhan/postback route can persist into this table when
+-- SUPABASE_SERVICE_ROLE_KEY is configured on the server.
+create table public.dhan_order_postbacks (
+  id uuid not null default gen_random_uuid(),
+  dhan_client_id text not null,
+  order_id text not null,
+  correlation_id text,
+  order_status text,
+  payload jsonb not null,
+  received_at timestamptz not null default timezone('utc', now()),
+
+  primary key (id)
+);
+
+alter table public.dhan_order_postbacks enable row level security;
+
+create index idx_dhan_order_postbacks_client on public.dhan_order_postbacks(dhan_client_id);
+create index idx_dhan_order_postbacks_order on public.dhan_order_postbacks(order_id);
