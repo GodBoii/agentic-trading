@@ -21,6 +21,7 @@ class DhanExecutionToolkit(Toolkit):
                 self.get_order_by_correlation_id,
                 self.get_trade_book,
                 self.calculate_margin_requirement,
+                self.calculate_multi_order_margin,
                 self.calculate_equity_order_quantity,
                 self.place_intraday_equity_order,
                 self.place_protected_intraday_super_order,
@@ -41,11 +42,18 @@ class DhanExecutionToolkit(Toolkit):
                 self.exit_all_intraday_positions,
                 self.activate_kill_switch,
                 self.deactivate_kill_switch,
+                self.get_kill_switch_status,
+                self.configure_pnl_exit,
+                self.disable_pnl_exit,
+                self.get_pnl_exit,
                 self.generate_edis_tpin,
                 self.get_edis_form,
                 self.check_edis_status,
                 self.get_ledger_report,
                 self.get_trade_history,
+                self.get_static_ips,
+                self.set_static_ip,
+                self.modify_static_ip,
                 self.modify_order,
                 self.cancel_order,
             ],
@@ -126,15 +134,45 @@ class DhanExecutionToolkit(Toolkit):
         validation_error = self._validate_order_inputs(side, quantity)
         if validation_error:
             return validation_error
+        normalized_exchange_segment = self._normalize_exchange_segment(exchange_segment, int(security_id))
         return json.dumps(
             self.dhan.calculate_margin_requirement(
                 security_id=int(security_id),
-                exchange_segment=exchange_segment,
+                exchange_segment=normalized_exchange_segment,
                 transaction_type=str(side).strip().upper(),
                 quantity=int(quantity),
                 product_type=str(product_type).strip().upper(),
                 price=float(reference_price),
                 trigger_price=float(trigger_price),
+            ),
+            ensure_ascii=True,
+        )
+
+    def calculate_multi_order_margin(
+        self,
+        scripts_json: str,
+        include_position: bool = True,
+        include_orders: bool = True,
+    ) -> str:
+        try:
+            scripts = json.loads(scripts_json)
+        except json.JSONDecodeError as exc:
+            return json.dumps({"status": "failure", "remarks": f"invalid_json: {exc}"}, ensure_ascii=True)
+        if not isinstance(scripts, list) or not all(isinstance(item, dict) for item in scripts):
+            return json.dumps({"status": "failure", "remarks": "scripts_json_must_be_array_of_objects"}, ensure_ascii=True)
+        normalized_scripts = []
+        for item in scripts:
+            copied = dict(item)
+            copied["exchangeSegment"] = self._normalize_exchange_segment(
+                str(copied.get("exchangeSegment") or self.default_exchange_segment),
+                int(copied.get("securityId", 0) or 0),
+            )
+            normalized_scripts.append(copied)
+        return json.dumps(
+            self.dhan.calculate_multi_order_margin(
+                scripts=normalized_scripts,
+                include_position=bool(include_position),
+                include_orders=bool(include_orders),
             ),
             ensure_ascii=True,
         )
@@ -152,6 +190,9 @@ class DhanExecutionToolkit(Toolkit):
         disclosed_quantity: int = 0,
         correlation_id: Optional[str] = None,
         should_slice: bool = False,
+        product_type: str = "INTRADAY",
+        after_market_order: bool = False,
+        amo_time: str = "OPEN",
     ) -> str:
         if not self.allow_live_orders:
             return json.dumps(
@@ -164,22 +205,28 @@ class DhanExecutionToolkit(Toolkit):
 
         normalized_side = str(side).strip().upper()
         normalized_order_type = str(order_type).strip().upper()
+        normalized_product_type = str(product_type).strip().upper()
+        normalized_exchange_segment = self._normalize_exchange_segment(exchange_segment, int(security_id))
         if normalized_side not in {"BUY", "SELL"}:
             return json.dumps({"status": "failure", "remarks": "invalid_side"}, ensure_ascii=True)
         if int(quantity) <= 0:
             return json.dumps({"status": "failure", "remarks": "invalid_quantity"}, ensure_ascii=True)
+        if normalized_product_type not in {"INTRADAY", "CNC", "MARGIN", "MTF", "CO", "BO"}:
+            return json.dumps({"status": "failure", "remarks": "invalid_product_type"}, ensure_ascii=True)
 
         tag = correlation_id or f"exec-{uuid.uuid4().hex[:12]}"
         order_kwargs = dict(
             security_id=int(security_id),
-            exchange_segment=exchange_segment,
+            exchange_segment=normalized_exchange_segment,
             transaction_type=normalized_side,
             quantity=int(quantity),
             order_type=normalized_order_type,
-            product_type="INTRADAY",
+            product_type=normalized_product_type,
             price=float(price),
             trigger_price=float(trigger_price),
             disclosed_quantity=int(disclosed_quantity),
+            after_market_order=bool(after_market_order),
+            amo_time=str(amo_time).strip().upper(),
             validity=validity,
             correlation_id=tag,
         )
@@ -202,6 +249,7 @@ class DhanExecutionToolkit(Toolkit):
         order_type: str = "LIMIT",
         trailing_jump: float = 0.0,
         exchange_segment: str = "BSE_EQ",
+        product_type: str = "INTRADAY",
         correlation_id: Optional[str] = None,
     ) -> str:
         if not self.allow_live_orders:
@@ -211,6 +259,8 @@ class DhanExecutionToolkit(Toolkit):
             return validation_error
 
         normalized_side = str(side).strip().upper()
+        normalized_product_type = str(product_type).strip().upper()
+        normalized_exchange_segment = self._normalize_exchange_segment(exchange_segment, int(security_id))
         entry = float(entry_price)
         target = float(target_price)
         stop = float(stop_loss_price)
@@ -218,15 +268,17 @@ class DhanExecutionToolkit(Toolkit):
             return json.dumps({"status": "failure", "remarks": "buy_super_order_requires_stop_below_entry_and_target_above_entry"}, ensure_ascii=True)
         if normalized_side == "SELL" and not (target < entry < stop):
             return json.dumps({"status": "failure", "remarks": "sell_super_order_requires_target_below_entry_and_stop_above_entry"}, ensure_ascii=True)
+        if normalized_product_type not in {"INTRADAY", "CNC", "MARGIN", "MTF", "CO", "BO"}:
+            return json.dumps({"status": "failure", "remarks": "invalid_product_type"}, ensure_ascii=True)
 
         tag = correlation_id or f"exec-so-{uuid.uuid4().hex[:10]}"
         response = self.dhan.place_super_order(
             security_id=int(security_id),
-            exchange_segment=exchange_segment,
+            exchange_segment=normalized_exchange_segment,
             transaction_type=normalized_side,
             quantity=int(quantity),
             order_type=str(order_type).strip().upper(),
-            product_type="INTRADAY",
+            product_type=normalized_product_type,
             price=entry,
             target_price=target,
             stop_loss_price=stop,
@@ -286,7 +338,7 @@ class DhanExecutionToolkit(Toolkit):
         return json.dumps(
             self.dhan.convert_position(
                 from_product_type=str(from_product_type).strip().upper(),
-                exchange_segment=exchange_segment,
+                exchange_segment=self._normalize_exchange_segment(exchange_segment, int(security_id)),
                 position_type=str(position_type).strip().upper(),
                 security_id=int(security_id),
                 convert_qty=int(convert_qty),
@@ -318,15 +370,25 @@ class DhanExecutionToolkit(Toolkit):
         validation_error = self._validate_order_inputs(side, quantity)
         if validation_error:
             return validation_error
+        normalized_product_type = str(product_type).strip().upper()
+        if normalized_product_type not in {"CNC", "MTF"}:
+            return json.dumps(
+                {
+                    "status": "failure",
+                    "remarks": "invalid_forever_product_type",
+                    "allowed": ["CNC", "MTF"],
+                },
+                ensure_ascii=True,
+            )
         tag = correlation_id or f"exec-fo-{uuid.uuid4().hex[:10]}"
         response = self.dhan.place_forever_order(
             security_id=int(security_id),
-            exchange_segment=exchange_segment,
+            exchange_segment=self._normalize_exchange_segment(exchange_segment, int(security_id)),
             transaction_type=str(side).strip().upper(),
             quantity=int(quantity),
             order_flag=str(order_flag).strip().upper(),
             order_type=str(order_type).strip().upper(),
-            product_type=str(product_type).strip().upper(),
+            product_type=normalized_product_type,
             price=float(price),
             trigger_price=float(trigger_price),
             validity=validity,
@@ -426,7 +488,7 @@ class DhanExecutionToolkit(Toolkit):
         tag = correlation_id or f"exit-{uuid.uuid4().hex[:10]}"
         response = self.dhan.place_order(
             security_id=security_id,
-            exchange_segment=exchange_segment,
+            exchange_segment=self._normalize_exchange_segment(exchange_segment, int(security_id)),
             transaction_type=str(side_to_exit).strip().upper(),
             quantity=int(quantity),
             order_type=str(order_type).strip().upper(),
@@ -464,7 +526,12 @@ class DhanExecutionToolkit(Toolkit):
                 exits.append({"security_id": position.get("securityId"), "response": json.loads(raw_response)})
             except Exception as exc:
                 exits.append({"security_id": position.get("securityId"), "status": "failure", "remarks": str(exc)})
-        return json.dumps({"status": "success", "exits": exits}, ensure_ascii=True)
+        failures = [
+            item for item in exits
+            if item.get("status") == "failure" or item.get("response", {}).get("status") in {"failure", "blocked"}
+        ]
+        status = "success" if not failures else ("failure" if len(failures) == len(exits) else "partial_failure")
+        return json.dumps({"status": status, "exits": exits}, ensure_ascii=True)
 
     def activate_kill_switch(self) -> str:
         if not self.allow_live_orders:
@@ -475,6 +542,42 @@ class DhanExecutionToolkit(Toolkit):
         if not self.allow_live_orders:
             return self._blocked("live_kill_switch_deactivation_disabled")
         return json.dumps(self.dhan.deactivate_kill_switch(), ensure_ascii=True)
+
+    def get_kill_switch_status(self) -> str:
+        return json.dumps(self.dhan.fetch_kill_switch_status(), ensure_ascii=True)
+
+    def configure_pnl_exit(
+        self,
+        profit_value: float,
+        loss_value: float,
+        product_types_json: str = '["INTRADAY"]',
+        enable_kill_switch: bool = False,
+    ) -> str:
+        if not self.allow_live_orders:
+            return self._blocked("live_pnl_exit_configuration_disabled")
+        try:
+            product_types = json.loads(product_types_json)
+        except json.JSONDecodeError as exc:
+            return json.dumps({"status": "failure", "remarks": f"invalid_json: {exc}"}, ensure_ascii=True)
+        if not isinstance(product_types, list) or not all(isinstance(item, str) for item in product_types):
+            return json.dumps({"status": "failure", "remarks": "product_types_json_must_be_array_of_strings"}, ensure_ascii=True)
+        return json.dumps(
+            self.dhan.configure_pnl_exit(
+                profit_value=float(profit_value),
+                loss_value=float(loss_value),
+                product_types=product_types,
+                enable_kill_switch=bool(enable_kill_switch),
+            ),
+            ensure_ascii=True,
+        )
+
+    def disable_pnl_exit(self) -> str:
+        if not self.allow_live_orders:
+            return self._blocked("live_pnl_exit_disable_disabled")
+        return json.dumps(self.dhan.disable_pnl_exit(), ensure_ascii=True)
+
+    def get_pnl_exit(self) -> str:
+        return json.dumps(self.dhan.fetch_pnl_exit(), ensure_ascii=True)
 
     def generate_edis_tpin(self) -> str:
         if not self.allow_live_orders:
@@ -497,6 +600,25 @@ class DhanExecutionToolkit(Toolkit):
 
     def get_trade_history(self, from_date: str, to_date: str, page: int = 0) -> str:
         return json.dumps(self.dhan.fetch_trade_history(from_date, to_date, int(page)), ensure_ascii=True)
+
+    def get_static_ips(self) -> str:
+        return json.dumps(self.dhan.fetch_static_ips(), ensure_ascii=True)
+
+    def set_static_ip(self, ip: str, ip_flag: str = "PRIMARY") -> str:
+        if not self.allow_live_orders:
+            return self._blocked("live_static_ip_set_disabled")
+        return json.dumps(
+            self.dhan.set_static_ip(ip=ip, ip_flag=str(ip_flag).strip().upper()),
+            ensure_ascii=True,
+        )
+
+    def modify_static_ip(self, ip: str, ip_flag: str = "PRIMARY") -> str:
+        if not self.allow_live_orders:
+            return self._blocked("live_static_ip_modify_disabled")
+        return json.dumps(
+            self.dhan.modify_static_ip(ip=ip, ip_flag=str(ip_flag).strip().upper()),
+            ensure_ascii=True,
+        )
 
     def modify_order(
         self,
@@ -544,6 +666,39 @@ class DhanExecutionToolkit(Toolkit):
         if int(quantity) <= 0:
             return json.dumps({"status": "failure", "remarks": "invalid_quantity"}, ensure_ascii=True)
         return None
+
+    def _normalize_exchange_segment(self, exchange_segment: str, security_id: Optional[int] = None) -> str:
+        raw = str(exchange_segment or self.default_exchange_segment).strip().upper()
+        default = str(self.default_exchange_segment or "BSE_EQ").strip().upper()
+
+        aliases = {
+            "EQ": default,
+            "EQUITY": default,
+            "CASH": default,
+            "BSE": "BSE_EQ",
+            "NSE": "NSE_EQ",
+            "FNO": "NSE_FNO",
+            "NFO": "NSE_FNO",
+            "MCX": "MCX_COMM",
+        }
+        normalized = aliases.get(raw, raw)
+
+        # This pipeline's equity universe is BSE-sourced. If the model passes an NSE
+        # alias for a BSE-style security id, keep the order/margin call on BSE_EQ.
+        if security_id is not None and 500000 <= int(security_id) < 600000 and normalized == "NSE_EQ":
+            return "BSE_EQ"
+
+        allowed = {
+            "NSE_EQ",
+            "NSE_FNO",
+            "NSE_CURRENCY",
+            "BSE_EQ",
+            "BSE_FNO",
+            "BSE_CURRENCY",
+            "MCX_COMM",
+            "IDX_I",
+        }
+        return normalized if normalized in allowed else default
 
     def _parse_condition_payload(self, condition_json: str, orders_json: str) -> tuple[Dict[str, Any], List[Dict[str, Any]], Optional[str]]:
         try:

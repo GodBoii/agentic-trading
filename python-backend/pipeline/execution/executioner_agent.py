@@ -24,6 +24,13 @@ class ExecutionerAgent:
         if not self.is_enabled():
             raise RuntimeError("executioner_disabled")
 
+        max_trade_value = os.getenv("EXECUTIONER_MAX_TRADE_VALUE_RUPEES", "").strip()
+        capital_instruction = (
+            f"Do not place a new order whose approximate notional value exceeds Rs {max_trade_value}."
+            if max_trade_value
+            else "Size trades from available balance, margin validation, supplied risk context, and any explicit capital cap in these instructions."
+        )
+
         agent = Agent(
             name=self.agent_name,
             model=create_mimo_model(),
@@ -48,11 +55,13 @@ class ExecutionerAgent:
                 "3. place_intraday_equity_order: Use this tool only for fallback cases, such as manual exits or when a protected super order cannot be used.",
                 "4. Live queries: Use tools to check order/position lists or funds if you need fresher information before committing to a decision.",
                 "When calling calculate_margin_requirement, pass only these named arguments exactly: security_id, side, quantity, reference_price, product_type, exchange_segment, trigger_price. Use product_type INTRADAY for intraday equity margin checks. Do not include extra_kwargs or XML/parameter tags.",
+                "Use Dhan exchange segment enums, not raw exchange names: BSE_EQ or NSE_EQ for equity cash. This pipeline's shortlisted equity securities are BSE-sourced, so prefer BSE_EQ unless the selected stock explicitly supplies another segment.",
                 "Validate Super Orders strictly: for BUY orders, the stop_loss_price must be below entry_price, and target_price must be above entry_price. For SELL orders, target_price must be below entry_price, and stop_loss_price must be above entry_price.",
                 "Do not write a long analysis report. Your job is to decide and act, not to produce commentary.",
                 "After acting or deciding not to act, output only a concise execution outcome in normal markdown/text.",
                 "Include actual order id, correlation id, side, quantity, and reference price only when they are known from tools or supplied context.",
-                "Trade with 300 Rs amount and 1 quantity we are doing testing so i dont want to use more than 300 Rs of capital",
+                "Dont take trade of more than ₹500 trade between ₹100 to ₹500",
+                capital_instruction,
             ],
             markdown=True,
             add_datetime_to_context=True,
@@ -84,6 +93,7 @@ class ExecutionerAgent:
             "fallback_order": "Use place_intraday_equity_order only for intentional fallback cases such as explicit exits or when a protected order cannot be used.",
             "super_order_validation": "For BUY Super Orders require stop_loss_price below entry_price and target_price above entry_price. For SELL Super Orders require target_price below entry_price and stop_loss_price above entry_price.",
             "margin_call_format": "For calculate_margin_requirement pass only security_id, side, quantity, reference_price, product_type, exchange_segment, and trigger_price. Do not pass any other arguments or XML-style parameter tags.",
+            "exchange_segment": "Use Dhan enum exchange segments. For selected stocks from this pipeline, use BSE_EQ unless supplied context explicitly says otherwise.",
         }
         return (
             "Make the final intraday execution decision for the supplied stock.\n"
