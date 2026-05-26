@@ -18,9 +18,15 @@ class RiskAnalyzeAgent:
     def is_enabled(self) -> bool:
         return self.use_agno
 
-    def analyze(self, risk_packet: Dict[str, Any], chart_paths: List[str]) -> str:
+    def analyze(self, risk_packet: Dict[str, Any], chart_paths: List[str], capital_instruction: str = None) -> str:
         if not self.is_enabled():
             raise RuntimeError("risk_analyzer_disabled")
+
+        # Build dynamic capital instruction
+        if capital_instruction:
+            capital_line = capital_instruction
+        else:
+            capital_line = "Use a starting capital of ₹100 to ₹500 for trading calculations."
 
         agent = Agent(
             name=self.agent_name,
@@ -37,7 +43,7 @@ class RiskAnalyzeAgent:
                 "Treat the market context as background information only; it is not trade permission, a trade veto, or position-size instruction.",
                 "Choose from the pre-shortlisted candidates using stock evidence, chart quality, account feasibility, and concentration risk.",
                 "Use only the supplied facts and images.",
-                "Use a starting capital of ₹100 to ₹500 for trading calculations.",
+                capital_line,
                 "Output ONLY a valid JSON object matching the requested schema. Do not include markdown code block formatting (like ```json) or explanation outside the JSON.",
             ],
             expected_output=(

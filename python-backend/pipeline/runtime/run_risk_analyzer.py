@@ -22,7 +22,7 @@ class RiskAnalyzerRunner:
         self.dhan = DhanService(self.config, prefer_gateway=False)
         self.agent = RiskAnalyzeAgent()
 
-    def run_cycle(self, force: bool = False) -> Optional[Dict[str, Any]]:
+    def run_cycle(self, force: bool = False, trade_config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Risk analyzer is idling.")
             return None
@@ -56,8 +56,10 @@ class RiskAnalyzerRunner:
             print("Risk analyzer report is still fresh.")
             return existing
 
+        # Build capital instruction based on trade config
+        capital_instruction = self._build_capital_instruction(trade_config, account_context)
         chart_paths = self._collect_chart_paths(stock_reports)
-        raw_report = self.agent.analyze(risk_packet, chart_paths)
+        raw_report = self.agent.analyze(risk_packet, chart_paths, capital_instruction=capital_instruction)
 
         is_json = False
         parsed_json = None
@@ -161,6 +163,25 @@ class RiskAnalyzerRunner:
             f"Saved risk analyzer snapshot. Decision: {decision.get('action')} {decision.get('selected_display_name') or decision.get('selected_symbol')}."
         )
         return payload
+
+    def _build_capital_instruction(self, trade_config: Optional[Dict[str, Any]], account_context: Dict[str, Any]) -> Optional[str]:
+        """Build a capital instruction string based on trade mode."""
+        if not trade_config:
+            return None
+
+        trade_mode = str(trade_config.get("trade_mode") or "auto").lower()
+        trade_amount = trade_config.get("trade_amount")
+
+        if trade_mode == "manual" and trade_amount:
+            return f"Use a starting capital of exactly ₹{trade_amount} for trading calculations. Do not exceed this budget."
+        elif trade_mode == "auto":
+            # Extract available balance from account context
+            fund_data = (account_context.get("funds") or {}).get("data") or {}
+            available_balance = fund_data.get("availabelBalance") or fund_data.get("availableBalance") or fund_data.get("sodLimit")
+            if available_balance:
+                return f"Use the user's available account balance of ₹{available_balance} for trading calculations. Size positions based on this balance."
+            return "Use the user's available account balance from the funds data for trading calculations."
+        return None
 
     def _load_required_snapshot(self, daily_path, latest_path, label: str) -> Dict[str, Any]:
         payload = self.storage.load_snapshot(daily_path)
