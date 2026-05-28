@@ -53,7 +53,12 @@ class ExecutionerAgent:
             tools=[self.toolkit],
             instructions=[
                 "You are the final execution layer in an intraday trading pipeline.",
-                "You receive one chosen stock, its analyzer report, the risk report, market context, user Dhan account context, and two chart images.",
+                "You receive one chosen stock, its analyzer report, the risk report, market context, user Dhan account context, and chart images.",
+                "You receive up to 8 chart images for the selected stock:",
+                "  Current Day: 1m, 5m, 15m, 30m, 1h (full session x-axis 09:15–15:30)",
+                "  Previous Day: 5m, 15m, 1h (prior trading session, weekends skipped)",
+                "Each chart is labeled 'CURRENT DAY' or 'PREVIOUS DAY' with its date.",
+                "Use previous-day charts to identify key support/resistance levels for today's execution decisions.",
                 "Reason carefully and step by step, but only provide the final actionable answer.",
                 "Treat the market context as background information only; it is not trade permission, a trade veto, or position-size instruction.",
                 "Do not reject the selected stock solely because the broader market context is bearish, bullish, mixed, volatile, event-driven, or neutral.",
@@ -110,7 +115,9 @@ class ExecutionerAgent:
         }
         return (
             "Make the final intraday execution decision for the supplied stock.\n"
-            "Interpret the two chart images as the 5-minute and 15-minute candlestick charts for the same stock.\n"
+            "You receive up to 8 chart images: Current Day (1m, 5m, 15m, 30m, 1h) then Previous Day (5m, 15m, 1h).\n"
+            "Each chart spans the full trading session (09:15–15:30) and is labeled with day type and date.\n"
+            "Use previous-day levels for S/R context and current-day charts for live setup quality.\n"
             "The execution layer may avoid trading, plan a trade, or place a trade using the available Dhan tools.\n"
             "Use the stock analyzer report for setup quality, the risk report for cross-stock selection context, and the account context for feasibility.\n"
             "Use market context as background only; do not treat regime labels or news tone as standalone permission or prohibition.\n"

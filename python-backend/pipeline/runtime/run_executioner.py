@@ -202,11 +202,29 @@ class ExecutionerRunner:
         base = candidate if candidate else selected_report
         chart_artifacts = base.get("chart_artifacts") or selected_report.get("chart_artifacts") or {}
         charts = chart_artifacts.get("charts") or {}
+
+        # Collect ALL chart paths (current day + previous day, all timeframes)
+        # Use chart_paths_ordered if available (from updated charting service)
         chart_paths: List[str] = []
-        for timeframe in ("5m", "15m"):
-            path = (charts.get(timeframe) or {}).get("path")
-            if path:
-                chart_paths.append(str(path))
+        ordered = chart_artifacts.get("chart_paths_ordered")
+        if ordered and isinstance(ordered, list):
+            chart_paths = [str(p) for p in ordered]
+        else:
+            # Fallback: collect all chart paths from charts dict in a sensible order
+            preferred_order = [
+                "current_1m", "current_5m", "current_15m", "current_30m", "current_1h",
+                "previous_5m", "previous_15m", "previous_1h",
+            ]
+            for key in preferred_order:
+                path = (charts.get(key) or {}).get("path")
+                if path:
+                    chart_paths.append(str(path))
+            # Also check legacy keys (5m, 15m) for backward compat
+            if not chart_paths:
+                for timeframe in ("5m", "15m"):
+                    path = (charts.get(timeframe) or {}).get("path")
+                    if path:
+                        chart_paths.append(str(path))
 
         return {
             "rank": selected_report.get("rank"),
