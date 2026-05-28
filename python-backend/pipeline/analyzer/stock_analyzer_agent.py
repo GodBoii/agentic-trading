@@ -41,11 +41,20 @@ class StockAnalyzerAgent:
                 "The monitor/stage-2 pipeline already shortlisted this stock for intraday eligibility; judge the stock setup from its own evidence first.",
                 "A bearish, bullish, volatile, or event-driven market can still contain valid long or short intraday setups.",
                 "Do not say 'do not trade' only because of market regime/news context; only flag concrete stock-level chart, liquidity, or data-quality problems.",
+                "",
+                "CHART IMAGE INTERPRETATION:",
+                "You will receive multiple chart images. They are split into two groups:",
+                "1) CURRENT DAY charts (labeled 'CURRENT DAY — YYYY-MM-DD') at timeframes: 1m, 5m, 15m, 30m, 1h.",
+                "   The x-axis spans the full session (09:15–15:30). If candles end before 15:30, the market is still open.",
+                "2) PREVIOUS DAY charts (labeled 'PREVIOUS DAY — YYYY-MM-DD') at timeframes: 5m, 15m, 1h.",
+                "   These show the prior trading session (weekends skipped). Use them to identify key levels, overnight gaps, prior close context.",
+                "Compare current-day structure against prior-day levels for support/resistance, gap analysis, and continuation/reversal signals.",
+                "",
                 "Write a compact but detailed analyst report in markdown.",
                 "Use this exact section structure:",
                 "1. Verdict",
                 "2. Context Fit",
-                "3. Chart Read",
+                "3. Chart Read (reference specific timeframes and prior-day levels)",
                 "4. Strengths",
                 "5. Risks",
                 "6. Trade Plan",
@@ -78,7 +87,10 @@ class StockAnalyzerAgent:
         return (
             "Analyze the supplied intraday stock candidate.\n"
             "Your downstream reader is a risk agent, so be precise, concrete, and usable.\n"
-            "Interpret the two chart images as 5-minute and 15-minute candlestick charts.\n"
+            "You are provided with multiple chart images in order:\n"
+            "  — Current day: 1m, 5m, 15m, 30m, 1h (full session x-axis 09:15–15:30)\n"
+            "  — Previous day: 5m, 15m, 1h (prior trading session, weekends skipped)\n"
+            "Each chart is labeled with 'CURRENT DAY' or 'PREVIOUS DAY' and its date.\n"
             "The monitor stage already screened for live tradability; still mention any warning signs you infer from the charts.\n"
             "Use market context to describe background pressure or tailwind/headwind only, not to decide trade permission.\n"
             "<context>\n"

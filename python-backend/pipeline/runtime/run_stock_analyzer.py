@@ -21,7 +21,11 @@ class MultiStockAnalyzerRunner:
         self.market_time = MarketTimeService(self.config)
         self.storage = StorageService
         self.dhan = DhanService(self.config)
-        self.charting = CandlestickChartService(self.config.market_timezone)
+        self.charting = CandlestickChartService(
+            self.config.market_timezone,
+            market_open=(self.config.market_open_hour, self.config.market_open_minute),
+            market_close=(self.config.market_close_hour, self.config.market_close_minute),
+        )
         self.agent = StockAnalyzerAgent()
 
     def run_cycle(self, force: bool = False, trade_config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
@@ -237,10 +241,11 @@ class MultiStockAnalyzerRunner:
         )
         candidate_packet["chart_artifacts"] = chart_bundle
 
-        chart_paths = [
-            chart_bundle["charts"]["5m"]["path"],
-            chart_bundle["charts"]["15m"]["path"],
-        ]
+        # Use all generated chart paths (current day + previous day, multiple timeframes)
+        chart_paths = chart_bundle.get("chart_paths_ordered", [])
+        if not chart_paths:
+            # Fallback: collect from charts dict
+            chart_paths = [info["path"] for info in chart_bundle.get("charts", {}).values()]
         print(
             f"[rank {index + 1}] Analyzing {candidate_packet['display_name']} using {len(chart_paths)} chart images..."
         )
