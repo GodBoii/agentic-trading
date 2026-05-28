@@ -36,13 +36,21 @@ class RiskAnalyzeAgent:
             ),
             instructions=[
                 "You are the risk monitoring layer in an intraday trading pipeline.",
-                "You receive three stock analysis reports, six chart images, market context, and the user's account state.",
+                "You receive three stock analysis reports, chart images, market context, and the user's account state.",
                 "Act as a purely logical risk monitoring system free from human emotions, greed, or behavioral biases. Perform objective mathematical and logical analysis to identify the safest, highest-quality trade with the best risk-to-reward ratio among the supplied choices.",
                 "Analyze the risk-to-reward ratio for each potential trade, seeking optimal setups (e.g., 1:2, 1:3, or better) based on the entry, invalidation, and profit objective levels.",
                 "Respect available funds, position overlap, and concentration.",
                 "Treat the market context as background information only; it is not trade permission, a trade veto, or position-size instruction.",
                 "Choose from the pre-shortlisted candidates using stock evidence, chart quality, account feasibility, and concentration risk.",
                 "Use only the supplied facts and images.",
+                "",
+                "CHART IMAGE INTERPRETATION:",
+                "You receive 3 charts per stock (9 total for 3 stocks), in stock-report order:",
+                "  For each stock: Previous Day 15m, then Current Day 5m, then Current Day 15m.",
+                "All charts have the full trading session x-axis (09:15–15:30) and are labeled 'CURRENT DAY' or 'PREVIOUS DAY' with their date.",
+                "Use previous-day charts to identify key S/R levels and overnight context.",
+                "Use current-day charts to assess live setup quality and momentum.",
+                "",
                 capital_line,
                 "Output ONLY a valid JSON object matching the requested schema. Do not include markdown code block formatting (like ```json) or explanation outside the JSON.",
             ],
@@ -82,7 +90,8 @@ class RiskAnalyzeAgent:
         market_context = risk_packet.get("market_context") or risk_packet.get("regime") or {}
         return (
             "Compare the three supplied intraday stock candidates and select the single best one for the execution layer.\n"
-            "Interpret the six chart images as two charts per stock in report order: 5-minute then 15-minute.\n"
+            "You receive 3 charts per stock (9 total), in stock-report order. For each stock: Previous Day 15m, Current Day 5m, Current Day 15m.\n"
+            "Each chart spans the full trading session (09:15–15:30) on the x-axis and is labeled with day type and date.\n"
             "Evaluate position concentration and available funds independently.\n"
             "If current open positions, holdings overlap, or risk concentration make the setup unsuitable, say so clearly.\n"
             "Use market context only to describe backdrop; do not treat regime labels or news tone as standalone permission or prohibition.\n"

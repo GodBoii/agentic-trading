@@ -289,11 +289,17 @@ class RiskAnalyzerRunner:
         }
 
     def _collect_chart_paths(self, stock_reports: List[Dict[str, Any]]) -> List[str]:
+        """Collect chart paths for the risk analyzer.
+
+        Per stock: previous_15m, current_5m, current_15m (3 images per stock).
+        For 3 stocks this gives 9 images total.
+        """
         chart_paths: List[str] = []
         for report in stock_reports:
             charts = (report.get("candidate") or {}).get("chart_artifacts", {}).get("charts", {})
-            for timeframe in ("5m", "15m"):
-                path = (charts.get(timeframe) or {}).get("path")
+            # Order: previous day 15m, then current day 5m and 15m
+            for key in ("previous_15m", "current_5m", "current_15m"):
+                path = (charts.get(key) or {}).get("path")
                 if path:
                     chart_paths.append(str(path))
         return chart_paths
