@@ -108,6 +108,7 @@ class CandlestickChartService:
                 subtitle=f"CURRENT DAY \u2014 {market_date}",
                 output_path=path,
                 market_date=market_date,
+                timeframe_minutes=timeframe,
                 sr_levels=sr_levels,
                 sd_zones=sd_zones,
                 patterns=patterns,
@@ -149,6 +150,7 @@ class CandlestickChartService:
                     subtitle=f"PREVIOUS DAY \u2014 {prev_date_str}",
                     output_path=path,
                     market_date=prev_date_str,
+                    timeframe_minutes=timeframe,
                     sr_levels=sr_levels_prev,
                     sd_zones=sd_zones_prev,
                     patterns=patterns_prev,
@@ -382,8 +384,14 @@ class CandlestickChartService:
                     patterns.append({"index": i, "pattern": "Bear Engulf", "bias": "bearish", "price": float(closes[i])})
                     continue
 
+        # Dedupe: drop consecutive same-type patterns within 2 candles of each other
+        deduped: List[Dict[str, Any]] = []
+        for p in patterns:
+            if deduped and deduped[-1]["pattern"] == p["pattern"] and (p["index"] - deduped[-1]["index"]) <= 2:
+                continue
+            deduped.append(p)
         # Only keep the last 5 most recent patterns to avoid clutter
-        return patterns[-5:]
+        return deduped[-5:]
 
     # ─── TECHNICAL METADATA FOR LLM TEXT PROMPT ────────────────────────────
 
@@ -462,13 +470,15 @@ class CandlestickChartService:
             .dropna(subset=["open", "high", "low", "close"])
         )
 
-        # ATR (14)
+        # ATR (14) — use min_periods=2 so we get a value even with limited data
         high_low = ohlcv["high"] - ohlcv["low"]
         high_close_prev = (ohlcv["high"] - ohlcv["close"].shift(1)).abs()
         low_close_prev = (ohlcv["low"] - ohlcv["close"].shift(1)).abs()
         true_range = pd.concat([high_low, high_close_prev, low_close_prev], axis=1).max(axis=1)
-        ohlcv["atr"] = true_range.rolling(window=14).mean()
+        ohlcv["atr"] = true_range.rolling(window=14, min_periods=2).mean()
         ohlcv["atr"] = ohlcv["atr"].bfill()
+        # Final fallback: if still NaN (only 1 candle), use that candle's range
+        ohlcv["atr"] = ohlcv["atr"].fillna(high_low)
 
         return ohlcv
 
@@ -500,6 +510,7 @@ class CandlestickChartService:
         subtitle: str,
         output_path: Path,
         market_date: str,
+        timeframe_minutes: int,
         sr_levels: List[Dict[str, Any]],
         sd_zones: List[Dict[str, Any]],
         patterns: List[Dict[str, Any]],
@@ -507,9 +518,9 @@ class CandlestickChartService:
     ) -> None:
         import matplotlib
         matplotlib.use("Agg")
-        import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
-        from matplotlib.patches import FancyBboxPatch, Rectangle
+        from matplotlib.patches import Rectangle
+        from matplotlib.ticker import FuncFormatter
 
         if frame.empty:
             raise ValueError(f"Cannot render empty chart for {title}.")
@@ -527,17 +538,41 @@ class CandlestickChartService:
         for ax in (ax_price, ax_volume, ax_rsi, ax_cvd):
             ax.set_facecolor(C["panel_bg"])
 
-        # Timezone-naive for matplotlib
+        # ── 1m chart special handling: slice to last 2 hours (120 candles) ──
+        # 1m on full session (375 candles) crushes candle width to ~3px.
+        # Showing only the last 2 hours keeps each candle visible while preserving
+        # the most relevant intraday context for trade decisions.
         plot_frame = frame.copy()
+        if timeframe_minutes == 1 and len(plot_frame) > 120:
+            plot_frame = plot_frame.iloc[-120:]
         if plot_frame.index.tz is not None:
             plot_frame.index = plot_frame.index.tz_localize(None)
 
-        date_numbers = mdates.date2num(plot_frame.index.to_pydatetime())
-        candle_width = self._candle_width(date_numbers)
+        n_candles = len(plot_frame)
+        x_positions = np.arange(n_candles, dtype=float)
+        timestamps = plot_frame.index.to_pydatetime()
+        candle_width = 0.78  # Fixed body width — looks great at any timeframe
+
+        # ── Compute full session expected candles (for non-1m x-axis extent) ──
+        # For 1m we don't extend; for other timeframes we extend to show the full session
+        # so the LLM sees how much of the day remains.
+        market_day = pd.Timestamp(market_date).date()
+        session_start = pd.Timestamp(
+            year=market_day.year, month=market_day.month, day=market_day.day,
+            hour=self.market_open[0], minute=self.market_open[1],
+        )
+        session_end = pd.Timestamp(
+            year=market_day.year, month=market_day.month, day=market_day.day,
+            hour=self.market_close[0], minute=self.market_close[1],
+        )
+        tf_minutes = timeframe_minutes
+        total_session_minutes = int((session_end - session_start).total_seconds() / 60)
+        full_session_candles = total_session_minutes // max(tf_minutes, 1)
 
         # ── Draw Candlesticks ──
-        for idx, (_, row) in enumerate(plot_frame.iterrows()):
-            x = date_numbers[idx]
+        for idx in range(n_candles):
+            row = plot_frame.iloc[idx]
+            x = x_positions[idx]
             o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
             vol = float(row["volume"])
             is_up = c >= o
@@ -546,12 +581,13 @@ class CandlestickChartService:
             edge = C["candle_up_edge"] if is_up else C["candle_down_edge"]
             wick = C["wick_up"] if is_up else C["wick_down"]
 
-            # Wick (shadow)
-            ax_price.vlines(x, l, h, color=wick, linewidth=1.6, zorder=2)
+            # Wick
+            ax_price.vlines(x, l, h, color=wick, linewidth=1.6, zorder=3)
 
-            # Body
+            # Body — with minimum height for visibility (especially dojis)
             body_low = min(o, c)
-            body_height = max(abs(c - o), (h - l) * 0.02)  # Minimum visible body
+            price_range = max(h - l, 0.001)
+            body_height = max(abs(c - o), price_range * 0.05)
             ax_price.add_patch(
                 Rectangle(
                     (x - candle_width / 2, body_low),
@@ -559,137 +595,191 @@ class CandlestickChartService:
                     body_height,
                     facecolor=face,
                     edgecolor=edge,
-                    linewidth=0.8,
-                    zorder=3,
+                    linewidth=0.9,
+                    zorder=4,
                 )
             )
 
             # Volume bars
-            ax_volume.bar(x, vol, width=candle_width, color=face, alpha=0.85, edgecolor=edge, linewidth=0.3)
+            ax_volume.bar(x, vol, width=candle_width, color=face, alpha=0.85, edgecolor=edge, linewidth=0.4)
 
-        # ── Supply & Demand Zones (draw BEHIND candles via zorder) ──
+        # ── Supply & Demand Zones ──
+        # x_right is set after we determine the chart's x-extent below.
+        is_compact_view = timeframe_minutes == 1
+        if is_compact_view:
+            x_right = n_candles - 1 + max(int(n_candles * 0.10), 3)
+        else:
+            x_right = full_session_candles
         for zone in sd_zones:
-            alpha = 0.18 if zone["strength"] == "strong" else 0.10
+            alpha = 0.20 if zone["strength"] == "strong" else 0.12
             color = C["sd_demand"] if zone["type"] == "demand" else C["sd_supply"]
-            ax_price.axhspan(
-                zone["zone_low"], zone["zone_high"],
-                alpha=alpha, color=color, zorder=0,
-            )
-            # Label
-            label_y = zone["zone_high"] if zone["type"] == "supply" else zone["zone_low"]
-            label_text = f"{'Supply' if zone['type'] == 'supply' else 'Demand'} Zone"
+            ax_price.axhspan(zone["zone_low"], zone["zone_high"], alpha=alpha, color=color, zorder=0)
+
+            # Label on the right side (inside the empty future-session space) so it doesn't clash with candles
+            label_y = (zone["zone_high"] + zone["zone_low"]) / 2
+            label_text = f"{'SUPPLY' if zone['type'] == 'supply' else 'DEMAND'} ZONE"
             ax_price.text(
-                date_numbers[0], label_y, f" {label_text}",
-                fontsize=7, color=color, alpha=0.8, va="bottom" if zone["type"] == "demand" else "top",
-                zorder=5,
+                x_right - 0.3, label_y, label_text,
+                fontsize=8, color=color, alpha=0.95, va="center", ha="right",
+                fontweight="bold", zorder=5,
             )
 
         # ── Support & Resistance Lines ──
         for level in sr_levels:
             color = C["sr_support"] if level["type"] == "support" else C["sr_resistance"]
             style = "--" if level["source"] == "pivot" else "-."
-            ax_price.axhline(
-                level["price"], color=color, linestyle=style,
-                linewidth=0.9, alpha=0.6, zorder=1,
-            )
+            ax_price.axhline(level["price"], color=color, linestyle=style, linewidth=0.9, alpha=0.55, zorder=1)
 
-        # ── Previous Day Levels ──
+        # ── Previous Day Levels (labels on right edge) ──
         if prev_day_levels:
             ph = prev_day_levels.get("prev_high")
             pl = prev_day_levels.get("prev_low")
             pc = prev_day_levels.get("prev_close")
             if ph:
-                ax_price.axhline(ph, color=C["prev_high"], linestyle=":", linewidth=1.0, alpha=0.7, zorder=1)
-                ax_price.text(date_numbers[-1], ph, f" PDH {ph:.1f}", fontsize=7, color=C["prev_high"], va="bottom", zorder=5)
+                ax_price.axhline(ph, color=C["prev_high"], linestyle=":", linewidth=1.0, alpha=0.75, zorder=1)
+                ax_price.text(x_right - 0.5, ph, f" PDH {ph:.1f}", fontsize=8, color=C["prev_high"], va="bottom", ha="right", zorder=5, fontweight="bold")
             if pl:
-                ax_price.axhline(pl, color=C["prev_low"], linestyle=":", linewidth=1.0, alpha=0.7, zorder=1)
-                ax_price.text(date_numbers[-1], pl, f" PDL {pl:.1f}", fontsize=7, color=C["prev_low"], va="top", zorder=5)
+                ax_price.axhline(pl, color=C["prev_low"], linestyle=":", linewidth=1.0, alpha=0.75, zorder=1)
+                ax_price.text(x_right - 0.5, pl, f" PDL {pl:.1f}", fontsize=8, color=C["prev_low"], va="top", ha="right", zorder=5, fontweight="bold")
             if pc:
-                ax_price.axhline(pc, color=C["prev_close"], linestyle=":", linewidth=1.0, alpha=0.7, zorder=1)
-                ax_price.text(date_numbers[-1], pc, f" PDC {pc:.1f}", fontsize=7, color=C["prev_close"], va="bottom", zorder=5)
+                ax_price.axhline(pc, color=C["prev_close"], linestyle=":", linewidth=1.0, alpha=0.75, zorder=1)
+                ax_price.text(x_right - 0.5, pc, f" PDC {pc:.1f}", fontsize=8, color=C["prev_close"], va="bottom", ha="right", zorder=5, fontweight="bold")
 
-        # ── EMA 9/21 Overlay ──
+        # ── EMA 9/21 Overlay (use only valid x positions) ──
         if "ema9" in plot_frame.columns and not plot_frame["ema9"].isna().all():
-            ax_price.plot(date_numbers, plot_frame["ema9"], color=C["ema9"], linewidth=1.3, label="EMA9", zorder=4)
+            ax_price.plot(x_positions, plot_frame["ema9"].values, color=C["ema9"], linewidth=1.5, label="EMA9", zorder=5)
         if "ema21" in plot_frame.columns and not plot_frame["ema21"].isna().all():
-            ax_price.plot(date_numbers, plot_frame["ema21"], color=C["ema21"], linewidth=1.3, label="EMA21", zorder=4)
+            ax_price.plot(x_positions, plot_frame["ema21"].values, color=C["ema21"], linewidth=1.5, label="EMA21", zorder=5)
 
         # ── Bollinger Bands ──
         if "bb_upper" in plot_frame.columns and not plot_frame["bb_upper"].isna().all():
-            ax_price.plot(date_numbers, plot_frame["bb_upper"], color=C["bb_line"], linewidth=0.7, alpha=0.5, zorder=4)
-            ax_price.plot(date_numbers, plot_frame["bb_lower"], color=C["bb_line"], linewidth=0.7, alpha=0.5, zorder=4)
+            ax_price.plot(x_positions, plot_frame["bb_upper"].values, color=C["bb_line"], linewidth=0.8, alpha=0.55, zorder=2)
+            ax_price.plot(x_positions, plot_frame["bb_lower"].values, color=C["bb_line"], linewidth=0.8, alpha=0.55, zorder=2)
             ax_price.fill_between(
-                date_numbers, plot_frame["bb_upper"], plot_frame["bb_lower"],
-                color=C["bb_fill"], alpha=0.06, zorder=0,
+                x_positions, plot_frame["bb_upper"].values, plot_frame["bb_lower"].values,
+                color=C["bb_fill"], alpha=0.07, zorder=0,
             )
 
         # ── VWAP ──
         if "vwap" in plot_frame.columns and not plot_frame["vwap"].isna().all():
-            ax_price.plot(date_numbers, plot_frame["vwap"], color=C["vwap"], linewidth=2.0, label="VWAP", zorder=4)
+            ax_price.plot(x_positions, plot_frame["vwap"].values, color=C["vwap"], linewidth=2.2, label="VWAP", zorder=6)
 
         # ── Candlestick Pattern Annotations ──
-        for pat in patterns:
+        # Filter to avoid clutter: keep at most 4 patterns, prefer non-Doji and recent ones
+        atr_series = plot_frame["atr"].values if "atr" in plot_frame.columns else np.full(n_candles, 1.0)
+        price_span = float(plot_frame["high"].max() - plot_frame["low"].min())
+        offset_base = max(price_span * 0.04, 0.8)
+
+        # Sort patterns: prefer engulfing/hammer/shooting star over doji, then by recency
+        pattern_priority = {"Bull Engulf": 0, "Bear Engulf": 0, "Hammer": 1, "Shooting Star": 1, "Doji": 2}
+        sorted_patterns = sorted(
+            patterns,
+            key=lambda p: (pattern_priority.get(p["pattern"], 3), -p["index"]),
+        )[:4]
+
+        for pat_idx, pat in enumerate(sorted_patterns):
             idx = pat["index"]
-            if idx >= len(date_numbers):
+            if idx >= n_candles:
                 continue
-            x = date_numbers[idx]
+            x = x_positions[idx]
             price = pat["price"]
             color = C["pattern_bull"] if pat["bias"] == "bullish" else C["pattern_bear"]
             marker = "^" if pat["bias"] == "bullish" else "v"
-            offset = float(plot_frame["atr"].iloc[idx]) * 0.5 if "atr" in plot_frame.columns else 1.0
-            y = price - offset if pat["bias"] == "bullish" else price + offset
 
-            ax_price.scatter(x, y, marker=marker, color=color, s=60, zorder=6, edgecolors="white", linewidths=0.3)
+            # Stagger annotations vertically to avoid overlap when patterns are clustered
+            stagger_offset = offset_base * (1.0 + (pat_idx % 2) * 0.6)
+            y = price - stagger_offset if pat["bias"] == "bullish" else price + stagger_offset
+
+            ax_price.scatter(x, y, marker=marker, color=color, s=100, zorder=7, edgecolors="white", linewidths=0.8)
+            label_y_offset = -22 if pat["bias"] == "bullish" else 22
             ax_price.annotate(
                 pat["pattern"], xy=(x, y),
-                xytext=(0, -12 if pat["bias"] == "bullish" else 12),
+                xytext=(0, label_y_offset),
                 textcoords="offset points",
-                fontsize=6, color=color, ha="center", va="top" if pat["bias"] == "bullish" else "bottom",
-                zorder=6,
+                fontsize=8, color=color, ha="center",
+                va="top" if pat["bias"] == "bullish" else "bottom",
+                fontweight="bold",
+                zorder=7,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor=C["bg"], edgecolor=color, alpha=0.85, linewidth=0.5),
             )
 
         # ── RSI Panel ──
         if "rsi" in plot_frame.columns and not plot_frame["rsi"].isna().all():
-            ax_rsi.plot(date_numbers, plot_frame["rsi"], color=C["rsi_line"], linewidth=1.4)
+            ax_rsi.plot(x_positions, plot_frame["rsi"].values, color=C["rsi_line"], linewidth=1.6)
             ax_rsi.axhline(70, color=C["rsi_ob"], linestyle="--", linewidth=0.8, alpha=0.7)
             ax_rsi.axhline(30, color=C["rsi_os"], linestyle="--", linewidth=0.8, alpha=0.7)
             ax_rsi.axhline(50, color=C["rsi_mid"], linestyle=":", linewidth=0.6, alpha=0.5)
-            ax_rsi.fill_between(date_numbers, plot_frame["rsi"], 70, where=(plot_frame["rsi"] >= 70), color=C["rsi_ob"], alpha=0.15)
-            ax_rsi.fill_between(date_numbers, plot_frame["rsi"], 30, where=(plot_frame["rsi"] <= 30), color=C["rsi_os"], alpha=0.15)
+            ax_rsi.fill_between(x_positions, plot_frame["rsi"].values, 70, where=(plot_frame["rsi"].values >= 70), color=C["rsi_ob"], alpha=0.18)
+            ax_rsi.fill_between(x_positions, plot_frame["rsi"].values, 30, where=(plot_frame["rsi"].values <= 30), color=C["rsi_os"], alpha=0.18)
             ax_rsi.set_ylim(0, 100)
-            ax_rsi.set_ylabel("RSI", color=C["text_dim"], fontsize=9)
+            ax_rsi.set_ylabel("RSI", color=C["text_dim"], fontsize=10)
 
         # ── CVD Panel ──
         if "cvd" in plot_frame.columns and not plot_frame["cvd"].isna().all():
-            ax_cvd.plot(date_numbers, plot_frame["cvd"], color=C["cvd_pos"], linewidth=1.4)
-            ax_cvd.fill_between(
-                date_numbers, plot_frame["cvd"], 0,
-                where=(plot_frame["cvd"] >= 0), color=C["cvd_pos"], alpha=0.2, interpolate=True,
-            )
-            ax_cvd.fill_between(
-                date_numbers, plot_frame["cvd"], 0,
-                where=(plot_frame["cvd"] < 0), color=C["cvd_neg"], alpha=0.2, interpolate=True,
-            )
+            cvd_vals = plot_frame["cvd"].values
+            ax_cvd.plot(x_positions, cvd_vals, color=C["cvd_pos"], linewidth=1.6)
+            ax_cvd.fill_between(x_positions, cvd_vals, 0, where=(cvd_vals >= 0), color=C["cvd_pos"], alpha=0.25, interpolate=True)
+            ax_cvd.fill_between(x_positions, cvd_vals, 0, where=(cvd_vals < 0), color=C["cvd_neg"], alpha=0.25, interpolate=True)
             ax_cvd.axhline(0, color=C["spine"], linestyle="--", linewidth=0.8)
 
-        # ── X-Axis: Full trading session ──
-        market_day = pd.Timestamp(market_date).date()
-        market_open_dt = pd.Timestamp(
-            year=market_day.year, month=market_day.month, day=market_day.day,
-            hour=self.market_open[0], minute=self.market_open[1],
-        )
-        market_close_dt = pd.Timestamp(
-            year=market_day.year, month=market_day.month, day=market_day.day,
-            hour=self.market_close[0], minute=self.market_close[1],
-        )
-        x_min = mdates.date2num(market_open_dt.to_pydatetime())
-        x_max = mdates.date2num(market_close_dt.to_pydatetime())
-        ax_price.set_xlim(x_min - candle_width, x_max + candle_width)
+        # ── X-axis: index-based with time-formatted ticks ──
+        # Build mapping from index → timestamp for the formatter
+        index_to_time = {i: timestamps[i] for i in range(n_candles)}
+
+        def format_time(x_val: float, _pos: int) -> str:
+            idx = int(round(x_val))
+            if 0 <= idx < n_candles:
+                return index_to_time[idx].strftime("%H:%M")
+            # Extrapolate for empty future candles
+            if idx >= n_candles and n_candles >= 1:
+                last_ts = timestamps[-1]
+                projected = last_ts + timedelta(minutes=tf_minutes * (idx - n_candles + 1))
+                # Don't show times past market close
+                if projected > session_end:
+                    return ""
+                return projected.strftime("%H:%M")
+            return ""
+
+        ax_cvd.xaxis.set_major_formatter(FuncFormatter(format_time))
+
+        # ── X-axis extent and ticks ──
+        # 1m: compact view (last ~120 candles + small padding) so candles stay readable.
+        # All other timeframes: extend to full session so the LLM sees how much
+        # of the trading day has elapsed vs. how much remains.
+        if is_compact_view:
+            x_left_lim = -0.8
+            x_right_lim = n_candles - 1 + max(int(n_candles * 0.10), 3)
+            tick_count = 10
+            tick_step = max(1, n_candles // tick_count)
+            ax_cvd.set_xticks(np.arange(0, n_candles, tick_step))
+        else:
+            x_left_lim = -0.8
+            x_right_lim = full_session_candles + 0.5
+            tick_count = 12
+            tick_step = max(1, full_session_candles // tick_count)
+            ax_cvd.set_xticks(np.arange(0, full_session_candles + 1, tick_step))
+
+        ax_price.set_xlim(x_left_lim, x_right_lim)
+
+        # ── Y-axis: tighten price panel to actual price range with padding ──
+        price_min = float(plot_frame["low"].min())
+        price_max = float(plot_frame["high"].max())
+        # Include S/R, S/D zones, prev day levels in y-range so they're visible
+        all_y = [price_min, price_max]
+        for level in sr_levels:
+            all_y.append(level["price"])
+        for zone in sd_zones:
+            all_y.extend([zone["zone_low"], zone["zone_high"]])
+        if prev_day_levels:
+            all_y.extend([v for v in prev_day_levels.values() if v])
+        y_min, y_max = min(all_y), max(all_y)
+        y_pad = max((y_max - y_min) * 0.08, 0.5)
+        ax_price.set_ylim(y_min - y_pad, y_max + y_pad)
 
         # ── Legend ──
         ax_price.legend(
             loc="upper left", facecolor=C["bg"], edgecolor=C["spine"],
-            labelcolor=C["text"], fontsize=8, framealpha=0.9,
+            labelcolor=C["text"], fontsize=9, framealpha=0.92,
         )
 
         # ── Title ──
@@ -703,20 +793,19 @@ class CandlestickChartService:
 
         # ── Styling ──
         for ax in (ax_price, ax_volume, ax_rsi, ax_cvd):
-            ax.grid(color=C["grid"], linestyle="--", linewidth=0.5, alpha=0.6)
-            ax.tick_params(colors=C["text_dim"], labelsize=8)
+            ax.grid(color=C["grid"], linestyle="--", linewidth=0.5, alpha=0.5)
+            ax.tick_params(colors=C["text_dim"], labelsize=9)
             for spine in ax.spines.values():
                 spine.set_color(C["spine"])
 
-        ax_cvd.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-        ax_cvd.xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0, 30]))
+        ax_price.set_ylabel("Price (\u20b9)", color=C["text_dim"], fontsize=10)
+        ax_volume.set_ylabel("Vol", color=C["text_dim"], fontsize=10)
+        ax_cvd.set_ylabel("CVD", color=C["text_dim"], fontsize=10)
 
-        ax_price.set_ylabel("Price (\u20b9)", color=C["text_dim"], fontsize=9)
-        ax_volume.set_ylabel("Vol", color=C["text_dim"], fontsize=9)
-        ax_cvd.set_ylabel("CVD", color=C["text_dim"], fontsize=9)
+        # Rotate x-axis tick labels for readability
+        plt.setp(ax_cvd.get_xticklabels(), rotation=45, ha="right")
 
-        fig.autofmt_xdate()
-        plt.tight_layout(rect=[0, 0, 1, 0.98])
+        plt.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.07, hspace=0.05)
         fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=C["bg"])
         plt.close(fig)
 
