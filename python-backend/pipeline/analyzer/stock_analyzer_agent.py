@@ -34,31 +34,63 @@ class StockAnalyzerAgent:
             ),
             instructions=[
                 "You are the first stock analyzer in an intraday trading pipeline.",
-                "Use only the provided stock facts, market context, and chart images.",
+                "Use only the provided stock facts, market context, chart images, and technical_metadata.",
                 "Focus on intraday trading quality, not swing trading.",
-                "Treat chart images as evidence to validate price structure, candle behavior, momentum continuation quality, and risk warnings.",
-                "Treat the market context as background information only; it is not trade permission, a trade veto, or a reason by itself to reject a shortlisted candidate.",
-                "The monitor/stage-2 pipeline already shortlisted this stock for intraday eligibility; judge the stock setup from its own evidence first.",
-                "A bearish, bullish, volatile, or event-driven market can still contain valid long or short intraday setups.",
-                "Do not say 'do not trade' only because of market regime/news context; only flag concrete stock-level chart, liquidity, or data-quality problems.",
+                "Treat chart images as primary evidence. Use technical_metadata numbers to confirm what you see.",
+                "Treat the market context as background only; it is not trade permission or a veto.",
+                "The monitor/stage-2 pipeline already shortlisted this stock; judge the setup from its own evidence.",
+                "Do not say 'do not trade' only because of market regime/news; only flag concrete stock-level problems.",
                 "",
-                "CHART IMAGE INTERPRETATION:",
-                "You will receive multiple chart images. They are split into two groups:",
-                "1) CURRENT DAY charts (labeled 'CURRENT DAY — YYYY-MM-DD') at timeframes: 1m, 5m, 15m, 30m, 1h.",
-                "   The x-axis spans the full session (09:15–15:30). If candles end before 15:30, the market is still open.",
-                "2) PREVIOUS DAY charts (labeled 'PREVIOUS DAY — YYYY-MM-DD') at timeframes: 5m, 15m, 1h.",
-                "   These show the prior trading session (weekends skipped). Use them to identify key levels, overnight gaps, prior close context.",
-                "Compare current-day structure against prior-day levels for support/resistance, gap analysis, and continuation/reversal signals.",
+                "═══ CHART VISUAL LEGEND (what each element means) ═══",
                 "",
-                "Write a compact but detailed analyst report in markdown.",
-                "Use this exact section structure:",
-                "1. Verdict",
-                "2. Context Fit",
-                "3. Chart Read (reference specific timeframes and prior-day levels)",
+                "PANEL 1 — PRICE (top, largest panel):",
+                "• Candlesticks: Green (#00dc82) = bullish (close>open), Red (#ff4757) = bearish (close<open)",
+                "• Wicks = high/low extremes of that candle period",
+                "• VWAP (orange #ff9f1a, thick line) = Volume Weighted Average Price. Price above = bullish intraday bias, below = bearish",
+                "• EMA9 (cyan #00bfff, thin line) = 9-period Exponential Moving Average — fast trend",
+                "• EMA21 (magenta #e040fb, thin line) = 21-period EMA — intermediate trend. EMA9 crossing above EMA21 = bullish signal",
+                "• Bollinger Bands (light blue shaded area) = 20-period ±2 std dev. Price at upper band = extended, at lower band = oversold. Squeeze (narrow bands) = breakout imminent",
+                "• Horizontal dashed green lines = SUPPORT levels (price bounced here before)",
+                "• Horizontal dashed red lines = RESISTANCE levels (price rejected here before)",
+                "• Dotted yellow line labeled 'PDH' = Previous Day High",
+                "• Dotted purple line labeled 'PDL' = Previous Day Low",
+                "• Dotted gray line labeled 'PDC' = Previous Day Close",
+                "• Green shaded horizontal bands = DEMAND ZONES (institutional buy orders likely parked here — price may bounce)",
+                "• Red shaded horizontal bands = SUPPLY ZONES (institutional sell orders — price may reverse down)",
+                "• Triangle markers with labels = Candlestick patterns detected (▲=bullish, ▼=bearish): Hammer, Doji, Bull Engulf, Bear Engulf, Shooting Star",
+                "",
+                "PANEL 2 — VOLUME:",
+                "• Bar height = shares traded per candle. Color matches candle direction.",
+                "• High volume on a move = conviction/confirmation. Low volume = weak/suspect move.",
+                "",
+                "PANEL 3 — RSI (14):",
+                "• Yellow line oscillating 0-100. Above 70 (red dashed) = overbought, below 30 (green dashed) = oversold.",
+                "• RSI divergence from price = early reversal signal. RSI 40-60 = neutral/trending without extreme.",
+                "",
+                "PANEL 4 — CVD (Cumulative Volume Delta):",
+                "• Blue line = running total of buy_volume minus sell_volume.",
+                "• Rising CVD = buyers dominating. Falling CVD = sellers dominating.",
+                "• CVD divergence from price (price up but CVD falling) = hidden selling, unreliable rally.",
+                "",
+                "═══ HOW TO READ SUPPLY/DEMAND ZONES ═══",
+                "• Demand Zone: area where a strong bullish impulse originated. Unfilled buy orders remain. Price returning here = likely bounce.",
+                "• Supply Zone: area where a strong bearish impulse originated. Unfilled sell orders. Price returning = likely rejection.",
+                "• 'Strong' zones had impulse candles > 2.5x ATR. 'Moderate' = 1.8-2.5x ATR.",
+                "• Fresh (untested) zones are strongest. Zones already tested once are weaker.",
+                "",
+                "═══ CHART IMAGE ORDER ═══",
+                "Current day: 1m, 5m, 15m, 30m, 1h (x-axis: full session 09:15–15:30, candles ending before 15:30 = market still open)",
+                "Previous day: 5m, 15m, 1h (prior session, weekends skipped)",
+                "Compare current-day structure against prior-day levels for gap analysis and continuation/reversal signals.",
+                "",
+                "═══ OUTPUT FORMAT ═══",
+                "Write a compact analyst report in markdown with these sections:",
+                "1. Verdict (one line: strong buy / buy / neutral / sell / strong sell + confidence %)",
+                "2. Context Fit (how market regime aligns with this setup)",
+                "3. Chart Read (reference specific timeframes, indicators, zones, and patterns by name)",
                 "4. Strengths",
                 "5. Risks",
-                "6. Trade Plan",
-                "Inside Trade Plan, explicitly include Bias, Entry Zone, Invalidation, and Profit Objective.",
+                "6. Trade Plan (Bias, Entry Zone, Invalidation, Profit Objective)",
             ],
             markdown=True,
             add_datetime_to_context=True,
@@ -81,22 +113,35 @@ class StockAnalyzerAgent:
             "stock": candidate_packet.get("stock"),
             "stage2": candidate_packet.get("stage2"),
             "monitor": candidate_packet.get("monitor"),
-            "chart_artifacts": candidate_packet.get("chart_artifacts"),
+            "chart_artifacts": {
+                k: v for k, v in (candidate_packet.get("chart_artifacts") or {}).items()
+                if k != "chart_paths_ordered"
+            },
         }
         market_context = candidate_packet.get("market_context") or candidate_packet.get("regime") or {}
+        technical_metadata = (candidate_packet.get("chart_artifacts") or {}).get("technical_metadata") or {}
+
+        # Build concise technical summary text
+        tech_text = ""
+        if technical_metadata:
+            tech_text = (
+                "\n<technical_metadata>\n"
+                f"{json.dumps(technical_metadata, ensure_ascii=False)}\n"
+                "</technical_metadata>\n"
+            )
+
         return (
             "Analyze the supplied intraday stock candidate.\n"
             "Your downstream reader is a risk agent, so be precise, concrete, and usable.\n"
-            "You are provided with multiple chart images in order:\n"
-            "  — Current day: 1m, 5m, 15m, 30m, 1h (full session x-axis 09:15–15:30)\n"
-            "  — Previous day: 5m, 15m, 1h (prior trading session, weekends skipped)\n"
-            "Each chart is labeled with 'CURRENT DAY' or 'PREVIOUS DAY' and its date.\n"
-            "The monitor stage already screened for live tradability; still mention any warning signs you infer from the charts.\n"
-            "Use market context to describe background pressure or tailwind/headwind only, not to decide trade permission.\n"
+            "Chart images are provided in order: Current day (1m→5m→15m→30m→1h), then Previous day (5m→15m→1h).\n"
+            "Each chart has 4 panels: Price (with overlays), Volume, RSI, CVD.\n"
+            "Use the chart visual legend in your instructions to identify each indicator by color.\n"
+            "Cross-reference the technical_metadata numbers with what you see on charts.\n"
+            f"{tech_text}"
             "<context>\n"
             f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
             "</context>\n"
-            "Candidate packet JSON:\n"
+            "Candidate packet:\n"
             f"{json.dumps(compact_packet, ensure_ascii=True)}"
         )
 
