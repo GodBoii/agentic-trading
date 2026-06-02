@@ -29,81 +29,86 @@ class ExecutionerRunner:
             return None
 
         market_date = self.market_time.market_date_str()
-        risk_payload = self._load_required_snapshot(
-            self.config.risk_analyzer_daily_path(market_date),
-            self.config.risk_analyzer_latest_path,
-            "Risk analyzer",
-        )
         stock_payload = self._load_required_snapshot(
             self.config.stock_analyzer_daily_path(market_date),
             self.config.stock_analyzer_latest_path,
             "Stock analyzer",
         )
 
-        execution_packet = self._build_execution_packet(market_date, risk_payload, stock_payload)
-        if not execution_packet:
-            return self._save_no_trade_payload(market_date, risk_payload, "No selected stock from risk analyzer.")
+        stock_reports = list(stock_payload.get("reports") or [])
+        if not stock_reports:
+            return self._save_no_trade_payload(market_date, stock_payload, "No stock analyzer reports available.")
 
-        # Inject trade config into the execution packet for the agent
-        execution_packet["trade_config"] = trade_config or {}
+        execution_packets = [
+            self._build_execution_packet(market_date, stock_payload, report, trade_config or {})
+            for report in stock_reports[: max(1, int(self.config.stock_analyzer_top_n))]
+        ]
+        execution_packets = [packet for packet in execution_packets if packet]
+        if not execution_packets:
+            return self._save_no_trade_payload(market_date, stock_payload, "No executable stock packets available.")
 
         existing = self.storage.load_snapshot(self.config.executioner_latest_path)
-        if not force and not self._should_refresh(existing, execution_packet):
-            print("Executioner report is still fresh.")
+        if not force and not self._should_refresh(existing, execution_packets):
+            print("Executioner batch is still fresh.")
             return existing
 
-        chart_paths = execution_packet["selected_stock"]["chart_paths"]
-        report_text = self.agent.analyze(execution_packet, chart_paths, trade_config=trade_config)
-        decision = self._parse_execution_report(report_text, execution_packet)
+        results: List[Dict[str, Any]] = []
+        for index, packet in enumerate(execution_packets, 1):
+            selected = packet["selected_stock"]
+            print(f"[execution {index}] Evaluating {selected.get('display_name') or selected.get('symbol')}...")
+            self.toolkit.set_allowed_security_id(int(selected.get("security_id") or 0))
+            chart_paths = selected["chart_paths"]
+            report_text = self.agent.analyze(packet, chart_paths, trade_config=trade_config)
+            decision = self._parse_execution_report(report_text, packet)
+            results.append(
+                {
+                    "rank": index,
+                    "selected_stock": selected,
+                    "execution_packet": packet,
+                    "decision": decision,
+                    "report_text": report_text,
+                }
+            )
 
         payload = {
             "stage": "executioner",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
             "summary": {
                 "market_date": market_date,
-                "status": decision.get("execution_status"),
-                "selected_security_id": decision.get("selected_security_id"),
-                "selected_display_name": decision.get("selected_display_name"),
-                "action": decision.get("action"),
-                "trade_side": decision.get("trade_side"),
-                "quantity": decision.get("quantity"),
-                "order_type": decision.get("order_type"),
-                "order_id": decision.get("order_id"),
-                "correlation_id": decision.get("correlation_id"),
-                "source_snapshots": execution_packet["summary"]["source_snapshots"],
-                "chart_count": len(chart_paths),
+                "status": "completed",
+                "executed_count": sum(1 for item in results if (item.get("decision") or {}).get("action") == "trade"),
+                "evaluated_count": len(results),
+                "selected_security_ids": [
+                    int((item.get("selected_stock") or {}).get("security_id") or 0) for item in results
+                ],
+                "decisions": [item.get("decision") for item in results],
+                "source_snapshots": {
+                    "stock_analyzer_generated_at_utc": stock_payload.get("generated_at_utc"),
+                },
+                "chart_count": sum(len((item.get("selected_stock") or {}).get("chart_paths") or []) for item in results),
             },
-            "execution_packet": execution_packet,
-            "decision": decision,
-            "report_text": report_text,
+            "results": results,
+            "decision": {
+                "action": "batch",
+                "executed_count": sum(1 for item in results if (item.get("decision") or {}).get("action") == "trade"),
+                "evaluated_count": len(results),
+            },
+            "report_text": self._build_batch_report(results),
         }
         self._save_payload(payload)
-        print(
-            f"Saved executioner snapshot. Decision: {decision.get('action')} {decision.get('selected_display_name')} ({decision.get('execution_status')})."
-        )
+        print(f"Saved executioner batch snapshot for {len(results)} stock(s).")
         return payload
 
     def _build_execution_packet(
         self,
         market_date: str,
-        risk_payload: Dict[str, Any],
         stock_payload: Dict[str, Any],
+        selected_report: Dict[str, Any],
+        trade_config: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
-        risk_packet = risk_payload.get("risk_packet") or {}
-        decision = risk_payload.get("decision") or {}
-        selected_security_id = int(decision.get("selected_security_id") or 0)
-        selected_report = self._resolve_selected_stock_report(
-            stock_payload=stock_payload,
-            risk_payload=risk_payload,
-            decision=decision,
-        )
-
-        if not selected_report:
-            return None
-
         selected_stock = self._normalize_selected_stock(selected_report)
         if not selected_stock["chart_paths"]:
-            raise RuntimeError("executioner_missing_chart_paths")
+            return None
 
         analysis_payload = selected_report.get("analysis_report")
         if analysis_payload is None:
@@ -113,89 +118,45 @@ class ExecutionerRunner:
             "market_date": market_date,
             "summary": {
                 "source_snapshots": {
-                    "risk_analyzer_generated_at_utc": risk_payload.get("generated_at_utc"),
                     "stock_analyzer_generated_at_utc": stock_payload.get("generated_at_utc"),
-                    "regime_generated_at_utc": (risk_packet.get("summary") or {}).get("source_snapshots", {}).get(
-                        "regime_generated_at_utc"
-                    ),
                 }
             },
             "selected_stock": selected_stock,
             "stock_analysis": self._normalize_stock_analysis(analysis_payload),
-            "risk_decision": decision,
-            "risk_report_text": risk_payload.get("report_text"),
-            "market_context": risk_packet.get("market_context") or risk_packet.get("regime") or {},
-            "account_context": risk_packet.get("account_context") or {},
+            "account_context": self._build_account_context(),
             "user_profile": self.dhan.fetch_user_profile(),
+            "trade_config": trade_config,
         }
 
-    def _resolve_selected_stock_report(
-        self,
-        *,
-        stock_payload: Dict[str, Any],
-        risk_payload: Dict[str, Any],
-        decision: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
-        selected_security_id = int(decision.get("selected_security_id") or 0)
-        selected_display_name = str(decision.get("selected_display_name") or "").strip()
-        selected_symbol = str(decision.get("selected_symbol") or "").strip()
+    def _build_account_context(self) -> Dict[str, Any]:
+        holdings = self.dhan.fetch_holdings()
+        positions = self.dhan.fetch_positions()
+        fund_limits = self.dhan.fetch_fund_limits()
 
-        stock_reports = list(stock_payload.get("reports") or [])
-        risk_selected_report = risk_payload.get("selected_report")
+        holdings_rows = holdings.get("data") if isinstance(holdings.get("data"), list) else []
+        positions_rows = positions.get("data") if isinstance(positions.get("data"), list) else []
+        raw_fund_data = fund_limits.get("data") if isinstance(fund_limits.get("data"), dict) else {}
+        fund_data = raw_fund_data.get("data") if isinstance(raw_fund_data.get("data"), dict) else raw_fund_data
 
-        if selected_security_id > 0:
-            matched = self._match_stock_report_by_security_id(stock_reports, selected_security_id)
-            if matched:
-                return matched
-
-        if selected_display_name:
-            matched = self._match_stock_report_by_text(stock_reports, selected_display_name)
-            if matched:
-                return matched
-
-        if selected_symbol:
-            matched = self._match_stock_report_by_text(stock_reports, selected_symbol)
-            if matched:
-                return matched
-
-        if risk_selected_report:
-            return risk_selected_report
-
-        return None
-
-    def _match_stock_report_by_security_id(
-        self,
-        stock_reports: List[Dict[str, Any]],
-        selected_security_id: int,
-    ) -> Optional[Dict[str, Any]]:
-        for report in stock_reports:
-            candidate = report.get("candidate") or {}
-            try:
-                if int(candidate.get("security_id") or 0) == selected_security_id:
-                    return report
-            except Exception:
-                continue
-        return None
-
-    def _match_stock_report_by_text(
-        self,
-        stock_reports: List[Dict[str, Any]],
-        text: str,
-    ) -> Optional[Dict[str, Any]]:
-        needle = self._normalize_text(text)
-        if not needle:
-            return None
-
-        for report in stock_reports:
-            candidate = report.get("candidate") or {}
-            haystacks = [
-                candidate.get("display_name"),
-                candidate.get("symbol"),
-            ]
-            for haystack in haystacks:
-                if self._normalize_text(str(haystack or "")) == needle:
-                    return report
-        return None
+        return {
+            "holdings": {"status": holdings.get("status"), "count": len(holdings_rows), "items": holdings_rows},
+            "positions": {
+                "status": positions.get("status"),
+                "count": len(positions_rows),
+                "open_intraday_count": sum(
+                    1
+                    for row in positions_rows
+                    if str(row.get("productType", "")).upper() == "INTRADAY" and float(row.get("netQty") or 0) != 0.0
+                ),
+                "items": positions_rows,
+            },
+            "funds": {"status": fund_limits.get("status"), "data": fund_data},
+            "fetch_status": {
+                "holdings": holdings.get("status"),
+                "positions": positions.get("status"),
+                "funds": fund_limits.get("status"),
+            },
+        }
 
     def _normalize_selected_stock(self, selected_report: Dict[str, Any]) -> Dict[str, Any]:
         candidate = selected_report.get("candidate") or {}
@@ -203,23 +164,25 @@ class ExecutionerRunner:
         chart_artifacts = base.get("chart_artifacts") or selected_report.get("chart_artifacts") or {}
         charts = chart_artifacts.get("charts") or {}
 
-        # Collect ALL chart paths (current day + previous day, all timeframes)
-        # Use chart_paths_ordered if available (from updated charting service)
         chart_paths: List[str] = []
         ordered = chart_artifacts.get("chart_paths_ordered")
         if ordered and isinstance(ordered, list):
             chart_paths = [str(p) for p in ordered]
         else:
-            # Fallback: collect all chart paths from charts dict in a sensible order
             preferred_order = [
-                "current_1m", "current_5m", "current_15m", "current_30m", "current_1h",
-                "previous_5m", "previous_15m", "previous_1h",
+                "current_1m",
+                "current_5m",
+                "current_15m",
+                "current_30m",
+                "current_1h",
+                "previous_5m",
+                "previous_15m",
+                "previous_1h",
             ]
             for key in preferred_order:
                 path = (charts.get(key) or {}).get("path")
                 if path:
                     chart_paths.append(str(path))
-            # Also check legacy keys (5m, 15m) for backward compat
             if not chart_paths:
                 for timeframe in ("5m", "15m"):
                     path = (charts.get(timeframe) or {}).get("path")
@@ -258,9 +221,6 @@ class ExecutionerRunner:
     def _extract_last_sentence(self, text: str) -> str:
         chunks = [chunk.strip() for chunk in re.split(r"(?<=[.!?])\s+", text) if chunk.strip()]
         return chunks[-1] if chunks else ""
-
-    def _normalize_text(self, value: str) -> str:
-        return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
     def _parse_execution_report(
         self,
@@ -372,19 +332,33 @@ class ExecutionerRunner:
             return default
         return " ".join(match.group(1).strip().split())
 
-    def _should_refresh(self, existing: Optional[Dict[str, Any]], execution_packet: Dict[str, Any]) -> bool:
+    def _build_batch_report(self, results: List[Dict[str, Any]]) -> str:
+        chunks = []
+        for item in results:
+            stock = item.get("selected_stock") or {}
+            decision = item.get("decision") or {}
+            chunks.append(
+                f"{item.get('rank')}. {stock.get('display_name') or stock.get('symbol')} - "
+                f"{decision.get('action')} / {decision.get('execution_status')} / "
+                f"qty={decision.get('quantity')}"
+            )
+        return "\n".join(chunks)
+
+    def _should_refresh(self, existing: Optional[Dict[str, Any]], execution_packets: List[Dict[str, Any]]) -> bool:
         if not existing:
             return True
 
         summary = existing.get("summary") or {}
-        if summary.get("market_date") != execution_packet.get("market_date"):
+        if summary.get("market_date") != execution_packets[0].get("market_date"):
             return True
 
-        if int(summary.get("selected_security_id") or 0) != int(execution_packet["selected_stock"]["security_id"] or 0):
+        expected_ids = [int(packet["selected_stock"]["security_id"] or 0) for packet in execution_packets]
+        actual_ids = [int(item) for item in summary.get("selected_security_ids") or []]
+        if actual_ids != expected_ids:
             return True
 
         existing_sources = summary.get("source_snapshots") or {}
-        if existing_sources != execution_packet["summary"].get("source_snapshots"):
+        if existing_sources != execution_packets[0]["summary"].get("source_snapshots"):
             return True
 
         generated_at = existing.get("generated_at_utc")
@@ -397,39 +371,24 @@ class ExecutionerRunner:
         age_seconds = (datetime.now(timezone.utc) - generated_dt).total_seconds()
         return age_seconds >= self.config.executioner_report_refresh_seconds
 
-    def _save_no_trade_payload(self, market_date: str, risk_payload: Dict[str, Any], reason: str) -> Dict[str, Any]:
+    def _save_no_trade_payload(self, market_date: str, stock_payload: Dict[str, Any], reason: str) -> Dict[str, Any]:
         payload = {
             "stage": "executioner",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
             "summary": {
                 "market_date": market_date,
                 "status": "skipped",
-                "selected_security_id": 0,
-                "selected_display_name": "NONE",
-                "action": "avoid",
-                "trade_side": "avoid",
-                "quantity": 0,
-                "order_type": "NONE",
-                "order_id": "NONE",
-                "correlation_id": "NONE",
+                "executed_count": 0,
+                "evaluated_count": 0,
+                "selected_security_ids": [],
+                "decisions": [],
                 "source_snapshots": {
-                    "risk_analyzer_generated_at_utc": risk_payload.get("generated_at_utc"),
+                    "stock_analyzer_generated_at_utc": stock_payload.get("generated_at_utc"),
                 },
                 "chart_count": 0,
             },
-            "execution_packet": None,
-            "decision": {
-                "selected_security_id": 0,
-                "selected_display_name": "NONE",
-                "action": "avoid",
-                "execution_status": "skipped",
-                "trade_side": "avoid",
-                "order_type": "NONE",
-                "quantity": 0,
-                "reference_price": 0.0,
-                "correlation_id": "NONE",
-                "order_id": "NONE",
-            },
+            "results": [],
+            "decision": {"action": "avoid", "executed_count": 0, "evaluated_count": 0},
             "report_text": reason,
         }
         self._save_payload(payload)
