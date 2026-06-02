@@ -257,7 +257,16 @@ class ExecutionerRunner:
 
         execution_status = execution_status_raw.strip().lower()
         if execution_status not in {"planned", "placed", "skipped", "blocked", "failed"}:
-            execution_status = self._infer_execution_status(report_text)
+            if "failed" in execution_status or "rejected" in execution_status:
+                execution_status = "failed"
+            elif "blocked" in execution_status:
+                execution_status = "blocked"
+            elif "placed" in execution_status:
+                execution_status = "placed"
+            elif "planned" in execution_status:
+                execution_status = "planned"
+            else:
+                execution_status = self._infer_execution_status(report_text)
 
         trade_side = trade_side_raw.strip().lower()
         if trade_side not in {"buy", "sell", "avoid"}:
@@ -294,12 +303,14 @@ class ExecutionerRunner:
 
     def _infer_execution_status(self, report_text: str) -> str:
         text = report_text.lower()
-        if "placed" in text or "order id" in text or "executed" in text:
-            return "placed"
-        if "blocked" in text:
-            return "blocked"
         if "failed" in text or "rejected" in text:
             return "failed"
+        if "blocked" in text:
+            return "blocked"
+        if "not placed" in text or "no order placed" in text or "order id: n/a" in text or "order id:** n/a" in text:
+            return "skipped"
+        if "placed" in text or "order id" in text or "executed" in text:
+            return "placed"
         if "planned" in text:
             return "planned"
         return "skipped"
@@ -329,8 +340,12 @@ class ExecutionerRunner:
         pattern = rf"(?is){re.escape(header)}\s*:\s*(.+?)(?=\s*(?:{alternatives})\s*:|\Z)"
         match = re.search(pattern, report_text)
         if not match:
+            bold_pattern = rf"(?is)\*+\s*{re.escape(header)}\s*\*+\s*:\s*(.+?)(?=\s*(?:[-*]\s*)?\*+\s*(?:{alternatives})\s*\*+\s*:|\s*(?:{alternatives})\s*:|\Z)"
+            match = re.search(bold_pattern, report_text)
+        if not match:
             return default
-        return " ".join(match.group(1).strip().split())
+        value = " ".join(match.group(1).strip().split())
+        return value.strip(" -*")
 
     def _build_batch_report(self, results: List[Dict[str, Any]]) -> str:
         chunks = []

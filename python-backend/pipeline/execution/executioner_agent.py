@@ -75,6 +75,9 @@ class ExecutionerAgent:
                 "Never call destructive or management tools: exit_position, exit_all_intraday_positions, cancel_order, modify_order, cancel_super_order, modify_super_order, convert_position, cancel_forever_order, modify_forever_order, delete_conditional_trigger, cancel_conditional_trigger, or modify_conditional_trigger.",
                 "Never place an exit-only order. Never place a SELL to close an existing long or a BUY to close an existing short. This agent only creates a new entry when there is no selected-stock overlap.",
                 "After a live order is placed, do not monitor the trade, chase fills, modify prices, cancel orders, or issue exits. Verify the placed order once if needed, then output the result and stop.",
+                "Order placement retry limit: make at most one place_protected_intraday_super_order attempt. If it fails with a broker/API input error, stop immediately. Only use one place_intraday_equity_order fallback if the protected order is unavailable for a non-input-error reason.",
+                "If any Dhan placement tool returns DH-905, Input_Exception, invalid parameters, missing fields, or bad values, do not retry with alternate order types. Report execution_status failed and stop.",
+                "Use only Dhan-documented order_type values: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_MARKET. Do not use SL, SL-L, SL-M, or other aliases in tool calls.",
                 "Only avoid because of concrete execution checks: insufficient usable balance or margin, dangerous position overlap, invalid quantity, tool/API block, stale or contradictory selected-stock evidence, or chart setup deterioration.",
                 "Only place an order if account has usable balance, there is no dangerous position overlap, the stock setup is still attractive from the images, and quantity is positive.",
                 "If live order placement, Super Order placement, static IP whitelisting, or margin validation blocks the trade, treat that as an execution block and do not pretend an order was sent.",
@@ -128,6 +131,8 @@ class ExecutionerAgent:
             "hard_scope": "Act only on selected_stock.security_id. Other account orders and positions are read-only context.",
             "forbidden_actions": "Do not exit, cancel, modify, convert, hedge, or close any order or position. Do not manage trades after entry.",
             "terminal_behavior": "After placing one protected order, optionally verify once, then output the result and stop.",
+            "retry_limit": "One protected entry attempt only. Stop on DH-905/Input_Exception. At most one normal entry fallback for non-input-error protected-order unavailability.",
+            "order_type_enums": "Use only LIMIT, MARKET, STOP_LOSS, STOP_LOSS_MARKET.",
         }
         return (
             "Make the final entry-only intraday execution decision for the supplied stock.\n"
