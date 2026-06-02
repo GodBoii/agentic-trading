@@ -177,7 +177,6 @@ export default function TradingStatus() {
     const stageLabels: Record<string, string> = {
         stage2: 'Stage 2',
         stock_analyzer: 'Stock Analyzer',
-        risk_analyzer: 'Risk Analyzer',
         executioner: 'Executioner',
     }
 
@@ -339,7 +338,7 @@ export default function TradingStatus() {
                     <div className="text-xs text-brutal-cream/70 font-mono leading-relaxed">
                         <p className="font-bold mb-2 uppercase tracking-wide">Safety First</p>
                         <p>
-                            AI trading runs only when you press start. The agents execute once in order: stock analyzer, risk analyzer, then executioner.
+                            AI trading runs only when you press start. The agents execute once in order: stock analyzer, then executioner.
                         </p>
                     </div>
                 </div>

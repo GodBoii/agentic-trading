@@ -28,11 +28,10 @@ interface AgentRunStatus {
 const stageLabels: Record<string, string> = {
     stage2: 'Stage 2 Momentum',
     stock_analyzer: 'Stock Analyzer',
-    risk_analyzer: 'Risk Analyzer',
     executioner: 'Executioner',
 }
 
-const stageOrder = ['stage2', 'stock_analyzer', 'risk_analyzer', 'executioner']
+const stageOrder = ['stage2', 'stock_analyzer', 'executioner']
 
 function formatTime(value?: string | null) {
     if (!value) return ''
@@ -74,6 +73,32 @@ function stageBody(stage: string, data?: AgentStage) {
                         </p>
                         <p className="text-sm text-brutal-cream/75 mt-2 whitespace-pre-wrap">
                             {report.analysis}
+                        </p>
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
+    const executionResults = data.details?.results || []
+    if (stage === 'executioner' && executionResults.length > 0) {
+        return (
+            <div className="space-y-3">
+                {executionResults.map((result: any) => (
+                    <div key={`${result.rank}-${result.display_name}`} className="border-t-3 border-brutal-cream/10 pt-3 first:border-t-0 first:pt-0">
+                        <p className="text-brutal-green font-mono text-xs font-bold uppercase">
+                            #{result.rank} {result.display_name || 'Stock'}
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                            {Object.entries(result.decision || {}).slice(0, 8).map(([key, value]) => (
+                                <div key={key} className="border-3 border-brutal-cream/20 p-3">
+                                    <p className="text-[10px] text-brutal-cream/50 font-mono uppercase">{key.replaceAll('_', ' ')}</p>
+                                    <p className="text-sm text-brutal-cream font-mono font-bold break-words">{String(value)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-sm text-brutal-cream/75 mt-3 whitespace-pre-wrap">
+                            {result.report_text}
                         </p>
                     </div>
                 ))}

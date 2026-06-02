@@ -96,7 +96,7 @@ async function writeStartRequest(user: { id: string; email?: string | null }, tr
 async function loadRunStatus() {
   try {
     const raw = await fs.readFile(statusFilePath, 'utf8')
-    return JSON.parse(raw)
+    return normalizeRunStatus(JSON.parse(raw))
   } catch {
     return {
       status: 'idle',
@@ -105,10 +105,36 @@ async function loadRunStatus() {
       stages: {
         stage2: { status: 'pending', summary: null, details: null },
         stock_analyzer: { status: 'pending', summary: null },
-        risk_analyzer: { status: 'pending', summary: null },
         executioner: { status: 'pending', summary: null },
       },
     }
+  }
+}
+
+function normalizeRunStatus(status: any) {
+  if (!status || typeof status !== 'object') return status
+  if (status.status !== 'running') return status
+
+  const updatedAtMs = Date.parse(String(status.updated_at_utc || ''))
+  const maxRunningMs = Number(process.env.AI_TRADING_RUNNING_STATUS_TTL_MS || 15 * 60 * 1000)
+  if (Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs <= maxRunningMs) {
+    return status
+  }
+
+  const currentStage = String(status.current_stage || '')
+  const stages = { ...(status.stages || {}) }
+  if (currentStage && stages[currentStage]?.status === 'running') {
+    stages[currentStage] = { ...stages[currentStage], status: 'stale' }
+  }
+
+  return {
+    ...status,
+    status: 'stale',
+    current_stage: 'idle',
+    updated_at_utc: new Date().toISOString(),
+    message: 'Previous AI trading run was interrupted before completion. Start a new run when ready.',
+    stale_previous_stage: currentStage || null,
+    stages,
   }
 }
 
