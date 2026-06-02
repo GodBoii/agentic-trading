@@ -186,12 +186,17 @@ export async function POST(request: NextRequest) {
       trade_mode: tradeMode,
       trade_amount: tradeAmount,
     }
-    const backendPayload = enabled
-      ? await callTradingBackend('/ai-trading/start', {
-        method: 'POST',
-        body: JSON.stringify(localRequest),
-      })
-      : null
+    let backendPayload = null
+    if (enabled) {
+      try {
+        backendPayload = await callTradingBackend('/ai-trading/start', {
+          method: 'POST',
+          body: JSON.stringify(localRequest),
+        })
+      } catch (error) {
+        console.warn('[Toggle API] AI trading backend unavailable, falling back to request file:', error)
+      }
+    }
     const startRequest = enabled
       ? backendPayload?.request || await writeStartRequest({ id: user.id, email: user.email }, { trade_mode: tradeMode, trade_amount: tradeAmount })
       : null
@@ -210,9 +215,13 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const backendPayload = await callTradingBackend('/ai-trading/status', { method: 'GET' })
-    if (backendPayload) {
-      return NextResponse.json(backendPayload)
+    try {
+      const backendPayload = await callTradingBackend('/ai-trading/status', { method: 'GET' })
+      if (backendPayload) {
+        return NextResponse.json(normalizeRunStatus(backendPayload))
+      }
+    } catch (error) {
+      console.warn('[Toggle API] AI trading backend status unavailable, falling back to status file:', error)
     }
     return NextResponse.json(await loadRunStatus())
   } catch (error) {
