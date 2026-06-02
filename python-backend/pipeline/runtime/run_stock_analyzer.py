@@ -48,7 +48,13 @@ class MultiStockAnalyzerRunner:
         if not monitor_payload:
             monitor_payload = self.storage.load_snapshot(self.config.monitor_latest_path)
 
-        selected_candidates, candidate_source = self._select_candidates(stage2_payload, monitor_payload, trade_config)
+        account_context = self._build_account_context()
+        effective_trade_config = self._with_effective_trade_amount(trade_config, account_context)
+        selected_candidates, candidate_source = self._select_candidates(
+            stage2_payload,
+            monitor_payload,
+            effective_trade_config,
+        )
         if not selected_candidates:
             raise RuntimeError("stock_analyzer_no_candidates_selected")
 
@@ -60,6 +66,7 @@ class MultiStockAnalyzerRunner:
                 stage2_payload=stage2_payload,
                 monitor_payload=monitor_payload,
                 regime_payload=regime_payload,
+                account_context=account_context,
             )
             for candidate_record in selected_candidates
         ]
@@ -106,23 +113,14 @@ class MultiStockAnalyzerRunner:
     ) -> tuple[List[Dict[str, Any]], str]:
         top_n = max(1, int(self.config.stock_analyzer_top_n))
 
-        monitor_stocks = monitor_payload.get("stocks") if monitor_payload else None
-        if isinstance(monitor_stocks, list) and monitor_stocks:
-            filtered = self._filter_by_trade_budget(monitor_stocks, trade_config)
-            if filtered:
-                return filtered[:top_n], "monitor"
-            return monitor_stocks[:top_n], "monitor"
+        stage2_stocks = self._build_stage2_selection_pool(stage2_payload)[:10]
 
-        stage2_stocks = list(stage2_payload.get("stocks") or [])
-
-        # Filter by trade budget: pick stocks whose price is within the user's budget
         filtered_stocks = self._filter_by_trade_budget(stage2_stocks, trade_config)
-        if filtered_stocks and len(filtered_stocks) >= top_n:
-            return filtered_stocks[:top_n], "stage2"
-
-        # If filtered gives enough, use them; otherwise fall back to unfiltered
         if filtered_stocks:
             return filtered_stocks[:top_n], "stage2"
+
+        if self._is_manual_mode(trade_config):
+            return stage2_stocks[:top_n], "stage2_manual_fallback"
 
         if len(stage2_stocks) >= top_n:
             return stage2_stocks[:top_n], "stage2"
@@ -146,12 +144,77 @@ class MultiStockAnalyzerRunner:
             raise RuntimeError("stock_analyzer_no_stage2_candidates")
         return combined, "stage2_fallback"
 
+    def _with_effective_trade_amount(
+        self,
+        trade_config: Optional[Dict[str, Any]],
+        account_context: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        if not trade_config:
+            return trade_config
+        copied = dict(trade_config)
+        trade_mode = str(copied.get("trade_mode") or "auto").lower()
+        if trade_mode == "auto" and not copied.get("trade_amount"):
+            fund_data = (account_context.get("funds") or {}).get("data") or {}
+            available_balance = (
+                fund_data.get("availabelBalance")
+                or fund_data.get("availableBalance")
+                or fund_data.get("sodLimit")
+            )
+            if available_balance:
+                copied["trade_amount"] = float(available_balance)
+        return copied
+
+    def _build_stage2_selection_pool(self, stage2_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        passed = self._sort_by_stage2_score(list(stage2_payload.get("stocks") or []))
+        near_misses = list((stage2_payload.get("summary") or {}).get("near_misses") or [])
+        stage1_lookup = self._load_stage1_lookup()
+
+        combined: List[Dict[str, Any]] = []
+        seen_security_ids: set[int] = set()
+        for row in passed + near_misses:
+            try:
+                security_id = int(row.get("security_id"))
+            except Exception:
+                continue
+            if security_id in seen_security_ids:
+                continue
+            seen_security_ids.add(security_id)
+            enriched = dict(row)
+            stage1_row = stage1_lookup.get(security_id, {})
+            for key in ("price", "adv_20_cr", "atr_percent", "instrument", "symbol", "display_name"):
+                if enriched.get(key) in (None, "") and stage1_row.get(key) not in (None, ""):
+                    enriched[key] = stage1_row.get(key)
+            combined.append(enriched)
+        return combined
+
+    def _load_stage1_lookup(self) -> Dict[int, Dict[str, Any]]:
+        payload = self.storage.load_snapshot(self.config.stage1_daily_path(self.market_time.market_date_str()))
+        if not payload:
+            payload = self.storage.load_snapshot(self.config.stage1_latest_path)
+        lookup: Dict[int, Dict[str, Any]] = {}
+        for row in (payload or {}).get("stocks") or []:
+            try:
+                lookup[int(row.get("security_id"))] = row
+            except Exception:
+                continue
+        return lookup
+
+    def _is_manual_mode(self, trade_config: Optional[Dict[str, Any]]) -> bool:
+        if not trade_config:
+            return False
+        return str(trade_config.get("trade_mode") or "auto").lower() == "manual"
+
+    def _sort_by_stage2_score(self, stocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        copied = list(stocks)
+        copied.sort(key=lambda s: float(s.get("stage2_score") or s.get("score") or 0), reverse=True)
+        return copied
+
     def _filter_by_trade_budget(
         self,
         stocks: List[Dict[str, Any]],
         trade_config: Optional[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        """Filter stocks whose price is within the trade budget so at least 1 share can be bought."""
+        """Filter the Stage 2 top ten by manual amount before analyzing top candidates."""
         if not trade_config:
             return []
         trade_mode = str(trade_config.get("trade_mode") or "auto").lower()
@@ -160,17 +223,49 @@ class MultiStockAnalyzerRunner:
         if trade_mode == "manual" and trade_amount:
             budget = float(trade_amount)
         elif trade_mode == "auto":
-            # In auto mode, use account balance fetched by risk analyzer later.
-            # At stock selection stage, we don't filter since balance isn't known yet.
             return []
         else:
             return []
 
-        # Filter stocks where at least 1 share can be purchased within the budget
         affordable = [s for s in stocks if float(s.get("price") or 0) <= budget and float(s.get("price") or 0) > 0]
-        # Sort by stage2_score descending (best first) to pick highest momentum affordable stocks
-        affordable.sort(key=lambda s: float(s.get("stage2_score") or 0), reverse=True)
-        return affordable
+        return self._sort_by_stage2_score(affordable)
+
+    def _build_account_context(self) -> Dict[str, Any]:
+        holdings = self.dhan.fetch_holdings()
+        positions = self.dhan.fetch_positions()
+        fund_limits = self.dhan.fetch_fund_limits()
+
+        holdings_rows = holdings.get("data") if isinstance(holdings.get("data"), list) else []
+        positions_rows = positions.get("data") if isinstance(positions.get("data"), list) else []
+        raw_fund_data = fund_limits.get("data") if isinstance(fund_limits.get("data"), dict) else {}
+        fund_data = raw_fund_data.get("data") if isinstance(raw_fund_data.get("data"), dict) else raw_fund_data
+
+        return {
+            "holdings": {
+                "status": holdings.get("status"),
+                "count": len(holdings_rows),
+                "items": holdings_rows,
+            },
+            "positions": {
+                "status": positions.get("status"),
+                "count": len(positions_rows),
+                "open_intraday_count": sum(
+                    1
+                    for row in positions_rows
+                    if str(row.get("productType", "")).upper() == "INTRADAY" and float(row.get("netQty") or 0) != 0.0
+                ),
+                "items": positions_rows,
+            },
+            "funds": {
+                "status": fund_limits.get("status"),
+                "data": fund_data,
+            },
+            "fetch_status": {
+                "holdings": holdings.get("status"),
+                "positions": positions.get("status"),
+                "funds": fund_limits.get("status"),
+            },
+        }
 
     def _analyze_candidates(self, candidate_packets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         max_workers = min(len(candidate_packets), max(1, int(self.config.stock_analyzer_top_n)))
@@ -264,6 +359,7 @@ class MultiStockAnalyzerRunner:
         stage2_payload: Dict[str, Any],
         monitor_payload: Optional[Dict[str, Any]],
         regime_payload: Dict[str, Any],
+        account_context: Dict[str, Any],
     ) -> Dict[str, Any]:
         security_id = int(candidate_record["security_id"])
         stage2_record = self._find_stock(stage2_payload, security_id)
@@ -302,6 +398,7 @@ class MultiStockAnalyzerRunner:
                 "intraday_value_cr": monitor_record.get("intraday_value_cr") if monitor_record else None,
             },
             "market_context": market_context,
+            "account_context": account_context,
             "source_snapshots": {
                 "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
                 "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
