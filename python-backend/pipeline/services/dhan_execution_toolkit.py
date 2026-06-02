@@ -23,39 +23,12 @@ class DhanExecutionToolkit(Toolkit):
                 self.calculate_margin_requirement,
                 self.calculate_multi_order_margin,
                 self.calculate_equity_order_quantity,
+                self.calculate_intraday_equity_order_quantity,
                 self.place_intraday_equity_order,
                 self.place_protected_intraday_super_order,
                 self.get_super_order_list,
-                self.modify_super_order,
-                self.cancel_super_order,
-                self.convert_position,
-                self.place_forever_order,
-                self.modify_forever_order,
-                self.cancel_forever_order,
-                self.get_forever_order_list,
-                self.place_conditional_trigger,
-                self.modify_conditional_trigger,
-                self.delete_conditional_trigger,
-                self.get_conditional_trigger_by_id,
-                self.get_all_conditional_triggers,
-                self.exit_position,
-                self.exit_all_intraday_positions,
-                self.activate_kill_switch,
-                self.deactivate_kill_switch,
                 self.get_kill_switch_status,
-                self.configure_pnl_exit,
-                self.disable_pnl_exit,
-                self.get_pnl_exit,
-                self.generate_edis_tpin,
-                self.get_edis_form,
-                self.check_edis_status,
-                self.get_ledger_report,
-                self.get_trade_history,
                 self.get_static_ips,
-                self.set_static_ip,
-                self.modify_static_ip,
-                self.modify_order,
-                self.cancel_order,
             ],
         )
         self.dhan = dhan_service
@@ -67,6 +40,10 @@ class DhanExecutionToolkit(Toolkit):
         self.default_risk_fraction = self._env_float("EXECUTIONER_RISK_FRACTION", 0.01)
         self.max_allocation_fraction = self._env_float("EXECUTIONER_MAX_ALLOCATION_FRACTION", 0.25)
         self.default_exchange_segment = os.getenv("EXECUTIONER_DEFAULT_EXCHANGE_SEGMENT", "BSE_EQ")
+        self.allowed_security_id: Optional[int] = None
+
+    def set_allowed_security_id(self, security_id: Optional[int]) -> None:
+        self.allowed_security_id = int(security_id) if security_id else None
 
     def get_account_snapshot(self) -> str:
         payload = {
@@ -148,6 +125,107 @@ class DhanExecutionToolkit(Toolkit):
             ensure_ascii=True,
         )
 
+    def calculate_intraday_equity_order_quantity(
+        self,
+        security_id: int,
+        side: str,
+        reference_price: float,
+        margin_budget: float,
+        stop_loss_price: Optional[float] = None,
+        max_risk_rupees: Optional[float] = None,
+        max_quantity: Optional[int] = None,
+        product_type: str = "INTRADAY",
+        exchange_segment: str = "BSE_EQ",
+        trigger_price: float = 0.0,
+    ) -> str:
+        """Size an intraday equity order from Dhan's margin for one share.
+
+        Manual trade amount is treated as an intraday margin budget, not as a
+        notional cap. The final order still needs a margin check for the chosen
+        quantity immediately before placement.
+        """
+        normalized_side = str(side).strip().upper()
+        budget = max(0.0, float(margin_budget))
+        entry = max(0.0, float(reference_price))
+        stop = float(stop_loss_price) if stop_loss_price is not None else None
+        normalized_exchange_segment = self._normalize_exchange_segment(exchange_segment, int(security_id))
+
+        validation_error = self._validate_order_inputs(normalized_side, 1)
+        if validation_error:
+            return validation_error
+        if budget <= 0 or entry <= 0:
+            return json.dumps(
+                {
+                    "status": "failure",
+                    "remarks": "invalid_budget_or_reference_price",
+                    "margin_budget": budget,
+                    "reference_price": entry,
+                },
+                ensure_ascii=True,
+            )
+
+        one_share_margin = self.dhan.calculate_margin_requirement(
+            security_id=int(security_id),
+            exchange_segment=normalized_exchange_segment,
+            transaction_type=normalized_side,
+            quantity=1,
+            product_type=str(product_type).strip().upper(),
+            price=entry,
+            trigger_price=float(trigger_price),
+        )
+        margin_data = one_share_margin.get("data") if isinstance(one_share_margin.get("data"), dict) else one_share_margin
+        try:
+            margin_per_share = float(margin_data.get("totalMargin"))
+        except Exception:
+            margin_per_share = 0.0
+        if margin_per_share <= 0:
+            return json.dumps(
+                {
+                    "status": "failure",
+                    "remarks": "invalid_margin_per_share",
+                    "margin_response": one_share_margin,
+                },
+                ensure_ascii=True,
+            )
+
+        qty_by_margin = int(budget // margin_per_share)
+        qty_by_risk: Optional[int] = None
+        per_share_risk: Optional[float] = None
+        if stop is not None and max_risk_rupees is not None and float(max_risk_rupees) > 0:
+            per_share_risk = abs(entry - stop)
+            qty_by_risk = int(float(max_risk_rupees) // per_share_risk) if per_share_risk > 0 else qty_by_margin
+
+        caps = [qty_by_margin]
+        if qty_by_risk is not None:
+            caps.append(qty_by_risk)
+        if max_quantity is not None and int(max_quantity) > 0:
+            caps.append(int(max_quantity))
+        recommended_qty = max(0, min(caps))
+
+        return json.dumps(
+            {
+                "status": "success",
+                "security_id": int(security_id),
+                "side": normalized_side,
+                "exchange_segment": normalized_exchange_segment,
+                "product_type": str(product_type).strip().upper(),
+                "reference_price": entry,
+                "stop_loss_price": stop,
+                "margin_budget": budget,
+                "margin_per_share": margin_per_share,
+                "max_qty_by_margin": qty_by_margin,
+                "max_risk_rupees": float(max_risk_rupees) if max_risk_rupees is not None else None,
+                "per_share_risk": per_share_risk,
+                "max_qty_by_risk": qty_by_risk,
+                "max_quantity": int(max_quantity) if max_quantity is not None else None,
+                "recommended_quantity": recommended_qty,
+                "estimated_margin_required": round(recommended_qty * margin_per_share, 4),
+                "estimated_notional": round(recommended_qty * entry, 4),
+                "one_share_margin_response": one_share_margin,
+            },
+            ensure_ascii=True,
+        )
+
     def calculate_multi_order_margin(
         self,
         scripts_json: str,
@@ -203,6 +281,13 @@ class DhanExecutionToolkit(Toolkit):
                 ensure_ascii=True,
             )
 
+        scope_error = self._validate_selected_security_scope(int(security_id))
+        if scope_error:
+            return scope_error
+        overlap_error = self._validate_no_selected_stock_overlap(int(security_id))
+        if overlap_error:
+            return overlap_error
+
         normalized_side = str(side).strip().upper()
         normalized_order_type = str(order_type).strip().upper()
         normalized_product_type = str(product_type).strip().upper()
@@ -254,6 +339,12 @@ class DhanExecutionToolkit(Toolkit):
     ) -> str:
         if not self.allow_live_orders:
             return self._blocked("live_super_order_placement_disabled")
+        scope_error = self._validate_selected_security_scope(int(security_id))
+        if scope_error:
+            return scope_error
+        overlap_error = self._validate_no_selected_stock_overlap(int(security_id))
+        if overlap_error:
+            return overlap_error
         validation_error = self._validate_order_inputs(side, quantity)
         if validation_error:
             return validation_error
@@ -666,6 +757,112 @@ class DhanExecutionToolkit(Toolkit):
         if int(quantity) <= 0:
             return json.dumps({"status": "failure", "remarks": "invalid_quantity"}, ensure_ascii=True)
         return None
+
+    def _validate_selected_security_scope(self, security_id: int) -> Optional[str]:
+        if self.allowed_security_id is None:
+            return None
+        if int(security_id) != int(self.allowed_security_id):
+            return json.dumps(
+                {
+                    "status": "blocked",
+                    "remarks": "selected_security_scope_violation",
+                    "allowed_security_id": int(self.allowed_security_id),
+                    "requested_security_id": int(security_id),
+                },
+                ensure_ascii=True,
+            )
+        return None
+
+    def _validate_no_selected_stock_overlap(self, security_id: int) -> Optional[str]:
+        overlap = self._find_selected_stock_overlap(int(security_id))
+        if not overlap:
+            return None
+        return json.dumps(
+            {
+                "status": "blocked",
+                "remarks": "selected_stock_already_has_order_or_position",
+                "security_id": int(security_id),
+                "overlap": overlap,
+            },
+            ensure_ascii=True,
+        )
+
+    def _find_selected_stock_overlap(self, security_id: int) -> List[Dict[str, Any]]:
+        overlaps: List[Dict[str, Any]] = []
+        active_statuses = {
+            "PENDING",
+            "TRANSIT",
+            "PART_TRADED",
+            "AMO_REQ_RECEIVED",
+            "AFTER_MARKET_ORDER",
+            "TRADED_PENDING",
+        }
+
+        try:
+            positions = self._extract_data_list(self.dhan.fetch_positions())
+            for row in positions:
+                if str(row.get("securityId") or row.get("security_id") or "") != str(security_id):
+                    continue
+                if str(row.get("productType") or "").upper() != "INTRADAY":
+                    continue
+                net_qty = float(row.get("netQty") or 0)
+                if net_qty != 0.0:
+                    overlaps.append(
+                        {
+                            "type": "position",
+                            "security_id": security_id,
+                            "product_type": row.get("productType"),
+                            "net_qty": net_qty,
+                            "position_type": row.get("positionType"),
+                        }
+                    )
+        except Exception as exc:
+            overlaps.append({"type": "position_check_error", "message": str(exc)})
+
+        try:
+            orders = self._extract_data_list(self.dhan.fetch_order_book())
+            for row in orders:
+                if str(row.get("securityId") or row.get("security_id") or "") != str(security_id):
+                    continue
+                status = str(row.get("orderStatus") or "").upper()
+                if status in active_statuses:
+                    overlaps.append(
+                        {
+                            "type": "order",
+                            "security_id": security_id,
+                            "order_id": row.get("orderId"),
+                            "status": status,
+                            "transaction_type": row.get("transactionType"),
+                            "quantity": row.get("quantity"),
+                            "price": row.get("price"),
+                        }
+                    )
+        except Exception as exc:
+            overlaps.append({"type": "order_check_error", "message": str(exc)})
+
+        try:
+            super_orders = self._extract_data_list(self.dhan.fetch_super_orders())
+            for row in super_orders:
+                if str(row.get("securityId") or row.get("security_id") or "") != str(security_id):
+                    continue
+                status = str(row.get("orderStatus") or "").upper()
+                leg_details = row.get("legDetails") if isinstance(row.get("legDetails"), list) else []
+                has_active_leg = any(str(leg.get("orderStatus") or "").upper() in active_statuses for leg in leg_details if isinstance(leg, dict))
+                if status in active_statuses or has_active_leg:
+                    overlaps.append(
+                        {
+                            "type": "super_order",
+                            "security_id": security_id,
+                            "order_id": row.get("orderId"),
+                            "status": status,
+                            "transaction_type": row.get("transactionType"),
+                            "quantity": row.get("quantity"),
+                        }
+                    )
+        except Exception as exc:
+            overlaps.append({"type": "super_order_check_error", "message": str(exc)})
+
+        return overlaps
 
     def _normalize_exchange_segment(self, exchange_segment: str, security_id: Optional[int] = None) -> str:
         raw = str(exchange_segment or self.default_exchange_segment).strip().upper()
