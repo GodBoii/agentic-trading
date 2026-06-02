@@ -11,7 +11,6 @@ from urllib.parse import urlparse
 
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_executioner import ExecutionerRunner
-from pipeline.runtime.run_risk_analyzer import RiskAnalyzerRunner
 from pipeline.runtime.run_sorting import wait_for_current_stage2_snapshot
 from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
@@ -23,7 +22,6 @@ class AITradingOrchestrator:
         self.config = config or PipelineConfig()
         self.storage = StorageService
         self.stock_analyzer = MultiStockAnalyzerRunner(self.config)
-        self.risk_analyzer = RiskAnalyzerRunner(self.config)
         self.executioner = ExecutionerRunner(self.config)
         self.last_request_id: Optional[str] = None
         self._boot_time_utc = datetime.now(timezone.utc)
@@ -84,6 +82,10 @@ class AITradingOrchestrator:
     def load_run_status(self) -> Dict[str, Any]:
         status = self.storage.load_snapshot(self.config.ai_trading_run_status_path)
         if isinstance(status, dict):
+            if self._is_stale_running_status(status):
+                stale_status = self._stale_status(status)
+                self.storage.save_snapshot(self.config.ai_trading_run_status_path, stale_status)
+                return stale_status
             return status
         return {
             "status": "idle",
@@ -92,10 +94,38 @@ class AITradingOrchestrator:
             "stages": {
                 "stage2": {"status": "pending", "summary": None, "details": None},
                 "stock_analyzer": {"status": "pending", "summary": None, "details": None},
-                "risk_analyzer": {"status": "pending", "summary": None, "details": None},
                 "executioner": {"status": "pending", "summary": None, "details": None},
             },
         }
+
+    def _is_stale_running_status(self, status: Dict[str, Any]) -> bool:
+        if status.get("status") != "running":
+            return False
+        updated_at = status.get("updated_at_utc")
+        if not updated_at:
+            return True
+        try:
+            updated_dt = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return True
+        return updated_dt < self._boot_time_utc
+
+    def _stale_status(self, status: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(status)
+        stages = dict(payload.get("stages") or {})
+        current_stage = str(payload.get("current_stage") or "")
+        if current_stage and current_stage in stages:
+            stage_payload = dict(stages.get(current_stage) or {})
+            if stage_payload.get("status") == "running":
+                stage_payload["status"] = "stale"
+                stages[current_stage] = stage_payload
+        payload["status"] = "stale"
+        payload["current_stage"] = "idle"
+        payload["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
+        payload["message"] = "Previous AI trading run was interrupted before completion. Start a new run when ready."
+        payload["stale_previous_stage"] = current_stage
+        payload["stages"] = stages
+        return payload
 
     def _start_http_gateway(self) -> None:
         server = ThreadingHTTPServer(
@@ -190,7 +220,6 @@ class AITradingOrchestrator:
 
         stages = [
             ("stock_analyzer", lambda force: self.stock_analyzer.run_cycle(force=force, trade_config=trade_config)),
-            ("risk_analyzer", lambda force: self.risk_analyzer.run_cycle(force=force, trade_config=trade_config)),
             ("executioner", lambda force: self.executioner.run_cycle(force=force, trade_config=trade_config)),
         ]
 
@@ -221,7 +250,6 @@ class AITradingOrchestrator:
             "stages": {
                 "stage2": self._stage_status("stage2", current_stage, outputs),
                 "stock_analyzer": self._stage_status("stock_analyzer", current_stage, outputs),
-                "risk_analyzer": self._stage_status("risk_analyzer", current_stage, outputs),
                 "executioner": self._stage_status("executioner", current_stage, outputs),
             },
         }
@@ -257,14 +285,18 @@ class AITradingOrchestrator:
                     for report in reports
                 ],
             }
-        if stage == "risk_analyzer":
-            return {
-                "decision": output.get("decision"),
-                "report_text": self._truncate(output.get("report_text")),
-            }
         if stage == "executioner":
             return {
                 "decision": output.get("decision"),
+                "results": [
+                    {
+                        "rank": item.get("rank"),
+                        "display_name": (item.get("selected_stock") or {}).get("display_name"),
+                        "decision": item.get("decision"),
+                        "report_text": self._truncate(item.get("report_text")),
+                    }
+                    for item in (output.get("results") or [])
+                ],
                 "report_text": self._truncate(output.get("report_text")),
             }
         return None
