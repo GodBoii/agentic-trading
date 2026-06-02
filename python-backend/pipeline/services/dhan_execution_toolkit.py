@@ -27,8 +27,36 @@ class DhanExecutionToolkit(Toolkit):
                 self.place_intraday_equity_order,
                 self.place_protected_intraday_super_order,
                 self.get_super_order_list,
+                self.modify_super_order,
+                self.cancel_super_order,
+                self.convert_position,
+                self.place_forever_order,
+                self.modify_forever_order,
+                self.cancel_forever_order,
+                self.get_forever_order_list,
+                self.place_conditional_trigger,
+                self.modify_conditional_trigger,
+                self.delete_conditional_trigger,
+                self.get_conditional_trigger_by_id,
+                self.get_all_conditional_triggers,
+                self.exit_position,
+                self.exit_all_intraday_positions,
+                self.activate_kill_switch,
+                self.deactivate_kill_switch,
                 self.get_kill_switch_status,
+                self.configure_pnl_exit,
+                self.disable_pnl_exit,
+                self.get_pnl_exit,
+                self.generate_edis_tpin,
+                self.get_edis_form,
+                self.check_edis_status,
+                self.get_ledger_report,
+                self.get_trade_history,
                 self.get_static_ips,
+                self.set_static_ip,
+                self.modify_static_ip,
+                self.modify_order,
+                self.cancel_order,
             ],
         )
         self.dhan = dhan_service
@@ -289,7 +317,7 @@ class DhanExecutionToolkit(Toolkit):
             return overlap_error
 
         normalized_side = str(side).strip().upper()
-        normalized_order_type = str(order_type).strip().upper()
+        normalized_order_type = self._normalize_order_type(order_type)
         normalized_product_type = str(product_type).strip().upper()
         normalized_exchange_segment = self._normalize_exchange_segment(exchange_segment, int(security_id))
         if normalized_side not in {"BUY", "SELL"}:
@@ -359,7 +387,7 @@ class DhanExecutionToolkit(Toolkit):
             return json.dumps({"status": "failure", "remarks": "buy_super_order_requires_stop_below_entry_and_target_above_entry"}, ensure_ascii=True)
         if normalized_side == "SELL" and not (target < entry < stop):
             return json.dumps({"status": "failure", "remarks": "sell_super_order_requires_target_below_entry_and_stop_above_entry"}, ensure_ascii=True)
-        if normalized_product_type not in {"INTRADAY", "CNC", "MARGIN", "MTF", "CO", "BO"}:
+        if normalized_product_type not in {"INTRADAY", "CNC", "MARGIN", "MTF"}:
             return json.dumps({"status": "failure", "remarks": "invalid_product_type"}, ensure_ascii=True)
 
         tag = correlation_id or f"exec-so-{uuid.uuid4().hex[:10]}"
@@ -368,7 +396,7 @@ class DhanExecutionToolkit(Toolkit):
             exchange_segment=normalized_exchange_segment,
             transaction_type=normalized_side,
             quantity=int(quantity),
-            order_type=str(order_type).strip().upper(),
+            order_type=self._normalize_order_type(order_type, allowed={"LIMIT", "MARKET"}),
             product_type=normalized_product_type,
             price=entry,
             target_price=target,
@@ -400,7 +428,7 @@ class DhanExecutionToolkit(Toolkit):
             self.dhan.modify_super_order(
                 order_id=order_id,
                 leg_name=str(leg_name).strip().upper(),
-                order_type=order_type,
+                order_type=self._normalize_order_type(order_type) if order_type else None,
                 quantity=quantity,
                 price=price,
                 target_price=target_price,
@@ -478,7 +506,7 @@ class DhanExecutionToolkit(Toolkit):
             transaction_type=str(side).strip().upper(),
             quantity=int(quantity),
             order_flag=str(order_flag).strip().upper(),
-            order_type=str(order_type).strip().upper(),
+            order_type=self._normalize_order_type(order_type),
             product_type=normalized_product_type,
             price=float(price),
             trigger_price=float(trigger_price),
@@ -512,7 +540,7 @@ class DhanExecutionToolkit(Toolkit):
                 order_id=order_id,
                 order_flag=str(order_flag).strip().upper(),
                 leg_name=str(leg_name).strip().upper(),
-                order_type=str(order_type).strip().upper(),
+                order_type=self._normalize_order_type(order_type),
                 quantity=int(quantity),
                 price=float(price),
                 trigger_price=float(trigger_price),
@@ -582,7 +610,7 @@ class DhanExecutionToolkit(Toolkit):
             exchange_segment=self._normalize_exchange_segment(exchange_segment, int(security_id)),
             transaction_type=str(side_to_exit).strip().upper(),
             quantity=int(quantity),
-            order_type=str(order_type).strip().upper(),
+            order_type=self._normalize_order_type(order_type),
             product_type=str(product_type).strip().upper(),
             price=price,
             trigger_price=0.0,
@@ -726,7 +754,7 @@ class DhanExecutionToolkit(Toolkit):
             return json.dumps({"status": "blocked", "remarks": "live_order_modification_disabled"}, ensure_ascii=True)
         response = self.dhan.modify_order(
             order_id=order_id,
-            order_type=order_type,
+            order_type=self._normalize_order_type(order_type),
             quantity=int(quantity),
             price=float(price),
             trigger_price=float(trigger_price),
@@ -757,6 +785,25 @@ class DhanExecutionToolkit(Toolkit):
         if int(quantity) <= 0:
             return json.dumps({"status": "failure", "remarks": "invalid_quantity"}, ensure_ascii=True)
         return None
+
+    def _normalize_order_type(self, order_type: Optional[str], allowed: Optional[set[str]] = None) -> str:
+        raw = str(order_type or "MARKET").strip().upper().replace(" ", "_")
+        aliases = {
+            "MKT": "MARKET",
+            "LMT": "LIMIT",
+            "SL": "STOP_LOSS",
+            "SL-L": "STOP_LOSS",
+            "SLL": "STOP_LOSS",
+            "STOPLOSS": "STOP_LOSS",
+            "STOP_LOSS_LIMIT": "STOP_LOSS",
+            "SLM": "STOP_LOSS_MARKET",
+            "SL-M": "STOP_LOSS_MARKET",
+            "STOPLOSSMARKET": "STOP_LOSS_MARKET",
+            "STOP_LOSS_MARKET_ORDER": "STOP_LOSS_MARKET",
+        }
+        normalized = aliases.get(raw, raw)
+        allowed_values = allowed or {"LIMIT", "MARKET", "STOP_LOSS", "STOP_LOSS_MARKET"}
+        return normalized if normalized in allowed_values else "MARKET"
 
     def _validate_selected_security_scope(self, security_id: int) -> Optional[str]:
         if self.allowed_security_id is None:
