@@ -165,23 +165,29 @@ class AITradingOrchestrator:
                     return {}
 
             def do_GET(self) -> None:
-                if not self._authorized():
-                    self._json_response({"error": "unauthorized"}, status=401)
-                    return
-                if urlparse(self.path).path != "/ai-trading/status":
-                    self._json_response({"error": "not_found"}, status=404)
-                    return
-                self._json_response(orchestrator.load_run_status())
+                try:
+                    if not self._authorized():
+                        self._json_response({"error": "unauthorized"}, status=401)
+                        return
+                    if urlparse(self.path).path != "/ai-trading/status":
+                        self._json_response({"error": "not_found"}, status=404)
+                        return
+                    self._json_response(orchestrator.load_run_status())
+                except Exception as exc:
+                    self._json_response({"error": f"status_handler_error: {type(exc).__name__}: {exc}"}, status=500)
 
             def do_POST(self) -> None:
-                if not self._authorized():
-                    self._json_response({"error": "unauthorized"}, status=401)
-                    return
-                if urlparse(self.path).path != "/ai-trading/start":
-                    self._json_response({"error": "not_found"}, status=404)
-                    return
-                request_payload = orchestrator.submit_start_request(self._read_body())
-                self._json_response({"ok": True, "request": request_payload})
+                try:
+                    if not self._authorized():
+                        self._json_response({"error": "unauthorized"}, status=401)
+                        return
+                    if urlparse(self.path).path != "/ai-trading/start":
+                        self._json_response({"error": "not_found"}, status=404)
+                        return
+                    request_payload = orchestrator.submit_start_request(self._read_body())
+                    self._json_response({"ok": True, "request": request_payload})
+                except Exception as exc:
+                    self._json_response({"error": f"start_handler_error: {type(exc).__name__}: {exc}"}, status=500)
 
             def log_message(self, format: str, *args: Any) -> None:
                 return
