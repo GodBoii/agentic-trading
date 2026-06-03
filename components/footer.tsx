@@ -1,83 +1,113 @@
-import React from 'react';
-import Link from 'next/link';
+import React from "react";
+import Link from "next/link";
+import LiveTicker from "./landing/live-ticker";
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-[#030303] border-t border-white/5 relative overflow-hidden mt-12 z-50">
-      {/* Top Gradient Line */}
-      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#7C3AED]/50 to-transparent"></div>
+    <footer className="relative w-full bg-[#050505] border-t border-line overflow-hidden">
+      {/* Subtle live ticker at the very top of footer */}
+      <LiveTicker />
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-          
-          {/* Column 1: Identity */}
-          <div className="flex flex-col space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-[#7C3AED] shadow-[0_0_10px_#7C3AED] rounded-sm"></div>
-              <h2 className="text-xl font-bold text-white tracking-widest font-sans uppercase">Aetheria AI</h2>
-            </div>
-            <p className="text-white/60 font-mono text-sm leading-relaxed max-w-xs mt-4">
-              Advanced Agentic Trading Neural System. Engineered for precision and alpha.
-            </p>
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <span className="text-white/40 font-mono text-xs block mb-1">ARCHITECT & LEAD ENGINEER</span>
-              <span className="text-[#10B981] font-mono font-bold tracking-wide">Prajwal Ghadge</span>
-            </div>
+      {/* Large editorial typography */}
+      <div className="relative px-6 lg:px-8 pt-24 pb-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="font-display text-[18vw] lg:text-[16vw] leading-[0.85] tracking-[-0.05em] text-white/[0.06] select-none pointer-events-none -mb-8">
+            AETHERIA
           </div>
+        </div>
+      </div>
 
-          {/* Column 2: External Comm Links */}
-          <div className="flex flex-col space-y-4 md:pl-10">
-             <h3 className="text-white/40 font-mono text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
-                 <span>{`//`}</span> EXTERNAL_UPLINKS
-             </h3>
-             <ul className="space-y-3 font-mono text-sm">
-                 <li>
-                     <Link href="https://aetheriaai.online" target="_blank" className="group flex items-center gap-2 text-white/70 hover:text-[#7C3AED] transition-colors">
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[#7C3AED]">&gt;</span> Official Site: aetheriaai.online
-                     </Link>
-                 </li>
-                 <li>
-                     <Link href="https://github.com/GodBoii" target="_blank" className="group flex items-center gap-2 text-white/70 hover:text-white transition-colors">
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white">&gt;</span> GitHub: @GodBoii
-                     </Link>
-                 </li>
-                 <li>
-                     <Link href="https://instagram.com/prajwal_._7" target="_blank" className="group flex items-center gap-2 text-white/70 hover:text-[#F472B6] transition-colors">
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[#F472B6]">&gt;</span> Instagram: @prajwal_._7
-                     </Link>
-                 </li>
-             </ul>
-          </div>
-
-          {/* Column 3: Contact & Status */}
-          <div className="flex flex-col space-y-4 md:pl-10">
-              <h3 className="text-white/40 font-mono text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
-                 <span>{`//`}</span> SYSTEM_COMMS
-             </h3>
-             
-             <div className="bg-[#080808] border border-white/5 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse"></div>
-                    <span className="text-[#10B981] font-mono text-xs font-bold">SYSTEM ONLINE</span>
+      <div className="relative mx-auto max-w-7xl px-6 lg:px-8 pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+          {/* Brand */}
+          <div className="md:col-span-5 flex flex-col gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="relative h-7 w-7">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent to-success opacity-80 blur-md" />
+                <div className="absolute inset-[3px] rounded-full bg-[#0a0a0c] flex items-center justify-center">
+                  <div className="h-1.5 w-1.5 rounded-full bg-white" />
                 </div>
-                
-                <a href="mailto:aetheriaai1@gmail.com" className="block text-white/80 font-mono text-sm hover:text-[#10B981] transition-colors truncate">
-                    aetheriaai1@gmail.com
-                </a>
-             </div>
+              </div>
+              <span className="text-[15px] font-medium tracking-[-0.02em] text-white">
+                Aetheria
+              </span>
+            </div>
+            <p className="text-[14px] text-ink-secondary leading-relaxed max-w-sm">
+              Autonomous AI trading intelligence. Engineered for precision,
+              audited for trust, designed for the next generation of markets.
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-pulse-ring" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+              </span>
+              <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-success">
+                System online
+              </span>
+            </div>
           </div>
 
+          {/* Product */}
+          <div className="md:col-span-2 flex flex-col gap-3">
+            <h3 className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
+              Product
+            </h3>
+            <Link href="#system" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              Operating System
+            </Link>
+            <Link href="#agents" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              Agents
+            </Link>
+            <Link href="#strategies" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              Strategies
+            </Link>
+            <Link href="#performance" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              Performance
+            </Link>
+          </div>
+
+          {/* Company */}
+          <div className="md:col-span-2 flex flex-col gap-3">
+            <h3 className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
+              Company
+            </h3>
+            <Link href="https://aetheriaai.online" target="_blank" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              About
+            </Link>
+            <Link href="mailto:aetheriaai1@gmail.com" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              Contact
+            </Link>
+            <Link href="https://github.com/GodBoii" target="_blank" className="text-[13px] text-ink-secondary hover:text-white transition-colors">
+              GitHub
+            </Link>
+          </div>
+
+          {/* Legal */}
+          <div className="md:col-span-3 flex flex-col gap-3">
+            <h3 className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
+              Legal
+            </h3>
+            <span className="text-[13px] text-ink-secondary">
+              Architect:{" "}
+              <span className="text-white">Prajwal Ghadge</span>
+            </span>
+            <span className="text-[13px] text-ink-secondary">
+              SOC 2 Type II · AES-256
+            </span>
+            <span className="text-[13px] text-ink-tertiary text-[11px] font-mono uppercase tracking-[0.18em]">
+              Terminal ID: AETH-001
+            </span>
+          </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-12 pt-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-white/30 font-mono text-xs">
-                © {new Date().getFullYear()} Aetheria AI. All systems operational.
-            </p>
-            <div className="flex items-center gap-2 text-white/20 font-mono text-[10px]">
-                <span>[ TERMINAL_ID: AETH-001 ]</span>
-                <span className="animate-pulse">_</span>
-            </div>
+        {/* Bottom bar */}
+        <div className="mt-16 pt-6 border-t border-line flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
+            © {new Date().getFullYear()} Aetheria AI · All systems operational
+          </p>
+          <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
+            Built for the next generation of markets
+          </p>
         </div>
       </div>
     </footer>
