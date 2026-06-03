@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
+
+const ease = [0.16, 1, 0.3, 1] as const
 
 export default function DhanConnect() {
     const [clientId, setClientId] = useState('')
@@ -36,32 +39,50 @@ export default function DhanConnect() {
     }
 
     return (
-        <div className="brutal-box p-8 space-y-6">
-            <div className="flex items-center gap-4">
-                <div className="w-3 h-3 bg-brutal-green flex-shrink-0"></div>
+        <div className="surface rounded-2xl p-7 lg:p-8 h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-7">
                 <div>
-                    <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">
+                    <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
+                        Broker · Link
+                    </span>
+                    <h3 className="font-display text-[24px] lg:text-[26px] text-white tracking-[-0.025em] leading-[1.1] mt-2">
                         Connect to Dhan
                     </h3>
-                    <p className="text-sm text-brutal-cream/60 font-mono mt-1">
-                        Link your trading account
-                    </p>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-60 animate-pulse-ring" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
+                        Ready
+                    </span>
                 </div>
             </div>
 
+            <p className="text-[13px] text-ink-secondary leading-relaxed mb-7">
+                Link your Dhan trading account to enable live execution, real-time position sync, and AI-driven order routing.
+            </p>
+
             {error && (
-                <div className="brutal-box-sm border-brutal-red shadow-brutal-red p-4 animate-shake">
-                    <p className="text-brutal-red font-mono text-sm font-bold uppercase">
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease }}
+                    className="mb-6 border border-danger/40 bg-danger/[0.06] rounded-xl px-4 py-3"
+                >
+                    <p className="text-danger font-mono text-[12px] font-medium">
                         {error}
                     </p>
-                </div>
+                </motion.div>
             )}
 
-            <form onSubmit={handleConnect} className="space-y-6">
-                <div>
+            <form onSubmit={handleConnect} className="space-y-5 flex-1 flex flex-col">
+                <div className="flex-1">
                     <label
                         htmlFor="clientId"
-                        className="block text-sm font-bold text-brutal-cream mb-3 uppercase tracking-wider font-mono"
+                        className="block text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-2.5"
                     >
                         Dhan Client ID
                     </label>
@@ -73,24 +94,24 @@ export default function DhanConnect() {
                         placeholder="1000054321"
                         required
                         disabled={isLoading}
-                        className="brutal-input w-full px-4 py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="w-full bg-[#0a0a0c] border border-line hover:border-line-strong focus:border-accent/60 rounded-xl px-4 py-3.5 text-[14px] font-mono text-white placeholder:text-ink-tertiary transition-all duration-300 ease-out-expo focus:outline-none focus:ring-1 focus:ring-accent/30 disabled:opacity-50"
                         aria-label="Enter your Dhan Client ID"
                     />
-                    <p className="mt-3 text-xs text-brutal-cream/50 font-mono uppercase tracking-wide">
-                        Find your ID in Dhan account settings
+                    <p className="mt-2.5 text-[11px] text-ink-tertiary font-mono">
+                        Find this in your Dhan account settings.
                     </p>
                 </div>
 
                 <button
                     type="submit"
                     disabled={isLoading || !clientId.trim()}
-                    className="brutal-btn w-full py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-brutal"
+                    className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-none"
                     aria-label="Connect to Dhan account"
                 >
                     {isLoading ? (
-                        <span className="flex items-center justify-center gap-3">
+                        <span className="flex items-center justify-center gap-2.5">
                             <svg
-                                className="animate-spin h-5 w-5 text-brutal-black"
+                                className="animate-spin h-4 w-4"
                                 xmlns="http://www.w3.org/2000/svg"
                                 fill="none"
                                 viewBox="0 0 24 24"
@@ -101,7 +122,7 @@ export default function DhanConnect() {
                                     cy="12"
                                     r="10"
                                     stroke="currentColor"
-                                    strokeWidth="4"
+                                    strokeWidth="3"
                                 />
                                 <path
                                     className="opacity-75"
@@ -109,20 +130,25 @@ export default function DhanConnect() {
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                 />
                             </svg>
-                            Connecting...
+                            <span>Connecting…</span>
                         </span>
                     ) : (
-                        'Connect Account'
+                        <>
+                            <span>Connect Account</span>
+                            <span className="text-[11px]">→</span>
+                        </>
                     )}
                 </button>
             </form>
 
-            <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+            <div className="mt-7 pt-6 border-t border-line">
                 <div className="flex gap-3">
-                    <div className="w-2 h-2 bg-brutal-green flex-shrink-0 mt-1"></div>
-                    <div className="text-xs text-brutal-cream/70 font-mono leading-relaxed">
-                        <p className="font-bold mb-2 uppercase tracking-wide">Secure Connection</p>
-                        <p>
+                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-success flex-shrink-0" />
+                    <div>
+                        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary mb-1.5">
+                            Secure Connection
+                        </p>
+                        <p className="text-[12px] text-ink-secondary leading-relaxed">
                             Your credentials are encrypted and stored securely. We never see your Dhan password.
                         </p>
                     </div>

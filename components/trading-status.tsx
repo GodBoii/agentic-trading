@@ -19,6 +19,12 @@ interface AgentRunStatus {
     stages?: Record<string, { status: string; summary?: any }>
 }
 
+const stageLabels: Record<string, string> = {
+    stage2: 'Stage 2',
+    stock_analyzer: 'Stock Analyzer',
+    executioner: 'Executioner',
+}
+
 export default function TradingStatus() {
     const router = useRouter()
     const [tradingKeys, setTradingKeys] = useState<TradingKeys | null>(null)
@@ -140,10 +146,11 @@ export default function TradingStatus() {
 
     if (loading) {
         return (
-            <div className="brutal-box p-8">
+            <div className="surface rounded-2xl p-7 lg:p-8 h-full">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-brutal-cream/20 w-1/3"></div>
-                    <div className="h-16 bg-brutal-cream/10"></div>
+                    <div className="h-3 w-24 bg-white/[0.06] rounded-full" />
+                    <div className="h-6 w-40 bg-white/[0.04] rounded" />
+                    <div className="h-32 bg-white/[0.03] rounded-xl mt-6" />
                 </div>
             </div>
         )
@@ -151,21 +158,23 @@ export default function TradingStatus() {
 
     if (!tradingKeys) {
         return (
-            <div className="brutal-box p-8">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="w-3 h-3 bg-brutal-cream/50 flex-shrink-0"></div>
+            <div className="surface rounded-2xl p-7 lg:p-8 h-full flex flex-col">
+                <div className="flex items-start justify-between mb-6">
                     <div>
-                        <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
+                            Agent · Engine
+                        </span>
+                        <h3 className="font-display text-[24px] lg:text-[26px] text-white tracking-[-0.025em] leading-[1.1] mt-2">
                             Trading Status
                         </h3>
-                        <p className="text-sm text-brutal-cream/60 font-mono mt-1">
-                            Not Connected
-                        </p>
                     </div>
                 </div>
-                <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-6 text-center">
-                    <p className="text-brutal-cream/70 font-mono text-sm">
-                        Connect your Dhan account to enable trading
+                <p className="text-[13px] text-ink-secondary leading-relaxed mb-7">
+                    Connect your Dhan account to enable live trading, AI agent orchestration, and real-time execution.
+                </p>
+                <div className="mt-auto border border-dashed border-line rounded-xl px-5 py-8 text-center">
+                    <p className="text-[12px] text-ink-tertiary font-mono">
+                        Awaiting broker connection
                     </p>
                 </div>
             </div>
@@ -174,150 +183,154 @@ export default function TradingStatus() {
 
     const tokenExpired = isTokenExpired()
     const isRunning = runStatus?.status === 'running'
-    const stageLabels: Record<string, string> = {
-        stage2: 'Stage 2',
-        stock_analyzer: 'Stock Analyzer',
-        executioner: 'Executioner',
-    }
+    const isActive = isRunning || tradingKeys.is_trading_enabled
 
     return (
-        <div className="brutal-box p-8 space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className={`w-4 h-4 ${tradingKeys.is_trading_enabled
-                            ? 'bg-brutal-green'
-                            : 'bg-brutal-cream/50'
-                        } flex-shrink-0`}></div>
-                    <div>
-                        <h3 className="text-2xl font-bold text-brutal-cream uppercase tracking-tight">
-                            Trading Status
-                        </h3>
-                        <p className="text-sm text-brutal-cream/60 font-mono mt-1">
-                            {isRunning ? 'RUNNING' : tradingKeys.is_trading_enabled ? 'READY' : 'IDLE'}
-                        </p>
-                    </div>
+        <div className="surface rounded-2xl p-7 lg:p-8 h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-7">
+                <div>
+                    <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
+                        Agent · Engine
+                    </span>
+                    <h3 className="font-display text-[24px] lg:text-[26px] text-white tracking-[-0.025em] leading-[1.1] mt-2">
+                        Trading Status
+                    </h3>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className={`relative flex h-1.5 w-1.5`}>
+                        <span className={`absolute inline-flex h-full w-full rounded-full ${isRunning ? 'bg-warning' : isActive ? 'bg-success' : 'bg-ink-tertiary'} opacity-60 animate-pulse-ring`} />
+                        <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isRunning ? 'bg-warning' : isActive ? 'bg-success' : 'bg-ink-tertiary'}`} />
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
+                        {isRunning ? 'Running' : tradingKeys.is_trading_enabled ? 'Ready' : 'Idle'}
+                    </span>
                 </div>
             </div>
 
             {error && (
-                <div className="brutal-box-sm border-brutal-red shadow-brutal-red p-4 animate-shake">
-                    <p className="text-brutal-red font-mono text-sm font-bold uppercase">
+                <div className="mb-6 border border-danger/40 bg-danger/[0.06] rounded-xl px-4 py-3">
+                    <p className="text-danger font-mono text-[12px] font-medium">
                         {error}
                     </p>
                 </div>
             )}
 
             {tokenExpired && (
-                <div className="brutal-box-sm border-brutal-yellow shadow-none p-4">
-                    <p className="text-brutal-yellow font-mono text-sm font-bold uppercase">
-                        ⚠ Token expired. Please reconnect.
+                <div className="mb-6 border border-warning/40 bg-warning/[0.06] rounded-xl px-4 py-3">
+                    <p className="text-warning font-mono text-[12px] font-medium">
+                        Token expired. Please reconnect.
                     </p>
                 </div>
             )}
 
-            <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-6 space-y-4">
-                <div>
-                    <p className="text-xs font-bold text-brutal-cream/60 mb-2 uppercase tracking-wider font-mono">
-                        Client ID
-                    </p>
-                    <p className="text-xl font-mono text-brutal-cream font-bold">
-                        {tradingKeys.dhan_client_id}
-                    </p>
-                </div>
-
-                <div className="border-t-3 border-brutal-cream/20 pt-4">
-                    <div className="mb-4">
-                        <p className="text-xs font-bold text-brutal-cream/60 mb-3 uppercase tracking-wider font-mono">
-                            Trade Amount
-                        </p>
-                        <div className="flex items-center gap-3 mb-3">
-                            <button
-                                onClick={() => setTradeMode('auto')}
-                                className={`px-4 py-2 text-xs font-mono font-bold uppercase border-3 transition-all ${tradeMode === 'auto'
-                                    ? 'border-brutal-green bg-brutal-green text-brutal-black'
-                                    : 'border-brutal-cream/30 text-brutal-cream/70 hover:border-brutal-cream/50'
-                                    }`}
-                            >
-                                Auto
-                            </button>
-                            <button
-                                onClick={() => setTradeMode('manual')}
-                                className={`px-4 py-2 text-xs font-mono font-bold uppercase border-3 transition-all ${tradeMode === 'manual'
-                                    ? 'border-brutal-green bg-brutal-green text-brutal-black'
-                                    : 'border-brutal-cream/30 text-brutal-cream/70 hover:border-brutal-cream/50'
-                                    }`}
-                            >
-                                Manual
-                            </button>
-                        </div>
-                        {tradeMode === 'manual' ? (
-                            <div className="flex items-center gap-2">
-                                <span className="text-brutal-cream font-mono text-sm font-bold">₹</span>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    value={tradeAmount}
-                                    onChange={(e) => setTradeAmount(e.target.value)}
-                                    placeholder="Enter amount (e.g. 500)"
-                                    className="w-full bg-brutal-black border-3 border-brutal-cream/30 text-brutal-cream font-mono text-sm px-4 py-2 placeholder:text-brutal-cream/30 focus:border-brutal-green focus:outline-none"
-                                />
-                            </div>
-                        ) : (
-                            <p className="text-xs text-brutal-cream/50 font-mono">
-                                Uses your available account balance to select stocks and size trades automatically.
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-brutal-cream/60 mb-1 uppercase tracking-wider font-mono">
-                                AI Trading
-                            </p>
-                            <p className="text-xs text-brutal-cream/50 font-mono">
-                                {isRunning
-                                    ? 'Agents are running in order'
-                                    : tradingKeys.is_trading_enabled
-                                        ? 'Ready for the next user-started run'
-                                        : 'Press start to run the agent chain'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleStart}
-                            disabled={updating || tokenExpired || isRunning || (tradeMode === 'manual' && (!tradeAmount || parseFloat(tradeAmount) <= 0))}
-                            className="brutal-btn px-5 py-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Start AI trading"
-                        >
-                            {updating ? 'Starting...' : isRunning ? 'Running...' : 'Start AI Trading'}
-                        </button>
-                    </div>
-                </div>
+            {/* Client ID */}
+            <div className="mb-6 pb-6 border-b border-line">
+                <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-2">
+                    Client ID
+                </p>
+                <p className="text-[18px] font-mono text-white font-medium nums">
+                    {tradingKeys.dhan_client_id}
+                </p>
             </div>
 
-            <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-5 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                    <p className="text-xs font-bold text-brutal-cream/60 uppercase tracking-wider font-mono">
+            {/* Trade Amount */}
+            <div className="mb-6">
+                <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-3">
+                    Trade Amount
+                </p>
+                <div className="flex items-center gap-2 mb-4">
+                    <button
+                        onClick={() => setTradeMode('auto')}
+                        className={`text-[11px] font-mono uppercase tracking-[0.15em] px-4 py-2 rounded-full border transition-all duration-300 ease-out-expo ${tradeMode === 'auto'
+                            ? 'border-accent/50 bg-accent/10 text-white'
+                            : 'border-line text-ink-tertiary hover:border-line-strong hover:text-ink-secondary'
+                            }`}
+                    >
+                        Auto
+                    </button>
+                    <button
+                        onClick={() => setTradeMode('manual')}
+                        className={`text-[11px] font-mono uppercase tracking-[0.15em] px-4 py-2 rounded-full border transition-all duration-300 ease-out-expo ${tradeMode === 'manual'
+                            ? 'border-accent/50 bg-accent/10 text-white'
+                            : 'border-line text-ink-tertiary hover:border-line-strong hover:text-ink-secondary'
+                            }`}
+                    >
+                        Manual
+                    </button>
+                </div>
+                {tradeMode === 'manual' ? (
+                    <div className="flex items-center gap-2 bg-[#0a0a0c] border border-line hover:border-line-strong focus-within:border-accent/60 rounded-xl px-4 py-3 transition-all duration-300">
+                        <span className="text-ink-secondary font-mono text-[14px]">₹</span>
+                        <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={tradeAmount}
+                            onChange={(e) => setTradeAmount(e.target.value)}
+                            placeholder="Enter amount (e.g. 500)"
+                            className="w-full bg-transparent text-white font-mono text-[14px] placeholder:text-ink-tertiary focus:outline-none"
+                        />
+                    </div>
+                ) : (
+                    <p className="text-[12px] text-ink-tertiary leading-relaxed">
+                        Uses your available balance to select stocks and size trades automatically.
+                    </p>
+                )}
+            </div>
+
+            {/* Start Button */}
+            <div className="flex items-center justify-between gap-4 mb-7 pb-7 border-b border-line">
+                <div className="flex-1">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
+                        AI Trading
+                    </p>
+                    <p className="text-[12px] text-ink-secondary leading-relaxed">
+                        {isRunning
+                            ? 'Agents are running in order'
+                            : tradingKeys.is_trading_enabled
+                                ? 'Ready for the next run'
+                                : 'Press start to run the chain'}
+                    </p>
+                </div>
+                <button
+                    onClick={handleStart}
+                    disabled={updating || tokenExpired || isRunning || (tradeMode === 'manual' && (!tradeAmount || parseFloat(tradeAmount) <= 0))}
+                    className="btn-primary !px-5 !py-2.5 !text-[12px] disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-none"
+                    aria-label="Start AI trading"
+                >
+                    {updating ? 'Starting…' : isRunning ? 'Running…' : 'Start Agent'}
+                </button>
+            </div>
+
+            {/* Agent Run Stages */}
+            <div className="space-y-4 mb-7 flex-1">
+                <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
                         Agent Run
                     </p>
-                    <p className="text-xs text-brutal-cream/60 font-mono uppercase">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
                         {runStatus?.status || 'idle'}
                     </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                     {Object.entries(stageLabels).map(([stage, label]) => {
                         const status = runStatus?.stages?.[stage]?.status || 'pending'
                         const active = status === 'running'
                         const complete = status === 'completed'
                         return (
-                            <div key={stage} className="flex items-center justify-between gap-4 border-t-3 border-brutal-cream/10 pt-3 first:border-t-0 first:pt-0">
+                            <div
+                                key={stage}
+                                className="flex items-center justify-between gap-4 py-2.5 px-3.5 rounded-lg bg-white/[0.015] border border-line/50 hover:border-line transition-colors"
+                            >
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-3 h-3 ${complete ? 'bg-brutal-green' : active ? 'bg-brutal-yellow' : 'bg-brutal-cream/30'}`}></div>
-                                    <p className="text-sm text-brutal-cream font-mono font-bold uppercase">
+                                    <div className={`h-1.5 w-1.5 rounded-full ${complete ? 'bg-success' : active ? 'bg-warning animate-pulse-soft' : 'bg-ink-tertiary'}`} />
+                                    <p className="text-[12px] text-white font-mono font-medium">
                                         {label}
                                     </p>
                                 </div>
-                                <p className="text-xs text-brutal-cream/60 font-mono uppercase">
+                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
                                     {status}
                                 </p>
                             </div>
@@ -326,19 +339,22 @@ export default function TradingStatus() {
                 </div>
 
                 {runStatus?.error && (
-                    <p className="text-xs text-brutal-red font-mono font-bold uppercase">
+                    <p className="text-[11px] text-danger font-mono pt-2">
                         {runStatus.error}
                     </p>
                 )}
             </div>
 
-            <div className="brutal-box-sm border-brutal-cream/30 shadow-none p-4">
+            {/* Safety Note */}
+            <div className="pt-6 border-t border-line">
                 <div className="flex gap-3">
-                    <div className="w-2 h-2 bg-brutal-green flex-shrink-0 mt-1"></div>
-                    <div className="text-xs text-brutal-cream/70 font-mono leading-relaxed">
-                        <p className="font-bold mb-2 uppercase tracking-wide">Safety First</p>
-                        <p>
-                            AI trading runs only when you press start. The agents execute once in order: stock analyzer, then executioner.
+                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-success flex-shrink-0" />
+                    <div>
+                        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary mb-1.5">
+                            Safety First
+                        </p>
+                        <p className="text-[12px] text-ink-secondary leading-relaxed">
+                            AI trading runs only when you press start. The agents execute once in order: analyzer, then executioner.
                         </p>
                     </div>
                 </div>
