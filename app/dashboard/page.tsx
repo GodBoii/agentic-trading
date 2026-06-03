@@ -9,8 +9,11 @@ import TradingStatus from '@/components/trading-status'
 import FundsCard from '@/components/funds-card'
 import HoldingsCard from '@/components/holdings-card'
 import PositionsCard from '@/components/positions-card'
+import { motion } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
+
+const ease = [0.16, 1, 0.3, 1] as const
 
 function DashboardContent() {
     const router = useRouter()
@@ -31,7 +34,7 @@ function DashboardContent() {
         const error = searchParams.get('error')
 
         if (success === 'true') {
-            setToastMessage('Connected Successfully!')
+            setToastMessage('Connected Successfully')
             setToastType('success')
             setShowToast(true)
             router.replace('/dashboard')
@@ -71,71 +74,91 @@ function DashboardContent() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-brutal-black flex items-center justify-center p-8">
-                <div className="brutal-box p-12 text-center animate-pop">
-                    <div className="inline-block animate-spin h-16 w-16 border-4 border-brutal-cream border-t-brutal-green mb-6"></div>
-                    <p className="text-brutal-cream font-mono text-xl font-bold uppercase tracking-wider">Loading...</p>
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-5">
+                    <div className="relative h-10 w-10">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-40 animate-pulse-ring" />
+                        <span className="relative inline-flex h-10 w-10 rounded-full border border-accent/40" />
+                    </div>
+                    <p className="text-[11px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
+                        Initializing terminal
+                    </p>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-brutal-black">
+        <div className="relative min-h-screen bg-[#050505] text-white overflow-x-hidden">
+            {/* Ambient backdrop */}
+            <div className="pointer-events-none fixed inset-0 bg-grid-fine opacity-50" />
+            <div className="pointer-events-none fixed inset-0 bg-spotlight" />
+
             {/* Toast Notification */}
             {showToast && (
-                <div className="fixed top-8 right-8 z-50 animate-slide-in-right">
-                    <div className={`brutal-box-sm p-6 flex items-center gap-4 ${toastType === 'success'
-                        ? 'border-brutal-green shadow-brutal-green'
-                        : 'border-brutal-red shadow-brutal-red'
+                <motion.div
+                    initial={{ opacity: 0, y: -16, x: 0 }}
+                    animate={{ opacity: 1, y: 0, x: 0 }}
+                    transition={{ duration: 0.5, ease }}
+                    className="fixed top-24 right-6 z-50"
+                >
+                    <div className={`glass rounded-2xl px-5 py-4 flex items-center gap-3 min-w-[300px] ${toastType === 'success'
+                        ? 'border-success/40'
+                        : 'border-danger/40'
                         }`}>
-                        <div className={`w-3 h-3 ${toastType === 'success' ? 'bg-brutal-green' : 'bg-brutal-red'}`}></div>
-                        <p className="font-bold text-brutal-cream uppercase tracking-wide text-sm">
+                        <div className="relative flex h-2 w-2">
+                            <span className={`absolute inline-flex h-full w-full rounded-full ${toastType === 'success' ? 'bg-success' : 'bg-danger'} opacity-60 animate-pulse-ring`} />
+                            <span className={`relative inline-flex h-2 w-2 rounded-full ${toastType === 'success' ? 'bg-success' : 'bg-danger'}`} />
+                        </div>
+                        <p className="text-[13px] font-medium text-white flex-1">
                             {toastMessage}
                         </p>
                         <button
                             onClick={() => setShowToast(false)}
-                            className="ml-4 text-brutal-cream hover:text-brutal-white transition-colors"
+                            className="text-ink-tertiary hover:text-white transition-colors"
                             aria-label="Close notification"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
-                </div>
+                </motion.div>
             )}
 
             {/* Header */}
-            <header className="bg-brutal-black border-b-4 border-brutal-white sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 py-5">
-                    <div className="flex items-center justify-between">
-                        {/* Logo — links back to homepage */}
-                        <Link href="/" className="flex items-center gap-4 group" aria-label="Go to home page">
-                            <div className="w-14 h-14 bg-brutal-cream border-4 border-brutal-black flex items-center justify-center p-2 group-hover:shadow-brutal-sm transition-all">
-                                <img src="/icon.png" alt="Logo" className="w-full h-full object-contain" />
+            <header className="sticky top-0 z-40">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-5">
+                    <div className="glass rounded-full px-5 sm:px-6 py-3 flex items-center justify-between">
+                        {/* Logo */}
+                        <Link href="/" className="group flex items-center gap-2.5" aria-label="Go to home page">
+                            <div className="relative h-7 w-7">
+                                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent to-success opacity-80 blur-md group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute inset-[3px] rounded-full bg-[#0a0a0c] flex items-center justify-center">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                                </div>
                             </div>
-                            <div>
-                                <h1 className="text-3xl font-bold text-brutal-cream uppercase tracking-tight group-hover:text-brutal-green transition-colors">
-                                    Agentic Trading
-                                </h1>
-                                <p className="text-brutal-cream/50 font-mono text-xs uppercase tracking-widest mt-0.5">
-                                    AI-Powered Platform
-                                </p>
-                            </div>
+                            <span className="text-[15px] font-medium tracking-[-0.02em] text-white">
+                                Aetheria
+                            </span>
+                            <span className="hidden sm:inline-block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 pl-2 border-l border-white/10 ml-1">
+                                Terminal
+                            </span>
                         </Link>
 
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3 sm:gap-4">
                             <div className="text-right hidden sm:block">
-                                <p className="text-brutal-cream/60 font-mono text-xs uppercase tracking-wider">Logged in as</p>
-                                <p className="text-brutal-cream font-mono font-bold text-sm truncate max-w-[200px]">
+                                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-tertiary">
+                                    Authenticated
+                                </p>
+                                <p className="text-[12px] font-mono text-white truncate max-w-[200px]">
                                     {user?.email}
                                 </p>
                             </div>
                             <button
                                 onClick={handleSignOut}
                                 id="dashboard-signout-btn"
-                                className="brutal-btn px-6 py-3 text-sm"
+                                className="btn-secondary !px-4 !py-1.5 !text-[12px]"
                                 aria-label="Sign out of your account"
                             >
                                 Sign Out
@@ -146,40 +169,67 @@ function DashboardContent() {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
+            <main className="relative mx-auto max-w-7xl px-6 lg:px-8 pt-12 pb-24">
                 {/* Welcome Section */}
-                <div className="mb-12">
-                    <h2 className="text-5xl font-bold text-brutal-cream mb-4 uppercase tracking-tight">
-                        Welcome Back
-                    </h2>
-                    <p className="text-brutal-cream/70 text-xl font-mono">
-                        Manage your trading account
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, ease, delay: 0.1 }}
+                    className="mb-14"
+                >
+                    <div className="inline-flex items-center gap-2 mb-5">
+                        <span className="h-px w-8 bg-accent" />
+                        <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-accent">
+                            Live Terminal
+                        </span>
+                    </div>
+                    <h1 className="font-display text-display-md text-white mb-4">
+                        Welcome back, <span className="font-serif-italic text-ink-secondary">operator</span>.
+                    </h1>
+                    <p className="text-[15px] text-ink-secondary max-w-xl">
+                        Manage your trading account, monitor live positions, and orchestrate AI agents from a single command surface.
                     </p>
-                </div>
+                </motion.div>
+
                 {/* Connect & Trading Status */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, ease, delay: 0.2 }}
+                    className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-20"
+                >
                     <DhanConnect />
                     <TradingStatus />
-                </div>
+                </motion.div>
 
                 {/* Portfolio Section */}
-                <div className="mb-12">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="w-3 h-3 bg-brutal-green"></div>
-                        <h2 className="text-3xl font-bold text-brutal-cream uppercase tracking-tight">
-                            Portfolio Overview
-                        </h2>
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, ease, delay: 0.3 }}
+                    className="space-y-8"
+                >
+                    <div className="flex items-end justify-between flex-wrap gap-4 pb-6 border-b border-line">
+                        <div>
+                            <div className="inline-flex items-center gap-2 mb-4">
+                                <span className="h-px w-8 bg-accent" />
+                                <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-accent">
+                                    Portfolio
+                                </span>
+                            </div>
+                            <h2 className="font-display text-display-sm text-white">
+                                Capital overview
+                            </h2>
+                        </div>
                     </div>
 
-                    <div className="mb-8">
-                        <FundsCard />
-                    </div>
+                    <FundsCard />
 
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <HoldingsCard />
                         <PositionsCard />
                     </div>
-                </div>
+                </motion.div>
             </main>
         </div>
     )
@@ -188,10 +238,15 @@ function DashboardContent() {
 export default function DashboardPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-brutal-black flex items-center justify-center p-8">
-                <div className="brutal-box p-12 text-center animate-pop">
-                    <div className="inline-block animate-spin h-16 w-16 border-4 border-brutal-cream border-t-brutal-green mb-6"></div>
-                    <p className="text-brutal-cream font-mono text-xl font-bold uppercase tracking-wider">Loading...</p>
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-5">
+                    <div className="relative h-10 w-10">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-40 animate-pulse-ring" />
+                        <span className="relative inline-flex h-10 w-10 rounded-full border border-accent/40" />
+                    </div>
+                    <p className="text-[11px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
+                        Initializing terminal
+                    </p>
                 </div>
             </div>
         }>
