@@ -336,13 +336,23 @@ function LiquidityHeatmap() {
 }
 
 function ExecutionFlow() {
-  // Generate a particle-blob density map
-  const dots = Array.from({ length: 240 }, () => ({
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    s: Math.random() * 2 + 0.5,
-    o: Math.random() * 0.6 + 0.1,
-    d: Math.random() * 3,
+  // Deterministic pseudo-random — same on server and client to avoid
+  // hydration warnings. Mulberry32 PRNG seeded with a fixed value.
+  const seed = 0xa37e9c1d;
+  const rand = (i: number) => {
+    let t = (seed + i) | 0;
+    t = (t + 0x6d2b79f5) | 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  const dots = Array.from({ length: 240 }, (_, i) => ({
+    x: rand(i * 5 + 1) * 100,
+    y: rand(i * 5 + 2) * 100,
+    s: rand(i * 5 + 3) * 2 + 0.5,
+    o: rand(i * 5 + 4) * 0.6 + 0.1,
+    d: rand(i * 5 + 5) * 3,
   }));
 
   return (

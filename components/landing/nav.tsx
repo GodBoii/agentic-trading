@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
@@ -13,6 +14,22 @@ export default function Nav() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSignedIn(Boolean(data.session)));
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(Boolean(session));
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
@@ -67,16 +84,16 @@ export default function Nav() {
           {/* CTAs */}
           <div className="flex items-center gap-2">
             <Link
-              href="/login"
+              href={signedIn ? "/dashboard" : "/login"}
               className="hidden sm:inline-flex text-[13px] text-white/70 hover:text-white transition-colors px-3 py-1.5 tracking-[-0.01em]"
             >
-              Sign in
+              {signedIn ? "Dashboard" : "Sign in"}
             </Link>
             <Link
-              href="/signup"
+              href={signedIn ? "/dashboard" : "/signup"}
               className="relative inline-flex items-center gap-1.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-full px-4 py-1.5 transition-all duration-300 tracking-[-0.01em] hover:shadow-[0_0_24px_rgba(255,255,255,0.15)]"
             >
-              Launch Agent
+              {signedIn ? "Open App" : "Launch Agent"}
               <span className="text-[10px]">→</span>
             </Link>
           </div>
