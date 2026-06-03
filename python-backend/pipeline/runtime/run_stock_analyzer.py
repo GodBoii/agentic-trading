@@ -77,11 +77,16 @@ class MultiStockAnalyzerRunner:
             return existing
 
         reports = self._analyze_candidates(candidate_packets)
+        generated_utc = datetime.now(timezone.utc)
+        generated_market = self.market_time.now()
         payload = {
             "stage": "stock_analyzer",
-            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "generated_at_utc": generated_utc.isoformat(),
+            "generated_at_ist": generated_market.isoformat(),
             "summary": {
                 "market_date": market_date,
+                "market_timezone": self.config.market_timezone,
+                "generated_at_ist": generated_market.isoformat(),
                 "candidate_source": candidate_source,
                 "status": "completed",
                 "selected_count": len(reports),
@@ -365,9 +370,11 @@ class MultiStockAnalyzerRunner:
         stage2_record = self._find_stock(stage2_payload, security_id)
         monitor_record = self._find_stock(monitor_payload, security_id) if monitor_payload else None
         market_context = self._build_market_context(regime_payload)
+        timing_context = self._build_timing_context(stage2_payload, monitor_payload, regime_payload)
 
         return {
             "market_date": market_date,
+            "timing_context": timing_context,
             "candidate_source": candidate_source,
             "security_id": security_id,
             "symbol": candidate_record.get("symbol"),
@@ -401,25 +408,114 @@ class MultiStockAnalyzerRunner:
             "account_context": account_context,
             "source_snapshots": {
                 "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
+                "stage2_generated_at_ist": self._to_market_iso(stage2_payload.get("generated_at_utc")),
                 "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
+                "monitor_generated_at_ist": self._to_market_iso(monitor_payload.get("generated_at_utc")) if monitor_payload else None,
                 "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
+                "regime_generated_at_ist": self._to_market_iso(regime_payload.get("generated_at_utc")),
             },
             "chart_artifacts": {},
+        }
+
+    def _build_timing_context(
+        self,
+        stage2_payload: Dict[str, Any],
+        monitor_payload: Optional[Dict[str, Any]],
+        regime_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        now_utc = datetime.now(timezone.utc)
+        now_market = self.market_time.now()
+        open_dt = now_market.replace(
+            hour=self.config.market_open_hour,
+            minute=self.config.market_open_minute,
+            second=0,
+            microsecond=0,
+        )
+        close_dt = now_market.replace(
+            hour=self.config.market_close_hour,
+            minute=self.config.market_close_minute,
+            second=0,
+            microsecond=0,
+        )
+        return {
+            "analysis_started_at_utc": now_utc.isoformat(),
+            "analysis_started_at_ist": now_market.isoformat(),
+            "current_market_time_ist": now_market.isoformat(),
+            "market_timezone": self.config.market_timezone,
+            "market_session": {
+                "open_time_ist": open_dt.isoformat(),
+                "close_time_ist": close_dt.isoformat(),
+                "regular_session": "09:15-15:30 IST",
+                "is_open_now": bool(open_dt <= now_market <= close_dt),
+                "minutes_since_open": max(0, int((now_market - open_dt).total_seconds() // 60)),
+                "minutes_to_close": max(0, int((close_dt - now_market).total_seconds() // 60)),
+            },
+            "source_snapshot_times": {
+                "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
+                "stage2_generated_at_ist": self._to_market_iso(stage2_payload.get("generated_at_utc")),
+                "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
+                "monitor_generated_at_ist": self._to_market_iso(monitor_payload.get("generated_at_utc")) if monitor_payload else None,
+                "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
+                "regime_generated_at_ist": self._to_market_iso(regime_payload.get("generated_at_utc")),
+            },
+            "source_snapshot_ages_seconds": {
+                "stage2": self._age_seconds(stage2_payload.get("generated_at_utc"), now_utc),
+                "monitor": self._age_seconds(monitor_payload.get("generated_at_utc"), now_utc) if monitor_payload else None,
+                "regime": self._age_seconds(regime_payload.get("generated_at_utc"), now_utc),
+            },
         }
 
     def _build_market_context(self, regime_payload: Dict[str, Any]) -> Dict[str, Any]:
         regime = regime_payload.get("regime") or {}
         return {
             "market_regime": regime.get("market_regime"),
+            "index_regime": regime.get("index_regime"),
+            "breadth_regime": regime.get("breadth_regime"),
+            "volatility_regime": regime.get("volatility_regime"),
+            "flow_regime": regime.get("flow_regime"),
+            "event_regime": regime.get("event_regime"),
+            "global_context_regime": regime.get("global_context_regime"),
             "confidence": regime.get("confidence"),
             "status": regime.get("status"),
             "minutes_since_open": regime.get("minutes_since_open"),
             "is_actionable": regime.get("is_actionable"),
+            "new_trade_permission": regime.get("new_trade_permission"),
+            "participation_bias": regime.get("participation_bias"),
+            "max_position_size_multiplier": regime.get("max_position_size_multiplier"),
+            "allowed_setup_types": regime.get("allowed_setup_types", []),
+            "avoid_setup_types": regime.get("avoid_setup_types", []),
+            "risk_flags": regime.get("risk_flags", []),
+            "decision_source": regime.get("decision_source"),
+            "source_staleness": regime.get("source_staleness", {}),
             "reasoning_summary": regime.get("reasoning_summary"),
+            "human_readable_report": regime.get("human_readable_report"),
             "diagnostics": regime.get("diagnostics", {}),
             "news_analysis": regime.get("news_analysis", {}),
             "generated_at_utc": regime_payload.get("generated_at_utc"),
+            "generated_at_ist": regime_payload.get("generated_at_ist") or self._to_market_iso(regime_payload.get("generated_at_utc")),
         }
+
+    def _age_seconds(self, value: Any, now: Optional[datetime] = None) -> Optional[float]:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return round(((now or datetime.now(timezone.utc)) - dt.astimezone(timezone.utc)).total_seconds(), 3)
+        except Exception:
+            return None
+
+    def _to_market_iso(self, value: Any) -> Optional[str]:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(self.market_time.tz).isoformat()
+        except Exception:
+            return None
 
     def _find_stock(self, payload: Optional[Dict[str, Any]], security_id: int) -> Dict[str, Any]:
         if not payload:

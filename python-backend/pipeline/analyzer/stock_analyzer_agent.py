@@ -39,6 +39,8 @@ class StockAnalyzerAgent:
                 "Use broad market regime/news context only as background pressure and psychology. The setup must be judged from this stock's chart, flow, liquidity, risk, and trade location.",
                 "Do not reject or approve a trade only because the broad market is bearish, bullish, event-driven, or choppy. Tie every conclusion to concrete stock-level evidence.",
                 "Use chart images as the primary evidence and technical_metadata as numeric confirmation.",
+                "Use only the supplied timing_context for dates and times. This pipeline trades Indian equities, so use *_ist fields and Asia/Calcutta for market-session reasoning.",
+                "Do not rely on any automatically injected current time. Treat UTC timestamps as audit fields only.",
                 "Focus on trade quality, risk, expected duration, and whether the setup is worth sending to execution.",
                 "",
                 "CHART VISUAL LEGEND",
@@ -76,7 +78,7 @@ class StockAnalyzerAgent:
                 "7. Execution Handoff - whether to send this stock to execution and what executioner must verify.",
             ],
             markdown=True,
-            add_datetime_to_context=True,
+            add_datetime_to_context=False,
             debug_mode=True,
         )
 
@@ -91,6 +93,7 @@ class StockAnalyzerAgent:
         compact_packet = {
             "candidate_source": candidate_packet.get("candidate_source"),
             "market_date": candidate_packet.get("market_date"),
+            "timing_context": candidate_packet.get("timing_context"),
             "analysis_horizon": "1m_to_60m_intraday",
             "primary_timeframe": "5m",
             "security_id": candidate_packet.get("security_id"),
@@ -123,6 +126,7 @@ class StockAnalyzerAgent:
             "Chart images are provided in order: Current day (1m->5m->15m->30m->1h), then Previous day (5m->15m->1h).\n"
             "Each chart has 4 panels: Price (with overlays), Volume, RSI, CVD.\n"
             "Cross-reference technical_metadata numbers with what you see on charts.\n"
+            "Use timing_context.current_market_time_ist and the Indian market session fields for all time-sensitive conclusions.\n"
             f"{tech_text}"
             "<context>\n"
             f"{json.dumps({'market_context': market_context}, ensure_ascii=True)}\n"
