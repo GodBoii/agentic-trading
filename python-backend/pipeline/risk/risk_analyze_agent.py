@@ -69,7 +69,7 @@ class RiskAnalyzeAgent:
                 "}"
             ),
             markdown=False,
-            add_datetime_to_context=True,
+            add_datetime_to_context=False,
             debug_mode=True,
         )
 
