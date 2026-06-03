@@ -68,6 +68,10 @@ class ExecutionerAgent:
                 "  Current Day: 1m, 5m, 15m, 30m, 1h",
                 "  Previous Day: 5m, 15m, 1h",
                 "Use previous-day charts for key levels and current-day charts for live setup quality.",
+                "You also receive timing_context and fresh_market_snapshot. Always compare stock_analyzer_generated_at_utc with executioner_started_at_utc before deciding.",
+                "For trading interpretation, use Indian market time fields ending in _ist and the configured market_timezone. UTC fields are for audit only.",
+                "Chart images may be older than the fresh text snapshot. If current price/quote/OHLC contradicts the chart-based setup, trust the fresh text snapshot and treat the chart setup as potentially deteriorated.",
+                "If fresh_market_snapshot is missing, failed, or stale, explicitly account for that data-quality risk in the final decision.",
                 "No broad market regime context is supplied to this execution layer. Validate this stock's current setup and execution feasibility only.",
                 "Hard scope: only act on the selected_stock.security_id from the execution packet. Treat every other account order, holding, or position as read-only context.",
                 "If the account already contains orders or positions for any other security, do not cancel, modify, exit, hedge, convert, or otherwise touch them.",
@@ -101,7 +105,7 @@ class ExecutionerAgent:
                 capital_instruction,
             ],
             markdown=True,
-            add_datetime_to_context=True,
+            add_datetime_to_context=False,
             debug_mode=True,
         )
 
@@ -115,8 +119,10 @@ class ExecutionerAgent:
     def _build_prompt(self, execution_packet: Dict[str, Any]) -> str:
         compact_packet = {
             "market_date": execution_packet.get("market_date"),
+            "timing_context": execution_packet.get("timing_context"),
             "selected_stock": execution_packet.get("selected_stock"),
             "stock_analysis": execution_packet.get("stock_analysis"),
+            "fresh_market_snapshot": execution_packet.get("fresh_market_snapshot"),
             "account_context": execution_packet.get("account_context"),
             "user_profile": execution_packet.get("user_profile"),
             "trade_config": execution_packet.get("trade_config"),
@@ -138,6 +144,9 @@ class ExecutionerAgent:
             "Make the final entry-only intraday execution decision for the supplied stock.\n"
             "You receive up to 8 chart images: Current Day (1m, 5m, 15m, 30m, 1h) then Previous Day (5m, 15m, 1h).\n"
             "Use previous-day levels for S/R context and current-day charts for live setup quality.\n"
+            "Before deciding, inspect timing_context.analysis_age_seconds and fresh_market_snapshot. The stock analyzer report and chart images can be older than the current quote/OHLC snapshot.\n"
+            "Use the *_ist timing fields for market-session reasoning because this system trades Indian equities.\n"
+            "If fresh_market_snapshot shows setup deterioration, stale data, a bad spread, or contradiction against the stock analyzer report, avoid the trade or require stricter confirmation.\n"
             "The execution layer may avoid trading, plan a trade, or place one new entry trade using the available Dhan tools.\n"
             "Do not monitor, modify, cancel, exit, or repair trades after entry. Do not touch orders or positions for other securities.\n"
             "Use the stock analyzer report for setup quality and the account context for feasibility.\n"
