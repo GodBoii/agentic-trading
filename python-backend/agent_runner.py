@@ -144,7 +144,7 @@ def get_llm_os(
             "Each agent contributes their specialized expertise.",
             "Synthesize findings into cohesive trading insights."
         ],
-        add_datetime_to_context=True,
+        add_datetime_to_context=False,
         debug_mode=debug_mode,
     )
     main_team_members.append(analysis_team)
@@ -182,7 +182,7 @@ def get_llm_os(
         num_history_runs=40,
         store_events=True, # This is crucial for saving the full history
         markdown=True,
-        add_datetime_to_context=True,
+        add_datetime_to_context=False,
         debug_mode=debug_mode,
     )
 

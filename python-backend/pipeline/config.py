@@ -62,6 +62,11 @@ class PipelineConfig:
     stage1_workers: int = 8
     stage2_workers: int = 8
     regime_workers: int = 8
+    regime_model_id: str = "mimo-v2.5-pro"
+    alpha_vantage_api_key_env: str = "ALPHA_VANTAGE_API_KEY"
+    regime_global_context_enabled: bool = True
+    regime_alpha_vantage_news_limit: int = 25
+    regime_source_max_staleness_seconds: int = 900
     stage2_loop_interval_seconds: int = 600
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
@@ -73,6 +78,8 @@ class PipelineConfig:
     risk_analyzer_report_refresh_seconds: int = 300
     executioner_loop_interval_seconds: int = 30
     executioner_report_refresh_seconds: int = 120
+    executioner_fresh_snapshot_enabled: bool = True
+    executioner_max_market_snapshot_staleness_seconds: int = 120
     tick_stats_save_interval_seconds: int = 30
     tick_stats_history_save_interval_seconds: int = 600
     rate_limit_backoff_base_seconds: float = 0.5
