@@ -43,10 +43,10 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect authenticated users away from login/signup to the homepage
+    // Redirect authenticated users away from login/signup to the app
     if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
         const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/'
+        redirectUrl.pathname = '/dashboard'
         return NextResponse.redirect(redirectUrl)
     }
 
