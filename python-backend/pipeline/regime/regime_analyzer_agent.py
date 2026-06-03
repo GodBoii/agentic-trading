@@ -62,7 +62,7 @@ class RegimeNewsAnalyzerAgent:
                     "A compact markdown report with: headline summary, market tone, FII/DII context, "
                     "event clusters, affected sectors, abnormal-volatility context, and birds-eye view."
                 ),
-                add_datetime_to_context=True,
+                add_datetime_to_context=False,
                 markdown=True,
                 debug_mode=True,
             )

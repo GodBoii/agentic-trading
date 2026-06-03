@@ -9,7 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from pipeline.config import PipelineConfig
-from pipeline.regime.regime_analyzer_agent import RegimeNewsAnalyzerAgent
+from pipeline.regime.regime_analysis_agent import RegimeAnalysisAgent
+from pipeline.services.alpha_vantage_service import AlphaVantageService
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_reference_service import MarketReferenceService
 from pipeline.services.regime_news_service import RegimeNewsService
@@ -38,7 +39,8 @@ class MarketRegimeAnalyzer:
         self.dhan = DhanService(self.config)
         self.market_time = MarketTimeService(self.config)
         self.news_service = RegimeNewsService(self.config, self.market_time)
-        self.news_agent = RegimeNewsAnalyzerAgent()
+        self.regime_agent = RegimeAnalysisAgent(self.config)
+        self.alpha_vantage = AlphaVantageService(self.config)
         self.references = MarketReferenceService(self.config)
         self.catalog = self._load_source_catalog()
 
@@ -309,14 +311,10 @@ class MarketRegimeAnalyzer:
             collected = self.news_service.collect_market_news_payload()
             headlines = collected.get("headlines") or []
             agno_error: Optional[str] = None
-            analysis_engine = "heuristic"
+            analysis_engine = "heuristic_feature_extraction"
 
             if headlines:
                 analysis = self.news_service.analyze_with_heuristics(headlines)
-                agent_analysis, agno_error = self.news_agent.analyze(headlines)
-                if agent_analysis is not None and not agno_error:
-                    analysis.update(agent_analysis)
-                    analysis_engine = "agno_markdown_plus_heuristic"
             else:
                 analysis = self.news_service.analyze_with_heuristics([])
 
@@ -1097,6 +1095,220 @@ class MarketRegimeAnalyzer:
             },
         }
 
+    def _build_regime_features(
+        self,
+        session_state: Dict[str, Any],
+        primary_indices: List[Dict[str, Any]],
+        sector_indices: List[Dict[str, Any]],
+        futures: List[Dict[str, Any]],
+        option_chains: List[Dict[str, Any]],
+        external_inputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        deterministic = self._classify_regime(
+            session_state=session_state,
+            primary_indices=primary_indices,
+            sector_indices=sector_indices,
+            futures=futures,
+            option_chains=option_chains,
+            external_inputs=external_inputs,
+        )
+        return {
+            "feature_engine": "deterministic_market_metrics_v1",
+            "fallback_regime": deterministic,
+            "diagnostics": deterministic.get("diagnostics", {}),
+            "note": "These are feature hints for REGIME_ANALYSIS_AGENT, not the final regime decision.",
+        }
+
+    def _build_regime_packet(
+        self,
+        session_state: Dict[str, Any],
+        primary_indices: List[Dict[str, Any]],
+        sector_indices: List[Dict[str, Any]],
+        futures: List[Dict[str, Any]],
+        option_chains: List[Dict[str, Any]],
+        external_inputs: Dict[str, Any],
+        regime_features: Dict[str, Any],
+        alpha_context: Dict[str, Any],
+        source_failures: Dict[str, str],
+    ) -> Dict[str, Any]:
+        compact_alpha = self.alpha_vantage.compact_for_agent(alpha_context)
+        now_utc = datetime.now(timezone.utc)
+        now_market = self.market_time.now()
+        return {
+            "packet_version": "regime_analysis_agent_v1",
+            "generated_at_utc": now_utc.isoformat(),
+            "generated_at_ist": now_market.isoformat(),
+            "market_timezone": self.config.market_timezone,
+            "market_date": self.market_time.market_date_str(),
+            "session_state": session_state,
+            "indian_market_context": {
+                "primary_indices": primary_indices,
+                "sector_indices": sector_indices,
+                "index_futures": futures,
+                "option_chains": option_chains,
+            },
+            "manual_feature_metrics": regime_features,
+            "news_and_flows": {
+                "market_news": external_inputs.get("market_news") or {},
+                "market_breadth": external_inputs.get("market_breadth") or {},
+                "market_movers": external_inputs.get("market_movers") or {},
+                "market_attention": external_inputs.get("market_attention") or {},
+                "market_derivatives": external_inputs.get("market_derivatives") or {},
+            },
+            "global_market_context": compact_alpha,
+            "source_quality": {
+                "source_failures": source_failures,
+                "source_staleness": self._build_source_staleness(
+                    primary_indices=primary_indices,
+                    sector_indices=sector_indices,
+                    futures=futures,
+                    option_chains=option_chains,
+                    external_inputs=external_inputs,
+                    alpha_context=compact_alpha,
+                ),
+            },
+        }
+
+    def _build_source_staleness(
+        self,
+        primary_indices: List[Dict[str, Any]],
+        sector_indices: List[Dict[str, Any]],
+        futures: List[Dict[str, Any]],
+        option_chains: List[Dict[str, Any]],
+        external_inputs: Dict[str, Any],
+        alpha_context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
+        rows: Dict[str, Any] = {}
+        for group_name, items in (
+            ("primary_indices", primary_indices),
+            ("sector_indices", sector_indices),
+            ("index_futures", futures),
+            ("option_chains", option_chains),
+        ):
+            group_rows = []
+            for item in items:
+                source_time = item.get("latest_bar_time") or item.get("fetched_at_utc") or item.get("generated_at_utc")
+                age = self._age_seconds(source_time, now)
+                group_rows.append(
+                    {
+                        "name": item.get("name") or item.get("symbol") or item.get("underlying_symbol"),
+                        "as_of_time": source_time,
+                        "as_of_time_ist": self._to_market_iso(source_time),
+                        "staleness_seconds": age,
+                        "is_stale": bool(age is not None and age > self.config.regime_source_max_staleness_seconds),
+                    }
+                )
+            rows[group_name] = group_rows
+
+        market_news = external_inputs.get("market_news") or {}
+        news_time = market_news.get("generated_at_utc")
+        flow = market_news.get("institutional_flows") or {}
+        rows["market_news"] = {
+            "as_of_time": news_time,
+            "as_of_time_ist": self._to_market_iso(news_time),
+            "staleness_seconds": self._age_seconds(news_time, now),
+            "institutional_flow_as_of_date": flow.get("as_of_date"),
+            "institutional_flow_is_current_market_date": self._flow_is_current_market_date(flow),
+            "analysis_engine": market_news.get("analysis_engine"),
+        }
+        rows["alpha_vantage"] = alpha_context.get("source_quality") or []
+        return rows
+
+    def _flow_is_current_market_date(self, flow: Dict[str, Any]) -> bool:
+        raw_date = flow.get("as_of_date")
+        if not raw_date:
+            return False
+        parsed = self._parse_iso_date(raw_date)
+        if parsed is None:
+            try:
+                parsed = datetime.strptime(str(raw_date), "%d-%b-%Y").date()
+            except Exception:
+                return False
+        return parsed == self.market_time.now().date()
+
+    def _age_seconds(self, value: Any, now: Optional[datetime] = None) -> Optional[float]:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return round(((now or datetime.now(timezone.utc)) - dt.astimezone(timezone.utc)).total_seconds(), 3)
+        except Exception:
+            return None
+
+    def _to_market_iso(self, value: Any) -> Optional[str]:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(self.market_time.tz).isoformat()
+        except Exception:
+            return None
+
+    def _fallback_agent_regime(
+        self,
+        regime_features: Dict[str, Any],
+        session_state: Dict[str, Any],
+        error: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        fallback = dict(regime_features.get("fallback_regime") or {})
+        diagnostics = fallback.get("diagnostics", {})
+        market_session = session_state.get("market_session")
+        is_actionable = bool(market_session == "live_market" and not session_state.get("is_discovery_phase"))
+        confidence = float(fallback.get("confidence") or 0.0)
+        label = str(fallback.get("market_regime") or "data_unavailable")
+        permission = "allowed" if is_actionable and confidence >= 55 else "reduced" if is_actionable else "unavailable"
+        if label in {"risk_off", "event_driven", "trend_down", "data_unavailable"}:
+            permission = "reduced" if is_actionable else permission
+        return {
+            "market_regime": label,
+            "index_regime": label,
+            "breadth_regime": self._dimension_from_diagnostic(diagnostics.get("sector_breadth_ratio"), "breadth"),
+            "volatility_regime": self._dimension_from_diagnostic(diagnostics.get("vix_change_percent"), "volatility"),
+            "flow_regime": str(diagnostics.get("institutional_flow_context") or "unknown"),
+            "event_regime": "event_risk" if label == "event_driven" else "none",
+            "global_context_regime": "unavailable",
+            "confidence": round(confidence, 2),
+            "is_actionable": is_actionable,
+            "new_trade_permission": permission,
+            "participation_bias": "selective" if permission == "allowed" else "defensive",
+            "max_position_size_multiplier": 0.75 if permission == "allowed" else 0.35 if permission == "reduced" else 0.0,
+            "allowed_setup_types": ["stock_specific_momentum", "clean_vwap_reclaim"] if permission != "unavailable" else [],
+            "avoid_setup_types": ["low_liquidity", "stale_data", "news_contradicted_breakout"],
+            "risk_flags": [error] if error else [],
+            "source_staleness": {},
+            "reasoning_summary": fallback.get("reasoning_summary") or "Fallback deterministic features used.",
+            "human_readable_report": (
+                "REGIME_ANALYSIS_AGENT was unavailable or returned invalid output; "
+                "deterministic feature fallback was used for backward-compatible operation."
+            ),
+            "agent_error": error,
+            "decision_source": "deterministic_feature_fallback",
+        }
+
+    def _dimension_from_diagnostic(self, value: Any, dimension: str) -> str:
+        try:
+            number = float(value)
+        except Exception:
+            return "unknown"
+        if dimension == "breadth":
+            if number >= 0.62:
+                return "broad_participation"
+            if number <= 0.38:
+                return "narrow_or_weak_breadth"
+            return "mixed_breadth"
+        if dimension == "volatility":
+            if number >= 5:
+                return "expanding_volatility"
+            if number <= -3:
+                return "cooling_volatility"
+            return "normal_volatility"
+        return "unknown"
+
     def _save_payload(self, payload: Dict[str, Any]) -> None:
         StorageService.save_snapshot(self.config.regime_latest_path, payload)
         StorageService.save_snapshot(self.config.regime_daily_path(self.market_time.market_date_str()), payload)
@@ -1115,11 +1327,22 @@ class MarketRegimeAnalyzer:
         self._print_group_preview("  Index futures", resolved["index_futures"], ["underlying_symbol", "security_id"])
         self._print_group_preview("  Option chain underlyings", resolved["option_chain_underlyings"], ["symbol", "security_id"])
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             source_future = executor.submit(self._fetch_resolved_sources, resolved)
             news_future = executor.submit(self._refresh_market_news_input)
+            alpha_future = (
+                executor.submit(self.alpha_vantage.collect_context)
+                if self.config.regime_global_context_enabled
+                else None
+            )
             source_snapshots, source_failures, debug_payloads = source_future.result()
             refreshed_market_news = news_future.result()
+            alpha_context = alpha_future.result() if alpha_future else {
+                "enabled": False,
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+                "generated_at_ist": self.market_time.now().isoformat(),
+                "source_status": {"alpha_vantage": {"ok": False, "error": "regime_global_context_disabled"}},
+            }
         external_inputs, external_missing = self._load_external_market_inputs()
 
         primary_indices = [
@@ -1143,7 +1366,7 @@ class MarketRegimeAnalyzer:
             if key.startswith("option_chain_underlyings.")
         ]
 
-        regime = self._classify_regime(
+        regime_features = self._build_regime_features(
             session_state=session_state,
             primary_indices=primary_indices,
             sector_indices=sector_indices,
@@ -1151,6 +1374,26 @@ class MarketRegimeAnalyzer:
             option_chains=option_chains,
             external_inputs=external_inputs,
         )
+        regime_packet = self._build_regime_packet(
+            session_state=session_state,
+            primary_indices=primary_indices,
+            sector_indices=sector_indices,
+            futures=futures,
+            option_chains=option_chains,
+            external_inputs=external_inputs,
+            regime_features=regime_features,
+            alpha_context=alpha_context,
+            source_failures=source_failures,
+        )
+        agent_regime, agent_error = self.regime_agent.analyze(regime_packet)
+        if agent_regime is None:
+            regime = self._fallback_agent_regime(regime_features, session_state, agent_error)
+        else:
+            regime = dict(agent_regime)
+            regime["decision_source"] = "regime_analysis_agent"
+            regime["model_id"] = self.regime_agent.model_id
+        regime.setdefault("diagnostics", regime_features.get("diagnostics", {}))
+        regime.setdefault("source_staleness", (regime_packet.get("source_quality") or {}).get("source_staleness", {}))
         print("Fetched source groups:")
         print(f"  Primary indices: {len(primary_indices)}")
         print(f"  Sector indices: {len(sector_indices)}")
@@ -1165,15 +1408,26 @@ class MarketRegimeAnalyzer:
                 f"headlines={refreshed_market_news.get('headline_count')} "
                 f"severity={refreshed_market_news.get('event_severity_score')}"
             )
+        print(
+            "Alpha Vantage/global context: "
+            f"enabled={alpha_context.get('enabled')} "
+            f"news_status={(alpha_context.get('news_sentiment') or {}).get('status')} "
+            f"market_status={(alpha_context.get('market_status') or {}).get('status')}"
+        )
         self._print_option_chain_summary(option_chains)
         self._print_debug_payload_summary(debug_payloads)
         self._print_regime_diagnostics(regime)
 
+        payload_generated_utc = datetime.now(timezone.utc)
+        payload_generated_market = self.market_time.now()
         payload = {
             "stage": "market_regime",
-            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "generated_at_utc": payload_generated_utc.isoformat(),
+            "generated_at_ist": payload_generated_market.isoformat(),
             "summary": {
                 "market_date": self.market_time.market_date_str(),
+                "market_timezone": self.config.market_timezone,
+                "generated_at_ist": payload_generated_market.isoformat(),
                 "market_session": session_state["market_session"],
                 "resolved_source_groups": {
                     "primary_indices": len(resolved["primary_indices"]),
@@ -1196,6 +1450,19 @@ class MarketRegimeAnalyzer:
                     "headline_count": (refreshed_market_news or {}).get("headline_count"),
                     "event_severity_score": (refreshed_market_news or {}).get("event_severity_score"),
                 },
+                "regime_analysis_agent": {
+                    "model_id": self.regime_agent.model_id,
+                    "decision_source": regime.get("decision_source"),
+                    "error": regime.get("agent_error") or agent_error,
+                },
+                "global_context_refresh": {
+                    "enabled": alpha_context.get("enabled"),
+                    "generated_at_utc": alpha_context.get("generated_at_utc"),
+                    "generated_at_ist": self._to_market_iso(alpha_context.get("generated_at_utc"))
+                    or alpha_context.get("generated_at_ist"),
+                    "news_status": (alpha_context.get("news_sentiment") or {}).get("status"),
+                    "market_status": (alpha_context.get("market_status") or {}).get("status"),
+                },
                 "review_interval_seconds": self.config.regime_loop_interval_seconds,
                 "next_review_at": (
                     self.market_time.now() + timedelta(seconds=self.config.regime_loop_interval_seconds)
@@ -1206,9 +1473,25 @@ class MarketRegimeAnalyzer:
                 "market_regime": regime["market_regime"],
                 "confidence": regime["confidence"],
                 "minutes_since_open": session_state["minutes_since_open"],
-                "is_actionable": session_state["market_session"] == "live_market"
-                and not session_state["is_discovery_phase"],
+                "is_actionable": bool(regime.get("is_actionable")),
+                "index_regime": regime.get("index_regime"),
+                "breadth_regime": regime.get("breadth_regime"),
+                "volatility_regime": regime.get("volatility_regime"),
+                "flow_regime": regime.get("flow_regime"),
+                "event_regime": regime.get("event_regime"),
+                "global_context_regime": regime.get("global_context_regime"),
+                "new_trade_permission": regime.get("new_trade_permission"),
+                "participation_bias": regime.get("participation_bias"),
+                "max_position_size_multiplier": regime.get("max_position_size_multiplier"),
+                "allowed_setup_types": regime.get("allowed_setup_types", []),
+                "avoid_setup_types": regime.get("avoid_setup_types", []),
+                "risk_flags": regime.get("risk_flags", []),
+                "source_staleness": regime.get("source_staleness", {}),
+                "decision_source": regime.get("decision_source"),
+                "model_id": regime.get("model_id"),
+                "agent_error": regime.get("agent_error") or agent_error,
                 "reasoning_summary": regime["reasoning_summary"],
+                "human_readable_report": regime.get("human_readable_report"),
                 "diagnostics": regime.get("diagnostics", {}),
                 "news_analysis": self._summarize_news_input(external_inputs.get("market_news") or {}),
             },
@@ -1219,6 +1502,9 @@ class MarketRegimeAnalyzer:
                 "index_futures": futures,
                 "option_chains": option_chains,
                 "external_inputs": external_inputs,
+                "global_context": self.alpha_vantage.compact_for_agent(alpha_context),
+                "regime_features": regime_features,
+                "regime_packet": regime_packet,
             },
         }
         self._save_payload(payload)
