@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Instrument_Serif } from "next/font/google";
+import { Inter, Inter_Tight, JetBrains_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
-import Footer from "@/components/footer";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+// Inter Tight is the closest free stand-in for Neue Montreal (tight tracking,
+// 500 weight works perfectly for our hero at -0.06em). If you license Neue
+// Montreal, swap the family name below — the rest of the design system will
+// keep working unchanged.
+const neue = Inter_Tight({
+  subsets: ["latin"],
+  variable: "--font-neue",
   weight: ["300", "400", "500", "600", "700"],
 });
 
@@ -23,9 +32,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Aetheria — Autonomous AI Trading Intelligence",
+  title: "Sentinel — Autonomous Intelligence for Global Markets",
   description:
-    "Deploy autonomous AI agents that analyze markets, execute strategies, manage risk, and optimize capital around the clock.",
+    "The first autonomous operating system for market research, execution, and portfolio intelligence.",
   icons: {
     icon: "/icon.png",
     apple: "/icon.png",
@@ -43,10 +52,9 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" />
       </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} font-sans antialiased bg-[#050505] text-white`}
+        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} font-sans antialiased bg-[#030303] text-[#F8F8F8]`}
       >
         {children}
-        <Footer />
       </body>
     </html>
   );
