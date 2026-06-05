@@ -34,6 +34,7 @@ export default function TradingStatus() {
     const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
     const [tradeMode, setTradeMode] = useState<'auto' | 'manual'>('auto')
     const [tradeAmount, setTradeAmount] = useState<string>('')
+    const [regimeAnalysisEnabled, setRegimeAnalysisEnabled] = useState(true)
     const supabase = createClient()
 
     useEffect(() => {
@@ -47,7 +48,11 @@ export default function TradingStatus() {
     }, [])
 
     const startAITrading = async () => {
-        const payload: Record<string, any> = { enabled: true, trade_mode: tradeMode }
+        const payload: Record<string, any> = {
+            enabled: true,
+            trade_mode: tradeMode,
+            regime_analysis_enabled: regimeAnalysisEnabled,
+        }
         if (tradeMode === 'manual') {
             const amount = parseFloat(tradeAmount)
             if (!amount || amount <= 0) {
@@ -277,6 +282,40 @@ export default function TradingStatus() {
                         Uses your available balance to select stocks and size trades automatically.
                     </p>
                 )}
+            </div>
+
+            {/* Regime Gate */}
+            <div className="mb-6 pb-6 border-b border-line">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
+                            Regime Analysis
+                        </p>
+                        <p className="text-[12px] text-ink-secondary leading-relaxed">
+                            {regimeAnalysisEnabled
+                                ? 'Market regime context will be supplied to the stock analyzer.'
+                                : 'Agents will run without regime context.'}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setRegimeAnalysisEnabled((value) => !value)}
+                        disabled={updating || isRunning}
+                        className={`relative h-7 w-12 rounded-full border transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${regimeAnalysisEnabled
+                            ? 'border-success/50 bg-success/20'
+                            : 'border-line bg-[#0a0a0c]'
+                            }`}
+                        aria-pressed={regimeAnalysisEnabled}
+                        aria-label="Toggle regime analysis"
+                    >
+                        <span
+                            className={`absolute top-1 h-5 w-5 rounded-full transition-all duration-300 ${regimeAnalysisEnabled
+                                ? 'left-6 bg-success'
+                                : 'left-1 bg-ink-tertiary'
+                                }`}
+                        />
+                    </button>
+                </div>
             </div>
 
             {/* Start Button */}
