@@ -8,10 +8,6 @@ const inter = Inter({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-// Inter Tight is the closest free stand-in for Neue Montreal (tight tracking,
-// 500 weight works perfectly for our hero at -0.06em). If you license Neue
-// Montreal, swap the family name below — the rest of the design system will
-// keep working unchanged.
 const neue = Inter_Tight({
   subsets: ["latin"],
   variable: "--font-neue",
@@ -52,7 +48,7 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" />
       </head>
       <body
-        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} font-sans antialiased bg-[#030303] text-[#F8F8F8]`}
+        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} font-sans antialiased bg-black text-white`}
       >
         {children}
       </body>
