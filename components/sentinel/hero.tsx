@@ -1,208 +1,198 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import IntelligenceCore from "./intelligence-core";
-
-/**
- * Hero — Section 1.
- *
- * Layout (desktop):
- *   left:   eyebrow, 4-line headline, subtitle, CTAs
- *   right:  glass status card (sticky-positioned absolute)
- *   behind: the IntelligenceCore (full-bleed)
- *
- * Mobile:
- *   the core shrinks and moves behind the headline, the status card drops
- *   below the CTAs as a horizontal strip.
- */
-
-const spring = { type: "spring", stiffness: 120, damping: 20, bounce: 0 } as const;
+import Monolith from "@/components/gdb/Monolith";
 
 const SPRING = { type: "spring" as const, stiffness: 120, damping: 20, bounce: 0 };
 
-function StatusCard() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((v) => v + 1), 2400);
-    return () => clearInterval(id);
-  }, []);
-
-  const rows: [string, string][] = [
-    ["Market State",        "ACTIVE"],
-    ["Signals Processed",   (18437229 + tick * 58231).toLocaleString("en-US")],
-    ["Agent Decisions",     (4281 + tick * 17).toLocaleString("en-US")],
-    ["Execution Accuracy",  `${(97.8 + (tick % 4) * 0.03).toFixed(1)}%`],
-  ];
-
-  return (
-    <motion.aside
-      initial={{ opacity: 0, x: 30 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ ...SPRING, delay: 0.35 }}
-      className="glass-liquid hidden w-[330px] p-5 lg:flex lg:flex-col"
-      aria-label="Live system status"
-    >
-      <div className="mb-5 flex items-center justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
-          Live system status
-        </span>
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-[#00FF9D] opacity-60 animate-pulse-ring" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#00FF9D]" />
-        </span>
-      </div>
-
-      <div className="space-y-3.5">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-end justify-between border-b border-white/[0.06] pb-3">
-            <span className="text-[12px] text-white/55">{label}</span>
-            <motion.span
-              key={`${label}-${value}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="nums font-mono text-[12px] text-[#F8F8F8]"
-            >
-              {value}
-            </motion.span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">
-        <span>Uptime 99.99%</span>
-        <span>Latency 12ms</span>
-      </div>
-    </motion.aside>
-  );
-}
-
-function StatusStripMobile() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((v) => v + 1), 2400);
-    return () => clearInterval(id);
-  }, []);
-
-  const items: { label: string; value: string; tone: "neutral" | "profit" }[] = [
-    { label: "Market",     value: "ACTIVE",                      tone: "neutral" },
-    { label: "Signals",    value: (18437229 + tick * 58231).toLocaleString("en-US"), tone: "neutral" },
-    { label: "Decisions",  value: (4281 + tick * 17).toLocaleString("en-US"),      tone: "neutral" },
-    { label: "Accuracy",   value: `${(97.8 + (tick % 4) * 0.03).toFixed(1)}%`,      tone: "profit" },
-  ];
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ ...SPRING, delay: 0.4 }}
-      className="glass-card mt-8 grid grid-cols-4 gap-px overflow-hidden p-3 sm:hidden"
-    >
-      {items.map((item) => (
-        <div key={item.label} className="px-2 py-2">
-          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/40">
-            {item.label}
-          </div>
-          <motion.div
-            key={`${item.label}-${item.value}`}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className={`nums mt-1.5 font-mono text-[12px] ${item.tone === "profit" ? "text-[#00FF9D]" : "text-[#F8F8F8]"}`}
-          >
-            {item.value}
-          </motion.div>
-        </div>
-      ))}
-    </motion.div>
-  );
-}
-
+/**
+ * GODBOY · Sentinel — opening section.
+ *
+ * The visitor's first impression: an iconic, monolithic, near-black void
+ * with a slowly rotating celestial artifact (the "intelligence core") and
+ * the brand wordmark carved into stone. No SaaS hero copy, no marketing
+ * dashboards. Just presence. Then they scroll into the agentic product.
+ *
+ * The product is the agentic trading OS Sentinel — a constellation of
+ * AI agents that research, signal, risk-manage, and execute.
+ */
 export default function Hero() {
-  return (
-    <section className="relative min-h-[100svh] overflow-hidden bg-[#030303]">
-      {/* Volumetric spotlight from the top */}
-      <div className="absolute inset-0 bg-spotlight pointer-events-none" />
-      <div className="absolute inset-0 bg-spotlight-bottom pointer-events-none" />
+  const [signedIn, setSignedIn] = useState(false);
 
-      {/* The intelligence core lives behind the entire hero */}
-      <div className="absolute inset-0">
-        <IntelligenceCore />
+  useEffect(() => {
+    // Lightweight session check (no SSR-time coupling). If Supabase is
+    // not configured the call just resolves null and we stay signed out.
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import("@/lib/supabase/client").catch(() => null);
+        if (!mod) return;
+        const supabase = mod.createClient();
+        const { data } = await supabase.auth.getSession();
+        if (!cancelled) setSignedIn(Boolean(data.session));
+        const sub = supabase.auth.onAuthStateChange((_e, session) => {
+          if (!cancelled) setSignedIn(Boolean(session));
+        });
+        return () => sub.data.subscription.unsubscribe();
+      } catch {
+        /* no-op */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <section
+      id="presence"
+      className="relative w-full overflow-hidden void"
+      style={{ minHeight: "100vh" }}
+    >
+      {/* Center crosshair (subtle, watch-dial) */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <div
+          className="absolute top-0 bottom-0 w-px"
+          style={{ left: "50%", background: "rgba(255,255,255,0.04)" }}
+        />
+        <div
+          className="absolute left-0 right-0 h-px"
+          style={{ top: "50%", background: "rgba(255,255,255,0.04)" }}
+        />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-[1800px] flex-col justify-center px-5 py-24 sm:px-8 lg:px-14">
-        <motion.p
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={spring}
-          className="mb-7 font-mono text-[10px] uppercase tracking-[0.24em] text-white/45"
-        >
-          Sentinel / Autonomous Capital OS
-        </motion.p>
+      {/* Top-left brand mark */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+        className="absolute top-20 left-7 sm:top-24 sm:left-10 z-20 flex items-center gap-3"
+      >
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full"
+          style={{ background: "var(--gold)", boxShadow: "0 0 10px var(--gold-soft)" }}
+        />
+        <span className="godboy-mark">GODBOY · SENTINEL</span>
+      </motion.div>
 
+      {/* Top-right precision readouts */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
+        className="absolute top-20 right-7 sm:top-24 sm:right-10 z-20 hidden sm:flex flex-col items-end gap-1"
+      >
+        <span className="godboy-mark">AUTONOMOUS · INTELLIGENCE · OS</span>
+        <span className="godboy-mark" style={{ color: "rgba(255,255,255,0.20)" }}>SOVEREIGN · 001 / 999</span>
+      </motion.div>
+
+      {/* The Monolith — barely visible above the wordmark */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 0.9, scale: 1 }}
+        transition={{ duration: 2.4, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        className="absolute z-0 left-1/2 -translate-x-1/2 pointer-events-none"
+        style={{ top: "10vh" }}
+      >
+        <Monolith size={320} />
+      </motion.div>
+
+      {/* THE WORDMARK — fills the lower 60–70% of the viewport */}
+      <div
+        className="relative z-10 mx-auto w-full px-2 flex flex-col items-center justify-center text-center"
+        style={{ minHeight: "100vh", paddingTop: "22vh" }}
+      >
         <motion.h1
-          initial={{ opacity: 0, y: 34 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...spring, delay: 0.12 }}
-          className="sentinel-hero-title"
+          initial={{ opacity: 0, y: 80, filter: "blur(8px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+          className="text-godboy-hero text-white select-none"
+          style={{ textWrap: "balance" }}
         >
-          AUTONOMOUS
-          <br />
-          INTELLIGENCE
-          <br />
-          FOR GLOBAL
-          <br />
-          MARKETS
+          GODBOY
         </motion.h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...spring, delay: 0.25 }}
-          className="mt-7 max-w-[520px] text-[15px] leading-[1.6] text-white/70 sm:text-base"
-        >
-          The first autonomous operating system for market research, execution, and portfolio intelligence.
-        </motion.p>
-
+        {/* Sub-line — the product statement. Single sentence, italic serif. */}
         <motion.div
-          initial={{ opacity: 0, y: 18 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ ...spring, delay: 0.36 }}
-          className="mt-8 flex flex-col gap-3 sm:flex-row"
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 1.1 }}
+          className="mt-8 sm:mt-12 flex flex-col items-center gap-4"
         >
-          <a href="/signup" className="liquid-button liquid-button-primary">
-            <span>Launch Agent</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 7h12M8 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </a>
-          <a href="#agents" className="liquid-button">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-[#00E5FF] opacity-60 animate-pulse-ring" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#00E5FF]" />
-            </span>
-            <span>View Intelligence Layer</span>
-          </a>
+          <p className="text-sentence-godboy text-white/75 italic">
+            Build what outlives you.
+          </p>
         </motion.div>
 
-        <StatusStripMobile />
+        {/* Sub-sub-line: the product essence (single mono line, restrained) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 1.5 }}
+          className="mt-6 flex flex-col items-center gap-3"
+        >
+          <div className="flex items-center gap-3">
+            <span className="w-6 h-px bg-white/20" />
+            <span className="text-eyebrow-godboy text-white/45">
+              Autonomous · Trading · Intelligence
+            </span>
+            <span className="w-6 h-px bg-white/20" />
+          </div>
+        </motion.div>
+
+        {/* Product CTAs — the only place we surface actions. Thin, restrained. */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 1.9 }}
+          className="mt-14 sm:mt-20 flex flex-col sm:flex-row items-center gap-4 sm:gap-5"
+        >
+          <Link
+            href={signedIn ? "/dashboard" : "/signup"}
+            className="enter-button"
+            aria-label={signedIn ? "Open dashboard" : "Launch Sentinel"}
+          >
+            <span>{signedIn ? "OPEN DASHBOARD" : "LAUNCH AGENT"}</span>
+            <span className="arrow" aria-hidden>→</span>
+          </Link>
+          {!signedIn && (
+            <Link
+              href="/login"
+              className="text-eyebrow-godboy text-white/45 hover:text-white transition-colors duration-500"
+            >
+              SIGN IN
+            </Link>
+          )}
+        </motion.div>
       </div>
 
-      {/* Desktop-only right-side glass status card */}
-      <div className="absolute right-6 top-1/2 z-20 hidden -translate-y-1/2 lg:flex xl:right-12">
-        <StatusCard />
-      </div>
-
-      {/* Scroll indicator */}
+      {/* Bottom-left index */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1.4, duration: 1 }}
-        className="absolute bottom-6 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 sm:flex"
+        transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 2.1 }}
+        className="absolute bottom-7 left-7 sm:bottom-9 sm:left-10 z-20 hidden sm:flex items-center gap-3"
       >
-        <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-white/35">Scroll</span>
-        <span className="block h-10 w-px bg-gradient-to-b from-white/30 to-transparent" />
+        <span className="index-num">001 / 008</span>
+        <span className="w-px h-3 bg-white/15" />
+        <span className="godboy-mark" style={{ color: "rgba(255,255,255,0.30)" }}>PRESENCE</span>
+      </motion.div>
+
+      {/* Bottom-right scroll hint */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 2.1 }}
+        className="absolute bottom-7 right-7 sm:bottom-9 sm:right-10 z-20 hidden sm:flex flex-col items-end gap-2"
+      >
+        <span className="godboy-mark" style={{ color: "rgba(255,255,255,0.30)" }}>SCROLL</span>
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 3, ease: "easeInOut", repeat: Infinity }}
+          className="w-px h-8 bg-gradient-to-b from-white/40 to-transparent"
+        />
       </motion.div>
     </section>
   );
