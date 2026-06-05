@@ -75,6 +75,7 @@ class AITradingOrchestrator:
             "requested_at_utc": request.get("requested_at_utc") or datetime.now(timezone.utc).isoformat(),
             "trade_mode": request.get("trade_mode") or "auto",
             "trade_amount": request.get("trade_amount"),
+            "regime_analysis_enabled": self._as_bool(request.get("regime_analysis_enabled"), default=True),
         }
         self.storage.save_snapshot(self.config.ai_trading_request_path, request_payload)
         return request_payload
@@ -199,6 +200,7 @@ class AITradingOrchestrator:
         user_id = str(request.get("user_id") or "")
         trade_mode = str(request.get("trade_mode") or "auto").strip().lower()
         trade_amount = request.get("trade_amount")
+        regime_analysis_enabled = self._as_bool(request.get("regime_analysis_enabled"), default=True)
 
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             self._save_status("blocked", "requested", request, "AI trading is not enabled for any user.")
@@ -206,6 +208,7 @@ class AITradingOrchestrator:
 
         print(f"Starting AI trading run {self.last_request_id} for user {user_id or 'unknown'}...")
         print(f"Trade mode: {trade_mode}, Trade amount: {trade_amount}")
+        print(f"Regime analysis enabled: {regime_analysis_enabled}")
         self._save_status(
             "waiting",
             "stage2",
@@ -222,10 +225,18 @@ class AITradingOrchestrator:
         trade_config = {
             "trade_mode": trade_mode,
             "trade_amount": float(trade_amount) if trade_amount else None,
+            "regime_analysis_enabled": regime_analysis_enabled,
         }
 
         stages = [
-            ("stock_analyzer", lambda force: self.stock_analyzer.run_cycle(force=force, trade_config=trade_config)),
+            (
+                "stock_analyzer",
+                lambda force: self.stock_analyzer.run_cycle(
+                    force=force,
+                    trade_config=trade_config,
+                    use_regime_analysis=regime_analysis_enabled,
+                ),
+            ),
             ("executioner", lambda force: self.executioner.run_cycle(force=force, trade_config=trade_config)),
         ]
 
@@ -260,6 +271,21 @@ class AITradingOrchestrator:
             },
         }
         self.storage.save_snapshot(self.config.ai_trading_run_status_path, payload)
+
+    def _as_bool(self, value: Any, default: bool = True) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "y", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "n", "off"}:
+                return False
+        return default
 
     def _stage_status(self, stage: str, current_stage: str, outputs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         output = (outputs or {}).get(stage)
