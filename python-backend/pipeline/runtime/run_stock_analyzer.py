@@ -28,22 +28,30 @@ class MultiStockAnalyzerRunner:
         )
         self.agent = StockAnalyzerAgent()
 
-    def run_cycle(self, force: bool = False, trade_config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def run_cycle(
+        self,
+        force: bool = False,
+        trade_config: Optional[Dict[str, Any]] = None,
+        use_regime_analysis: Optional[bool] = None,
+    ) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Stock analyzer is idling.")
             return None
 
+        regime_enabled = self._resolve_regime_gate(trade_config, use_regime_analysis)
         market_date = self.market_time.market_date_str()
         stage2_payload = self._load_required_snapshot(
             self.config.stage2_daily_path(market_date),
             self.config.stage2_latest_path,
             "Stage 2",
         )
-        regime_payload = self._load_required_snapshot(
-            self.config.regime_daily_path(market_date),
-            self.config.regime_latest_path,
-            "Regime",
-        )
+        regime_payload = None
+        if regime_enabled:
+            regime_payload = self._load_required_snapshot(
+                self.config.regime_daily_path(market_date),
+                self.config.regime_latest_path,
+                "Regime",
+            )
         monitor_payload = self.storage.load_snapshot(self.config.monitor_daily_path(market_date))
         if not monitor_payload:
             monitor_payload = self.storage.load_snapshot(self.config.monitor_latest_path)
@@ -66,6 +74,7 @@ class MultiStockAnalyzerRunner:
                 stage2_payload=stage2_payload,
                 monitor_payload=monitor_payload,
                 regime_payload=regime_payload,
+                regime_enabled=regime_enabled,
                 account_context=account_context,
             )
             for candidate_record in selected_candidates
@@ -93,6 +102,7 @@ class MultiStockAnalyzerRunner:
                 "selected_symbols": [report["candidate"]["symbol"] for report in reports],
                 "selected_security_ids": [report["candidate"]["security_id"] for report in reports],
                 "source_snapshots": reports[0]["candidate"]["source_snapshots"],
+                "regime_analysis_enabled": regime_enabled,
                 "chart_count": sum(int(report["candidate"]["chart_artifacts"].get("chart_count", 0)) for report in reports),
             },
             "reports": reports,
@@ -109,6 +119,32 @@ class MultiStockAnalyzerRunner:
         if payload:
             return payload
         raise FileNotFoundError(f"{label} snapshot not found for stock analyzer.")
+
+    def _resolve_regime_gate(
+        self,
+        trade_config: Optional[Dict[str, Any]],
+        explicit_value: Optional[bool],
+    ) -> bool:
+        if explicit_value is not None:
+            return bool(explicit_value)
+        if trade_config and "regime_analysis_enabled" in trade_config:
+            return self._as_bool(trade_config.get("regime_analysis_enabled"), default=True)
+        return True
+
+    def _as_bool(self, value: Any, default: bool = True) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "y", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "n", "off"}:
+                return False
+        return default
 
     def _select_candidates(
         self,
@@ -363,19 +399,35 @@ class MultiStockAnalyzerRunner:
         candidate_source: str,
         stage2_payload: Dict[str, Any],
         monitor_payload: Optional[Dict[str, Any]],
-        regime_payload: Dict[str, Any],
+        regime_payload: Optional[Dict[str, Any]],
+        regime_enabled: bool,
         account_context: Dict[str, Any],
     ) -> Dict[str, Any]:
         security_id = int(candidate_record["security_id"])
         stage2_record = self._find_stock(stage2_payload, security_id)
         monitor_record = self._find_stock(monitor_payload, security_id) if monitor_payload else None
-        market_context = self._build_market_context(regime_payload)
+        market_context = self._build_market_context(regime_payload) if regime_enabled and regime_payload else None
         timing_context = self._build_timing_context(stage2_payload, monitor_payload, regime_payload)
+        source_snapshots = {
+            "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
+            "stage2_generated_at_ist": self._to_market_iso(stage2_payload.get("generated_at_utc")),
+            "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
+            "monitor_generated_at_ist": self._to_market_iso(monitor_payload.get("generated_at_utc")) if monitor_payload else None,
+            "regime_analysis_enabled": regime_enabled,
+        }
+        if regime_enabled and regime_payload:
+            source_snapshots.update(
+                {
+                    "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
+                    "regime_generated_at_ist": self._to_market_iso(regime_payload.get("generated_at_utc")),
+                }
+            )
 
-        return {
+        packet = {
             "market_date": market_date,
             "timing_context": timing_context,
             "candidate_source": candidate_source,
+            "regime_analysis_enabled": regime_enabled,
             "security_id": security_id,
             "symbol": candidate_record.get("symbol"),
             "display_name": candidate_record.get("display_name"),
@@ -404,24 +456,19 @@ class MultiStockAnalyzerRunner:
                 "time_of_day_rvol": monitor_record.get("time_of_day_rvol") if monitor_record else None,
                 "intraday_value_cr": monitor_record.get("intraday_value_cr") if monitor_record else None,
             },
-            "market_context": market_context,
             "account_context": account_context,
-            "source_snapshots": {
-                "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
-                "stage2_generated_at_ist": self._to_market_iso(stage2_payload.get("generated_at_utc")),
-                "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
-                "monitor_generated_at_ist": self._to_market_iso(monitor_payload.get("generated_at_utc")) if monitor_payload else None,
-                "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
-                "regime_generated_at_ist": self._to_market_iso(regime_payload.get("generated_at_utc")),
-            },
+            "source_snapshots": source_snapshots,
             "chart_artifacts": {},
         }
+        if market_context is not None:
+            packet["market_context"] = market_context
+        return packet
 
     def _build_timing_context(
         self,
         stage2_payload: Dict[str, Any],
         monitor_payload: Optional[Dict[str, Any]],
-        regime_payload: Dict[str, Any],
+        regime_payload: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
         now_utc = datetime.now(timezone.utc)
         now_market = self.market_time.now()
@@ -437,6 +484,25 @@ class MultiStockAnalyzerRunner:
             second=0,
             microsecond=0,
         )
+        source_snapshot_times = {
+            "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
+            "stage2_generated_at_ist": self._to_market_iso(stage2_payload.get("generated_at_utc")),
+            "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
+            "monitor_generated_at_ist": self._to_market_iso(monitor_payload.get("generated_at_utc")) if monitor_payload else None,
+        }
+        source_snapshot_ages_seconds = {
+            "stage2": self._age_seconds(stage2_payload.get("generated_at_utc"), now_utc),
+            "monitor": self._age_seconds(monitor_payload.get("generated_at_utc"), now_utc) if monitor_payload else None,
+        }
+        if regime_payload:
+            source_snapshot_times.update(
+                {
+                    "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
+                    "regime_generated_at_ist": self._to_market_iso(regime_payload.get("generated_at_utc")),
+                }
+            )
+            source_snapshot_ages_seconds["regime"] = self._age_seconds(regime_payload.get("generated_at_utc"), now_utc)
+
         return {
             "analysis_started_at_utc": now_utc.isoformat(),
             "analysis_started_at_ist": now_market.isoformat(),
@@ -450,19 +516,8 @@ class MultiStockAnalyzerRunner:
                 "minutes_since_open": max(0, int((now_market - open_dt).total_seconds() // 60)),
                 "minutes_to_close": max(0, int((close_dt - now_market).total_seconds() // 60)),
             },
-            "source_snapshot_times": {
-                "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
-                "stage2_generated_at_ist": self._to_market_iso(stage2_payload.get("generated_at_utc")),
-                "monitor_generated_at_utc": monitor_payload.get("generated_at_utc") if monitor_payload else None,
-                "monitor_generated_at_ist": self._to_market_iso(monitor_payload.get("generated_at_utc")) if monitor_payload else None,
-                "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
-                "regime_generated_at_ist": self._to_market_iso(regime_payload.get("generated_at_utc")),
-            },
-            "source_snapshot_ages_seconds": {
-                "stage2": self._age_seconds(stage2_payload.get("generated_at_utc"), now_utc),
-                "monitor": self._age_seconds(monitor_payload.get("generated_at_utc"), now_utc) if monitor_payload else None,
-                "regime": self._age_seconds(regime_payload.get("generated_at_utc"), now_utc),
-            },
+            "source_snapshot_times": source_snapshot_times,
+            "source_snapshot_ages_seconds": source_snapshot_ages_seconds,
         }
 
     def _build_market_context(self, regime_payload: Dict[str, Any]) -> Dict[str, Any]:
