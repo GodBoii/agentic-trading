@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from agno.agent import Agent
 from agno.media import Image
 
-from pipeline.llm import create_mimo_model
+from pipeline.llm import create_multimodal_trading_model
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 
 
@@ -52,7 +52,7 @@ class ExecutionerAgent:
 
         agent = Agent(
             name=self.agent_name,
-            model=create_mimo_model(),
+            model=create_multimodal_trading_model(),
             description=(
                 "Make the final intraday execution decision for one analyzed stock using charts, "
                 "the stock analyzer report, account context, and Dhan trading tools."
@@ -72,7 +72,7 @@ class ExecutionerAgent:
                 "For trading interpretation, use Indian market time fields ending in _ist and the configured market_timezone. UTC fields are for audit only.",
                 "Chart images may be older than the fresh text snapshot. If current price/quote/OHLC contradicts the chart-based setup, trust the fresh text snapshot and treat the chart setup as potentially deteriorated.",
                 "If fresh_market_snapshot is missing, failed, or stale, explicitly account for that data-quality risk in the final decision.",
-                "No broad market regime context is supplied to this execution layer. Validate this stock's current setup and execution feasibility only.",
+                "If a consolidated regime report is supplied, treat it as non-binding background context only. Validate this stock's current setup and execution feasibility from the stock evidence first.",
                 "Hard scope: only act on the selected_stock.security_id from the execution packet. Treat every other account order, holding, or position as read-only context.",
                 "If the account already contains orders or positions for any other security, do not cancel, modify, exit, hedge, convert, or otherwise touch them.",
                 "If there is an existing order or open position for the selected stock, do not manage or exit it. Report that the selected stock already has exposure/order overlap and stop.",
@@ -117,16 +117,13 @@ class ExecutionerAgent:
         return response_text
 
     def _build_prompt(self, execution_packet: Dict[str, Any]) -> str:
-        compact_packet = {
-            "market_date": execution_packet.get("market_date"),
-            "timing_context": execution_packet.get("timing_context"),
-            "selected_stock": execution_packet.get("selected_stock"),
-            "stock_analysis": execution_packet.get("stock_analysis"),
-            "fresh_market_snapshot": execution_packet.get("fresh_market_snapshot"),
-            "account_context": execution_packet.get("account_context"),
-            "user_profile": execution_packet.get("user_profile"),
-            "trade_config": execution_packet.get("trade_config"),
-        }
+        timing_context = execution_packet.get("timing_context") or {}
+        selected_stock = execution_packet.get("selected_stock") or {}
+        stock_analysis = execution_packet.get("stock_analysis") or {}
+        fresh_market_snapshot = execution_packet.get("fresh_market_snapshot") or {}
+        account_context = execution_packet.get("account_context") or {}
+        trade_config = execution_packet.get("trade_config") or {}
+        regime_report = str(execution_packet.get("regime_report") or "").strip()
         tool_instructions = {
             "sizing": "For new intraday trades, first call calculate_intraday_equity_order_quantity with security_id, side, reference_price, margin_budget, and stop_loss_price.",
             "margin": "Before any live order, call calculate_margin_requirement for the final security, side, quantity, and reference price.",
@@ -140,24 +137,67 @@ class ExecutionerAgent:
             "retry_limit": "One protected entry attempt only. Stop on DH-905/Input_Exception. At most one normal entry fallback for non-input-error protected-order unavailability.",
             "order_type_enums": "Use only LIMIT, MARKET, STOP_LOSS, STOP_LOSS_MARKET.",
         }
-        return (
-            "Make the final entry-only intraday execution decision for the supplied stock.\n"
-            "You receive up to 8 chart images: Current Day (1m, 5m, 15m, 30m, 1h) then Previous Day (5m, 15m, 1h).\n"
-            "Use previous-day levels for S/R context and current-day charts for live setup quality.\n"
-            "Before deciding, inspect timing_context.analysis_age_seconds and fresh_market_snapshot. The stock analyzer report and chart images can be older than the current quote/OHLC snapshot.\n"
-            "Use the *_ist timing fields for market-session reasoning because this system trades Indian equities.\n"
-            "If fresh_market_snapshot shows setup deterioration, stale data, a bad spread, or contradiction against the stock analyzer report, avoid the trade or require stricter confirmation.\n"
-            "The execution layer may avoid trading, plan a trade, or place one new entry trade using the available Dhan tools.\n"
-            "Do not monitor, modify, cancel, exit, or repair trades after entry. Do not touch orders or positions for other securities.\n"
-            "Use the stock analyzer report for setup quality and the account context for feasibility.\n"
-            "No regime or broad market context is provided here.\n"
-            "Output only the final execution outcome. Do not produce JSON.\n"
-            "<tools>\n"
-            f"{json.dumps(tool_instructions, ensure_ascii=True)}\n"
-            "</tools>\n"
-            "Execution packet JSON:\n"
-            f"{json.dumps(compact_packet, ensure_ascii=True)}"
+        lines = [
+            "Make the final entry-only intraday execution decision for the supplied stock.",
+            "You receive up to 8 chart images: Current Day (1m, 5m, 15m, 30m, 1h) then Previous Day (5m, 15m, 1h).",
+            "Use previous-day levels for S/R context and current-day charts for live setup quality.",
+            "Before deciding, inspect timing_context.analysis_age_seconds and fresh_market_snapshot. The stock analyzer report and chart images can be older than the current quote/OHLC snapshot.",
+            "Use the *_ist timing fields for market-session reasoning because this system trades Indian equities.",
+            "If fresh_market_snapshot shows setup deterioration, stale data, a bad spread, or contradiction against the stock analyzer report, avoid the trade or require stricter confirmation.",
+            "The execution layer may avoid trading, plan a trade, or place one new entry trade using the available Dhan tools.",
+            "Do not monitor, modify, cancel, exit, or repair trades after entry. Do not touch orders or positions for other securities.",
+            "Use the stock analyzer report for setup quality and the account context for feasibility.",
+            "Output only the final execution outcome. Do not produce JSON.",
+            "",
+            "## Tool Rules",
+            json.dumps(tool_instructions, ensure_ascii=True),
+            "",
+            "## Timing Context",
+            json.dumps(timing_context, ensure_ascii=True),
+            "",
+            "## Selected Stock",
+            json.dumps(
+                {
+                    "rank": selected_stock.get("rank"),
+                    "security_id": selected_stock.get("security_id"),
+                    "symbol": selected_stock.get("symbol"),
+                    "display_name": selected_stock.get("display_name"),
+                    "candidate_source": selected_stock.get("candidate_source"),
+                    "stock": selected_stock.get("stock"),
+                    "stage2": selected_stock.get("stage2"),
+                    "monitor": selected_stock.get("monitor"),
+                },
+                ensure_ascii=True,
+            ),
+        ]
+
+        if regime_report:
+            lines.extend(
+                [
+                    "",
+                    "## Regime Context",
+                    "Use this report only as non-binding background context:",
+                    regime_report,
+                ]
+            )
+
+        lines.extend(
+            [
+                "",
+                "## Stock Analyzer Report",
+                json.dumps(stock_analysis, ensure_ascii=True),
+                "",
+                "## Fresh Market Snapshot",
+                json.dumps(fresh_market_snapshot, ensure_ascii=True),
+                "",
+                "## Account Context",
+                json.dumps(account_context, ensure_ascii=True),
+                "",
+                "## Trade Config",
+                json.dumps(trade_config, ensure_ascii=True),
+            ]
         )
+        return "\n".join(lines)
 
     def _extract_text(self, response: Any) -> str:
         if response is None:

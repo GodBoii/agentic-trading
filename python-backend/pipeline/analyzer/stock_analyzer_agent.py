@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from agno.agent import Agent
 from agno.media import Image
 
-from pipeline.llm import create_mimo_model
+from pipeline.llm import create_multimodal_trading_model
 
 
 class StockAnalyzerAgent:
@@ -29,7 +29,7 @@ class StockAnalyzerAgent:
         regime_enabled = bool(candidate_packet.get("regime_analysis_enabled", True))
         agent = Agent(
             name=self.agent_name,
-            model=create_mimo_model(),
+            model=create_multimodal_trading_model(),
             description=(
                 "Analyze one intraday stock candidate using supplied stock data, technical metadata, "
                 "chart images, and broad market context only when it is supplied."
@@ -49,22 +49,22 @@ class StockAnalyzerAgent:
 
     def _build_instructions(self, regime_enabled: bool) -> List[str]:
         regime_instructions = [
-            "Use broad market regime/news context only as background pressure and psychology. The setup must be judged from this stock's chart, flow, liquidity, risk, and trade location.",
-            "Do not reject or approve a trade only because the broad market is bearish, bullish, event-driven, or choppy. Tie every conclusion to concrete stock-level evidence.",
+            "If a consolidated regime analysis report is supplied, treat it as background pressure and psychology only. The setup must be judged from this stock's chart, flow, liquidity, risk, and trade location.",
+            "Do not reject or approve a trade only because the regime report sounds bearish, bullish, event-driven, or choppy. Tie every conclusion to concrete stock-level evidence.",
         ]
         if not regime_enabled:
             regime_instructions = [
-                "No broad market regime/news context is supplied for this run.",
+                "No consolidated regime analysis report is supplied for this run.",
                 "Do not infer, invent, request, or mention market regime analysis. Judge the setup from this stock's chart, flow, liquidity, risk, account context, and trade location only.",
             ]
 
         context_scope = (
-            "supplied stock data, chart images, broad market context, and technical metadata"
+            "supplied stock data, chart images, a consolidated regime analysis report, and technical metadata"
             if regime_enabled
             else "supplied stock data, chart images, account context, and technical metadata"
         )
         psychology_section = (
-            "2. Market Psychology - how broad context and this stock's behavior may affect traders/institutions."
+            "2. Market Psychology - how the supplied regime report and this stock's behavior may affect traders/institutions."
             if regime_enabled
             else "2. Market Psychology - how this stock's behavior may affect traders/institutions."
         )
@@ -113,55 +113,81 @@ class StockAnalyzerAgent:
         ]
 
     def _build_prompt(self, candidate_packet: Dict[str, Any]) -> str:
-        compact_packet = {
-            "candidate_source": candidate_packet.get("candidate_source"),
-            "regime_analysis_enabled": candidate_packet.get("regime_analysis_enabled", True),
-            "market_date": candidate_packet.get("market_date"),
-            "timing_context": candidate_packet.get("timing_context"),
-            "analysis_horizon": "1m_to_60m_intraday",
-            "primary_timeframe": "5m",
-            "security_id": candidate_packet.get("security_id"),
-            "symbol": candidate_packet.get("symbol"),
-            "display_name": candidate_packet.get("display_name"),
-            "stock": candidate_packet.get("stock"),
-            "stage2": candidate_packet.get("stage2"),
-            "monitor": candidate_packet.get("monitor"),
-            "account_context": candidate_packet.get("account_context"),
-            "chart_artifacts": {
-                k: v
-                for k, v in (candidate_packet.get("chart_artifacts") or {}).items()
-                if k not in {"chart_paths_ordered", "technical_metadata"}
-            },
-        }
         regime_enabled = bool(candidate_packet.get("regime_analysis_enabled", True))
-        market_context = candidate_packet.get("market_context") or candidate_packet.get("regime") or {}
-        context_payload = {"regime_analysis_enabled": regime_enabled}
-        if regime_enabled:
-            context_payload["market_context"] = market_context
+        regime_report = str(candidate_packet.get("regime_report") or "").strip()
         technical_metadata = (candidate_packet.get("chart_artifacts") or {}).get("technical_metadata") or {}
+        timing_context = candidate_packet.get("timing_context") or {}
+        market_session = timing_context.get("market_session") or {}
+        stock = candidate_packet.get("stock") or {}
+        stage2 = candidate_packet.get("stage2") or {}
+        monitor = candidate_packet.get("monitor") or {}
+        account_context = candidate_packet.get("account_context") or {}
+        funds = (account_context.get("funds") or {}).get("data") or {}
 
-        tech_text = ""
-        if technical_metadata:
-            tech_text = (
-                "\n<technical_metadata>\n"
-                f"{json.dumps(technical_metadata, ensure_ascii=False)}\n"
-                "</technical_metadata>\n"
+        lines = [
+            "Analyze the supplied intraday stock candidate.",
+            "Your downstream reader is this stock's executioner agent, so be precise, concrete, and usable.",
+            "Chart images are provided in order: Current day (1m->5m->15m->30m->1h), then Previous day (5m->15m->1h).",
+            "Each chart has 4 panels: Price (with overlays), Volume, RSI, CVD.",
+            "Cross-reference the technical snapshot with what you see on charts.",
+            "Use timing_context.current_market_time_ist and the Indian market session fields for all time-sensitive conclusions.",
+            "",
+            "## Stock",
+            f"Display name: {candidate_packet.get('display_name') or candidate_packet.get('symbol') or 'Unknown'}",
+            f"Security ID: {candidate_packet.get('security_id')}",
+            f"Symbol: {candidate_packet.get('symbol') or 'Unknown'}",
+            f"Candidate source: {candidate_packet.get('candidate_source') or 'unknown'}",
+            f"Market date: {candidate_packet.get('market_date') or 'unknown'}",
+            "",
+            "## Timing Context",
+            f"Current market time IST: {timing_context.get('current_market_time_ist') or 'unknown'}",
+            f"Minutes since open: {market_session.get('minutes_since_open')}",
+            f"Minutes to close: {market_session.get('minutes_to_close')}",
+        ]
+
+        if regime_enabled and regime_report:
+            lines.extend(
+                [
+                    "",
+                    "## Regime Context",
+                    "Use this report only as non-binding background context:",
+                    regime_report,
+                ]
             )
 
-        return (
-            "Analyze the supplied intraday stock candidate.\n"
-            "Your downstream reader is this stock's executioner agent, so be precise, concrete, and usable.\n"
-            "Chart images are provided in order: Current day (1m->5m->15m->30m->1h), then Previous day (5m->15m->1h).\n"
-            "Each chart has 4 panels: Price (with overlays), Volume, RSI, CVD.\n"
-            "Cross-reference technical_metadata numbers with what you see on charts.\n"
-            "Use timing_context.current_market_time_ist and the Indian market session fields for all time-sensitive conclusions.\n"
-            f"{tech_text}"
-            "<context>\n"
-            f"{json.dumps(context_payload, ensure_ascii=True)}\n"
-            "</context>\n"
-            "Candidate packet:\n"
-            f"{json.dumps(compact_packet, ensure_ascii=True)}"
+        if technical_metadata:
+            lines.extend(
+                [
+                    "",
+                    "## Technical Snapshot",
+                    json.dumps(technical_metadata, ensure_ascii=False),
+                ]
+            )
+
+        lines.extend(
+            [
+                "",
+                "## Selection Context",
+                f"Cash price reference: {stock.get('price')}",
+                f"ADV 20d (Cr): {stock.get('adv_20_cr')}",
+                f"ATR percent: {stock.get('atr_percent')}",
+                f"Stage 2 score: {stage2.get('score')}",
+                f"Time-of-day RVOL: {stage2.get('time_of_day_rvol')}",
+                f"Price vs VWAP percent: {stage2.get('price_vs_vwap_percent')}",
+                f"Opening-range breakout percent: {stage2.get('opening_range_breakout_percent')}",
+                f"Volume acceleration ratio: {stage2.get('volume_acceleration_ratio')}",
+                f"Monitor passed: {monitor.get('passed')}",
+                f"Monitor spread percent: {monitor.get('spread_percent')}",
+                f"Monitor ticks last 10 min: {monitor.get('ticks_last_10min')}",
+                "",
+                "## Account Context",
+                f"Holdings count: {(account_context.get('holdings') or {}).get('count')}",
+                f"Open intraday positions: {(account_context.get('positions') or {}).get('open_intraday_count')}",
+                f"Available balance: {funds.get('availabelBalance') or funds.get('availableBalance') or funds.get('sodLimit')}",
+            ]
         )
+
+        return "\n".join(lines)
 
     def _extract_text(self, response: Any) -> str:
         if response is None:

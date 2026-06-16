@@ -406,7 +406,7 @@ class MultiStockAnalyzerRunner:
         security_id = int(candidate_record["security_id"])
         stage2_record = self._find_stock(stage2_payload, security_id)
         monitor_record = self._find_stock(monitor_payload, security_id) if monitor_payload else None
-        market_context = self._build_market_context(regime_payload) if regime_enabled and regime_payload else None
+        regime_report = self._build_regime_report(regime_payload) if regime_enabled and regime_payload else None
         timing_context = self._build_timing_context(stage2_payload, monitor_payload, regime_payload)
         source_snapshots = {
             "stage2_generated_at_utc": stage2_payload.get("generated_at_utc"),
@@ -460,8 +460,8 @@ class MultiStockAnalyzerRunner:
             "source_snapshots": source_snapshots,
             "chart_artifacts": {},
         }
-        if market_context is not None:
-            packet["market_context"] = market_context
+        if regime_report:
+            packet["regime_report"] = regime_report
         return packet
 
     def _build_timing_context(
@@ -520,35 +520,15 @@ class MultiStockAnalyzerRunner:
             "source_snapshot_ages_seconds": source_snapshot_ages_seconds,
         }
 
-    def _build_market_context(self, regime_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_regime_report(self, regime_payload: Dict[str, Any]) -> Optional[str]:
         regime = regime_payload.get("regime") or {}
-        return {
-            "market_regime": regime.get("market_regime"),
-            "index_regime": regime.get("index_regime"),
-            "breadth_regime": regime.get("breadth_regime"),
-            "volatility_regime": regime.get("volatility_regime"),
-            "flow_regime": regime.get("flow_regime"),
-            "event_regime": regime.get("event_regime"),
-            "global_context_regime": regime.get("global_context_regime"),
-            "confidence": regime.get("confidence"),
-            "status": regime.get("status"),
-            "minutes_since_open": regime.get("minutes_since_open"),
-            "is_actionable": regime.get("is_actionable"),
-            "new_trade_permission": regime.get("new_trade_permission"),
-            "participation_bias": regime.get("participation_bias"),
-            "max_position_size_multiplier": regime.get("max_position_size_multiplier"),
-            "allowed_setup_types": regime.get("allowed_setup_types", []),
-            "avoid_setup_types": regime.get("avoid_setup_types", []),
-            "risk_flags": regime.get("risk_flags", []),
-            "decision_source": regime.get("decision_source"),
-            "source_staleness": regime.get("source_staleness", {}),
-            "reasoning_summary": regime.get("reasoning_summary"),
-            "human_readable_report": regime.get("human_readable_report"),
-            "diagnostics": regime.get("diagnostics", {}),
-            "news_analysis": regime.get("news_analysis", {}),
-            "generated_at_utc": regime_payload.get("generated_at_utc"),
-            "generated_at_ist": regime_payload.get("generated_at_ist") or self._to_market_iso(regime_payload.get("generated_at_utc")),
-        }
+        report = str(regime.get("human_readable_report") or "").strip()
+        if not report:
+            return None
+        lowered = report.lower()
+        if "unavailable" in lowered or "fallback" in lowered or "invalid output" in lowered:
+            return None
+        return report
 
     def _age_seconds(self, value: Any, now: Optional[datetime] = None) -> Optional[float]:
         if not value:

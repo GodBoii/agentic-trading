@@ -252,7 +252,6 @@ class RiskAnalyzerRunner:
                     "stage2": candidate.get("stage2"),
                     "monitor": candidate.get("monitor"),
                     "analysis_report": analysis,
-                    "chart_artifacts": candidate.get("chart_artifacts"),
                 }
             )
 
@@ -269,39 +268,20 @@ class RiskAnalyzerRunner:
                     "regime_generated_at_utc": regime_payload.get("generated_at_utc"),
                 },
             },
-            "market_context": self._build_market_context(regime_payload),
+            "regime_report": self._build_regime_report(regime_payload),
             "account_context": account_context,
             "stock_reports": compact_reports,
         }
 
-    def _build_market_context(self, regime_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_regime_report(self, regime_payload: Dict[str, Any]) -> Optional[str]:
         regime = regime_payload.get("regime") or {}
-        return {
-            "market_regime": regime.get("market_regime"),
-            "index_regime": regime.get("index_regime"),
-            "breadth_regime": regime.get("breadth_regime"),
-            "volatility_regime": regime.get("volatility_regime"),
-            "flow_regime": regime.get("flow_regime"),
-            "event_regime": regime.get("event_regime"),
-            "global_context_regime": regime.get("global_context_regime"),
-            "confidence": regime.get("confidence"),
-            "status": regime.get("status"),
-            "minutes_since_open": regime.get("minutes_since_open"),
-            "is_actionable": regime.get("is_actionable"),
-            "new_trade_permission": regime.get("new_trade_permission"),
-            "participation_bias": regime.get("participation_bias"),
-            "max_position_size_multiplier": regime.get("max_position_size_multiplier"),
-            "allowed_setup_types": regime.get("allowed_setup_types", []),
-            "avoid_setup_types": regime.get("avoid_setup_types", []),
-            "risk_flags": regime.get("risk_flags", []),
-            "decision_source": regime.get("decision_source"),
-            "source_staleness": regime.get("source_staleness", {}),
-            "reasoning_summary": regime.get("reasoning_summary"),
-            "human_readable_report": regime.get("human_readable_report"),
-            "diagnostics": regime.get("diagnostics", {}),
-            "news_analysis": regime.get("news_analysis", {}),
-            "generated_at_utc": regime_payload.get("generated_at_utc"),
-        }
+        report = str(regime.get("human_readable_report") or "").strip()
+        if not report:
+            return None
+        lowered = report.lower()
+        if "unavailable" in lowered or "fallback" in lowered or "invalid output" in lowered:
+            return None
+        return report
 
     def _collect_chart_paths(self, stock_reports: List[Dict[str, Any]]) -> List[str]:
         """Collect chart paths for the risk analyzer.

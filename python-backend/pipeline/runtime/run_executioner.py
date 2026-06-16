@@ -34,6 +34,13 @@ class ExecutionerRunner:
             self.config.stock_analyzer_latest_path,
             "Stock analyzer",
         )
+        regime_payload = None
+        if (stock_payload.get("summary") or {}).get("regime_analysis_enabled"):
+            regime_payload = self._load_required_snapshot(
+                self.config.regime_daily_path(market_date),
+                self.config.regime_latest_path,
+                "Regime",
+            )
 
         stock_reports = list(stock_payload.get("reports") or [])
         if not stock_reports:
@@ -49,6 +56,7 @@ class ExecutionerRunner:
                 report,
                 trade_config or {},
                 fresh_snapshots.get(self._extract_report_security_id(report), {}),
+                regime_payload=regime_payload,
             )
             for report in stock_reports[: max(1, int(self.config.stock_analyzer_top_n))]
         ]
@@ -120,6 +128,7 @@ class ExecutionerRunner:
         selected_report: Dict[str, Any],
         trade_config: Dict[str, Any],
         fresh_market_snapshot: Optional[Dict[str, Any]] = None,
+        regime_payload: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         selected_stock = self._normalize_selected_stock(selected_report)
         if not selected_stock["chart_paths"]:
@@ -140,6 +149,7 @@ class ExecutionerRunner:
             },
             "timing_context": timing_context,
             "selected_stock": selected_stock,
+            "regime_report": self._build_regime_report(regime_payload),
             "stock_analysis": normalized_analysis,
             "fresh_market_snapshot": fresh_market_snapshot or self._empty_fresh_market_snapshot(
                 int(selected_stock.get("security_id") or 0),
@@ -165,6 +175,18 @@ class ExecutionerRunner:
             "analysis_age_seconds": age_seconds,
             "analysis_age_human": self._human_age(age_seconds),
         }
+
+    def _build_regime_report(self, regime_payload: Optional[Dict[str, Any]]) -> Optional[str]:
+        if not regime_payload:
+            return None
+        regime = regime_payload.get("regime") or {}
+        report = str(regime.get("human_readable_report") or "").strip()
+        if not report:
+            return None
+        lowered = report.lower()
+        if "unavailable" in lowered or "fallback" in lowered or "invalid output" in lowered:
+            return None
+        return report
 
     def _build_fresh_market_snapshots(self, stock_reports: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
         ids = [self._extract_report_security_id(report) for report in stock_reports]
