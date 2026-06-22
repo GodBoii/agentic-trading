@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { createClient } from '@/lib/supabase/server'
+import { syncLatestTradeSession } from '@/lib/ai-trading-sessions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -226,12 +227,16 @@ export async function GET() {
     try {
       const backendPayload = await callTradingBackend('/ai-trading/status', { method: 'GET' })
       if (backendPayload) {
-        return NextResponse.json(normalizeRunStatus(backendPayload))
+        const status = normalizeRunStatus(backendPayload)
+        await syncLatestTradeSession({ status, uploadToCloud: status?.status === 'completed' })
+        return NextResponse.json(status)
       }
     } catch (error) {
       console.warn('[Toggle API] AI trading backend status unavailable, falling back to status file:', error)
     }
-    return NextResponse.json(await loadRunStatus())
+    const status = await loadRunStatus()
+    await syncLatestTradeSession({ status, uploadToCloud: status?.status === 'completed' })
+    return NextResponse.json(status)
   } catch (error) {
     console.error('AI trading status route error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
