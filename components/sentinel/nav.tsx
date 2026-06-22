@@ -99,7 +99,7 @@ export default function Nav() {
           <span
             className="font-grotesk text-sm font-semibold tracking-[-0.02em] text-white"
           >
-            SENTINEL
+            POLYCOGNITIVE
           </span>
           <span className="hidden font-mono text-[9px] uppercase tracking-[0.3em] text-white/30 sm:inline">
             OS

@@ -88,20 +88,20 @@ function DataStream({
   );
 }
 
-function SentinelWordmark() {
-  const word = "SENTINEL";
-  const opacities = [0.06, 0.04, 0.05, 0.03, 0.06, 0.04, 0.05, 0.03];
+function PolycognitiveWordmark() {
+  const word = "POLYCOGNITIVE";
+  const opacities = [0.06, 0.04, 0.05, 0.03, 0.06, 0.04, 0.05, 0.03, 0.06, 0.04, 0.05, 0.03, 0.06];
 
   return (
     <div className="select-none pointer-events-none">
-      {/* First line: "SENT" offset left */}
+      {/* First line: "POLYCOG" offset left */}
       <div className="flex" style={{ marginLeft: "-2vw" }}>
-        {word.slice(0, 4).split("").map((letter, i) => (
+        {word.slice(0, 7).split("").map((letter, i) => (
           <span
             key={`a-${i}`}
             className="font-grotesk font-bold"
             style={{
-              fontSize: "clamp(8rem, 22vw, 26rem)",
+              fontSize: "clamp(4rem, 14vw, 18rem)",
               lineHeight: 0.82,
               letterSpacing: "-0.06em",
               color: `rgba(255,255,255,${opacities[i]})`,
@@ -111,17 +111,17 @@ function SentinelWordmark() {
           </span>
         ))}
       </div>
-      {/* Second line: "INEL" offset right */}
-      <div className="flex justify-end" style={{ marginRight: "-3vw", marginTop: "-4vw" }}>
-        {word.slice(4).split("").map((letter, i) => (
+      {/* Second line: "NITIVE" offset right */}
+      <div className="flex justify-end" style={{ marginRight: "-3vw", marginTop: "-2vw" }}>
+        {word.slice(7).split("").map((letter, i) => (
           <span
             key={`b-${i}`}
             className="font-editorial font-bold"
             style={{
-              fontSize: "clamp(6rem, 18vw, 22rem)",
+              fontSize: "clamp(3rem, 12vw, 16rem)",
               lineHeight: 0.82,
               letterSpacing: "-0.04em",
-              color: `rgba(255,255,255,${opacities[i + 4]})`,
+              color: `rgba(255,255,255,${opacities[i + 7]})`,
             }}
           >
             {letter}
@@ -142,7 +142,7 @@ export default function Footer() {
           <div className="flex items-start justify-between mb-10 sm:mb-14">
             <div>
               <div className="font-grotesk font-semibold text-sm tracking-[-0.01em] text-white/70">
-                SENTINEL
+                POLYCOGNITIVE
               </div>
               <p className="mt-2 max-w-xs text-[12px] text-white/40 font-grotesk leading-relaxed">
                 The first autonomous operating system for market research,
@@ -201,7 +201,7 @@ export default function Footer() {
           viewport={{ once: true }}
           className="absolute inset-0 flex items-center justify-center"
         >
-          <SentinelWordmark />
+          <PolycognitiveWordmark />
         </motion.div>
       </div>
 
@@ -209,7 +209,7 @@ export default function Footer() {
       <div className="relative z-10 border-t border-white/[0.05] px-5 py-5 sm:px-8">
         <div className="mx-auto flex max-w-[1400px] flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
           <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-white/30">
-            © 2026 Sentinel Capital Systems
+            © 2026 Polycognitive Capital Systems
           </span>
           <span className="font-grotesk text-[10px] text-white/25">
             For research purposes only · Not investment advice
