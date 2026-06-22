@@ -11,7 +11,7 @@ import FinalCta from "./final-cta";
 import Footer from "./footer";
 
 /**
- * Sentinel — the complete landing page.
+ * Polycognitive — the complete landing page.
  *
  * 7 sections + nav + footer, all orchestrated into a single client
  * component so framer-motion / scroll handlers share a single
@@ -25,7 +25,7 @@ import Footer from "./footer";
  *   05 Decision Engine  — terminal-style reasoning feed
  *   06 Trust            — massive editorial + 5 metrics
  *   07 Final CTA        — converging particles
- *   Footer              — 25vw SENTINEL + market data streams
+ *   Footer              — 25vw POLYCOGNITIVE + market data streams
  */
 export default function Sentinel() {
   return (

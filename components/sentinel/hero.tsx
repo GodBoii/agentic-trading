@@ -82,7 +82,7 @@ const DATA_PILLS = [
 
 export default function Hero() {
   const [signedIn, setSignedIn] = useState(false);
-  const { display: heroText, done: scrambleDone } = useScrambleText("SENTINEL", 1800, 600);
+  const { display: heroText, done: scrambleDone } = useScrambleText("POLYCOGNITIVE", 1800, 600);
   const mouseX = useMotionValue(0.5);
   const mouseY = useMotionValue(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -214,7 +214,7 @@ export default function Hero() {
                 textWrap: "balance",
               }}
             >
-              {heroText || "SENTINEL"}
+              {heroText || "POLYCOGNITIVE"}
             </motion.h1>
 
             {/* Sub-tagline in editorial italic — contrasting font */}
@@ -292,7 +292,7 @@ export default function Hero() {
           <Link
             href={signedIn ? "/dashboard" : "/signup"}
             className="enter-button"
-            aria-label={signedIn ? "Open dashboard" : "Launch Sentinel"}
+            aria-label={signedIn ? "Open dashboard" : "Launch Polycognitive"}
           >
             <span>{signedIn ? "OPEN DASHBOARD" : "LAUNCH AGENT"}</span>
             <span className="arrow" aria-hidden>
