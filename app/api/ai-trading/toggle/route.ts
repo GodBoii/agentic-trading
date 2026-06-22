@@ -108,8 +108,7 @@ async function loadRunStatus() {
       message: null,
       stages: {
         stage2: { status: 'pending', summary: null, details: null },
-        stock_analyzer: { status: 'pending', summary: null },
-        executioner: { status: 'pending', summary: null },
+        stock_agent: { status: 'pending', summary: null, details: null },
       },
     }
   }

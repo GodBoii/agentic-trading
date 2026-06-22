@@ -26,13 +26,25 @@ interface AgentRunStatus {
     stages?: Record<string, AgentStage>
 }
 
-const stageLabels: Record<string, string> = {
-    stage2: 'Stage 2 Momentum',
-    stock_analyzer: 'Stock Analyzer',
-    executioner: 'Executioner',
+interface LiveAgentEvent {
+    type: string
+    rank?: number
+    security_id?: number
+    symbol?: string
+    display_name?: string
+    message?: string
+    decision?: Record<string, any>
+    report_text?: string
+    error?: string
+    sent_at_utc?: string
 }
 
-const stageOrder = ['stage2', 'stock_analyzer', 'executioner']
+const stageLabels: Record<string, string> = {
+    stage2: 'Stage 2 Momentum',
+    stock_agent: 'Stock Agent',
+}
+
+const agentSlots = [1, 2, 3, 4, 5, 6]
 
 const ease = [0.16, 1, 0.3, 1] as const
 
@@ -62,35 +74,17 @@ function statusText(stage: string, data?: AgentStage) {
 function stageBody(stage: string, data?: AgentStage) {
     if (!data || data.status !== 'completed') return null
 
-    if (stage === 'stock_analyzer') {
-        const reports = data.details?.reports || []
+    if (stage === 'stock_agent') {
+        const results = data.details?.results || []
         return (
             <div className="space-y-3">
                 <p className="text-[12px] text-ink-secondary font-mono">
                     Selected: {(data.summary?.selected_symbols || []).join(', ') || 'No symbols found'}
                 </p>
-                {reports.map((report: any) => (
-                    <div key={`${report.rank}-${report.symbol}`} className="pt-3 border-t border-line/60 first:border-t-0 first:pt-0">
+                {results.map((result: any) => (
+                    <div key={`${result.rank}-${result.symbol}`} className="pt-3 border-t border-line/60 first:border-t-0 first:pt-0">
                         <p className="text-success font-mono text-[10px] uppercase tracking-[0.18em]">
-                            #{report.rank} {report.display_name || report.symbol}
-                        </p>
-                        <p className="text-[13px] text-ink-secondary mt-2 whitespace-pre-wrap leading-relaxed">
-                            {report.analysis}
-                        </p>
-                    </div>
-                ))}
-            </div>
-        )
-    }
-
-    const executionResults = data.details?.results || []
-    if (stage === 'executioner' && executionResults.length > 0) {
-        return (
-            <div className="space-y-3">
-                {executionResults.map((result: any) => (
-                    <div key={`${result.rank}-${result.display_name}`} className="pt-3 border-t border-line/60 first:border-t-0 first:pt-0">
-                        <p className="text-success font-mono text-[10px] uppercase tracking-[0.18em]">
-                            #{result.rank} {result.display_name || 'Stock'}
+                            #{result.rank} {result.display_name || result.symbol}
                         </p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line rounded-lg overflow-hidden border border-line mt-3">
                             {Object.entries(result.decision || {}).slice(0, 8).map(([key, value]) => (
@@ -104,8 +98,8 @@ function stageBody(stage: string, data?: AgentStage) {
                                 </div>
                             ))}
                         </div>
-                        <p className="text-[13px] text-ink-secondary mt-3 whitespace-pre-wrap leading-relaxed">
-                            {result.report_text}
+                        <p className="text-[13px] text-ink-secondary mt-2 whitespace-pre-wrap leading-relaxed">
+                            {result.report_text || result.analysis}
                         </p>
                     </div>
                 ))}
@@ -135,13 +129,223 @@ function stageBody(stage: string, data?: AgentStage) {
     )
 }
 
+function websocketUrl() {
+    if (typeof window === 'undefined') return null
+    const configured = process.env.NEXT_PUBLIC_AI_TRADING_WS_URL
+    const base = configured || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8020/ai-trading/stream`
+    const token = process.env.NEXT_PUBLIC_AI_TRADING_WS_TOKEN
+    if (!token) return base
+    const separator = base.includes('?') ? '&' : '?'
+    return `${base}${separator}token=${encodeURIComponent(token)}`
+}
+
+function eventTitle(event: LiveAgentEvent) {
+    if (event.type === 'stock_agent_started') return 'Started'
+    if (event.type === 'stock_agent_charts_ready') return 'Charts Ready'
+    if (event.type === 'stock_agent_completed') return 'Completed'
+    if (event.type === 'stock_agent_failed') return 'Failed'
+    if (event.type === 'stock_agent_selection') return 'Selected'
+    return event.type.replaceAll('_', ' ')
+}
+
+function AgentChatBoard({
+    runStatus,
+    liveEvents,
+    activeAgent,
+    setActiveAgent,
+    connectionState,
+}: {
+    runStatus: AgentRunStatus | null
+    liveEvents: Record<number, LiveAgentEvent[]>
+    activeAgent: number
+    setActiveAgent: (rank: number) => void
+    connectionState: string
+}) {
+    const stockStage = runStatus?.stages?.stock_agent
+    const completedResults = stockStage?.details?.results || []
+
+    const mergedEvents = (rank: number): LiveAgentEvent[] => {
+        const events = liveEvents[rank] || []
+        const completed = completedResults.find((item: any) => Number(item.rank) === rank)
+        if (completed && !events.some((event) => event.type === 'stock_agent_completed')) {
+            return [
+                ...events,
+                {
+                    type: 'stock_agent_completed',
+                    rank,
+                    symbol: completed.symbol,
+                    display_name: completed.display_name,
+                    message: 'Completed from latest saved status.',
+                    decision: completed.decision,
+                    report_text: completed.report_text || completed.analysis,
+                    error: undefined,
+                    sent_at_utc: stockStage?.generated_at_utc || runStatus?.updated_at_utc,
+                },
+            ]
+        }
+        return events
+    }
+
+    const activeEvents = mergedEvents(activeAgent)
+    const activeCompleted = completedResults.find((item: any) => Number(item.rank) === activeAgent)
+    const activeName = activeEvents.find((event) => event.display_name || event.symbol)?.display_name
+        || activeCompleted?.display_name
+        || `Agent ${activeAgent}`
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease, delay: 0.18 }}
+            className="surface rounded-2xl p-5 border border-line"
+        >
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
+                <div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
+                        Stock Agents
+                    </p>
+                    <p className="text-[13px] text-ink-secondary mt-1">
+                        Stream: <span className="font-mono uppercase text-[11px]">{connectionState}</span>
+                    </p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                    {agentSlots.map((rank) => {
+                        const events = mergedEvents(rank)
+                        const latest = events[events.length - 1]
+                        const complete = latest?.type === 'stock_agent_completed'
+                        const failed = latest?.type === 'stock_agent_failed'
+                        const active = activeAgent === rank
+                        return (
+                            <button
+                                key={rank}
+                                type="button"
+                                onClick={() => setActiveAgent(rank)}
+                                className={`min-w-0 rounded-xl border px-3 py-2 text-left transition-colors ${active
+                                    ? 'border-accent/60 bg-accent/10'
+                                    : 'border-line bg-[#08080a] hover:border-line-strong'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <span className={`h-1.5 w-1.5 rounded-full ${failed ? 'bg-danger' : complete ? 'bg-success' : events.length ? 'bg-warning animate-pulse-soft' : 'bg-ink-tertiary'}`} />
+                                    <p className="text-[11px] text-white font-mono uppercase tracking-[0.12em] truncate">
+                                        Agent {rank}
+                                    </p>
+                                </div>
+                                <p className="text-[10px] text-ink-tertiary font-mono mt-1 truncate">
+                                    {latest ? eventTitle(latest) : 'Waiting'}
+                                </p>
+                            </button>
+                        )
+                    })}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-[280px,1fr] gap-5">
+                <div className="space-y-2">
+                    {agentSlots.map((rank) => {
+                        const events = mergedEvents(rank)
+                        const latest = events[events.length - 1]
+                        return (
+                            <button
+                                key={rank}
+                                type="button"
+                                onClick={() => setActiveAgent(rank)}
+                                className={`w-full text-left rounded-xl border p-4 transition-colors ${activeAgent === rank
+                                    ? 'border-success/40 bg-success/[0.04]'
+                                    : 'border-line bg-white/[0.015] hover:border-line-strong'
+                                    }`}
+                            >
+                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
+                                    Agent {rank}
+                                </p>
+                                <p className="text-[13px] text-white mt-1 truncate">
+                                    {latest?.display_name || latest?.symbol || completedResults.find((item: any) => Number(item.rank) === rank)?.display_name || 'Awaiting stock'}
+                                </p>
+                                <p className="text-[11px] text-ink-secondary mt-1 truncate">
+                                    {latest?.message || (latest ? eventTitle(latest) : 'No stream events yet')}
+                                </p>
+                            </button>
+                        )
+                    })}
+                </div>
+
+                <div className="rounded-2xl border border-line bg-[#08080a]/70 overflow-hidden">
+                    <div className="border-b border-line px-5 py-4 flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-success">
+                                Agent {activeAgent}
+                            </p>
+                            <h2 className="text-white text-[16px] font-medium mt-1 truncate">
+                                {activeName}
+                            </h2>
+                        </div>
+                        <p className="text-[10px] text-ink-tertiary font-mono uppercase tracking-[0.16em]">
+                            {activeEvents.length ? eventTitle(activeEvents[activeEvents.length - 1]) : 'Waiting'}
+                        </p>
+                    </div>
+                    <div className="p-5 space-y-4 min-h-[360px] max-h-[720px] overflow-y-auto">
+                        {activeEvents.length === 0 ? (
+                            <div className="h-full min-h-[300px] flex items-center justify-center border border-dashed border-line rounded-xl">
+                                <p className="text-[12px] text-ink-tertiary font-mono">
+                                    Waiting for assignment
+                                </p>
+                            </div>
+                        ) : (
+                            activeEvents.map((event, index) => (
+                                <div key={`${event.type}-${index}-${event.sent_at_utc || ''}`} className="rounded-xl border border-line bg-[#0c0c0f] p-4">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-accent">
+                                            {eventTitle(event)}
+                                        </p>
+                                        <p className="text-[10px] text-ink-tertiary font-mono">
+                                            {formatTime(event.sent_at_utc)}
+                                        </p>
+                                    </div>
+                                    {event.message && (
+                                        <p className="text-[13px] text-ink-secondary leading-relaxed">
+                                            {event.message}
+                                        </p>
+                                    )}
+                                    {event.decision && (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line rounded-lg overflow-hidden border border-line mt-3">
+                                            {Object.entries(event.decision).slice(0, 8).map(([key, value]) => (
+                                                <div key={key} className="bg-[#08080a] p-3">
+                                                    <p className="text-[9px] text-ink-tertiary font-mono uppercase tracking-[0.15em]">
+                                                        {key.replaceAll('_', ' ')}
+                                                    </p>
+                                                    <p className="text-[12px] text-white font-mono font-medium break-words nums mt-1">
+                                                        {String(value)}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {(event.report_text || event.error) && (
+                                        <p className={`text-[13px] mt-3 whitespace-pre-wrap leading-relaxed ${event.error ? 'text-danger' : 'text-ink-secondary'}`}>
+                                            {event.error || event.report_text}
+                                        </p>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    )
+}
+
 function AITradingChatContent() {
     const searchParams = useSearchParams()
     const expectedRun = searchParams.get('run')
     const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [liveEvents, setLiveEvents] = useState<Record<number, LiveAgentEvent[]>>({})
+    const [activeAgent, setActiveAgent] = useState(1)
+    const [connectionState, setConnectionState] = useState('connecting')
     const bottomRef = useRef<HTMLDivElement | null>(null)
     const shouldAutoScrollRef = useRef(true)
+    const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const fetchStatus = async () => {
         try {
@@ -159,6 +363,121 @@ function AITradingChatContent() {
         fetchStatus()
         const timer = setInterval(fetchStatus, 2500)
         return () => clearInterval(timer)
+    }, [])
+
+    useEffect(() => {
+        let socket: WebSocket | null = null
+        let closedByEffect = false
+
+        const connect = () => {
+            const url = websocketUrl()
+            if (!url) {
+                setConnectionState('unavailable')
+                return
+            }
+            try {
+                setConnectionState('connecting')
+                socket = new WebSocket(url)
+            } catch (socketError) {
+                console.error('AI trading stream setup failed:', socketError)
+                setConnectionState('fallback')
+                return
+            }
+
+            socket.onopen = () => {
+                setConnectionState('live')
+            }
+
+            socket.onmessage = (event) => {
+                try {
+                    const payload = JSON.parse(event.data)
+                    if (payload.type === 'heartbeat') return
+                    if (payload.type === 'status_snapshot' && payload.status) {
+                        setRunStatus(payload.status)
+                        return
+                    }
+                    if (payload.type === 'status_update' && payload.status) {
+                        setRunStatus(payload.status)
+                        return
+                    }
+                    if (payload.type === 'stock_agent_selection') {
+                        const nextEvents: Record<number, LiveAgentEvent[]> = {}
+                        for (const selected of payload.selected || []) {
+                            const rank = Number(selected.rank || 0)
+                            if (!rank) continue
+                            nextEvents[rank] = [
+                                {
+                                    type: 'stock_agent_selection',
+                                    rank,
+                                    security_id: selected.security_id,
+                                    symbol: selected.symbol,
+                                    display_name: selected.display_name,
+                                    message: 'Selected from Stage 2 scan.',
+                                    sent_at_utc: payload.sent_at_utc,
+                                },
+                            ]
+                        }
+                        setLiveEvents(nextEvents)
+                        setActiveAgent(1)
+                        return
+                    }
+                    if (payload.type === 'stock_agent_no_trade') {
+                        setLiveEvents({
+                            1: [{
+                                type: 'stock_agent_no_trade',
+                                rank: 1,
+                                message: payload.reason || 'No stock qualified.',
+                                sent_at_utc: payload.sent_at_utc,
+                            }],
+                        })
+                        setActiveAgent(1)
+                        return
+                    }
+                    if (typeof payload.rank === 'number') {
+                        const rank = Number(payload.rank)
+                        setLiveEvents((current) => ({
+                            ...current,
+                            [rank]: [
+                                ...(current[rank] || []),
+                                {
+                                    type: payload.type,
+                                    rank,
+                                    security_id: payload.security_id,
+                                    symbol: payload.symbol,
+                                    display_name: payload.display_name,
+                                    message: payload.message,
+                                    decision: payload.decision,
+                                    report_text: payload.report_text,
+                                    error: payload.error,
+                                    sent_at_utc: payload.sent_at_utc,
+                                },
+                            ],
+                        }))
+                    }
+                } catch (streamError) {
+                    console.error('AI trading stream payload error:', streamError)
+                }
+            }
+
+            socket.onerror = () => {
+                setConnectionState('fallback')
+            }
+
+            socket.onclose = () => {
+                if (closedByEffect) return
+                setConnectionState('reconnecting')
+                reconnectTimerRef.current = setTimeout(connect, 2500)
+            }
+        }
+
+        connect()
+        return () => {
+            closedByEffect = true
+            if (reconnectTimerRef.current) {
+                clearTimeout(reconnectTimerRef.current)
+            }
+            socket?.close()
+        }
     }, [])
 
     useEffect(() => {
@@ -181,7 +500,7 @@ function AITradingChatContent() {
 
     const messages = useMemo(() => {
         const stages = runStatus?.stages || {}
-        return stageOrder.map((stage) => ({
+        return ['stage2'].map((stage) => ({
             stage,
             data: stages[stage],
         }))
@@ -295,10 +614,18 @@ function AITradingChatContent() {
                                 Start AI Trading
                             </p>
                             <p className="text-ink-secondary text-[12px] mt-1.5 leading-relaxed">
-                                Run the trading agents once, in order, only after Stage 2 is ready.
+                                Run the stock agents once, only after Stage 2 is ready.
                             </p>
                         </div>
                     </motion.div>
+
+                    <AgentChatBoard
+                        runStatus={runStatus}
+                        liveEvents={liveEvents}
+                        activeAgent={activeAgent}
+                        setActiveAgent={setActiveAgent}
+                        connectionState={connectionState}
+                    />
 
                     {messages.map(({ stage, data }, index) => {
                         const active = data?.status === 'running'
