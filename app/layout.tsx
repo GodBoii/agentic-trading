@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight, JetBrains_Mono, Instrument_Serif } from "next/font/google";
+import { Inter, Inter_Tight, JetBrains_Mono, Instrument_Serif, Space_Grotesk, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,6 +27,19 @@ const instrumentSerif = Instrument_Serif({
   style: ["normal", "italic"],
 });
 
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  weight: ["400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+});
+
 export const metadata: Metadata = {
   title: "Sentinel — Autonomous Intelligence for Global Markets",
   description:
@@ -48,7 +61,7 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" />
       </head>
       <body
-        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} font-sans antialiased bg-black text-white`}
+        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} font-sans antialiased bg-black text-white`}
       >
         {children}
       </body>
