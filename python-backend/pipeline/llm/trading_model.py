@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from agno.models.openrouter import OpenRouter
 
 
-DEFAULT_TEXT_MODEL_ID = "deepseek/deepseek-v4-pro"
+DEFAULT_TEXT_MODEL_ID = "xiaomi/mimo-v2.5-pro"
 DEFAULT_MULTIMODAL_MODEL_ID = "minimax/minimax-m3"
 _ENV_LOADED = False
 
