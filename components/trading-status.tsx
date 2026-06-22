@@ -21,8 +21,7 @@ interface AgentRunStatus {
 
 const stageLabels: Record<string, string> = {
     stage2: 'Stage 2',
-    stock_analyzer: 'Stock Analyzer',
-    executioner: 'Executioner',
+    stock_agent: 'Stock Agent',
 }
 
 export default function TradingStatus() {
@@ -293,7 +292,7 @@ export default function TradingStatus() {
                         </p>
                         <p className="text-[12px] text-ink-secondary leading-relaxed">
                             {regimeAnalysisEnabled
-                                ? 'Market regime context will be supplied to the stock analyzer.'
+                                ? 'Market regime context will be supplied to the stock agent.'
                                 : 'Agents will run without regime context.'}
                         </p>
                     </div>
@@ -326,10 +325,10 @@ export default function TradingStatus() {
                     </p>
                     <p className="text-[12px] text-ink-secondary leading-relaxed">
                         {isRunning
-                            ? 'Agents are running in order'
+                            ? 'Stock agents are running'
                             : tradingKeys.is_trading_enabled
                                 ? 'Ready for the next run'
-                                : 'Press start to run the chain'}
+                                : 'Press start to run the stock agents'}
                     </p>
                 </div>
                 <button
@@ -393,7 +392,7 @@ export default function TradingStatus() {
                             Safety First
                         </p>
                         <p className="text-[12px] text-ink-secondary leading-relaxed">
-                            AI trading runs only when you press start. The agents execute once in order: analyzer, then executioner.
+                            AI trading runs only when you press start. Stock agents analyze and execute once after Stage 2 is ready.
                         </p>
                     </div>
                 </div>
