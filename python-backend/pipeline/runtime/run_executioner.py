@@ -15,13 +15,13 @@ from pipeline.services.storage_service import StorageService
 
 
 class ExecutionerRunner:
-    def __init__(self, config: Optional[PipelineConfig] = None) -> None:
+    def __init__(self, config: Optional[PipelineConfig] = None, initialize_agent: bool = True) -> None:
         self.config = config or PipelineConfig()
         self.market_time = MarketTimeService(self.config)
         self.storage = StorageService
         self.dhan = DhanService(self.config, prefer_gateway=False)
-        self.toolkit = DhanExecutionToolkit(self.dhan)
-        self.agent = ExecutionerAgent(self.toolkit)
+        self.toolkit = DhanExecutionToolkit(self.dhan) if initialize_agent else None
+        self.agent = ExecutionerAgent(self.toolkit) if self.toolkit else None
 
     def run_cycle(self, force: bool = False, trade_config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
@@ -456,6 +456,10 @@ class ExecutionerRunner:
         execution_packet: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         selected_stock = (execution_packet or {}).get("selected_stock") or {}
+        if not selected_stock and isinstance(execution_packet, dict):
+            candidate = execution_packet.get("candidate") or {}
+            if candidate:
+                selected_stock = candidate
         selected_security_id_raw = self._extract_header_value(report_text, "Selected Security ID", default="0")
         quantity_raw = self._extract_header_value(report_text, "Quantity", default="0")
         reference_price_raw = self._extract_header_value(report_text, "Reference Price", default="0")
@@ -468,6 +472,11 @@ class ExecutionerRunner:
             selected_security_id = int(re.findall(r"-?\d+", selected_security_id_raw)[0])
         except Exception:
             selected_security_id = int(selected_stock.get("security_id") or 0)
+        if selected_security_id <= 0:
+            try:
+                selected_security_id = int(selected_stock.get("security_id") or 0)
+            except Exception:
+                selected_security_id = 0
 
         try:
             quantity = int(re.findall(r"-?\d+", quantity_raw)[0])
