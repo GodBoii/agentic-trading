@@ -18,6 +18,7 @@ class PipelineConfig:
     ai_trading_state_path: Path = backend_dir / "ai_trading_state.json"
     ai_trading_request_path: Path = backend_dir / "ai_trading_request.json"
     ai_trading_run_status_path: Path = backend_dir / "ai_trading_run_status.json"
+    ai_trading_sessions_dir: Path = backend_dir / "ai_trading_sessions"
     stock_analyzer_latest_path: Path = backend_dir / "stock_analyzer_latest.json"
     stock_agent_latest_path: Path = backend_dir / "stock_agent_latest.json"
     risk_analyzer_latest_path: Path = backend_dir / "risk_analyzer_latest.json"

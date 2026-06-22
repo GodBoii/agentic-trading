@@ -17,12 +17,14 @@ _ENV_LOADED = False
 def create_text_trading_model(**overrides: Any) -> OpenRouter:
     _load_env_files()
     model_id = overrides.pop("id", None) or os.getenv("OPENROUTER_TEXT_MODEL_ID", DEFAULT_TEXT_MODEL_ID)
+    _apply_reasoning_defaults(overrides)
     return OpenRouter(id=model_id, **overrides)
 
 
 def create_multimodal_trading_model(**overrides: Any) -> OpenRouter:
     _load_env_files()
     model_id = overrides.pop("id", None) or os.getenv("OPENROUTER_MULTIMODAL_MODEL_ID", DEFAULT_MULTIMODAL_MODEL_ID)
+    _apply_reasoning_defaults(overrides)
     return OpenRouter(id=model_id, **overrides)
 
 
@@ -39,3 +41,14 @@ def _load_env_files() -> None:
     load_dotenv(root_dir / ".env", override=False)
     load_dotenv(backend_dir / ".env", override=False)
     _ENV_LOADED = True
+
+
+def _apply_reasoning_defaults(overrides: dict[str, Any]) -> None:
+    if "reasoning" in overrides:
+        return
+
+    enabled = os.getenv("OPENROUTER_ENABLE_REASONING", "1").strip().lower() not in {"0", "false", "no", "off"}
+    if not enabled:
+        return
+
+    overrides["reasoning"] = {"enabled": True, "exclude": False}
