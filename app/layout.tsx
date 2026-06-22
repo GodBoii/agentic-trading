@@ -41,7 +41,7 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Sentinel — Autonomous Intelligence for Global Markets",
+  title: "Polycognitive — Autonomous Intelligence for Global Markets",
   description:
     "The first autonomous operating system for market research, execution, and portfolio intelligence.",
   icons: {
