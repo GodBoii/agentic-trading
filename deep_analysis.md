@@ -1,0 +1,10 @@
+**FII** stands for **Foreign Institutional Investors** (often categorized alongside Foreign Portfolio Investors, or FPIs), and **DII** stands for **Domestic Institutional Investors**. In the Indian equity market, the dynamic between these two institutional forces acts as a primary driver of price movements and volatility:
+
+*   **FIIs (The Trend Creators):** These are international investors whose capital allocations are highly sensitive to global macroeconomic conditions, such as U.S. interest rates, a strong U.S. Dollar, and geopolitical shocks. Large FII inflows provide liquidity and drive market valuations higher, while their outflows trigger selling pressure and broad market corrections. 
+*   **DIIs (The Shock Absorbers):** These are local institutional entities, such as Indian mutual funds, which are heavily fueled by domestic retail Systematic Investment Plans (SIPs). DIIs frequently act as counter-cyclical market stabilizers, stepping in to buy the dips created by aggressive FII selling and creating critical support floors.
+
+The URL you referenced points to the **daily provisional flow reports published by the National Stock Exchange of India (NSE)**. *(Note: While the exact URL string is not explicitly printed in the sources, the sources extensively detail the NSE's FII/DII data pages and reports it hosts).* 
+
+These exchange reports provide **daily provisional buy, sell, and net flow figures (measured in ₹ Crores) for both FIIs and DIIs** in the Capital Market segment. The data is compiled using NSDL PANs for foreign investors and broker trading codes for domestic investors, and is made available as downloadable CSV files. 
+
+For institutional and autonomous trading systems, the data from these daily NSE reports is continuously ingested and treated as a **highly predictive leading indicator for 3-5 day market moves**. Tracking this daily data allows quantitative models to monitor the liquidity "tug-of-war" between global capital flight and domestic absorption, helping systems predict when selling pressure exhausts itself so they can capitalize on mean-reversion opportunities.

@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+python-backend/trade
+trade
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+python-backend/.env
+*.log

@@ -1,0 +1,128 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+yarn.lock
+pnpm-lock.yaml
+
+# Testing
+.pytest_cache/
+coverage/
+.coverage
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+python-backend/.env
+*.pem
+*.key
+
+# Vercel
+.vercel/
+.vercelignore
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# tmp files
+tmp/
+temp/
+
+# Logs and local diagnostics
+*.log
+terminal-logs.txt
+docker-logs.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Generated reports and local output
+output/
+screenshots/
+
+# Runtime trading snapshots and generated market artifacts
+python-backend/ai_trading_request.json
+python-backend/ai_trading_run_status.json
+python-backend/ai_trading_state.json
+python-backend/ai_trading_sessions/
+python-backend/dhan_rate_limit_state.json
+python-backend/*_latest.json
+python-backend/stage1-*.json
+python-backend/stage2-*.json
+python-backend/stage2-tick-*.json
+python-backend/monitor-*.json
+python-backend/regime-*.json
+python-backend/risk-analyzer-*.json
+python-backend/executioner-*.json
+python-backend/stock-agent-*.json
+python-backend/stock-analyzer-*.json
+python-backend/stock_analyzer_artifacts/
+python-backend/regime_inputs/
+
+# Large/raw market data exports
+*.xlsx
+*.pdf
+List_of_GSM_Securities_*.CSV
+security_id_list.csv
+mca21_data/
+python-backend/all_stocks_*.json
+
+# Local credential/API screenshots
+*access-token*.png
+dhan-*.png
+alpha-vantage.png
