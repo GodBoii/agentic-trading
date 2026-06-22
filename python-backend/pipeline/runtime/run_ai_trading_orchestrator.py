@@ -2,29 +2,97 @@ from __future__ import annotations
 
 import json
 import os
+import base64
+import hashlib
+import socket
+import struct
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Thread
+from threading import Lock, Thread
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from pipeline.config import PipelineConfig
-from pipeline.runtime.run_executioner import ExecutionerRunner
 from pipeline.runtime.run_sorting import wait_for_current_stage2_snapshot
-from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
+from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.storage_service import StorageService
+
+
+class WebSocketBroadcaster:
+    MAGIC_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+    def __init__(self) -> None:
+        self.clients: list[socket.socket] = []
+        self.lock = Lock()
+
+    def accept(self, handler: BaseHTTPRequestHandler) -> bool:
+        key = handler.headers.get("Sec-WebSocket-Key")
+        if not key:
+            return False
+        accept_key = base64.b64encode(
+            hashlib.sha1(f"{key}{self.MAGIC_GUID}".encode("ascii")).digest()
+        ).decode("ascii")
+        handler.send_response(101, "Switching Protocols")
+        handler.send_header("Upgrade", "websocket")
+        handler.send_header("Connection", "Upgrade")
+        handler.send_header("Sec-WebSocket-Accept", accept_key)
+        handler.end_headers()
+        with self.lock:
+            self.clients.append(handler.request)
+        return True
+
+    def remove(self, client: socket.socket) -> None:
+        with self.lock:
+            if client in self.clients:
+                self.clients.remove(client)
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    def broadcast(self, payload: Dict[str, Any]) -> None:
+        message = json.dumps(payload, ensure_ascii=True, default=str)
+        with self.lock:
+            clients = list(self.clients)
+        stale: list[socket.socket] = []
+        for client in clients:
+            try:
+                client.sendall(self._frame(message))
+            except Exception:
+                stale.append(client)
+        for client in stale:
+            self.remove(client)
+
+    def send_one(self, client: socket.socket, payload: Dict[str, Any]) -> bool:
+        try:
+            client.sendall(self._frame(json.dumps(payload, ensure_ascii=True, default=str)))
+            return True
+        except Exception:
+            self.remove(client)
+            return False
+
+    def _frame(self, message: str) -> bytes:
+        body = message.encode("utf-8")
+        length = len(body)
+        if length < 126:
+            header = struct.pack("!BB", 0x81, length)
+        elif length < 65536:
+            header = struct.pack("!BBH", 0x81, 126, length)
+        else:
+            header = struct.pack("!BBQ", 0x81, 127, length)
+        return header + body
 
 
 class AITradingOrchestrator:
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
         self.storage = StorageService
-        self.stock_analyzer = MultiStockAnalyzerRunner(self.config)
-        self.executioner = ExecutionerRunner(self.config)
+        self.stock_agent = MultiStockAgentRunner(self.config)
         self.last_request_id: Optional[str] = None
         self._boot_time_utc = datetime.now(timezone.utc)
+        self.ws = WebSocketBroadcaster()
 
     def run_forever(self) -> None:
         print("=" * 60)
@@ -94,8 +162,7 @@ class AITradingOrchestrator:
             "message": None,
             "stages": {
                 "stage2": {"status": "pending", "summary": None, "details": None},
-                "stock_analyzer": {"status": "pending", "summary": None, "details": None},
-                "executioner": {"status": "pending", "summary": None, "details": None},
+                "stock_agent": {"status": "pending", "summary": None, "details": None},
             },
         }
 
@@ -146,7 +213,10 @@ class AITradingOrchestrator:
                 if not auth_token:
                     return True
                 header = self.headers.get("authorization", "")
-                return header == f"Bearer {auth_token}"
+                if header == f"Bearer {auth_token}":
+                    return True
+                query_token = (parse_qs(urlparse(self.path).query).get("token") or [""])[0]
+                return query_token == auth_token
 
             def _json_response(self, payload: Dict[str, Any], status: int = 200) -> None:
                 body = json.dumps(payload).encode("utf-8")
@@ -170,7 +240,11 @@ class AITradingOrchestrator:
                     if not self._authorized():
                         self._json_response({"error": "unauthorized"}, status=401)
                         return
-                    if urlparse(self.path).path != "/ai-trading/status":
+                    parsed = urlparse(self.path)
+                    if parsed.path == "/ai-trading/stream":
+                        self._websocket_stream()
+                        return
+                    if parsed.path != "/ai-trading/status":
                         self._json_response({"error": "not_found"}, status=404)
                         return
                     self._json_response(orchestrator.load_run_status())
@@ -192,6 +266,33 @@ class AITradingOrchestrator:
 
             def log_message(self, format: str, *args: Any) -> None:
                 return
+
+            def _websocket_stream(self) -> None:
+                if self.headers.get("Upgrade", "").lower() != "websocket":
+                    self._json_response({"error": "upgrade_required"}, status=426)
+                    return
+                if not orchestrator.ws.accept(self):
+                    self._json_response({"error": "bad_websocket_handshake"}, status=400)
+                    return
+                client = self.request
+                orchestrator.ws.send_one(
+                    client,
+                    {
+                        "type": "status_snapshot",
+                        "status": orchestrator.load_run_status(),
+                        "sent_at_utc": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                try:
+                    while True:
+                        time.sleep(25)
+                        if not orchestrator.ws.send_one(
+                            client,
+                            {"type": "heartbeat", "sent_at_utc": datetime.now(timezone.utc).isoformat()},
+                        ):
+                            break
+                finally:
+                    orchestrator.ws.remove(client)
 
         return AITradingGatewayHandler
 
@@ -230,14 +331,14 @@ class AITradingOrchestrator:
 
         stages = [
             (
-                "stock_analyzer",
-                lambda force: self.stock_analyzer.run_cycle(
+                "stock_agent",
+                lambda force: self.stock_agent.run_cycle(
                     force=force,
                     trade_config=trade_config,
                     use_regime_analysis=regime_analysis_enabled,
+                    event_callback=self._broadcast_event,
                 ),
             ),
-            ("executioner", lambda force: self.executioner.run_cycle(force=force, trade_config=trade_config)),
         ]
 
         for stage_name, runner in stages:
@@ -266,11 +367,11 @@ class AITradingOrchestrator:
             "message": message,
             "stages": {
                 "stage2": self._stage_status("stage2", current_stage, outputs),
-                "stock_analyzer": self._stage_status("stock_analyzer", current_stage, outputs),
-                "executioner": self._stage_status("executioner", current_stage, outputs),
+                "stock_agent": self._stage_status("stock_agent", current_stage, outputs),
             },
         }
         self.storage.save_snapshot(self.config.ai_trading_run_status_path, payload)
+        self._broadcast_event({"type": "status_update", "status": payload})
 
     def _as_bool(self, value: Any, default: bool = True) -> bool:
         if value is None:
@@ -303,32 +404,22 @@ class AITradingOrchestrator:
     def _stage_details(self, stage: str, output: Any) -> Optional[Dict[str, Any]]:
         if not isinstance(output, dict):
             return None
-        if stage == "stock_analyzer":
-            reports = output.get("reports") or []
+        if stage == "stock_agent":
+            results = output.get("results") or []
             return {
                 "selected_symbols": (output.get("summary") or {}).get("selected_symbols"),
-                "reports": [
-                    {
-                        "rank": report.get("rank"),
-                        "symbol": (report.get("candidate") or {}).get("symbol"),
-                        "display_name": (report.get("candidate") or {}).get("display_name"),
-                        "analysis": self._truncate(report.get("analysis")),
-                    }
-                    for report in reports
-                ],
-            }
-        if stage == "executioner":
-            return {
-                "decision": output.get("decision"),
                 "results": [
                     {
                         "rank": item.get("rank"),
-                        "display_name": (item.get("selected_stock") or {}).get("display_name"),
+                        "symbol": (item.get("candidate") or {}).get("symbol"),
+                        "display_name": (item.get("candidate") or {}).get("display_name"),
                         "decision": item.get("decision"),
+                        "analysis": self._truncate(item.get("analysis")),
                         "report_text": self._truncate(item.get("report_text")),
                     }
-                    for item in (output.get("results") or [])
+                    for item in results
                 ],
+                "decision": output.get("decision"),
                 "report_text": self._truncate(output.get("report_text")),
             }
         return None
@@ -338,6 +429,13 @@ class AITradingOrchestrator:
         if len(text) <= limit:
             return text
         return f"{text[:limit].rstrip()}..."
+
+    def _broadcast_event(self, event: Dict[str, Any]) -> None:
+        payload = dict(event)
+        payload.setdefault("sent_at_utc", datetime.now(timezone.utc).isoformat())
+        if self.last_request_id:
+            payload.setdefault("request_id", self.last_request_id)
+        self.ws.broadcast(payload)
 
 
 def main() -> None:
