@@ -4,6 +4,7 @@ import json
 import os
 import base64
 import hashlib
+import re
 import socket
 import struct
 import time
@@ -371,6 +372,7 @@ class AITradingOrchestrator:
             },
         }
         self.storage.save_snapshot(self.config.ai_trading_run_status_path, payload)
+        self._save_trade_session_snapshot(payload, outputs)
         self._broadcast_event({"type": "status_update", "status": payload})
 
     def _as_bool(self, value: Any, default: bool = True) -> bool:
@@ -414,13 +416,15 @@ class AITradingOrchestrator:
                         "symbol": (item.get("candidate") or {}).get("symbol"),
                         "display_name": (item.get("candidate") or {}).get("display_name"),
                         "decision": item.get("decision"),
-                        "analysis": self._truncate(item.get("analysis")),
-                        "report_text": self._truncate(item.get("report_text")),
+                        "attachments": item.get("attachments"),
+                        "agent_metadata": item.get("agent_metadata"),
+                        "analysis": self._truncate(item.get("analysis"), 20000),
+                        "report_text": self._truncate(item.get("report_text"), 20000),
                     }
                     for item in results
                 ],
                 "decision": output.get("decision"),
-                "report_text": self._truncate(output.get("report_text")),
+                "report_text": self._truncate(output.get("report_text"), 20000),
             }
         return None
 
@@ -429,6 +433,65 @@ class AITradingOrchestrator:
         if len(text) <= limit:
             return text
         return f"{text[:limit].rstrip()}..."
+
+    def _save_trade_session_snapshot(
+        self,
+        status_payload: Dict[str, Any],
+        outputs: Optional[Dict[str, Any]],
+    ) -> None:
+        request = status_payload.get("request") if isinstance(status_payload.get("request"), dict) else {}
+        request_id = str(request.get("request_id") or self.last_request_id or "").strip()
+        if not request_id:
+            return
+
+        stock_output = (outputs or {}).get("stock_agent")
+        agents = []
+        if isinstance(stock_output, dict):
+            for item in stock_output.get("results") or []:
+                if not isinstance(item, dict):
+                    continue
+                candidate = item.get("candidate") or {}
+                agents.append(
+                    {
+                        "rank": item.get("rank"),
+                        "symbol": candidate.get("symbol"),
+                        "display_name": candidate.get("display_name"),
+                        "decision": item.get("decision"),
+                        "attachments": item.get("attachments"),
+                        "agent_metadata": item.get("agent_metadata"),
+                        "analysis": item.get("analysis"),
+                        "report_text": item.get("report_text"),
+                    }
+                )
+
+        session_id = self._slugify_session_id(request_id)
+        payload = {
+            "session_id": session_id,
+            "request_id": request_id,
+            "title": self._session_title(status_payload, agents),
+            "status": status_payload.get("status"),
+            "created_at_utc": request.get("requested_at_utc"),
+            "updated_at_utc": status_payload.get("updated_at_utc"),
+            "request": request,
+            "summary": ((stock_output or {}).get("summary") if isinstance(stock_output, dict) else None),
+            "status_snapshot": status_payload,
+            "agents": agents,
+        }
+        session_dir = self.config.ai_trading_sessions_dir / session_id
+        session_dir.mkdir(parents=True, exist_ok=True)
+        self.storage.save_snapshot(session_dir / "session.json", payload)
+
+    def _slugify_session_id(self, value: str) -> str:
+        slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-")
+        return slug or f"session-{int(time.time() * 1000)}"
+
+    def _session_title(self, status_payload: Dict[str, Any], agents: list[Dict[str, Any]]) -> str:
+        request = status_payload.get("request") if isinstance(status_payload.get("request"), dict) else {}
+        stock_names = [str(agent.get("display_name") or agent.get("symbol")) for agent in agents[:3] if agent.get("display_name") or agent.get("symbol")]
+        if stock_names:
+            return ", ".join(stock_names)
+        requested_at = request.get("requested_at_utc") or status_payload.get("updated_at_utc") or "Trade session"
+        return f"Trade session {requested_at}"
 
     def _broadcast_event(self, event: Dict[str, Any]) -> None:
         payload = dict(event)
