@@ -9,12 +9,12 @@ from pipeline.config import PipelineConfig
 try:
     from agno.agent import Agent
 
-    from pipeline.llm import create_mimo_model
+    from pipeline.llm import create_trading_model
 
     AGNO_AVAILABLE = True
 except Exception:  # pragma: no cover - optional runtime dependency
     Agent = None  # type: ignore
-    create_mimo_model = None  # type: ignore
+    create_trading_model = None  # type: ignore
     AGNO_AVAILABLE = False
 
 
@@ -55,12 +55,12 @@ class RegimeAnalysisAgent:
     def analyze(self, regime_packet: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         if not self.use_agno:
             return None, "regime_analysis_agent_disabled"
-        if not AGNO_AVAILABLE or Agent is None or create_mimo_model is None:
+        if not AGNO_AVAILABLE or Agent is None or create_trading_model is None:
             return None, "regime_analysis_agent_dependency_not_available"
         try:
             agent = Agent(
                 name=self.agent_name,
-                model=create_mimo_model(id=self.model_id),
+                model=create_trading_model(id=self.model_id),
                 description=(
                     "Classify the Indian intraday market regime from supplied market internals, "
                     "manual feature metrics, news, institutional flows, options, futures, and global context."

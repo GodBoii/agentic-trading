@@ -7,13 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 try:
     from agno.agent import Agent
 
-    from pipeline.llm import create_mimo_model
+    from pipeline.llm import create_trading_model
 
     AGNO_AVAILABLE = True
 except Exception:  # pragma: no cover - optional runtime dependency
     AGNO_AVAILABLE = False
     Agent = None  # type: ignore
-    create_mimo_model = None  # type: ignore
+    create_trading_model = None  # type: ignore
 
 
 class RegimeNewsAnalyzerAgent:
@@ -32,7 +32,7 @@ class RegimeNewsAnalyzerAgent:
         return self.use_agno
 
     def is_available(self) -> bool:
-        return AGNO_AVAILABLE and Agent is not None and create_mimo_model is not None
+        return AGNO_AVAILABLE and Agent is not None and create_trading_model is not None
 
     def analyze(self, rows: List[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         if not rows:
@@ -49,7 +49,7 @@ class RegimeNewsAnalyzerAgent:
                     "Analyze supplied Indian-equity market context and explain whether it points to "
                     "isolated stock activity, sector-level pressure, institutional-flow pressure, or broad context."
                 ),
-                model=create_mimo_model(),
+                model=create_trading_model(),
                 instructions=[
                     "Use only the supplied evidence from the payload.",
                     "Focus on latest stock-related news, institutional FII/DII flow context, overall market tone, and a concise birds-eye view for Indian equities.",
