@@ -47,7 +47,7 @@ function FeedRow({ line }: { line: FeedLine }) {
       <div className="flex items-center gap-2 text-[#00FF9D]/40">
         <span>[{line.time}]</span>
         <span className="h-1 w-1 rounded-full bg-[#00FF9D]/30" />
-        <span className="text-[9px] uppercase tracking-[0.2em]">SENTINEL · REASON</span>
+        <span className="text-[9px] uppercase tracking-[0.2em]">POLYCOGNITIVE · REASON</span>
       </div>
       <p className="mt-2 text-[12px] font-sans text-[#00FF9D]/80 sm:text-[13px]">{line.message}</p>
       <div className="mt-2.5 grid grid-cols-1 gap-1 text-[#00FF9D]/50 sm:grid-cols-3 sm:gap-2">
@@ -201,7 +201,7 @@ export default function DecisionEngine() {
               <span className="h-2 w-2 rounded-full bg-[#FFB800]" />
               <span className="h-2 w-2 rounded-full bg-[#00FF9D]" />
               <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.22em] text-[#00FF9D]/40">
-                sentinel.terminal
+                polycognitive.terminal
               </span>
             </div>
             <span className="hidden font-mono text-[9px] uppercase tracking-[0.22em] text-[#00FF9D]/35 sm:flex items-center gap-2">
