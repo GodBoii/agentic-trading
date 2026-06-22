@@ -360,6 +360,8 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "symbol": candidate_packet.get("symbol"),
                 "display_name": candidate_packet.get("display_name"),
                 "chart_count": len(chart_paths),
+                "attachments": {"images": self._chart_image_cards(chart_bundle), "files": []},
+                "chart_artifacts": chart_bundle,
                 "message": "Charts are ready; running stock agent.",
             },
         )
@@ -388,12 +390,15 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         print(f"[stock agent {index + 1}] Analyzing and trading {candidate_packet['display_name']}...")
         report_text = agent.analyze(stock_packet, chart_paths, trade_config=trade_config)
         decision = self.execution_helper._parse_execution_report(report_text, stock_packet)
+        attachments = self._build_agent_attachments(index + 1, candidate_packet, stock_packet, chart_bundle)
         result = {
             "rank": index + 1,
             "candidate": candidate_packet,
             "selected_stock": selected_stock,
             "stock_packet": stock_packet,
             "decision": decision,
+            "attachments": attachments,
+            "agent_metadata": agent.last_run_metadata,
             "analysis": report_text,
             "report_text": report_text,
         }
@@ -406,10 +411,122 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "symbol": candidate_packet.get("symbol"),
                 "display_name": candidate_packet.get("display_name"),
                 "decision": decision,
+                "attachments": attachments,
+                "agent_metadata": agent.last_run_metadata,
                 "report_text": report_text,
             },
         )
         return result
+
+    def _chart_image_cards(self, chart_bundle: Dict[str, Any]) -> List[Dict[str, Any]]:
+        charts = chart_bundle.get("charts") if isinstance(chart_bundle, dict) else {}
+        if not isinstance(charts, dict):
+            return []
+        cards: List[Dict[str, Any]] = []
+        order = list(chart_bundle.get("chart_paths_ordered") or [])
+        by_path = {
+            str(info.get("path")): (key, info)
+            for key, info in charts.items()
+            if isinstance(info, dict) and info.get("path")
+        }
+        ordered_items = []
+        for chart_path in order:
+            if str(chart_path) in by_path:
+                ordered_items.append(by_path[str(chart_path)])
+        for key, info in charts.items():
+            if isinstance(info, dict) and not any(existing_key == key for existing_key, _ in ordered_items):
+                ordered_items.append((key, info))
+        for key, info in ordered_items:
+            cards.append(
+                {
+                    "id": key,
+                    "title": f"{str(info.get('day_type') or '').title()} {info.get('label') or ''}".strip(),
+                    "filename": str(info.get("path") or "").split("/")[-1],
+                    "path": info.get("path"),
+                    "day_type": info.get("day_type"),
+                    "date": info.get("date"),
+                    "timeframe": info.get("label"),
+                    "candles": info.get("candles"),
+                }
+            )
+        return cards
+
+    def _build_agent_attachments(
+        self,
+        rank: int,
+        candidate_packet: Dict[str, Any],
+        stock_packet: Dict[str, Any],
+        chart_bundle: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        display_name = candidate_packet.get("display_name") or candidate_packet.get("symbol") or f"Agent {rank}"
+        return {
+            "images": self._chart_image_cards(chart_bundle),
+            "files": [
+                {
+                    "id": "instructions",
+                    "title": "Instructions",
+                    "filename": "instructions.md",
+                    "content_type": "text/markdown",
+                    "content": self._build_instructions_markdown(display_name, stock_packet),
+                },
+                {
+                    "id": "data",
+                    "title": "Data",
+                    "filename": "data.md",
+                    "content_type": "text/markdown",
+                    "content": self._build_data_markdown(display_name, stock_packet),
+                },
+            ],
+        }
+
+    def _build_instructions_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
+        trade_config = stock_packet.get("trade_config") or {}
+        selected_stock = stock_packet.get("selected_stock") or {}
+        lines = [
+            f"# {display_name} Agent Instructions",
+            "",
+            "- Analyze the assigned intraday Indian equity candidate.",
+            "- Use chart images and technical metadata as the primary current market evidence.",
+            "- Use current 1m/5m charts for execution timing and higher timeframes for structure.",
+            "- Check existing orders and positions for the selected security before any new entry.",
+            "- Use Dhan margin and order tools before any live placement.",
+            "- Prefer protected intraday Super Orders when available.",
+            "- Stop after one protected-order attempt and one fallback normal-entry attempt.",
+            "- Return parseable Decision and Execution Status headers exactly once.",
+            "",
+            "## Selected Stock",
+            "```json",
+            json.dumps(selected_stock, indent=2, ensure_ascii=True, default=str),
+            "```",
+            "",
+            "## Trade Config",
+            "```json",
+            json.dumps(trade_config, indent=2, ensure_ascii=True, default=str),
+            "```",
+        ]
+        return "\n".join(lines)
+
+    def _build_data_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
+        candidate = stock_packet.get("candidate") or {}
+        data = {
+            "display_name": display_name,
+            "market_date": stock_packet.get("market_date"),
+            "timing_context": stock_packet.get("timing_context"),
+            "selected_stock": stock_packet.get("selected_stock"),
+            "technical_metadata": (candidate.get("chart_artifacts") or {}).get("technical_metadata"),
+            "stage2": candidate.get("stage2"),
+            "fresh_market_snapshot": stock_packet.get("fresh_market_snapshot"),
+            "account_context": stock_packet.get("account_context"),
+        }
+        return "\n".join(
+            [
+                f"# {display_name} Agent Data",
+                "",
+                "```json",
+                json.dumps(data, indent=2, ensure_ascii=True, default=str),
+                "```",
+            ]
+        )
 
     def _build_stock_agent_timing_context(self, candidate_packet: Dict[str, Any]) -> Dict[str, Any]:
         now_utc = datetime.now(timezone.utc)

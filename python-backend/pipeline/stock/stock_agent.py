@@ -16,6 +16,7 @@ class StockAgent:
         self.agent_name = os.getenv("STOCK_AGENT_NAME", "STOCK_AGENT")
         self.use_agno = os.getenv("STOCK_AGENT_USE_AGNO", "1").strip().lower() not in {"0", "false"}
         self.toolkit = toolkit
+        self.last_run_metadata: Dict[str, Any] = {}
 
     def is_enabled(self) -> bool:
         return self.use_agno
@@ -84,6 +85,7 @@ class StockAgent:
 
         images = [Image(filepath=path) for path in chart_paths]
         response = agent.run(self._build_prompt(stock_packet), images=images)
+        self.last_run_metadata = self._extract_metadata(response)
         response_text = self._extract_text(response).strip()
         if not response_text:
             raise RuntimeError("stock_agent_empty_response")
@@ -164,6 +166,57 @@ class StockAgent:
             ]
         )
         return "\n".join(lines)
+
+    def _extract_metadata(self, response: Any) -> Dict[str, Any]:
+        if response is None:
+            return {}
+
+        metadata: Dict[str, Any] = {}
+        for attr in ("reasoning_content", "reasoning_steps", "reasoning_messages", "metrics"):
+            value = getattr(response, attr, None)
+            if value:
+                metadata[attr] = self._json_safe(value)
+
+        metrics = metadata.get("metrics") if isinstance(metadata.get("metrics"), dict) else {}
+        token_keys = (
+            "reasoning_tokens",
+            "thinking_tokens",
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "prompt_tokens",
+            "completion_tokens",
+        )
+        token_usage = {key: metrics.get(key) for key in token_keys if metrics.get(key) is not None}
+        if token_usage:
+            metadata["token_usage"] = token_usage
+
+        tool_calls: List[Any] = []
+        messages = getattr(response, "messages", None)
+        if isinstance(messages, list):
+            for message in messages:
+                calls = getattr(message, "tool_calls", None)
+                if calls:
+                    safe_calls = self._json_safe(calls)
+                    if isinstance(safe_calls, list):
+                        tool_calls.extend(safe_calls)
+                    else:
+                        tool_calls.append(safe_calls)
+        if tool_calls:
+            metadata["tool_calls"] = tool_calls
+
+        return metadata
+
+    def _json_safe(self, value: Any) -> Any:
+        try:
+            json.dumps(value, ensure_ascii=True, default=str)
+            return value
+        except TypeError:
+            if isinstance(value, list):
+                return [self._json_safe(item) for item in value]
+            if isinstance(value, dict):
+                return {str(key): self._json_safe(item) for key, item in value.items()}
+            return str(value)
 
     def _extract_text(self, response: Any) -> str:
         if response is None:
