@@ -16,7 +16,7 @@ from pipeline.services.storage_service import StorageService
 
 
 class MultiStockAnalyzerRunner:
-    def __init__(self, config: Optional[PipelineConfig] = None) -> None:
+    def __init__(self, config: Optional[PipelineConfig] = None, initialize_agent: bool = True) -> None:
         self.config = config or PipelineConfig()
         self.market_time = MarketTimeService(self.config)
         self.storage = StorageService
@@ -26,7 +26,7 @@ class MultiStockAnalyzerRunner:
             market_open=(self.config.market_open_hour, self.config.market_open_minute),
             market_close=(self.config.market_close_hour, self.config.market_close_minute),
         )
-        self.agent = StockAnalyzerAgent()
+        self.agent = StockAnalyzerAgent() if initialize_agent else None
 
     def run_cycle(
         self,
