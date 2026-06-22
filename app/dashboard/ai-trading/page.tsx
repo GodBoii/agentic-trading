@@ -44,8 +44,6 @@ const stageLabels: Record<string, string> = {
     stock_agent: 'Stock Agent',
 }
 
-const agentSlots = [1, 2, 3, 4, 5, 6]
-
 const ease = [0.16, 1, 0.3, 1] as const
 
 function formatTime(value?: string | null) {
@@ -163,6 +161,13 @@ function AgentChatBoard({
 }) {
     const stockStage = runStatus?.stages?.stock_agent
     const completedResults = stockStage?.details?.results || []
+    const slotRanks = Array.from(
+        new Set([
+            ...Object.keys(liveEvents).map((rank) => Number(rank)).filter(Boolean),
+            ...completedResults.map((item: any) => Number(item.rank)).filter(Boolean),
+        ]),
+    ).sort((a, b) => a - b)
+    const agentSlots = slotRanks.length ? slotRanks : [activeAgent]
 
     const mergedEvents = (rank: number): LiveAgentEvent[] => {
         const events = liveEvents[rank] || []
@@ -208,7 +213,7 @@ function AgentChatBoard({
                         Stream: <span className="font-mono uppercase text-[11px]">{connectionState}</span>
                     </p>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                     {agentSlots.map((rank) => {
                         const events = mergedEvents(rank)
                         const latest = events[events.length - 1]
