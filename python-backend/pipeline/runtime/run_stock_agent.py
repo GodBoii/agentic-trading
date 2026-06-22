@@ -153,10 +153,9 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             return super()._select_candidates(stage2_payload, monitor_payload, trade_config)
 
         scan_limit = max(1, int(self.config.stock_agent_manual_scan_limit))
-        top_n = max(1, int(self.config.stock_agent_max_agents))
         stage2_stocks = self._build_stage2_selection_pool(stage2_payload)[:scan_limit]
         filtered_stocks = self._filter_by_manual_margin_budget(stage2_stocks, trade_config)
-        return filtered_stocks[:top_n], "stage2_manual_margin_filter"
+        return filtered_stocks, "stage2_manual_margin_filter"
 
     def _strip_monitor_context(self, packet: Dict[str, Any]) -> None:
         packet.pop("monitor", None)
@@ -266,7 +265,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         trade_config: Dict[str, Any],
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[Dict[str, Any]]:
-        max_workers = min(len(candidate_packets), max(1, int(self.config.stock_agent_max_agents)))
+        max_workers = max(1, len(candidate_packets))
         results: Dict[int, Dict[str, Any]] = {}
         failures: List[Dict[str, Any]] = []
 
@@ -562,7 +561,7 @@ def main() -> None:
     print("STOCK AGENT")
     print("=" * 60)
     print(f"Loop interval: {config.stock_analyzer_loop_interval_seconds} seconds")
-    print(f"Top N agents: {config.stock_agent_max_agents}")
+    print("Manual agents: all top-30 stocks within entered margin budget")
     print(f"Manual scan limit: {config.stock_agent_manual_scan_limit}")
 
     while True:
