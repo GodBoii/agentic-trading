@@ -63,7 +63,7 @@ class PipelineConfig:
     stage1_workers: int = 8
     stage2_workers: int = 8
     regime_workers: int = 8
-    multimodal_model_id: str = "minimax/minimax-m3"
+    multimodal_model_id: str = "xiaomi/mimo-v2.5"
     regime_model_id: str = "xiaomi/mimo-v2.5-pro"
     alpha_vantage_api_key_env: str = "ALPHA_VANTAGE_API_KEY"
     regime_global_context_enabled: bool = True
@@ -76,7 +76,6 @@ class PipelineConfig:
     stock_analyzer_loop_interval_seconds: int = 30
     stock_analyzer_report_refresh_seconds: int = 300
     stock_analyzer_top_n: int = 3
-    stock_agent_max_agents: int = 6
     stock_agent_manual_scan_limit: int = 30
     risk_analyzer_loop_interval_seconds: int = 30
     risk_analyzer_report_refresh_seconds: int = 300
