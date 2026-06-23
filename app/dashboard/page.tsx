@@ -147,6 +147,12 @@ function DashboardContent() {
                         </Link>
 
                         <div className="flex items-center gap-3 sm:gap-4">
+                            <Link
+                                href="/dashboard/ai-trading?view=trades"
+                                className="hidden sm:inline-flex rounded-full border border-success/40 bg-success/[0.08] px-4 py-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white hover:border-success/70 transition-colors"
+                            >
+                                Trades
+                            </Link>
                             <div className="text-right hidden sm:block">
                                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-ink-tertiary">
                                     Authenticated
@@ -194,7 +200,7 @@ function DashboardContent() {
                             href="/dashboard/ai-trading?view=trades"
                             className="rounded-full border border-success/40 bg-success/[0.08] px-5 py-2.5 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-success/70 transition-colors"
                         >
-                            Trade Sessions
+                            Trades
                         </Link>
                         <Link
                             href="/dashboard/ai-trading"
