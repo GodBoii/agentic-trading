@@ -44,11 +44,14 @@ def _load_env_files() -> None:
 
 
 def _apply_reasoning_defaults(overrides: dict[str, Any]) -> None:
-    if "reasoning" in overrides:
-        return
+    overrides.setdefault("max_tokens", None)
 
     enabled = os.getenv("OPENROUTER_ENABLE_REASONING", "1").strip().lower() not in {"0", "false", "no", "off"}
     if not enabled:
         return
 
-    overrides["reasoning"] = {"enabled": True, "exclude": False}
+    extra_body = overrides.get("extra_body")
+    if not isinstance(extra_body, dict):
+        extra_body = {}
+    extra_body.setdefault("reasoning", {"enabled": True, "exclude": False})
+    overrides["extra_body"] = extra_body
