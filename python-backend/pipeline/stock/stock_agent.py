@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
 import json
 import os
 from typing import Any, Dict, List, Optional
@@ -207,16 +208,53 @@ class StockAgent:
 
         return metadata
 
-    def _json_safe(self, value: Any) -> Any:
+    def _json_safe(self, value: Any, depth: int = 0) -> Any:
+        if depth > 8:
+            return str(value)
+
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+
         try:
-            json.dumps(value, ensure_ascii=True, default=str)
+            json.dumps(value, ensure_ascii=True)
             return value
         except TypeError:
-            if isinstance(value, list):
-                return [self._json_safe(item) for item in value]
-            if isinstance(value, dict):
-                return {str(key): self._json_safe(item) for key, item in value.items()}
-            return str(value)
+            pass
+
+        if isinstance(value, dict):
+            return {str(key): self._json_safe(item, depth + 1) for key, item in value.items()}
+
+        if isinstance(value, (list, tuple, set)):
+            return [self._json_safe(item, depth + 1) for item in value]
+
+        if is_dataclass(value):
+            return self._json_safe(asdict(value), depth + 1)
+
+        model_dump = getattr(value, "model_dump", None)
+        if callable(model_dump):
+            try:
+                return self._json_safe(model_dump(mode="json"), depth + 1)
+            except TypeError:
+                return self._json_safe(model_dump(), depth + 1)
+            except Exception:
+                pass
+
+        to_dict = getattr(value, "to_dict", None)
+        if callable(to_dict):
+            try:
+                return self._json_safe(to_dict(), depth + 1)
+            except Exception:
+                pass
+
+        object_dict = getattr(value, "__dict__", None)
+        if isinstance(object_dict, dict) and object_dict:
+            return {
+                str(key): self._json_safe(item, depth + 1)
+                for key, item in object_dict.items()
+                if not str(key).startswith("_") and not callable(item)
+            }
+
+        return str(value)
 
     def _extract_text(self, response: Any) -> str:
         if response is None:
