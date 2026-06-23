@@ -64,7 +64,7 @@ class PipelineConfig:
     stage1_workers: int = 8
     stage2_workers: int = 8
     regime_workers: int = 8
-    multimodal_model_id: str = "xiaomi/mimo-v2.5"
+    multimodal_model_id: str = "minimax/minimax-m3"
     regime_model_id: str = "xiaomi/mimo-v2.5-pro"
     alpha_vantage_api_key_env: str = "ALPHA_VANTAGE_API_KEY"
     regime_global_context_enabled: bool = True
