@@ -93,15 +93,23 @@ interface TradeSessionSummary {
     updated_at_utc?: string | null
     agent_count?: number
     executed_count?: number
+    cloud_synced_at_utc?: string | null
+    loaded_from_cloud?: boolean
 }
 
 interface TradeSession {
     session_id: string
+    request_id?: string
     title: string
     status: string
+    created_at_utc?: string | null
     updated_at_utc?: string | null
+    request?: Record<string, any>
+    summary?: Record<string, any> | null
     status_snapshot?: AgentRunStatus
     agents?: AgentResult[]
+    cloud_synced_at_utc?: string | null
+    loaded_from_cloud?: boolean
 }
 
 const stageLabels: Record<string, string> = {
@@ -122,6 +130,22 @@ function formatTime(value?: string | null) {
     } catch {
         return ''
     }
+}
+
+function formatDateTime(value?: string | null) {
+    if (!value) return 'Unknown time'
+    try {
+        return new Intl.DateTimeFormat('en-IN', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(new Date(value))
+    } catch {
+        return 'Unknown time'
+    }
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+    return `${count} ${count === 1 ? singular : plural}`
 }
 
 function statusText(stage: string, data?: AgentStage) {
@@ -297,7 +321,7 @@ function AttachmentStrip({ attachments }: { attachments?: AgentAttachments | nul
                                         {file.title || file.filename}
                                     </p>
                                     <p className="text-[10px] text-ink-tertiary font-mono mt-1 truncate">
-                                        {file.filename || 'artifact.md'}
+                                        {file.storage_path || file.path || file.filename || 'artifact.md'}
                                     </p>
                                 </a>
                             )
@@ -313,7 +337,12 @@ function AgentMetadataPanel({ metadata }: { metadata?: Record<string, any> | nul
     const tokenUsage = metadata?.token_usage || metadata?.metrics || {}
     const tokenEntries = Object.entries(tokenUsage).filter(([, value]) => value !== null && value !== undefined)
     const toolCalls = Array.isArray(metadata?.tool_calls) ? metadata?.tool_calls : []
-    const reasoning = typeof metadata?.reasoning_content === 'string' ? metadata.reasoning_content : ''
+    const reasoningValue = metadata?.reasoning_content || metadata?.reasoning_steps || metadata?.reasoning_messages
+    const reasoning = typeof reasoningValue === 'string'
+        ? reasoningValue
+        : reasoningValue
+            ? JSON.stringify(reasoningValue, null, 2)
+            : ''
 
     if (!tokenEntries.length && !toolCalls.length && !reasoning) {
         return (
@@ -332,12 +361,12 @@ function AgentMetadataPanel({ metadata }: { metadata?: Record<string, any> | nul
         <div className="space-y-3">
             {tokenEntries.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line rounded-xl overflow-hidden border border-line">
-                    {tokenEntries.slice(0, 8).map(([key, value]) => (
+                    {tokenEntries.map(([key, value]) => (
                         <div key={key} className="bg-[#08080a] p-3">
                             <p className="text-[9px] text-ink-tertiary font-mono uppercase tracking-[0.15em]">
                                 {key.replaceAll('_', ' ')}
                             </p>
-                            <p className="text-[12px] text-white font-mono nums mt-1">{String(value)}</p>
+                            <p className="text-[12px] text-white font-mono nums mt-1 break-words">{String(value)}</p>
                         </div>
                     ))}
                 </div>
@@ -646,16 +675,253 @@ function AgentChatBoard({
     )
 }
 
+function TradeHistoryView({
+    tradeSessions,
+    selectedSession,
+    openTradeSession,
+    activeAgent,
+    setActiveAgent,
+}: {
+    tradeSessions: TradeSessionSummary[]
+    selectedSession: TradeSession | null
+    openTradeSession: (sessionId: string) => void
+    activeAgent: number
+    setActiveAgent: (rank: number) => void
+}) {
+    const sessionRunStatus = selectedSession?.status_snapshot || null
+    const sessionAgents = selectedSession?.agents || []
+    const stageMessages = ['stage2'].map((stage) => ({
+        stage,
+        data: sessionRunStatus?.stages?.[stage],
+    }))
+    const selectedUpdatedAt = selectedSession?.updated_at_utc || selectedSession?.created_at_utc
+
+    return (
+        <div className="grid grid-cols-1 xl:grid-cols-[340px,1fr] gap-6 items-start">
+            <aside className="surface rounded-2xl border border-line overflow-hidden xl:sticky xl:top-28">
+                <div className="border-b border-line px-5 py-4">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
+                        Past Trades
+                    </p>
+                    <div className="flex items-end justify-between gap-4 mt-1">
+                        <h2 className="text-white text-[18px] font-medium">
+                            Trade Sessions
+                        </h2>
+                        <span className="text-[10px] text-ink-tertiary font-mono uppercase tracking-[0.14em]">
+                            {pluralize(tradeSessions.length, 'session')}
+                        </span>
+                    </div>
+                </div>
+
+                {tradeSessions.length === 0 ? (
+                    <div className="p-5">
+                        <div className="rounded-xl border border-dashed border-line p-8 text-center">
+                            <p className="text-[12px] text-ink-tertiary font-mono">
+                                No saved trade sessions yet
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="max-h-[68vh] overflow-y-auto p-3 space-y-2">
+                        {tradeSessions.map((session) => {
+                            const active = selectedSession?.session_id === session.session_id
+                            return (
+                                <button
+                                    key={session.session_id}
+                                    type="button"
+                                    onClick={() => openTradeSession(session.session_id)}
+                                    className={`w-full rounded-xl border p-4 text-left transition-colors ${active
+                                        ? 'border-success/50 bg-success/[0.06]'
+                                        : 'border-line bg-white/[0.02] hover:border-line-strong'
+                                        }`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-ink-tertiary">
+                                                {formatDateTime(session.updated_at_utc || session.created_at_utc)}
+                                            </p>
+                                            <p className="text-[14px] text-white mt-1 truncate">
+                                                {session.title}
+                                            </p>
+                                        </div>
+                                        <span className={`mt-0.5 h-2 w-2 rounded-full flex-shrink-0 ${session.status === 'completed'
+                                            ? 'bg-success'
+                                            : session.status === 'failed'
+                                                ? 'bg-danger'
+                                                : 'bg-warning'
+                                            }`}
+                                        />
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <span className="rounded-full border border-line bg-black/30 px-2.5 py-1 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.12em]">
+                                            {session.status}
+                                        </span>
+                                        <span className="rounded-full border border-line bg-black/30 px-2.5 py-1 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.12em]">
+                                            {session.agent_count || 0} agents
+                                        </span>
+                                        {session.loaded_from_cloud && (
+                                            <span className="rounded-full border border-accent/30 bg-accent/[0.08] px-2.5 py-1 text-[10px] text-accent font-mono uppercase tracking-[0.12em]">
+                                                cloud
+                                            </span>
+                                        )}
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+            </aside>
+
+            <section className="min-w-0 space-y-5">
+                {!selectedSession ? (
+                    <div className="surface rounded-2xl border border-line p-10 text-center min-h-[420px] flex items-center justify-center">
+                        <div>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
+                                Session Reader
+                            </p>
+                            <p className="text-white text-[18px] mt-3">
+                                Select a saved trade session to read the agent conversation.
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, ease }}
+                            className="surface rounded-2xl p-5 sm:p-6 border border-line"
+                        >
+                            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
+                                        Saved Trade Conversation
+                                    </p>
+                                    <h2 className="text-white text-[22px] sm:text-[26px] font-medium tracking-[-0.02em] mt-2 break-words">
+                                        {selectedSession.title}
+                                    </h2>
+                                    <p className="text-[12px] text-ink-secondary font-mono mt-3 break-all">
+                                        {selectedSession.request_id || selectedSession.session_id}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line rounded-xl overflow-hidden border border-line min-w-0 lg:min-w-[420px]">
+                                    {[
+                                        ['Status', selectedSession.status],
+                                        ['Agents', sessionAgents.length],
+                                        ['Executed', selectedSession.summary?.executed_count ?? 0],
+                                        ['Updated', formatTime(selectedUpdatedAt)],
+                                    ].map(([label, value]) => (
+                                        <div key={String(label)} className="bg-[#08080a] p-3">
+                                            <p className="text-[9px] text-ink-tertiary font-mono uppercase tracking-[0.15em]">
+                                                {label}
+                                            </p>
+                                            <p className="text-[12px] text-white font-mono nums mt-1 break-words">
+                                                {String(value)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                <span className="rounded-full border border-line bg-white/[0.02] px-3 py-1.5 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.14em]">
+                                    Created {formatDateTime(selectedSession.created_at_utc)}
+                                </span>
+                                <span className="rounded-full border border-line bg-white/[0.02] px-3 py-1.5 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.14em]">
+                                    {selectedSession.cloud_synced_at_utc ? `Synced ${formatDateTime(selectedSession.cloud_synced_at_utc)}` : 'Local session'}
+                                </span>
+                                {selectedSession.loaded_from_cloud && (
+                                    <span className="rounded-full border border-accent/30 bg-accent/[0.08] px-3 py-1.5 text-[10px] text-accent font-mono uppercase tracking-[0.14em]">
+                                        Loaded from Supabase
+                                    </span>
+                                )}
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, ease, delay: 0.05 }}
+                            className="flex justify-end"
+                        >
+                            <div className="max-w-3xl bg-accent/[0.08] border border-accent/30 rounded-2xl rounded-tr-md px-5 py-4">
+                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-accent mb-1.5">
+                                    Operator
+                                </p>
+                                <p className="text-white text-[14px] leading-relaxed">
+                                    Start AI Trading
+                                </p>
+                                <p className="text-ink-secondary text-[12px] mt-1.5 leading-relaxed">
+                                    Saved run from {formatDateTime(selectedSession.created_at_utc)}.
+                                </p>
+                            </div>
+                        </motion.div>
+
+                        <AgentChatBoard
+                            runStatus={sessionRunStatus}
+                            liveEvents={{}}
+                            sessionAgents={sessionAgents}
+                            activeAgent={activeAgent}
+                            setActiveAgent={setActiveAgent}
+                            connectionState={selectedSession.loaded_from_cloud ? 'cloud archive' : 'saved archive'}
+                        />
+
+                        {stageMessages.map(({ stage, data }, index) => {
+                            const complete = data?.status === 'completed'
+                            if (!data) return null
+                            return (
+                                <motion.div
+                                    key={stage}
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, ease, delay: 0.1 + index * 0.05 }}
+                                    className="flex justify-start"
+                                >
+                                    <div className={`max-w-4xl w-full rounded-2xl rounded-tl-md p-5 border ${complete
+                                        ? 'border-success/30 bg-success/[0.03]'
+                                        : 'border-line bg-[#0a0a0c]/50'
+                                        }`}>
+                                        <div className="flex items-start justify-between gap-4 mb-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${complete ? 'bg-success' : 'bg-ink-tertiary'}`} />
+                                                <div className="min-w-0">
+                                                    <p className="text-white font-medium text-[14px]">
+                                                        {stageLabels[stage]}
+                                                    </p>
+                                                    <p className={`text-[10px] font-mono uppercase tracking-[0.18em] mt-0.5 ${complete ? 'text-success' : 'text-ink-tertiary'}`}>
+                                                        {data.status || 'pending'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-ink-tertiary font-mono flex-shrink-0">
+                                                {formatTime(data.generated_at_utc)}
+                                            </p>
+                                        </div>
+                                        <p className="text-[13px] text-ink-secondary mb-4 leading-relaxed">
+                                            {statusText(stage, data)}
+                                        </p>
+                                        {stageBody(stage, data)}
+                                    </div>
+                                </motion.div>
+                            )
+                        })}
+                    </>
+                )}
+            </section>
+        </div>
+    )
+}
+
 function AITradingChatContent() {
     const searchParams = useSearchParams()
     const expectedRun = searchParams.get('run')
+    const initialView = searchParams.get('view') === 'trades' ? 'trades' : 'live'
     const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [liveEvents, setLiveEvents] = useState<Record<number, LiveAgentEvent[]>>({})
     const [activeAgent, setActiveAgent] = useState(1)
     const [connectionState, setConnectionState] = useState('connecting')
+    const [viewMode, setViewMode] = useState<'live' | 'trades'>(initialView)
     const [runningPanelOpen, setRunningPanelOpen] = useState(false)
-    const [tradesPanelOpen, setTradesPanelOpen] = useState(false)
     const [tradeSessions, setTradeSessions] = useState<TradeSessionSummary[]>([])
     const [selectedSession, setSelectedSession] = useState<TradeSession | null>(null)
     const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -708,7 +974,7 @@ function AITradingChatContent() {
             setLiveEvents({})
             const firstRank = Number(session.agents?.[0]?.rank || 1)
             setActiveAgent(firstRank)
-            setTradesPanelOpen(false)
+            setViewMode('trades')
         } catch (sessionError) {
             console.error('Error opening trade session:', sessionError)
             setError('Could not open that trade session.')
@@ -718,6 +984,7 @@ function AITradingChatContent() {
     const resumeLiveRun = () => {
         setSelectedSession(null)
         setLiveEvents({})
+        setViewMode('live')
         fetchStatus()
     }
 
@@ -727,6 +994,18 @@ function AITradingChatContent() {
         const timer = setInterval(fetchStatus, 2500)
         return () => clearInterval(timer)
     }, [])
+
+    useEffect(() => {
+        if (viewMode === 'trades') {
+            fetchTradeSessions()
+        }
+    }, [viewMode])
+
+    useEffect(() => {
+        if (viewMode === 'trades' && !selectedSession && tradeSessions.length > 0) {
+            openTradeSession(tradeSessions[0].session_id)
+        }
+    }, [viewMode, tradeSessions, selectedSession])
 
     useEffect(() => {
         let socket: WebSocket | null = null
@@ -899,15 +1178,15 @@ function AITradingChatContent() {
                             </Link>
                             <div className="border-l border-white/10 pl-3 sm:pl-4 min-w-0">
                                 <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
-                                    Live Agent Run
+                                    {viewMode === 'trades' ? 'Trade History' : 'Live Agent Run'}
                                 </p>
                                 <h1 className="font-display text-[18px] sm:text-[20px] text-white tracking-[-0.02em] leading-[1.1] mt-0.5">
-                                    AI Trading <span className="font-serif-italic text-ink-secondary">Terminal</span>
+                                    AI Trading <span className="font-serif-italic text-ink-secondary">{viewMode === 'trades' ? 'Sessions' : 'Terminal'}</span>
                                 </h1>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar">
-                            {selectedSession && (
+                            {viewMode === 'trades' && (
                                 <button
                                     type="button"
                                     onClick={resumeLiveRun}
@@ -927,9 +1206,12 @@ function AITradingChatContent() {
                                 type="button"
                                 onClick={() => {
                                     fetchTradeSessions()
-                                    setTradesPanelOpen(true)
+                                    setViewMode('trades')
                                 }}
-                                className="flex-shrink-0 rounded-full border border-line bg-white/[0.03] px-4 py-2 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-line-strong transition-colors"
+                                className={`flex-shrink-0 rounded-full border px-4 py-2 text-[11px] font-mono uppercase tracking-[0.14em] text-white transition-colors ${viewMode === 'trades'
+                                    ? 'border-success/50 bg-success/[0.08]'
+                                    : 'border-line bg-white/[0.03] hover:border-line-strong'
+                                    }`}
                             >
                                 Trades
                             </button>
@@ -978,51 +1260,6 @@ function AITradingChatContent() {
                         </button>
                     ))}
                 </div>
-            </FloatingPanel>
-
-            <FloatingPanel
-                title="Trades"
-                open={tradesPanelOpen}
-                onClose={() => setTradesPanelOpen(false)}
-            >
-                {tradeSessions.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-line p-8 text-center">
-                        <p className="text-[12px] text-ink-tertiary font-mono">
-                            No trade sessions saved yet
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {tradeSessions.map((session) => (
-                            <button
-                                key={session.session_id}
-                                type="button"
-                                onClick={() => openTradeSession(session.session_id)}
-                                className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedSession?.session_id === session.session_id
-                                    ? 'border-success/50 bg-success/[0.06]'
-                                    : 'border-line bg-white/[0.02] hover:border-line-strong'
-                                    }`}
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-ink-tertiary">
-                                            {formatTime(session.updated_at_utc || session.created_at_utc)}
-                                        </p>
-                                        <p className="text-[14px] text-white mt-1 truncate">
-                                            {session.title}
-                                        </p>
-                                    </div>
-                                    <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-success">
-                                        {session.status}
-                                    </span>
-                                </div>
-                                <p className="text-[11px] text-ink-secondary mt-2">
-                                    {session.agent_count || 0} agents / {session.executed_count || 0} executed
-                                </p>
-                            </button>
-                        ))}
-                    </div>
-                )}
             </FloatingPanel>
 
             <main className="relative mx-auto max-w-6xl px-6 lg:px-8 pt-10 pb-24">
@@ -1078,8 +1315,17 @@ function AITradingChatContent() {
                     </motion.div>
                 )}
 
-                {/* Conversation stream */}
-                <div className="space-y-5 pb-8">
+                {viewMode === 'trades' ? (
+                    <TradeHistoryView
+                        tradeSessions={tradeSessions}
+                        selectedSession={selectedSession}
+                        openTradeSession={openTradeSession}
+                        activeAgent={activeAgent}
+                        setActiveAgent={setActiveAgent}
+                    />
+                ) : (
+                    <div className="space-y-5 pb-8">
+                        {/* Conversation stream */}
                     {/* User input bubble */}
                     <motion.div
                         initial={{ opacity: 0, y: 12 }}
@@ -1191,7 +1437,8 @@ function AITradingChatContent() {
                         </motion.div>
                     )}
                     <div ref={bottomRef} />
-                </div>
+                    </div>
+                )}
             </main>
         </div>
     )

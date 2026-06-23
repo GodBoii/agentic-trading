@@ -189,6 +189,20 @@ function DashboardContent() {
                     <p className="text-[15px] text-ink-secondary max-w-xl">
                         Manage your trading account, monitor live positions, and orchestrate AI agents from a single command surface.
                     </p>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                        <Link
+                            href="/dashboard/ai-trading?view=trades"
+                            className="rounded-full border border-success/40 bg-success/[0.08] px-5 py-2.5 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-success/70 transition-colors"
+                        >
+                            Trade Sessions
+                        </Link>
+                        <Link
+                            href="/dashboard/ai-trading"
+                            className="rounded-full border border-line bg-white/[0.03] px-5 py-2.5 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-line-strong transition-colors"
+                        >
+                            Live Agent Chat
+                        </Link>
+                    </div>
                 </motion.div>
 
                 {/* Connect & Trading Status */}

@@ -32,7 +32,7 @@ export function resolveTradingArtifactPath(input: string) {
 export async function loadTradeSession(sessionId: string) {
   const safeId = safeSegment(sessionId)
   if (!safeId) return null
-  return readJson(path.join(sessionsDir, safeId, 'session.json'))
+  return readJson(path.join(sessionsDir, safeId, 'session.json')) || loadTradeSessionFromSupabase(safeId)
 }
 
 export async function listTradeSessions() {
@@ -42,28 +42,27 @@ export async function listTradeSessions() {
   try {
     entries = await fs.readdir(sessionsDir)
   } catch {
-    return []
+    entries = []
   }
 
-  const sessions = await Promise.all(
+  const localSessions = await Promise.all(
     entries.map(async (entry) => {
       const payload = await readJson(path.join(sessionsDir, entry, 'session.json'))
       if (!payload) return null
-      return {
-        session_id: payload.session_id || entry,
-        request_id: payload.request_id || payload.request?.request_id || entry,
-        title: payload.title || 'Trade session',
-        status: payload.status || payload.status_snapshot?.status || 'unknown',
-        created_at_utc: payload.created_at_utc || payload.request?.requested_at_utc || null,
-        updated_at_utc: payload.updated_at_utc || payload.status_snapshot?.updated_at_utc || null,
-        agent_count: Array.isArray(payload.agents) ? payload.agents.length : 0,
-        executed_count: payload.summary?.executed_count ?? payload.status_snapshot?.stages?.stock_agent?.summary?.executed_count ?? 0,
-      }
+      return sessionSummary(payload, entry)
     }),
   )
 
-  return sessions
-    .filter(Boolean)
+  const cloudSessions = await listTradeSessionsFromSupabase()
+  const merged = new Map<string, JsonRecord>()
+  for (const session of cloudSessions) {
+    if (session?.session_id) merged.set(String(session.session_id), session)
+  }
+  for (const session of localSessions.filter(Boolean) as JsonRecord[]) {
+    if (session?.session_id) merged.set(String(session.session_id), session)
+  }
+
+  return Array.from(merged.values())
     .sort((a: any, b: any) => Date.parse(b.updated_at_utc || b.created_at_utc || '') - Date.parse(a.updated_at_utc || a.created_at_utc || ''))
 }
 
@@ -293,6 +292,66 @@ async function uploadBuffer(body: Buffer, storagePath: string, contentType: stri
   if (error) throw error
   const { data } = client.storage.from(defaultBucket).getPublicUrl(storagePath)
   return data.publicUrl
+}
+
+async function loadTradeSessionFromSupabase(sessionId: string) {
+  const payload = await downloadJsonFromSupabase(`${sessionId}/session.json`)
+  if (!payload) return null
+  return {
+    ...payload,
+    loaded_from_cloud: true,
+  }
+}
+
+async function listTradeSessionsFromSupabase() {
+  const client = serviceSupabase()
+  if (!client) return []
+
+  const { data, error } = await client.storage
+    .from(defaultBucket)
+    .list('', { limit: 200, sortBy: { column: 'updated_at', order: 'desc' } })
+
+  if (error || !Array.isArray(data)) return []
+
+  const sessions = await Promise.all(
+    data.map(async (entry) => {
+      const sessionId = safeSegment(entry.name)
+      if (!sessionId || entry.name === 'session.json') return null
+      const payload = await downloadJsonFromSupabase(`${sessionId}/session.json`)
+      return payload ? sessionSummary(payload, sessionId, true) : null
+    }),
+  )
+
+  return sessions.filter(Boolean) as JsonRecord[]
+}
+
+async function downloadJsonFromSupabase(storagePath: string) {
+  const client = serviceSupabase()
+  if (!client) return null
+
+  const { data, error } = await client.storage.from(defaultBucket).download(storagePath)
+  if (error || !data) return null
+
+  try {
+    return JSON.parse(await data.text())
+  } catch {
+    return null
+  }
+}
+
+function sessionSummary(payload: JsonRecord, fallbackId: string, loadedFromCloud = false) {
+  return {
+    session_id: payload.session_id || fallbackId,
+    request_id: payload.request_id || payload.request?.request_id || fallbackId,
+    title: payload.title || 'Trade session',
+    status: payload.status || payload.status_snapshot?.status || 'unknown',
+    created_at_utc: payload.created_at_utc || payload.request?.requested_at_utc || null,
+    updated_at_utc: payload.updated_at_utc || payload.status_snapshot?.updated_at_utc || null,
+    agent_count: Array.isArray(payload.agents) ? payload.agents.length : 0,
+    executed_count: payload.summary?.executed_count ?? payload.status_snapshot?.stages?.stock_agent?.summary?.executed_count ?? 0,
+    cloud_synced_at_utc: payload.cloud_synced_at_utc || null,
+    loaded_from_cloud: loadedFromCloud,
+  }
 }
 
 function serviceSupabase() {
