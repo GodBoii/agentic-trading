@@ -269,6 +269,47 @@ class NiftyDepthChartGenerator:
             )
         return pd.DataFrame.from_records(records).sort_values("timestamp")
 
+    def _trade_tick_dataframe(self, rows: List[Dict[str, Any]]) -> pd.DataFrame:
+        records: List[Dict[str, Any]] = []
+        for row in rows:
+            ts = self._parse_ts(row.get("captured_at_utc"))
+            price = self._number(row.get("latest_price"))
+            if ts is None or price is None:
+                continue
+            quantity = self._number(row.get("volume_delta"))
+            if quantity is None or quantity <= 0:
+                quantity = self._number(row.get("last_traded_quantity")) or 0.0
+            if quantity <= 0:
+                continue
+            records.append(
+                {
+                    "timestamp": ts,
+                    "price": price,
+                    "price_bin": self._round_price(price),
+                    "quantity": quantity,
+                    "volume": self._number(row.get("volume")),
+                    "ltq": self._number(row.get("last_traded_quantity")),
+                    "best_bid": self._number(row.get("best_bid")),
+                    "best_ask": self._number(row.get("best_ask")),
+                    "aggressor": str(row.get("aggressor") or "neutral"),
+                    "classification_method": str(row.get("classification_method") or "trade_ticks"),
+                }
+            )
+        if not records:
+            return pd.DataFrame(
+                columns=[
+                    "timestamp",
+                    "price",
+                    "price_bin",
+                    "quantity",
+                    "best_bid",
+                    "best_ask",
+                    "aggressor",
+                    "classification_method",
+                ]
+            )
+        return pd.DataFrame.from_records(records).sort_values("timestamp")
+
     def _chart_paths(self, market_date: str) -> Dict[str, Path]:
         output_dir = self.config.nifty_depth_charts_dir / market_date
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -284,14 +325,16 @@ class NiftyDepthChartGenerator:
         data_dir = self.config.nifty_depth_data_dir / market_date
         paths = self._chart_paths(market_date)
         depth_rows = self._load_ndjson_tail(data_dir / "depth_200.ndjson", self.max_depth_packets)
+        trade_tick_rows = self._load_ndjson_tail(data_dir / "trade_ticks.ndjson", self.max_full_packets)
         full_rows = self._load_ndjson_tail(data_dir / "full_market.ndjson", self.max_full_packets)
 
         depth_df = self._depth_dataframe(depth_rows)
         quote_df = self._best_quotes_from_depth(depth_rows)
-        trade_df = self._trade_dataframe(full_rows, quote_df)
+        trade_tick_source = "trade_ticks.ndjson" if trade_tick_rows else "full_market.ndjson_fallback"
+        trade_df = self._trade_tick_dataframe(trade_tick_rows) if trade_tick_rows else self._trade_dataframe(full_rows, quote_df)
 
         if depth_df.empty and trade_df.empty:
-            payload = self._build_summary(market_date, paths, depth_df, trade_df, generated=False)
+            payload = self._build_summary(market_date, paths, depth_df, trade_df, generated=False, trade_tick_source=trade_tick_source)
             StorageService.save_snapshot(paths["summary"], payload)
             StorageService.save_snapshot(self.config.nifty_depth_charts_latest_path, payload)
             return payload
@@ -300,7 +343,7 @@ class NiftyDepthChartGenerator:
         self._render_footprint_chart(trade_df, paths["footprint"], market_date)
         self._render_dom_ladder(depth_rows, trade_df, paths["dom"], market_date)
 
-        payload = self._build_summary(market_date, paths, depth_df, trade_df, generated=True)
+        payload = self._build_summary(market_date, paths, depth_df, trade_df, generated=True, trade_tick_source=trade_tick_source)
         StorageService.save_snapshot(paths["summary"], payload)
         StorageService.save_snapshot(self.config.nifty_depth_charts_latest_path, payload)
         return payload
@@ -313,6 +356,7 @@ class NiftyDepthChartGenerator:
         trade_df: pd.DataFrame,
         *,
         generated: bool,
+        trade_tick_source: str,
     ) -> Dict[str, Any]:
         buy_volume = 0.0
         sell_volume = 0.0
@@ -356,6 +400,7 @@ class NiftyDepthChartGenerator:
             "input": {
                 "depth_rows_used": len(depth_df),
                 "trade_rows_used": len(trade_df),
+                "trade_tick_source": trade_tick_source,
                 "max_depth_packets": self.max_depth_packets,
                 "max_full_packets": self.max_full_packets,
                 "price_step": self.price_step,

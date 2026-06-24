@@ -42,7 +42,8 @@ class NiftyDepthMonitor:
         self.depth_level = self._env_int("NIFTY_DEPTH_LEVEL", 200)
         self.reconnect_delay_seconds = self._env_float("NIFTY_DEPTH_RECONNECT_SECONDS", 5.0)
         self.latest_save_interval_seconds = self._env_float("NIFTY_DEPTH_LATEST_SAVE_SECONDS", 5.0)
-        self.raw_write_interval_seconds = self._env_float("NIFTY_DEPTH_RAW_WRITE_SECONDS", 1.0)
+        self.raw_write_interval_seconds = self._env_float("NIFTY_DEPTH_RAW_WRITE_SECONDS", 0.0)
+        self.persist_every_packet = self._env_bool("NIFTY_DEPTH_PERSIST_EVERY_PACKET", True)
         self.first_packet_timeout_seconds = self._env_float("NIFTY_DEPTH_FIRST_PACKET_TIMEOUT_SECONDS", 20.0)
         self.max_latest_depth_levels = self._env_int("NIFTY_DEPTH_LATEST_LEVELS", 20)
         self.charts_enabled = self._env_bool("NIFTY_DEPTH_CHARTS_ENABLED", True)
@@ -61,11 +62,16 @@ class NiftyDepthMonitor:
         self.last_error_by_stream: Dict[str, str] = {}
         self.last_packet_at_utc_by_stream: Dict[str, str] = {}
         self.stream_states: Dict[str, Dict[str, Any]] = {}
+        self.event_sequence_by_stream: Dict[str, int] = {}
+        self.previous_trade_volume: Optional[float] = None
+        self.previous_trade_price: Optional[float] = None
+        self.last_trade_fingerprint: Optional[str] = None
         self.metrics = {
             "full_market_packets": 0,
             "depth_200_packets": 0,
             "depth_200_bid_packets": 0,
             "depth_200_ask_packets": 0,
+            "trade_ticks_written": 0,
             "raw_events_written": 0,
             "reconnects": 0,
             "no_packet_timeouts": 0,
@@ -198,7 +204,7 @@ class NiftyDepthMonitor:
 
     def _append_event(self, stream_name: str, payload: Dict[str, Any], *, throttle: bool = True) -> None:
         now = time.time()
-        if throttle:
+        if throttle and self.raw_write_interval_seconds > 0:
             last_write = self.last_raw_write_at.get(stream_name, 0.0)
             if now - last_write < self.raw_write_interval_seconds:
                 return
@@ -206,12 +212,20 @@ class NiftyDepthMonitor:
 
         payload = dict(payload)
         payload.setdefault("captured_at_utc", self._now_utc())
+        payload.setdefault("captured_monotonic_ns", time.monotonic_ns())
+        payload.setdefault("event_sequence", self._next_event_sequence(stream_name))
         path = self._daily_dir() / f"{stream_name}.ndjson"
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=True, default=str))
             handle.write("\n")
         with self.lock:
             self.metrics["raw_events_written"] += 1
+
+    def _next_event_sequence(self, stream_name: str) -> int:
+        with self.lock:
+            value = int(self.event_sequence_by_stream.get(stream_name, 0)) + 1
+            self.event_sequence_by_stream[stream_name] = value
+            return value
 
     def _first_number(self, payload: Any, keys: tuple[str, ...]) -> Optional[float]:
         if isinstance(payload, dict):
@@ -340,6 +354,128 @@ class NiftyDepthMonitor:
             "raw_keys": sorted(str(key) for key in packet.keys()) if isinstance(packet, dict) else [],
         }
 
+    def _first_value(self, payload: Any, keys: tuple[str, ...]) -> Optional[Any]:
+        if isinstance(payload, dict):
+            for key in keys:
+                if key in payload and payload.get(key) not in (None, ""):
+                    return payload.get(key)
+            for value in payload.values():
+                nested = self._first_value(value, keys)
+                if nested not in (None, ""):
+                    return nested
+        elif isinstance(payload, list):
+            for value in payload:
+                nested = self._first_value(value, keys)
+                if nested not in (None, ""):
+                    return nested
+        return None
+
+    def _best_bid_ask_from_packet(self, packet: Dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
+        best_bid = self._first_number(packet, ("best_bid", "bestBid", "best_bid_price", "bid_price"))
+        best_ask = self._first_number(packet, ("best_ask", "bestAsk", "best_ask_price", "ask_price"))
+        depth = packet.get("depth") if isinstance(packet, dict) else None
+        if isinstance(depth, list):
+            bid_prices: List[float] = []
+            ask_prices: List[float] = []
+            for level in depth:
+                if not isinstance(level, dict):
+                    continue
+                bid = self._first_number(level, ("bid_price", "bidPrice", "best_bid_price"))
+                ask = self._first_number(level, ("ask_price", "askPrice", "best_ask_price"))
+                if bid is not None and bid > 0:
+                    bid_prices.append(bid)
+                if ask is not None and ask > 0:
+                    ask_prices.append(ask)
+            if bid_prices:
+                best_bid = max(bid_prices)
+            if ask_prices:
+                best_ask = min(ask_prices)
+        elif isinstance(depth, dict):
+            bid_levels = self._normalize_depth_levels(depth.get("buy") or depth.get("bids"), "bid")
+            ask_levels = self._normalize_depth_levels(depth.get("sell") or depth.get("asks"), "ask")
+            bid_prices = [float(level.get("price") or 0.0) for level in bid_levels if level.get("price")]
+            ask_prices = [float(level.get("price") or 0.0) for level in ask_levels if level.get("price")]
+            if bid_prices:
+                best_bid = max(bid_prices)
+            if ask_prices:
+                best_ask = min(ask_prices)
+        return best_bid, best_ask
+
+    def _build_trade_tick(self, packet: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        latest_price = self._first_number(
+            packet,
+            ("last_price", "lastPrice", "ltp", "LTP", "latest_traded_price"),
+        )
+        if latest_price is None:
+            return None
+
+        volume = self._first_number(packet, ("volume", "Volume", "total_volume"))
+        last_quantity = self._first_number(
+            packet,
+            ("last_traded_quantity", "lastTradedQuantity", "last_quantity", "lastQuantity", "LTQ"),
+        )
+        last_trade_time = self._first_value(
+            packet,
+            ("last_traded_time", "lastTradedTime", "last_trade_time", "lastTradeTime", "LTT"),
+        )
+        open_interest = self._first_number(packet, ("open_interest", "openInterest", "oi", "OI"))
+        best_bid, best_ask = self._best_bid_ask_from_packet(packet)
+
+        volume_delta = None
+        if volume is not None and self.previous_trade_volume is not None and volume >= self.previous_trade_volume:
+            volume_delta = volume - self.previous_trade_volume
+
+        aggressor = "neutral"
+        classification_method = "unclassified"
+        if best_ask is not None and latest_price >= best_ask:
+            aggressor = "buy"
+            classification_method = "ltp_at_or_above_best_ask"
+        elif best_bid is not None and latest_price <= best_bid:
+            aggressor = "sell"
+            classification_method = "ltp_at_or_below_best_bid"
+        elif self.previous_trade_price is not None and latest_price > self.previous_trade_price:
+            aggressor = "buy"
+            classification_method = "uptick_fallback"
+        elif self.previous_trade_price is not None and latest_price < self.previous_trade_price:
+            aggressor = "sell"
+            classification_method = "downtick_fallback"
+
+        self.previous_trade_volume = volume if volume is not None else self.previous_trade_volume
+        self.previous_trade_price = latest_price
+
+        return {
+            "type": "trade_tick",
+            "security_id": packet.get("security_id"),
+            "exchange_segment": packet.get("exchange_segment"),
+            "latest_price": latest_price,
+            "last_traded_quantity": last_quantity,
+            "last_trade_time": last_trade_time,
+            "volume": volume,
+            "volume_delta": volume_delta,
+            "open_interest": open_interest,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "aggressor": aggressor,
+            "classification_method": classification_method,
+        }
+
+    def _should_write_trade_tick(self, tick: Dict[str, Any]) -> bool:
+        if self.persist_every_packet:
+            return True
+        fingerprint = json.dumps(
+            {
+                "ltp": tick.get("latest_price"),
+                "ltq": tick.get("last_traded_quantity"),
+                "ltt": tick.get("last_trade_time"),
+                "volume": tick.get("volume"),
+            },
+            sort_keys=True,
+        )
+        if fingerprint == self.last_trade_fingerprint:
+            return False
+        self.last_trade_fingerprint = fingerprint
+        return True
+
     def _save_latest(
         self,
         *,
@@ -366,6 +502,8 @@ class NiftyDepthMonitor:
                     "active_stream": stream_name,
                     "data_dir": str(self._daily_dir()),
                     "latest_path": str(self.latest_path),
+                    "persist_every_packet": self.persist_every_packet,
+                    "raw_write_interval_seconds": self.raw_write_interval_seconds,
                 },
                 "targets": self.targets,
                 "metrics": dict(self.metrics),
@@ -408,8 +546,13 @@ class NiftyDepthMonitor:
         self._append_event(
             "full_market",
             {"type": "full_market_packet", "packet": packet},
-            throttle=True,
+            throttle=not self.persist_every_packet,
         )
+        trade_tick = self._build_trade_tick(packet)
+        if trade_tick and self._should_write_trade_tick(trade_tick):
+            self._append_event("trade_ticks", trade_tick, throttle=not self.persist_every_packet)
+            with self.lock:
+                self.metrics["trade_ticks_written"] += 1
         self._save_latest(stream_name="full_market")
 
     def _record_depth_packet(self, update: Dict[str, Any]) -> None:
@@ -432,7 +575,7 @@ class NiftyDepthMonitor:
                 "security_id": update.get("security_id"),
                 "depth": update.get("depth"),
             },
-            throttle=True,
+            throttle=not self.persist_every_packet,
         )
         self._save_latest(stream_name="depth_200")
 
