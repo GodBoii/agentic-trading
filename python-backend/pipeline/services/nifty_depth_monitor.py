@@ -17,6 +17,7 @@ from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_reference_service import MarketReferenceService
 from pipeline.services.market_time_service import MarketTimeService
+from pipeline.services.nifty_depth_charting import NiftyDepthChartGenerator
 from pipeline.services.storage_service import StorageService
 
 
@@ -44,6 +45,9 @@ class NiftyDepthMonitor:
         self.raw_write_interval_seconds = self._env_float("NIFTY_DEPTH_RAW_WRITE_SECONDS", 1.0)
         self.first_packet_timeout_seconds = self._env_float("NIFTY_DEPTH_FIRST_PACKET_TIMEOUT_SECONDS", 20.0)
         self.max_latest_depth_levels = self._env_int("NIFTY_DEPTH_LATEST_LEVELS", 20)
+        self.charts_enabled = self._env_bool("NIFTY_DEPTH_CHARTS_ENABLED", True)
+        self.chart_interval_seconds = self._env_float("NIFTY_DEPTH_CHART_INTERVAL_SECONDS", 60.0)
+        self.charting = NiftyDepthChartGenerator(config)
 
         self.data_dir = self.config.nifty_depth_data_dir
         self.latest_path = self.config.nifty_depth_latest_path
@@ -65,6 +69,8 @@ class NiftyDepthMonitor:
             "raw_events_written": 0,
             "reconnects": 0,
             "no_packet_timeouts": 0,
+            "chart_generations": 0,
+            "chart_errors": 0,
         }
 
     def _env_bool(self, key: str, default: bool) -> bool:
@@ -588,11 +594,50 @@ class NiftyDepthMonitor:
         for name, target in (
             ("nifty-full-market", self._full_market_worker),
             ("nifty-depth-200", self._depth_200_worker),
+            ("nifty-depth-charts", self._chart_worker),
         ):
             thread = threading.Thread(target=target, name=name, daemon=True)
             thread.start()
         self.started_threads = True
         self._save_latest(status="started", force=True)
+
+    def _chart_worker(self) -> None:
+        stream_name = "chart_generator"
+        if not self.charts_enabled:
+            self._set_stream_state(stream_name, status="disabled")
+            return
+
+        while not self.stop_event.is_set():
+            try:
+                self._set_stream_state(stream_name, status="generating")
+                bundle = self.charting.generate_for_market_date(self._market_date())
+                with self.lock:
+                    self.metrics["chart_generations"] += 1
+                    self.last_packet_at_utc_by_stream[stream_name] = self._now_utc()
+                self._set_stream_state(
+                    stream_name,
+                    status="ready" if bundle.get("generated") else "no_input_data",
+                    chart_count=bundle.get("chart_count", 0),
+                    latest_manifest=str(self.config.nifty_depth_charts_latest_path),
+                )
+            except Exception as exc:
+                text = f"{type(exc).__name__}: {exc}"
+                print(f"NIFTY depth chart generator error: {text}")
+                with self.lock:
+                    self.last_error_by_stream[stream_name] = text
+                    self.metrics["chart_errors"] += 1
+                self._set_stream_state(stream_name, status="error", last_error=text)
+                try:
+                    self._append_event(
+                        "errors",
+                        {"stream": stream_name, "error": text},
+                        throttle=False,
+                    )
+                except Exception:
+                    pass
+            sleep_until = time.time() + self.chart_interval_seconds
+            while not self.stop_event.is_set() and time.time() < sleep_until:
+                time.sleep(1)
 
     def run(self) -> None:
         print("=" * 60)
