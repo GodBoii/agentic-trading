@@ -32,6 +32,8 @@ class PipelineConfig:
     dhan_rate_limit_state_path: Path = backend_dir / "dhan_rate_limit_state.json"
     nifty_depth_latest_path: Path = backend_dir / "nifty_market_depth_latest.json"
     nifty_depth_data_dir: Path = backend_dir / "nifty_market_depth"
+    nifty_depth_charts_latest_path: Path = backend_dir / "nifty_market_depth_charts_latest.json"
+    nifty_depth_charts_dir: Path = backend_dir / "nifty_market_depth_charts"
 
     stage1_min_price: float = 100.0
     stage1_max_price: float = 3000.0
