@@ -23,9 +23,11 @@ services:
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    command: python -m pipeline.runtime.run_sorting
+      AI_TRADING_BACKEND_URL_INTERNAL: http://ai-trading-agents:8020
+    command: python -m pipeline.runtime.run_session_supervisor
     depends_on:
       - market-data-gateway
+      - ai-trading-agents
     volumes:
       - ./python-backend:/app/python-backend
       - ./:/app
@@ -41,6 +43,8 @@ services:
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
+      NIFTY_DEPTH_PERSIST_EVERY_PACKET: "1"
+      NIFTY_DEPTH_RAW_WRITE_SECONDS: "0"
     command: python -m pipeline.runtime.run_monitor_loop
     depends_on:
       - market-data-gateway
