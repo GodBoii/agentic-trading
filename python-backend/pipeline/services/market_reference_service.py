@@ -82,3 +82,60 @@ class MarketReferenceService:
 
         candidates.sort(key=lambda row: row["expiry_date"])
         return candidates[0] if candidates else None
+
+    def find_nearest_index_options(
+        self,
+        exch_id: str,
+        underlying_symbol: str,
+        reference_price: float,
+        strikes_each_side: int = 2,
+    ) -> List[Dict[str, Any]]:
+        target_underlying = underlying_symbol.strip().upper()
+        today = date.today()
+        candidates: List[Dict[str, Any]] = []
+        for row in self._load_rows():
+            if row.get("EXCH_ID") != exch_id or row.get("SEGMENT") != "D":
+                continue
+            if (row.get("INSTRUMENT") or "").strip().upper() != "OPTIDX":
+                continue
+            if (row.get("UNDERLYING_SYMBOL") or "").strip().upper() != target_underlying:
+                continue
+            expiry_date = self._parse_expiry_date(row.get("SM_EXPIRY_DATE"))
+            if expiry_date is None or expiry_date < today:
+                continue
+            option_type = (row.get("OPTION_TYPE") or "").strip().upper()
+            if option_type not in {"CE", "PE"}:
+                continue
+            try:
+                float(row.get("STRIKE_PRICE") or 0)
+            except ValueError:
+                continue
+            candidates.append(self._normalize_row(row))
+
+        if not candidates:
+            return []
+
+        nearest_expiry = min(row["expiry_date"] for row in candidates if row.get("expiry_date"))
+        expiry_rows = [row for row in candidates if row.get("expiry_date") == nearest_expiry]
+        strikes = sorted({float(row.get("STRIKE_PRICE") or 0.0) for row in expiry_rows})
+        if not strikes:
+            return []
+
+        atm_strike = min(strikes, key=lambda strike: abs(strike - reference_price))
+        atm_index = strikes.index(atm_strike)
+        start = max(0, atm_index - max(strikes_each_side, 0))
+        end = min(len(strikes), atm_index + max(strikes_each_side, 0) + 1)
+        wanted_strikes = set(strikes[start:end])
+
+        results = [
+            row
+            for row in expiry_rows
+            if float(row.get("STRIKE_PRICE") or 0.0) in wanted_strikes
+        ]
+        results.sort(
+            key=lambda row: (
+                float(row.get("STRIKE_PRICE") or 0.0),
+                0 if (row.get("OPTION_TYPE") or "").strip().upper() == "CE" else 1,
+            )
+        )
+        return results
