@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import math
 import os
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -23,7 +23,9 @@ class NiftyDepthChartGenerator:
         self.max_full_packets = self._env_int("NIFTY_CHART_MAX_FULL_PACKETS", 1800)
         self.price_step = self._env_float("NIFTY_CHART_PRICE_STEP", 1.0)
         self.footprint_minutes = self._env_int("NIFTY_CHART_FOOTPRINT_MINUTES", 1)
+        self.max_footprint_buckets = self._env_int("NIFTY_CHART_MAX_FOOTPRINT_BUCKETS", 42)
         self.dom_levels = self._env_int("NIFTY_CHART_DOM_LEVELS", 48)
+        self.sample_mode = os.getenv("NIFTY_CHART_SAMPLE_MODE", "tail").strip().lower()
 
     def _env_int(self, key: str, default: int) -> int:
         try:
@@ -40,21 +42,79 @@ class NiftyDepthChartGenerator:
     def _now_utc(self) -> str:
         return datetime.now(timezone.utc).isoformat()
 
+    def _parse_ndjson_line(self, line: str) -> Optional[Dict[str, Any]]:
+        if not line.strip():
+            return None
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError:
+            return None
+
     def _load_ndjson_tail(self, path: Path, max_rows: int) -> List[Dict[str, Any]]:
         if not path.exists():
             return []
+        if max_rows <= 0:
+            rows: List[Dict[str, Any]] = []
+            with path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    row = self._parse_ndjson_line(line)
+                    if row is not None:
+                        rows.append(row)
+            return rows
+
+        tail: deque[Dict[str, Any]] = deque(maxlen=max_rows)
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                row = self._parse_ndjson_line(line)
+                if row is not None:
+                    tail.append(row)
+        return list(tail)
+
+    def _count_ndjson_rows(self, path: Path) -> int:
+        count = 0
+        if not path.exists():
+            return count
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    count += 1
+        return count
+
+    def _load_ndjson_span_sample(self, path: Path, max_rows: int) -> List[Dict[str, Any]]:
+        if not path.exists():
+            return []
+        if max_rows <= 0:
+            return self._load_ndjson_tail(path, max_rows)
+
+        row_count = self._count_ndjson_rows(path)
+        if row_count <= max_rows:
+            return self._load_ndjson_tail(path, max_rows)
+
+        if max_rows == 1:
+            target_indexes = {row_count - 1}
+        else:
+            target_indexes = {
+                round(index * (row_count - 1) / (max_rows - 1))
+                for index in range(max_rows)
+            }
+
         rows: List[Dict[str, Any]] = []
+        current_index = 0
         with path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 if not line.strip():
                     continue
-                try:
-                    rows.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-        if max_rows > 0 and len(rows) > max_rows:
-            return rows[-max_rows:]
+                if current_index in target_indexes:
+                    row = self._parse_ndjson_line(line)
+                    if row is not None:
+                        rows.append(row)
+                current_index += 1
         return rows
+
+    def _load_ndjson(self, path: Path, max_rows: int) -> List[Dict[str, Any]]:
+        if self.sample_mode in {"span", "full_day", "full-session", "full_session"}:
+            return self._load_ndjson_span_sample(path, max_rows)
+        return self._load_ndjson_tail(path, max_rows)
 
     def _number(self, value: Any) -> Optional[float]:
         if value in (None, ""):
@@ -324,9 +384,9 @@ class NiftyDepthChartGenerator:
     def generate_for_market_date(self, market_date: str) -> Dict[str, Any]:
         data_dir = self.config.nifty_depth_data_dir / market_date
         paths = self._chart_paths(market_date)
-        depth_rows = self._load_ndjson_tail(data_dir / "depth_200.ndjson", self.max_depth_packets)
-        trade_tick_rows = self._load_ndjson_tail(data_dir / "trade_ticks.ndjson", self.max_full_packets)
-        full_rows = self._load_ndjson_tail(data_dir / "full_market.ndjson", self.max_full_packets)
+        depth_rows = self._load_ndjson(data_dir / "depth_200.ndjson", self.max_depth_packets)
+        trade_tick_rows = self._load_ndjson(data_dir / "trade_ticks.ndjson", self.max_full_packets)
+        full_rows = self._load_ndjson(data_dir / "full_market.ndjson", self.max_full_packets)
 
         depth_df = self._depth_dataframe(depth_rows)
         quote_df = self._best_quotes_from_depth(depth_rows)
@@ -401,10 +461,12 @@ class NiftyDepthChartGenerator:
                 "depth_rows_used": len(depth_df),
                 "trade_rows_used": len(trade_df),
                 "trade_tick_source": trade_tick_source,
+                "sample_mode": self.sample_mode,
                 "max_depth_packets": self.max_depth_packets,
                 "max_full_packets": self.max_full_packets,
                 "price_step": self.price_step,
                 "footprint_minutes": self.footprint_minutes,
+                "max_footprint_buckets": self.max_footprint_buckets,
             },
             "charts": charts,
             "chart_count": len(charts) if generated else 0,
@@ -552,8 +614,15 @@ class NiftyDepthChartGenerator:
         df = trade_df.copy()
         df["bucket"] = df["timestamp"].dt.floor(freq)
         buckets = list(df["bucket"].drop_duplicates().sort_values())
-        if len(buckets) > 42:
-            buckets = buckets[-42:]
+        if len(buckets) > self.max_footprint_buckets:
+            if self.sample_mode in {"span", "full_day", "full-session", "full_session"}:
+                indexes = {
+                    round(index * (len(buckets) - 1) / (self.max_footprint_buckets - 1))
+                    for index in range(self.max_footprint_buckets)
+                }
+                buckets = [bucket for index, bucket in enumerate(buckets) if index in indexes]
+            else:
+                buckets = buckets[-self.max_footprint_buckets :]
             df = df[df["bucket"].isin(buckets)]
 
         footprint: Dict[Tuple[pd.Timestamp, float], Dict[str, float]] = defaultdict(lambda: {"buy": 0.0, "sell": 0.0, "neutral": 0.0})
