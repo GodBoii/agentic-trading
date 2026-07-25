@@ -44,6 +44,8 @@
   --font-serif: var(--font-instrument-serif), "Instrument Serif", Georgia, serif;
   --font-grotesk: var(--font-space), "Space Grotesk", system-ui, sans-serif;
   --font-editorial: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-product-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
+  --font-product-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", monospace;
 
   /* Motion — celestial, inevitable */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -1027,6 +1029,42 @@ body {
    DASHBOARD — Minimalist Utility Classes
    Clean, spatial, typographically confident.
    ===================================================================== */
+
+/* Product-only type system. The marketing surface intentionally keeps its
+   existing editorial typography. */
+.product-shell {
+  --font-sans: var(--font-product-sans);
+  --font-display: var(--font-grotesk);
+  --font-mono: var(--font-product-mono);
+  font-family: var(--font-product-sans);
+  font-kerning: normal;
+  letter-spacing: -0.012em;
+}
+
+.product-shell h1,
+.product-shell h2,
+.product-shell h3 {
+  font-family: var(--font-grotesk);
+  font-optical-sizing: auto;
+}
+
+.product-shell .font-mono,
+.product-shell code,
+.product-shell pre {
+  font-family: var(--font-product-mono);
+  letter-spacing: -0.01em;
+}
+
+.product-shell .font-display,
+.product-shell .dash-metric {
+  font-family: var(--font-grotesk);
+}
+
+.product-shell .nums {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
 @layer utilities {
   /* ── Dashboard surfaces ── */
   .dash-surface {

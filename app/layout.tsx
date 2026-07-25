@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight, JetBrains_Mono, Instrument_Serif, Space_Grotesk, Playfair_Display } from "next/font/google";
+import {
+  IBM_Plex_Mono,
+  Instrument_Serif,
+  Inter,
+  Inter_Tight,
+  JetBrains_Mono,
+  Manrope,
+  Playfair_Display,
+  Space_Grotesk,
+} from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -40,6 +49,18 @@ const playfairDisplay = Playfair_Display({
   style: ["normal", "italic"],
 });
 
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+  weight: ["400", "500", "600", "700"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-ibm-plex-mono",
+  weight: ["400", "500", "600"],
+});
+
 export const metadata: Metadata = {
   title: "Polycognitive — Autonomous Intelligence for Global Markets",
   description:
@@ -61,7 +82,7 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" />
       </head>
       <body
-        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} font-sans antialiased bg-black text-white`}
+        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} ${manrope.variable} ${ibmPlexMono.variable} font-sans antialiased bg-black text-white`}
       >
         {children}
       </body>
