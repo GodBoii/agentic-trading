@@ -68,7 +68,7 @@ function DashboardContent() {
     if (loading) return <DashboardLoader />
 
     return (
-        <div className="min-h-screen bg-[var(--dash-canvas)] text-white">
+        <div className="product-shell min-h-screen bg-[var(--dash-canvas)] text-white">
             <AnimatePresence>
                 {toast && (
                     <motion.div
@@ -133,7 +133,7 @@ function DashboardContent() {
 
 function DashboardLoader() {
     return (
-        <div className="grid min-h-screen place-items-center bg-[var(--dash-canvas)]">
+        <div className="product-shell grid min-h-screen place-items-center bg-[var(--dash-canvas)]">
             <div className="flex items-center gap-3">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[#37d67a]" />
                 <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--dash-text-muted)]">Loading portfolio</span>
