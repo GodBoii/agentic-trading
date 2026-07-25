@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.market_reference_service import MarketReferenceService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 from pipeline.services.surveillance_service import SurveillanceService
@@ -24,6 +25,7 @@ class Stage1Sanitation:
         self.config = config or PipelineConfig()
         self.dhan = DhanService(self.config)
         self.market_time = MarketTimeService(self.config)
+        self.market_reference = MarketReferenceService(self.config)
         self.universe_service = UniverseService(self.config)
         self.surveillance_service = SurveillanceService(self.config)
         self.lock = Lock()
@@ -177,6 +179,99 @@ class Stage1Sanitation:
                 )
                 self.failure_samples_logged += 1
 
+    def _safe_float(self, value: Any) -> Optional[float]:
+        if value in (None, ""):
+            return None
+        try:
+            result = float(value)
+        except Exception:
+            return None
+        if result != result:
+            return None
+        return result
+
+    def _percent_change(self, current: Optional[float], previous: Optional[float]) -> Optional[float]:
+        if current is None or previous is None or previous <= 0:
+            return None
+        return ((current - previous) / previous) * 100.0
+
+    def _circuit_buffer_percent(
+        self,
+        price: Optional[float],
+        circuit: Optional[float],
+        direction: str,
+    ) -> Optional[float]:
+        if price is None or circuit is None or price <= 0:
+            return None
+        if direction == "upper":
+            return max(0.0, ((circuit - price) / price) * 100.0)
+        return max(0.0, ((price - circuit) / price) * 100.0)
+
+    def _build_static_tradability(self, stock: Dict[str, Any], last_close: float) -> Dict[str, Any]:
+        upper_circuit = self._safe_float(stock.get("upper_circuit"))
+        lower_circuit = self._safe_float(stock.get("lower_circuit"))
+        return {
+            "series": stock.get("series"),
+            "instrument_type": stock.get("instrument_type"),
+            "lot_size": int(self._safe_float(stock.get("lot_size")) or 0) or None,
+            "tick_size": self._safe_float(stock.get("tick_size")),
+            "mtf_leverage": self._safe_float(stock.get("mtf_leverage")),
+            "upper_circuit": upper_circuit,
+            "lower_circuit": lower_circuit,
+            "upper_circuit_buffer_percent": (
+                round(self._circuit_buffer_percent(last_close, upper_circuit, "upper"), 4)
+                if self._circuit_buffer_percent(last_close, upper_circuit, "upper") is not None
+                else None
+            ),
+            "lower_circuit_buffer_percent": (
+                round(self._circuit_buffer_percent(last_close, lower_circuit, "lower"), 4)
+                if self._circuit_buffer_percent(last_close, lower_circuit, "lower") is not None
+                else None
+            ),
+            "buy_sell_indicator": stock.get("buy_sell_indicator"),
+        }
+
+    def _build_previous_session_stats(self, frame: Any, prefilter_price: Any) -> Dict[str, Any]:
+        latest = frame.iloc[-1]
+        prior = frame.iloc[-2] if len(frame) >= 2 else None
+
+        latest_close = self._safe_float(latest.get("close"))
+        latest_open = self._safe_float(latest.get("open"))
+        latest_high = self._safe_float(latest.get("high"))
+        latest_low = self._safe_float(latest.get("low"))
+        latest_volume = self._safe_float(latest.get("volume"))
+        prior_close = self._safe_float(prior.get("close")) if prior is not None else None
+        prefilter = self._safe_float(prefilter_price)
+
+        value_cr = None
+        if latest_close is not None and latest_volume is not None:
+            value_cr = (latest_close * latest_volume) / 10000000
+
+        range_percent = None
+        if latest_high is not None and latest_low is not None and latest_close and latest_close > 0:
+            range_percent = ((latest_high - latest_low) / latest_close) * 100.0
+
+        return {
+            "date": latest["timestamp"].date().isoformat(),
+            "open": round(latest_open, 4) if latest_open is not None else None,
+            "high": round(latest_high, 4) if latest_high is not None else None,
+            "low": round(latest_low, 4) if latest_low is not None else None,
+            "close": round(latest_close, 4) if latest_close is not None else None,
+            "volume": int(latest_volume) if latest_volume is not None else None,
+            "value_cr": round(value_cr, 4) if value_cr is not None else None,
+            "range_percent": round(range_percent, 4) if range_percent is not None else None,
+            "return_percent": (
+                round(self._percent_change(latest_close, prior_close), 4)
+                if self._percent_change(latest_close, prior_close) is not None
+                else None
+            ),
+            "prefilter_price_vs_close_percent": (
+                round(self._percent_change(prefilter, latest_close), 4)
+                if self._percent_change(prefilter, latest_close) is not None
+                else None
+            ),
+        }
+
     def _process_stock(self, stock: Dict[str, Any], idx: int, total: int) -> Tuple[Optional[Dict[str, Any]], bool]:
         security_id = int(stock["security_id"])
 
@@ -214,7 +309,14 @@ class Stage1Sanitation:
         last_close = float(frame["close"].iloc[-1])
         adv_10_cr = float((frame["close"].tail(10) * frame["volume"].tail(10)).mean() / 10000000)
         adv_20_cr = float((frame["close"].tail(20) * frame["volume"].tail(20)).mean() / 10000000)
+        avg_volume_20 = float(frame["volume"].tail(20).mean())
         atr_percent = self.dhan.compute_atr_percent(frame, period=14)
+        previous_session = self._build_previous_session_stats(frame, stock.get("prefilter_price"))
+        static_tradability = self._build_static_tradability(stock, last_close)
+        derivative_summary = self.market_reference.summarize_stock_derivatives(
+            security_id,
+            market_date=self.market_time.market_date_str(),
+        )
 
         record = {
             "security_id": security_id,
@@ -226,9 +328,14 @@ class Stage1Sanitation:
             "prefilter_price": stock.get("prefilter_price"),
             "adv_10_cr": round(adv_10_cr, 2),
             "adv_20_cr": round(adv_20_cr, 2),
+            "avg_volume_20": int(avg_volume_20) if avg_volume_20 > 0 else None,
             "atr_percent": round(atr_percent, 2),
             "last_close_date": frame["timestamp"].iloc[-1].date().isoformat(),
+            "previous_session": previous_session,
+            "static_tradability": static_tradability,
+            "derivatives": derivative_summary,
             "asm_gsm_flag": stock.get("asm_gsm_flag"),
+            "asm_gsm_category": stock.get("asm_gsm_category"),
             "prefilter_reason": None,
             "generated_at": datetime.now().isoformat(),
         }
@@ -367,6 +474,12 @@ class Stage1Sanitation:
             "unsupported_today": [
                 "corporate_actions_today",
                 "recent_circuit_hit_last_5_sessions",
+            ],
+            "stage1_enrichments": [
+                "previous_session_ohlcv",
+                "avg_volume_20",
+                "static_tradability",
+                "local_derivatives_reference",
             ],
         }
 

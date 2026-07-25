@@ -19,6 +19,21 @@ class MarketReferenceService:
                 rows.append(row)
         return rows
 
+    @lru_cache(maxsize=1)
+    def _stock_derivative_rows_by_underlying(self) -> Dict[str, List[Dict[str, Any]]]:
+        by_underlying: Dict[str, List[Dict[str, Any]]] = {}
+        for row in self._load_rows():
+            if row.get("SEGMENT") != "D":
+                continue
+            instrument = (row.get("INSTRUMENT") or "").strip().upper()
+            if instrument not in {"FUTSTK", "OPTSTK"}:
+                continue
+            underlying = str(row.get("UNDERLYING_SECURITY_ID") or "").strip()
+            if not underlying:
+                continue
+            by_underlying.setdefault(underlying, []).append(row)
+        return by_underlying
+
     def _parse_expiry_date(self, raw_value: Optional[str]) -> Optional[date]:
         if not raw_value:
             return None
@@ -139,3 +154,79 @@ class MarketReferenceService:
             )
         )
         return results
+
+    def summarize_stock_derivatives(
+        self,
+        underlying_security_id: int,
+        market_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Summarize locally-known stock F&O availability without any API calls.
+
+        The security master can be stale, so this returns both broad listing
+        availability and active-contract availability relative to market_date.
+        """
+        try:
+            target_security_id = str(int(underlying_security_id))
+        except Exception:
+            target_security_id = str(underlying_security_id or "").strip()
+
+        reference_date = date.today()
+        if market_date:
+            try:
+                reference_date = datetime.strptime(str(market_date), "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+        derivative_rows = list(self._stock_derivative_rows_by_underlying().get(target_security_id, []))
+
+        expiries: List[date] = []
+        futures_count = 0
+        options_count = 0
+        active_futures_count = 0
+        active_options_count = 0
+        lot_sizes: List[int] = []
+        exchange_segments = set()
+
+        for row in derivative_rows:
+            instrument = (row.get("INSTRUMENT") or "").strip().upper()
+            expiry = self._parse_expiry_date(row.get("SM_EXPIRY_DATE"))
+            if expiry:
+                expiries.append(expiry)
+            try:
+                lot_size_raw = float(row.get("LOT_SIZE") or 0)
+                if lot_size_raw > 0:
+                    lot_sizes.append(int(lot_size_raw))
+            except Exception:
+                pass
+            exchange_segments.add(f"{row.get('EXCH_ID')}_{row.get('SEGMENT')}")
+
+            is_active = bool(expiry and expiry >= reference_date)
+            if instrument == "FUTSTK":
+                futures_count += 1
+                if is_active:
+                    active_futures_count += 1
+            elif instrument == "OPTSTK":
+                options_count += 1
+                if is_active:
+                    active_options_count += 1
+
+        nearest_expiry = min((item for item in expiries if item >= reference_date), default=None)
+        max_expiry = max(expiries, default=None)
+        unique_lot_sizes = sorted(set(lot_sizes))
+
+        return {
+            "underlying_security_id": int(target_security_id) if target_security_id.isdigit() else target_security_id,
+            "has_derivative_listing": bool(derivative_rows),
+            "has_futures_listing": futures_count > 0,
+            "has_options_listing": options_count > 0,
+            "active_futures_count": active_futures_count,
+            "active_options_count": active_options_count,
+            "active_contracts_count": active_futures_count + active_options_count,
+            "nearest_expiry": nearest_expiry.isoformat() if nearest_expiry else None,
+            "max_expiry": max_expiry.isoformat() if max_expiry else None,
+            "reference_date": reference_date.isoformat(),
+            "reference_stale_for_date": bool(derivative_rows and max_expiry and max_expiry < reference_date),
+            "lot_size": unique_lot_sizes[0] if len(unique_lot_sizes) == 1 else None,
+            "lot_sizes": unique_lot_sizes[:5],
+            "exchange_segments": sorted(exchange_segments),
+        }

@@ -74,6 +74,10 @@ class Stage2MomentumIgnition:
             "volume_acceleration_max_ratio": self.config.stage2_volume_acceleration_max_ratio,
             "opening_range_minutes": self.config.stage2_opening_range_minutes,
             "min_breakout_percent": self.config.stage2_min_breakout_percent,
+            "live_quote_enrichment_enabled": self.config.stage2_live_quote_enrichment_enabled,
+            "good_spread_percent": self.config.stage2_good_spread_percent,
+            "acceptable_spread_percent": self.config.stage2_acceptable_spread_percent,
+            "min_intraday_value_cr": self.config.stage2_min_intraday_value_cr,
         }
 
     def _save_payload(self, payload: Dict[str, Any]) -> None:
@@ -132,6 +136,215 @@ class Stage2MomentumIgnition:
     def _record_filter_reason(self, reason: str) -> None:
         with self.lock:
             self.filter_reasons[reason] += 1
+
+    def _chunk_stocks(self, stocks: List[Dict[str, Any]], size: int) -> List[List[Dict[str, Any]]]:
+        return [stocks[i:i + size] for i in range(0, len(stocks), size)]
+
+    def _fetch_live_quote_enrichment(self, stocks: List[Dict[str, Any]]) -> Tuple[Dict[int, Dict[str, Any]], Dict[str, Any]]:
+        if not self.config.stage2_live_quote_enrichment_enabled:
+            return {}, {"status": "disabled", "quotes": 0, "failed_batches": 0}
+
+        batches = self._chunk_stocks(stocks, self.config.stage2_quote_batch_size)
+        quotes: Dict[int, Dict[str, Any]] = {}
+        failed_batches = 0
+        print(f"Stage 2 live quote enrichment: fetching {len(batches)} batch(es)...")
+        for index, batch in enumerate(batches, 1):
+            batch_ids = [int(stock["security_id"]) for stock in batch]
+            try:
+                quote_map = self.dhan.fetch_quote_batch(batch_ids, exchange_segment="BSE_EQ")
+            except Exception as exc:
+                failed_batches += 1
+                self._record_fetch_failure(f"quote_batch_failed::{type(exc).__name__}")
+                print(f"  Stage 2 quote batch {index}/{len(batches)} failed: {exc}")
+                continue
+            quotes.update(quote_map)
+            print(f"  Stage 2 quote batch {index}/{len(batches)} complete")
+
+        return quotes, {
+            "status": "completed",
+            "quotes": len(quotes),
+            "failed_batches": failed_batches,
+            "batch_count": len(batches),
+        }
+
+    def _first_number(self, payload: Any, keys: Tuple[str, ...]) -> Optional[float]:
+        if isinstance(payload, dict):
+            for key in keys:
+                value = payload.get(key)
+                if value in (None, ""):
+                    continue
+                try:
+                    number = float(value)
+                except Exception:
+                    continue
+                if not math.isnan(number) and not math.isinf(number):
+                    return number
+            for value in payload.values():
+                nested = self._first_number(value, keys)
+                if nested is not None:
+                    return nested
+        elif isinstance(payload, list):
+            for value in payload:
+                nested = self._first_number(value, keys)
+                if nested is not None:
+                    return nested
+        return None
+
+    def _first_level_number(self, levels: Any, keys: Tuple[str, ...]) -> Optional[float]:
+        if not isinstance(levels, list):
+            return None
+        for level in levels:
+            if not isinstance(level, dict):
+                continue
+            value = self._first_number(level, keys)
+            if value is not None and value > 0:
+                return value
+        return None
+
+    def _build_quote_features(self, quote_item: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not quote_item:
+            return {
+                "quote_available": False,
+                "live_price": None,
+                "bid_price": None,
+                "ask_price": None,
+                "bid_quantity": None,
+                "ask_quantity": None,
+                "spread_percent": None,
+                "live_volume": None,
+                "live_intraday_value_cr": None,
+                "open_interest": None,
+                "quote_depth_levels": 0,
+                "quote_raw_keys": [],
+            }
+
+        depth = quote_item.get("depth") or quote_item.get("market_depth") or {}
+        buy_levels = []
+        sell_levels = []
+        if isinstance(depth, dict):
+            buy_levels = depth.get("buy") or depth.get("bids") or []
+            sell_levels = depth.get("sell") or depth.get("asks") or []
+        elif isinstance(depth, list):
+            buy_levels = depth
+            sell_levels = depth
+
+        bid_price = self._first_level_number(
+            buy_levels,
+            ("price", "bid_price", "bidPrice", "best_bid_price", "bestBidPrice"),
+        ) or self._first_number(quote_item, ("best_bid_price", "bestBidPrice", "bid_price", "bidPrice", "bid"))
+        ask_price = self._first_level_number(
+            sell_levels,
+            ("price", "ask_price", "askPrice", "best_ask_price", "bestAskPrice"),
+        ) or self._first_number(quote_item, ("best_ask_price", "bestAskPrice", "ask_price", "askPrice", "ask"))
+        bid_quantity = self._first_level_number(
+            buy_levels,
+            ("quantity", "qty", "bid_quantity", "bidQuantity", "bid_qty"),
+        ) or self._first_number(quote_item, ("bid_quantity", "bidQuantity", "bid_qty"))
+        ask_quantity = self._first_level_number(
+            sell_levels,
+            ("quantity", "qty", "ask_quantity", "askQuantity", "ask_qty"),
+        ) or self._first_number(quote_item, ("ask_quantity", "askQuantity", "ask_qty"))
+        live_price = self._first_number(
+            quote_item,
+            ("last_price", "lastPrice", "LTP", "ltp", "latest_traded_price"),
+        )
+        live_volume = self._first_number(quote_item, ("volume", "Volume", "total_volume"))
+        open_interest = self._first_number(quote_item, ("open_interest", "openInterest", "oi", "OI"))
+
+        spread_percent = None
+        if bid_price is not None and ask_price is not None:
+            mid = (bid_price + ask_price) / 2.0
+            if mid > 0:
+                spread_percent = ((ask_price - bid_price) / mid) * 100.0
+
+        live_intraday_value_cr = None
+        if live_price is not None and live_volume is not None:
+            live_intraday_value_cr = (live_price * live_volume) / 10000000
+
+        return {
+            "quote_available": True,
+            "live_price": round(live_price, 4) if live_price is not None else None,
+            "bid_price": round(bid_price, 4) if bid_price is not None else None,
+            "ask_price": round(ask_price, 4) if ask_price is not None else None,
+            "bid_quantity": int(bid_quantity) if bid_quantity is not None else None,
+            "ask_quantity": int(ask_quantity) if ask_quantity is not None else None,
+            "spread_percent": round(spread_percent, 4) if spread_percent is not None else None,
+            "live_volume": int(live_volume) if live_volume is not None else None,
+            "live_intraday_value_cr": round(live_intraday_value_cr, 4) if live_intraday_value_cr is not None else None,
+            "open_interest": int(open_interest) if open_interest is not None else None,
+            "quote_depth_levels": max(len(buy_levels) if isinstance(buy_levels, list) else 0, len(sell_levels) if isinstance(sell_levels, list) else 0),
+            "quote_raw_keys": sorted(str(key) for key in quote_item.keys())[:30],
+        }
+
+    def _score_live_liquidity(self, quote_features: Dict[str, Any], adv_20_cr: Any) -> Dict[str, Any]:
+        score = 50.0
+        reasons: List[str] = []
+
+        spread = quote_features.get("spread_percent")
+        if spread is None:
+            reasons.append("spread_unavailable")
+        elif spread <= self.config.stage2_good_spread_percent:
+            score += 25.0
+            reasons.append("tight_spread")
+        elif spread <= self.config.stage2_acceptable_spread_percent:
+            score += 10.0
+            reasons.append("acceptable_spread")
+        else:
+            score -= min(35.0, (float(spread) - self.config.stage2_acceptable_spread_percent) * 80.0)
+            reasons.append("wide_spread")
+
+        intraday_value = quote_features.get("live_intraday_value_cr")
+        if intraday_value is None:
+            reasons.append("intraday_value_unavailable")
+        elif float(intraday_value) >= self.config.stage2_min_intraday_value_cr:
+            score += min(20.0, float(intraday_value) / max(self.config.stage2_min_intraday_value_cr, 0.01) * 4.0)
+            reasons.append("live_value_ok")
+        else:
+            score -= 10.0
+            reasons.append("low_live_value")
+
+        try:
+            adv = float(adv_20_cr or 0.0)
+        except Exception:
+            adv = 0.0
+        if adv >= self.config.stage1_min_adv_cr * 2:
+            score += 5.0
+        elif adv < self.config.stage1_min_adv_cr:
+            score -= 10.0
+
+        if quote_features.get("bid_quantity") and quote_features.get("ask_quantity"):
+            score += 5.0
+            bid_qty = float(quote_features["bid_quantity"])
+            ask_qty = float(quote_features["ask_quantity"])
+            imbalance = (bid_qty - ask_qty) / (bid_qty + ask_qty) if bid_qty + ask_qty > 0 else None
+        else:
+            imbalance = None
+
+        return {
+            "score": round(max(0.0, min(score, 100.0)), 2),
+            "reasons": reasons,
+            "top_book_imbalance": round(imbalance, 4) if imbalance is not None else None,
+        }
+
+    def _score_data_quality(self, record: Dict[str, Any], quote_features: Dict[str, Any]) -> Dict[str, Any]:
+        score = 100.0
+        warnings: List[str] = []
+        if record.get("time_of_day_rvol") is None:
+            score -= 25.0
+            warnings.append("rvol_unavailable")
+        if record.get("intraday_vwap") is None:
+            score -= 15.0
+            warnings.append("vwap_unavailable")
+        if record.get("volume_acceleration_ratio") is None:
+            score -= 10.0
+            warnings.append("volume_acceleration_unavailable")
+        if not quote_features.get("quote_available"):
+            score -= 20.0
+            warnings.append("live_quote_unavailable")
+        elif quote_features.get("spread_percent") is None:
+            score -= 10.0
+            warnings.append("spread_unavailable")
+        return {"score": round(max(0.0, score), 2), "warnings": warnings}
 
     def _log_progress(self, total: int) -> None:
         with self.lock:
@@ -326,9 +539,18 @@ class Stage2MomentumIgnition:
         )
         return round(score, 2)
 
+    def _score_selection_record(self, record: Dict[str, Any]) -> float:
+        base = float(record.get("stage2_score") or 0.0)
+        liquidity = float((record.get("live_liquidity") or {}).get("score") or 50.0)
+        data_quality = float((record.get("data_quality") or {}).get("score") or 80.0)
+        # Keep momentum dominant, but prefer cleaner, more tradable candidates.
+        score = base * 0.72 + liquidity * 0.20 + data_quality * 0.08
+        return round(score, 2)
+
     def _process_stock(
         self,
         stock: Dict[str, Any],
+        quote_map: Dict[int, Dict[str, Any]],
         idx: int,
         total: int,
     ) -> Tuple[Optional[Dict[str, Any]], bool]:
@@ -368,6 +590,7 @@ class Stage2MomentumIgnition:
         vwap = self._compute_intraday_vwap(today_frame)
         opening_high, opening_low, opening_range_complete = self._compute_opening_range(today_frame)
         volume_acceleration_ratio = self._compute_volume_acceleration_ratio(today_frame)
+        quote_features = self._build_quote_features(quote_map.get(security_id))
         accel_window = self.config.stage2_volume_acceleration_window_minutes
         volume_series = pd.to_numeric(today_frame["volume"], errors="coerce").fillna(0.0)
         recent_volume_window = float(volume_series.tail(accel_window).sum()) if not volume_series.empty else None
@@ -420,8 +643,16 @@ class Stage2MomentumIgnition:
             "previous_volume_window": (
                 round(previous_volume_window, 2) if previous_volume_window is not None else None
             ),
+            "avg_volume_20": stock.get("avg_volume_20"),
+            "previous_session": stock.get("previous_session"),
+            "static_tradability": stock.get("static_tradability"),
+            "derivatives": stock.get("derivatives"),
+            "live_quote": quote_features,
             "stage2_reason": None,
             "stage2_score": None,
+            "selection_score": None,
+            "live_liquidity": None,
+            "data_quality": None,
             "generated_at": datetime.now().isoformat(),
         }
 
@@ -456,7 +687,12 @@ class Stage2MomentumIgnition:
 
         if passed:
             record["stage2_score"] = self._score_record(record)
+            record["live_liquidity"] = self._score_live_liquidity(quote_features, record.get("adv_20_cr"))
+            record["data_quality"] = self._score_data_quality(record, quote_features)
+            record["selection_score"] = self._score_selection_record(record)
         elif record["stage2_reason"]:
+            record["live_liquidity"] = self._score_live_liquidity(quote_features, record.get("adv_20_cr"))
+            record["data_quality"] = self._score_data_quality(record, quote_features)
             self._record_filter_reason(record["stage2_reason"])
 
         status_text = "PASS" if passed else f"FILTERED ({record['stage2_reason']})"
@@ -465,7 +701,9 @@ class Stage2MomentumIgnition:
             f"rvol={record['time_of_day_rvol']} "
             f"vwap_delta={record['price_vs_vwap_percent']} "
             f"orb={record['opening_range_breakout_percent']} "
-            f"vol_accel={record['volume_acceleration_ratio']}"
+            f"vol_accel={record['volume_acceleration_ratio']} "
+            f"spread={quote_features.get('spread_percent')} "
+            f"liq={record.get('live_liquidity', {}).get('score') if record.get('live_liquidity') else None}"
         )
         self._log_progress(total)
         return record, passed
@@ -485,10 +723,11 @@ class Stage2MomentumIgnition:
 
         print("Stage 2 execution plan:")
         print("  1. Load Stage 1 survivors for current market date")
-        print("  2. Fetch intraday minute history for each stock in parallel")
-        print("  3. Compute RVOL, VWAP, opening-range breakout, and volume acceleration")
-        print("  4. Filter for active momentum ignition candidates")
-        print("  5. Rank passed stocks by momentum score")
+        print("  2. Fetch one batched live quote snapshot for cheap liquidity enrichment")
+        print("  3. Fetch intraday minute history for each stock in parallel")
+        print("  4. Compute RVOL, VWAP, opening-range breakout, volume acceleration, and liquidity scores")
+        print("  5. Filter for active momentum ignition candidates")
+        print("  6. Rank passed stocks by momentum plus liquidity/data-quality score")
 
         stage1_stocks = self._load_stage1_universe()
         if max_stocks:
@@ -524,6 +763,13 @@ class Stage2MomentumIgnition:
             return payload
 
         total = len(stage1_stocks)
+        quote_map, quote_summary = self._fetch_live_quote_enrichment(stage1_stocks)
+        print(
+            "Stage 2 quote enrichment summary: "
+            f"status={quote_summary.get('status')}, "
+            f"quotes={quote_summary.get('quotes')}, "
+            f"failed_batches={quote_summary.get('failed_batches')}"
+        )
         print(
             f"Stage 2 ignition scan starting for {total} stock(s) "
             f"with {workers} worker(s) and shared rate limit {self.config.historical_rate_limit_per_sec}/sec"
@@ -535,7 +781,7 @@ class Stage2MomentumIgnition:
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
-                executor.submit(self._process_stock, stock, idx, total): stock
+                executor.submit(self._process_stock, stock, quote_map, idx, total): stock
                 for idx, stock in enumerate(stage1_stocks, 1)
             }
             for future in as_completed(futures):
@@ -552,7 +798,12 @@ class Stage2MomentumIgnition:
                     self._record_fetch_failure(f"task_error::{type(exc).__name__}")
                     print(f"Stage 2 task error: {exc}")
 
-        passed_records.sort(key=lambda row: -float(row.get("stage2_score") or 0.0))
+        passed_records.sort(
+            key=lambda row: (
+                -float(row.get("selection_score") or row.get("stage2_score") or 0.0),
+                -float(row.get("stage2_score") or 0.0),
+            )
+        )
         stage_funnel = self._build_stage_funnel_counts(total, all_records, failed_count)
         score_distribution = self._summarize_numeric_series(
             [float(row.get("stage2_score") or 0.0) for row in passed_records]
@@ -572,6 +823,7 @@ class Stage2MomentumIgnition:
             "near_misses": near_misses,
             "filter_reason_counts": dict(self.filter_reasons),
             "fetch_failure_reason_counts": dict(self.fetch_failure_reasons),
+            "quote_enrichment": quote_summary,
         }
 
         payload = StorageService.build_payload(
@@ -618,10 +870,13 @@ class Stage2MomentumIgnition:
                 print(
                     f"{idx}. {record.get('display_name') or record.get('symbol')} "
                     f"score={record.get('stage2_score')} "
+                    f"selection={record.get('selection_score')} "
                     f"rvol={record.get('time_of_day_rvol')} "
                     f"vwap_delta={record.get('price_vs_vwap_percent')} "
                     f"orb={record.get('opening_range_breakout_percent')} "
-                    f"vol_accel={record.get('volume_acceleration_ratio')}"
+                    f"vol_accel={record.get('volume_acceleration_ratio')} "
+                    f"spread={(record.get('live_quote') or {}).get('spread_percent')} "
+                    f"liq={(record.get('live_liquidity') or {}).get('score')}"
                 )
 
         if self.filter_reasons:

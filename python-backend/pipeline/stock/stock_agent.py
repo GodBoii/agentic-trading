@@ -57,6 +57,8 @@ class StockAgent:
                 "Use the supplied *_ist fields and Asia/Calcutta market timezone for time-sensitive reasoning.",
                 "You receive chart images in this order: current day 1m, 5m, 15m, 30m, 1h; previous day 5m, 15m, 1h.",
                 "Use 1m for execution timing, 5m for primary setup, and 15m/30m/1h plus previous-day charts for structure.",
+                "Use stage2.live_quote, stage2.live_liquidity, stage2.data_quality, previous_session, static_tradability, and derivatives reference as structured evidence when present.",
+                "Treat missing live quote/spread/derivatives data as a data-quality warning, not as permission to invent those values.",
                 "If a regime report is supplied, treat it as non-binding background context only.",
                 "fresh_market_snapshot is optional extra quote/OHLC confirmation, not a second-agent freshness gate.",
                 "Do not reject a trade solely because fresh_market_snapshot is missing or failed. Use it as a veto only when it directly contradicts chart/technical metadata, shows dangerous spread/staleness, or exposes an execution feasibility problem.",
@@ -142,6 +144,15 @@ class StockAgent:
                 "",
                 "## Technical Metadata",
                 json.dumps(technical_metadata, ensure_ascii=True),
+                "",
+                "## Stage 2 Structured Evidence",
+                json.dumps(
+                    {
+                        "stock": selected_stock.get("stock"),
+                        "stage2": selected_stock.get("stage2"),
+                    },
+                    ensure_ascii=True,
+                ),
             ]
         )
         if has_optional_quote_snapshot:

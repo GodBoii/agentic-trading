@@ -55,6 +55,10 @@ class PipelineConfig:
     stage2_volume_acceleration_max_ratio: float = 8.0
     stage2_near_miss_limit: int = 10
     stage2_quote_batch_size: int = 1000
+    stage2_live_quote_enrichment_enabled: bool = True
+    stage2_good_spread_percent: float = 0.08
+    stage2_acceptable_spread_percent: float = 0.20
+    stage2_min_intraday_value_cr: float = 1.0
     regime_history_days: int = 5
     regime_opening_range_minutes: int = 15
     regime_min_minutes_after_open: int = 30

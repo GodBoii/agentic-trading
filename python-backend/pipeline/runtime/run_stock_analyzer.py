@@ -222,7 +222,18 @@ class MultiStockAnalyzerRunner:
             seen_security_ids.add(security_id)
             enriched = dict(row)
             stage1_row = stage1_lookup.get(security_id, {})
-            for key in ("price", "adv_20_cr", "atr_percent", "instrument", "symbol", "display_name"):
+            for key in (
+                "price",
+                "adv_20_cr",
+                "atr_percent",
+                "avg_volume_20",
+                "previous_session",
+                "static_tradability",
+                "derivatives",
+                "instrument",
+                "symbol",
+                "display_name",
+            ):
                 if enriched.get(key) in (None, "") and stage1_row.get(key) not in (None, ""):
                     enriched[key] = stage1_row.get(key)
             combined.append(enriched)
@@ -247,7 +258,16 @@ class MultiStockAnalyzerRunner:
 
     def _sort_by_stage2_score(self, stocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         copied = list(stocks)
-        copied.sort(key=lambda s: float(s.get("stage2_score") or s.get("score") or 0), reverse=True)
+        copied.sort(
+            key=lambda s: float(
+                s.get("selection_score")
+                or s.get("stage2_selection_score")
+                or s.get("stage2_score")
+                or s.get("score")
+                or 0
+            ),
+            reverse=True,
+        )
         return copied
 
     def _filter_by_trade_budget(
@@ -436,9 +456,17 @@ class MultiStockAnalyzerRunner:
                 "price": candidate_record.get("price"),
                 "adv_20_cr": stage2_record.get("adv_20_cr") if stage2_record else candidate_record.get("adv_20_cr"),
                 "atr_percent": stage2_record.get("atr_percent") if stage2_record else candidate_record.get("atr_percent"),
+                "avg_volume_20": stage2_record.get("avg_volume_20") if stage2_record else candidate_record.get("avg_volume_20"),
+                "previous_session": stage2_record.get("previous_session") if stage2_record else candidate_record.get("previous_session"),
+                "static_tradability": stage2_record.get("static_tradability") if stage2_record else candidate_record.get("static_tradability"),
+                "derivatives": stage2_record.get("derivatives") if stage2_record else candidate_record.get("derivatives"),
             },
             "stage2": {
                 "score": stage2_record.get("stage2_score") if stage2_record else candidate_record.get("stage2_score"),
+                "selection_score": stage2_record.get("selection_score") if stage2_record else candidate_record.get("selection_score"),
+                "live_liquidity": stage2_record.get("live_liquidity") if stage2_record else candidate_record.get("live_liquidity"),
+                "data_quality": stage2_record.get("data_quality") if stage2_record else candidate_record.get("data_quality"),
+                "live_quote": stage2_record.get("live_quote") if stage2_record else candidate_record.get("live_quote"),
                 "time_of_day_rvol": stage2_record.get("time_of_day_rvol") if stage2_record else candidate_record.get("time_of_day_rvol"),
                 "price_vs_vwap_percent": stage2_record.get("price_vs_vwap_percent") if stage2_record else candidate_record.get("price_vs_vwap_percent"),
                 "opening_range_breakout_percent": (

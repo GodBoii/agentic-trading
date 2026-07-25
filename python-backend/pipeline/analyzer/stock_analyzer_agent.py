@@ -123,6 +123,9 @@ class StockAnalyzerAgent:
         monitor = candidate_packet.get("monitor") or {}
         account_context = candidate_packet.get("account_context") or {}
         funds = (account_context.get("funds") or {}).get("data") or {}
+        live_quote = stage2.get("live_quote") or {}
+        live_liquidity = stage2.get("live_liquidity") or {}
+        data_quality = stage2.get("data_quality") or {}
 
         lines = [
             "Analyze the supplied intraday stock candidate.",
@@ -170,12 +173,20 @@ class StockAnalyzerAgent:
                 "## Selection Context",
                 f"Cash price reference: {stock.get('price')}",
                 f"ADV 20d (Cr): {stock.get('adv_20_cr')}",
+                f"Average volume 20d: {stock.get('avg_volume_20')}",
                 f"ATR percent: {stock.get('atr_percent')}",
+                f"Previous session: {json.dumps(stock.get('previous_session'), ensure_ascii=False)}",
+                f"Static tradability: {json.dumps(stock.get('static_tradability'), ensure_ascii=False)}",
+                f"Derivatives reference: {json.dumps(stock.get('derivatives'), ensure_ascii=False)}",
                 f"Stage 2 score: {stage2.get('score')}",
+                f"Stage 2 selection score: {stage2.get('selection_score')}",
                 f"Time-of-day RVOL: {stage2.get('time_of_day_rvol')}",
                 f"Price vs VWAP percent: {stage2.get('price_vs_vwap_percent')}",
                 f"Opening-range breakout percent: {stage2.get('opening_range_breakout_percent')}",
                 f"Volume acceleration ratio: {stage2.get('volume_acceleration_ratio')}",
+                f"Live quote: {json.dumps(live_quote, ensure_ascii=False)}",
+                f"Live liquidity score: {json.dumps(live_liquidity, ensure_ascii=False)}",
+                f"Data quality score: {json.dumps(data_quality, ensure_ascii=False)}",
                 f"Monitor passed: {monitor.get('passed')}",
                 f"Monitor spread percent: {monitor.get('spread_percent')}",
                 f"Monitor ticks last 10 min: {monitor.get('ticks_last_10min')}",
