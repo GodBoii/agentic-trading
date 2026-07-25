@@ -121,6 +121,23 @@ export default function PortfolioOverview() {
         load()
     }, [load])
 
+    useEffect(() => {
+        const handleConnectionChange = (event: Event) => {
+            const change = event as CustomEvent<{ connected?: boolean }>
+            if (change.detail?.connected !== false) return
+
+            setFunds(null)
+            setHoldings([])
+            setPositions([])
+            setOrders([])
+            setUpdatedAt(null)
+            setError('Connect Dhan to view your live portfolio.')
+        }
+
+        window.addEventListener('dhan-connection-change', handleConnectionChange)
+        return () => window.removeEventListener('dhan-connection-change', handleConnectionChange)
+    }, [])
+
     const analytics = useMemo(() => {
         const invested = holdings.reduce((sum, item) => sum + item.totalQty * item.avgCostPrice, 0)
         const realized = positions.reduce((sum, item) => sum + item.realizedProfit, 0)
