@@ -150,11 +150,11 @@ export default function TradingStatus() {
 
     if (loading) {
         return (
-            <div className="surface rounded-2xl p-7 lg:p-8 h-full">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-3 w-24 bg-white/[0.06] rounded-full" />
-                    <div className="h-6 w-40 bg-white/[0.04] rounded" />
-                    <div className="h-32 bg-white/[0.03] rounded-xl mt-6" />
+            <div className="dash-surface p-6 h-full">
+                <div className="animate-pulse space-y-3">
+                    <div className="h-3 w-20 bg-white/[0.04] rounded" />
+                    <div className="h-5 w-32 bg-white/[0.03] rounded" />
+                    <div className="h-24 bg-white/[0.02] rounded mt-4" />
                 </div>
             </div>
         )
@@ -162,22 +162,18 @@ export default function TradingStatus() {
 
     if (!tradingKeys) {
         return (
-            <div className="surface rounded-2xl p-7 lg:p-8 h-full flex flex-col">
-                <div className="flex items-start justify-between mb-6">
-                    <div>
-                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
-                            Agent · Engine
-                        </span>
-                        <h3 className="font-display text-[24px] lg:text-[26px] text-white tracking-[-0.025em] leading-[1.1] mt-2">
-                            Trading Status
-                        </h3>
-                    </div>
+            <div className="dash-surface p-6 h-full flex flex-col">
+                <div className="mb-4">
+                    <span className="dash-label">Agent Engine</span>
+                    <h3 className="text-[20px] font-display text-[var(--dash-text)] tracking-[-0.02em] mt-1">
+                        Trading Status
+                    </h3>
                 </div>
-                <p className="text-[13px] text-ink-secondary leading-relaxed mb-7">
-                    Connect your Dhan account to enable live trading, AI agent orchestration, and real-time execution.
+                <p className="text-[13px] text-[var(--dash-text-secondary)] leading-relaxed mb-6">
+                    Connect your Dhan account to enable AI agent orchestration.
                 </p>
-                <div className="mt-auto border border-dashed border-line rounded-xl px-5 py-8 text-center">
-                    <p className="text-[12px] text-ink-tertiary font-mono">
+                <div className="mt-auto rounded-xl border border-dashed border-[var(--dash-border)] py-8 text-center">
+                    <p className="text-[12px] text-[var(--dash-text-muted)] font-mono">
                         Awaiting broker connection
                     </p>
                 </div>
@@ -190,169 +186,129 @@ export default function TradingStatus() {
     const isActive = isRunning || tradingKeys.is_trading_enabled
 
     return (
-        <div className="surface rounded-2xl p-7 lg:p-8 h-full flex flex-col">
+        <div className="dash-surface p-6 h-full flex flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between mb-7">
+            <div className="flex items-center justify-between mb-5">
                 <div>
-                    <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
-                        Agent · Engine
-                    </span>
-                    <h3 className="font-display text-[24px] lg:text-[26px] text-white tracking-[-0.025em] leading-[1.1] mt-2">
+                    <span className="dash-label">Agent Engine</span>
+                    <h3 className="text-[20px] font-display text-[var(--dash-text)] tracking-[-0.02em] mt-1">
                         Trading Status
                     </h3>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                    <span className={`relative flex h-1.5 w-1.5`}>
-                        <span className={`absolute inline-flex h-full w-full rounded-full ${isRunning ? 'bg-warning' : isActive ? 'bg-success' : 'bg-ink-tertiary'} opacity-60 animate-pulse-ring`} />
-                        <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isRunning ? 'bg-warning' : isActive ? 'bg-success' : 'bg-ink-tertiary'}`} />
-                    </span>
-                    <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
-                        {isRunning ? 'Running' : tradingKeys.is_trading_enabled ? 'Ready' : 'Idle'}
-                    </span>
-                </div>
+                <span className={`dash-badge ${isRunning ? 'dash-badge-warning' : isActive ? 'dash-badge-positive' : ''}`}>
+                    <span className={`dash-dot ${isRunning ? 'dash-dot-warning dash-dot-pulse' : isActive ? 'dash-dot-positive' : 'dash-dot-muted'}`}
+                          style={{ width: 5, height: 5 }} />
+                    {isRunning ? 'Running' : tradingKeys.is_trading_enabled ? 'Ready' : 'Idle'}
+                </span>
             </div>
 
+            {/* Alerts */}
             {error && (
-                <div className="mb-6 border border-danger/40 bg-danger/[0.06] rounded-xl px-4 py-3">
-                    <p className="text-danger font-mono text-[12px] font-medium">
-                        {error}
-                    </p>
+                <div className="mb-4 px-3 py-2.5 rounded-lg bg-[rgba(248,113,113,0.04)] border border-[rgba(248,113,113,0.15)]">
+                    <p className="text-[var(--dash-negative)] font-mono text-[12px]">{error}</p>
                 </div>
             )}
-
             {tokenExpired && (
-                <div className="mb-6 border border-warning/40 bg-warning/[0.06] rounded-xl px-4 py-3">
-                    <p className="text-warning font-mono text-[12px] font-medium">
-                        Token expired. Please reconnect.
-                    </p>
+                <div className="mb-4 px-3 py-2.5 rounded-lg bg-[rgba(251,191,36,0.04)] border border-[rgba(251,191,36,0.15)]">
+                    <p className="text-[var(--dash-warning)] font-mono text-[12px]">Token expired — please reconnect.</p>
                 </div>
             )}
 
             {/* Client ID */}
-            <div className="mb-6 pb-6 border-b border-line">
-                <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-2">
-                    Client ID
-                </p>
-                <p className="text-[18px] font-mono text-white font-medium nums">
+            <div className="mb-5 pb-4 border-b border-[var(--dash-border)]">
+                <p className="dash-label mb-1">Client ID</p>
+                <p className="text-[16px] font-mono text-[var(--dash-text)] font-medium nums">
                     {tradingKeys.dhan_client_id}
                 </p>
             </div>
 
-            {/* Trade Amount */}
-            <div className="mb-6">
-                <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-3">
-                    Trade Amount
-                </p>
-                <div className="flex items-center gap-2 mb-4">
-                    <button
-                        onClick={() => setTradeMode('auto')}
-                        className={`text-[11px] font-mono uppercase tracking-[0.15em] px-4 py-2 rounded-full border transition-all duration-300 ease-out-expo ${tradeMode === 'auto'
-                            ? 'border-accent/50 bg-accent/10 text-white'
-                            : 'border-line text-ink-tertiary hover:border-line-strong hover:text-ink-secondary'
+            {/* Trade Config */}
+            <div className="space-y-4 mb-5">
+                {/* Mode selector */}
+                <div>
+                    <p className="dash-label mb-2">Trade Amount</p>
+                    <div className="flex gap-1.5">
+                        <button
+                            onClick={() => setTradeMode('auto')}
+                            className={`text-[12px] font-mono px-3 py-1.5 rounded-md transition-all duration-200 ${
+                                tradeMode === 'auto'
+                                    ? 'bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/25'
+                                    : 'text-[var(--dash-text-muted)] border border-[var(--dash-border)] hover:text-[var(--dash-text-secondary)]'
                             }`}
-                    >
-                        Auto
-                    </button>
-                    <button
-                        onClick={() => setTradeMode('manual')}
-                        className={`text-[11px] font-mono uppercase tracking-[0.15em] px-4 py-2 rounded-full border transition-all duration-300 ease-out-expo ${tradeMode === 'manual'
-                            ? 'border-accent/50 bg-accent/10 text-white'
-                            : 'border-line text-ink-tertiary hover:border-line-strong hover:text-ink-secondary'
+                        >
+                            Auto
+                        </button>
+                        <button
+                            onClick={() => setTradeMode('manual')}
+                            className={`text-[12px] font-mono px-3 py-1.5 rounded-md transition-all duration-200 ${
+                                tradeMode === 'manual'
+                                    ? 'bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/25'
+                                    : 'text-[var(--dash-text-muted)] border border-[var(--dash-border)] hover:text-[var(--dash-text-secondary)]'
                             }`}
-                    >
-                        Manual
-                    </button>
-                </div>
-                {tradeMode === 'manual' ? (
-                    <div className="flex items-center gap-2 bg-[#0a0a0c] border border-line hover:border-line-strong focus-within:border-accent/60 rounded-xl px-4 py-3 transition-all duration-300">
-                        <span className="text-ink-secondary font-mono text-[14px]">₹</span>
-                        <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={tradeAmount}
-                            onChange={(e) => setTradeAmount(e.target.value)}
-                            placeholder="Enter amount (e.g. 500)"
-                            className="w-full bg-transparent text-white font-mono text-[14px] placeholder:text-ink-tertiary focus:outline-none"
-                        />
+                        >
+                            Manual
+                        </button>
                     </div>
-                ) : (
-                    <p className="text-[12px] text-ink-tertiary leading-relaxed">
-                        Uses your available balance to select stocks and size trades automatically.
-                    </p>
-                )}
-            </div>
-
-            {/* Regime Gate */}
-            <div className="mb-6 pb-6 border-b border-line">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
-                            Regime Analysis
+                    {tradeMode === 'manual' ? (
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className="text-[var(--dash-text-secondary)] font-mono text-[13px]">₹</span>
+                            <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={tradeAmount}
+                                onChange={(e) => setTradeAmount(e.target.value)}
+                                placeholder="500"
+                                className="dash-input !py-1.5"
+                            />
+                        </div>
+                    ) : (
+                        <p className="text-[11px] text-[var(--dash-text-muted)] mt-2 leading-relaxed">
+                            Auto-sizes trades from available balance.
                         </p>
-                        <p className="text-[12px] text-ink-secondary leading-relaxed">
-                            {regimeAnalysisEnabled
-                                ? 'Market regime context will be supplied to the stock agent.'
-                                : 'Agents will run without regime context.'}
+                    )}
+                </div>
+
+                {/* Regime toggle */}
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <p className="text-[12px] text-[var(--dash-text-secondary)]">Regime Analysis</p>
+                        <p className="text-[11px] text-[var(--dash-text-muted)]">
+                            {regimeAnalysisEnabled ? 'Enabled' : 'Disabled'}
                         </p>
                     </div>
                     <button
                         type="button"
-                        onClick={() => setRegimeAnalysisEnabled((value) => !value)}
+                        onClick={() => setRegimeAnalysisEnabled((v) => !v)}
                         disabled={updating || isRunning}
-                        className={`relative h-7 w-12 rounded-full border transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${regimeAnalysisEnabled
-                            ? 'border-success/50 bg-success/20'
-                            : 'border-line bg-[#0a0a0c]'
-                            }`}
+                        className="dash-toggle"
                         aria-pressed={regimeAnalysisEnabled}
                         aria-label="Toggle regime analysis"
-                    >
-                        <span
-                            className={`absolute top-1 h-5 w-5 rounded-full transition-all duration-300 ${regimeAnalysisEnabled
-                                ? 'left-6 bg-success'
-                                : 'left-1 bg-ink-tertiary'
-                                }`}
-                        />
-                    </button>
+                    />
                 </div>
             </div>
 
-            {/* Start Button */}
-            <div className="flex items-center justify-between gap-4 mb-7 pb-7 border-b border-line">
-                <div className="flex-1">
-                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary mb-1">
-                        AI Trading
-                    </p>
-                    <p className="text-[12px] text-ink-secondary leading-relaxed">
-                        {isRunning
-                            ? 'Stock agents are running'
-                            : tradingKeys.is_trading_enabled
-                                ? 'Ready for the next run'
-                                : 'Press start to run the stock agents'}
+            {/* Start Action */}
+            <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-[var(--dash-border)]">
+                <div>
+                    <p className="text-[12px] text-[var(--dash-text-secondary)]">
+                        {isRunning ? 'Agents are running' : 'Press start to run agents'}
                     </p>
                 </div>
                 <button
                     onClick={handleStart}
                     disabled={updating || tokenExpired || isRunning || (tradeMode === 'manual' && (!tradeAmount || parseFloat(tradeAmount) <= 0))}
-                    className="btn-primary !px-5 !py-2.5 !text-[12px] disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-none"
+                    className="dash-btn-primary !text-[12px] !px-4 !py-2"
                     aria-label="Start AI trading"
                 >
                     {updating ? 'Starting…' : isRunning ? 'Running…' : 'Start Agent'}
                 </button>
             </div>
 
-            {/* Agent Run Stages */}
-            <div className="space-y-4 mb-7 flex-1">
-                <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
-                        Agent Run
-                    </p>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
-                        {runStatus?.status || 'idle'}
-                    </p>
-                </div>
-
-                <div className="space-y-2.5">
+            {/* Agent Stages */}
+            <div className="flex-1 space-y-3">
+                <p className="dash-label">Agent Run</p>
+                <div className="space-y-1.5">
                     {Object.entries(stageLabels).map(([stage, label]) => {
                         const status = runStatus?.stages?.[stage]?.status || 'pending'
                         const active = status === 'running'
@@ -360,43 +316,28 @@ export default function TradingStatus() {
                         return (
                             <div
                                 key={stage}
-                                className="flex items-center justify-between gap-4 py-2.5 px-3.5 rounded-lg bg-white/[0.015] border border-line/50 hover:border-line transition-colors"
+                                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/[0.01] transition-colors"
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className={`h-1.5 w-1.5 rounded-full ${complete ? 'bg-success' : active ? 'bg-warning animate-pulse-soft' : 'bg-ink-tertiary'}`} />
-                                    <p className="text-[12px] text-white font-mono font-medium">
-                                        {label}
-                                    </p>
+                                <div className="flex items-center gap-2.5">
+                                    <span className={`dash-dot ${complete ? 'dash-dot-positive' : active ? 'dash-dot-warning dash-dot-pulse' : 'dash-dot-muted'}`} />
+                                    <span className="text-[12px] font-mono text-[var(--dash-text)]">{label}</span>
                                 </div>
-                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
-                                    {status}
-                                </p>
+                                <span className="dash-label">{status}</span>
                             </div>
                         )
                     })}
                 </div>
-
                 {runStatus?.error && (
-                    <p className="text-[11px] text-danger font-mono pt-2">
+                    <p className="text-[11px] text-[var(--dash-negative)] font-mono mt-1">
                         {runStatus.error}
                     </p>
                 )}
             </div>
 
-            {/* Safety Note */}
-            <div className="pt-6 border-t border-line">
-                <div className="flex gap-3">
-                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-success flex-shrink-0" />
-                    <div>
-                        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary mb-1.5">
-                            Safety First
-                        </p>
-                        <p className="text-[12px] text-ink-secondary leading-relaxed">
-                            AI trading runs only when you press start. Stock agents analyze and execute once after Stage 2 is ready.
-                        </p>
-                    </div>
-                </div>
-            </div>
+            {/* Safety note */}
+            <p className="mt-4 pt-3 border-t border-[var(--dash-border)] text-[11px] text-[var(--dash-text-muted)] leading-relaxed">
+                AI trading runs only when you press start. Agents analyze and execute once.
+            </p>
         </div>
     )
 }

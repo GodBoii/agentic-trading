@@ -1,0 +1,284 @@
+{
+  "stage": "session_supervisor",
+  "status": "running",
+  "generated_at_utc": "2026-06-24T05:56:05.571924+00:00",
+  "generated_at_ist": "2026-06-24T11:26:05.571950+05:30",
+  "details": {
+    "session": {
+      "market_date": "2026-06-24",
+      "is_trading_day": true,
+      "is_market_hours": true,
+      "is_before_open": false,
+      "is_after_close": false,
+      "is_new_entry_window": true,
+      "reason": "market_open_new_entries_allowed",
+      "source": "nse_holiday_cache",
+      "open_at_ist": "2026-06-24T09:15:00+05:30",
+      "close_at_ist": "2026-06-24T15:30:00+05:30",
+      "new_entry_cutoff_ist": "2026-06-24T15:00:00+05:30",
+      "protect_positions_at_ist": "2026-06-24T15:20:00+05:30",
+      "calendar_checked_at_ist": "2026-06-24T11:26:05.555599+05:30",
+      "external_status": {
+        "status": "success",
+        "source": "nse_holiday_master",
+        "generated_at_utc": "2026-06-24T01:03:51Z",
+        "holiday_count": 25,
+        "last_sync_error": null
+      }
+    },
+    "state": {
+      "current_market_date": "2026-06-24",
+      "stage1": {
+        "last_run_at_utc": "2026-06-24T03:23:54.633946+00:00",
+        "generated_at_utc": "2026-06-24T03:23:54.599598+00:00",
+        "summary": {
+          "market_date": "2026-06-24",
+          "output_file": "stage1-2026-06-24.json",
+          "input_universe": 5287,
+          "gsm_excluded": 382,
+          "asm_excluded": 0,
+          "missing_ohlc": 765,
+          "price_filtered": 2150,
+          "historical_candidates": 1990,
+          "data_retrieved": 1951,
+          "failed_fetch": 39,
+          "rate_limited_count": 0,
+          "insufficient_history_count": 31,
+          "true_no_data_count": 8,
+          "stage1_passed": 164,
+          "stage1_filters": {
+            "min_price": 100.0,
+            "max_price": 3000.0,
+            "min_adv_20_cr": 10.0,
+            "min_atr_percent": 1.5
+          },
+          "unsupported_today": [
+            "corporate_actions_today",
+            "recent_circuit_hit_last_5_sessions"
+          ]
+        }
+      },
+      "stage2": {
+        "last_run_at_utc": "2026-06-24T05:36:08.185485+00:00",
+        "generated_at_utc": "2026-06-24T05:36:08.178035+00:00",
+        "signature": "[{\"accel\": 8.0, \"orb\": 2.7922, \"reason\": null, \"rvol\": 14.583, \"score\": 360.36, \"security_id\": 544606, \"vwap\": 2.1736}, {\"accel\": 8.0, \"orb\": 1.092, \"reason\": null, \"rvol\": 11.406, \"score\": 308.46, \"security_id\": 511243, \"vwap\": 0.8538}, {\"accel\": 2.0854, \"orb\": 0.2021, \"reason\": null, \"rvol\": 4.568, \"score\": 231.93, \"security_id\": 500493, \"vwap\": 0.952}, {\"accel\": 3.5354, \"orb\": 0.5675, \"reason\": null, \"rvol\": 3.245, \"score\": 211.75, \"security_id\": 500425, \"vwap\": 0.5028}, {\"accel\": 8.0, \"orb\": 1.3446, \"reason\": null, \"rvol\": 2.632, \"score\": 207.62, \"security_id\": 500034, \"vwap\": 0.3586}, {\"accel\": 3.8139, \"orb\": 0.855, \"reason\": null, \"rvol\": 1.399, \"score\": 155.26, \"security_id\": 532215, \"vwap\": 0.8063}, {\"accel\": 2.0848, \"orb\": 1.5037, \"reason\": null, \"rvol\": 1.656, \"score\": 135.56, \"security_id\": 500086, \"vwap\": 0.9821}, {\"accel\": 1.4482, \"orb\": 0.1381, \"reason\": null, \"rvol\": 1.746, \"score\": 98.73, \"security_id\": 500188, \"vwap\": 0.7809}, {\"accel\": 0.0486, \"orb\": 1.004, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.255, \"score\": 0.0, \"security_id\": 544081, \"vwap\": -0.1071}, {\"accel\": 0.3884, \"orb\": -0.0592, \"reason\": \"opening_range_breakout\", \"rvol\": 1.376, \"score\": 0.0, \"security_id\": 500113, \"vwap\": 0.8325}]",
+        "summary": {
+          "market_date": "2026-06-24",
+          "input_stage1_count": 164,
+          "data_retrieved": 164,
+          "failed_fetch": 0,
+          "stage2_passed": 8,
+          "status": "completed",
+          "stage2_filters": {
+            "history_days": 15,
+            "min_time_of_day_rvol": 1.3,
+            "min_price_vs_vwap_percent": 0.0,
+            "min_volume_acceleration_ratio": 1.1,
+            "volume_acceleration_window_minutes": 5,
+            "volume_acceleration_denominator_floor_fraction": 0.35,
+            "volume_acceleration_max_ratio": 8.0,
+            "opening_range_minutes": 15,
+            "min_breakout_percent": 0.0
+          },
+          "stage_funnel_counts": {
+            "input_stage1_count": 164,
+            "after_fetch": 164,
+            "after_rvol": 29,
+            "after_vwap": 22,
+            "after_opening_range": 12,
+            "after_volume_acceleration": 8,
+            "passed": 8
+          },
+          "score_distribution": {
+            "count": 8,
+            "min": 98.73,
+            "median": 211.75,
+            "p90": 308.46,
+            "max": 360.36,
+            "avg": 213.7088
+          },
+          "near_misses": [
+            {
+              "security_id": 544081,
+              "display_name": "Jyoti CNC Automation",
+              "symbol": "Jyoti CNC Automation Limi",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.045,
+              "time_of_day_rvol": 1.255,
+              "price_vs_vwap_percent": -0.1071,
+              "opening_range_breakout_percent": 1.004,
+              "volume_acceleration_ratio": 0.0486
+            },
+            {
+              "security_id": 500113,
+              "display_name": "Steel Authority of India",
+              "symbol": "STEEL AUTHORITY OF INDIA ",
+              "stage2_reason": "opening_range_breakout",
+              "miss_gap": 0.0592,
+              "time_of_day_rvol": 1.376,
+              "price_vs_vwap_percent": 0.8325,
+              "opening_range_breakout_percent": -0.0592,
+              "volume_acceleration_ratio": 0.3884
+            },
+            {
+              "security_id": 540678,
+              "display_name": "Cochin Shipyard",
+              "symbol": "Cochin Shipyard Limited",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.064,
+              "time_of_day_rvol": 1.236,
+              "price_vs_vwap_percent": 0.0305,
+              "opening_range_breakout_percent": -0.29,
+              "volume_acceleration_ratio": 0.5462
+            },
+            {
+              "security_id": 532921,
+              "display_name": "Adani Ports & SEZ",
+              "symbol": "ADANI PORTS AND SPECIAL E",
+              "stage2_reason": "opening_range_breakout",
+              "miss_gap": 0.0778,
+              "time_of_day_rvol": 58.388,
+              "price_vs_vwap_percent": 0.7815,
+              "opening_range_breakout_percent": -0.0778,
+              "volume_acceleration_ratio": 0.052
+            },
+            {
+              "security_id": 500257,
+              "display_name": "Lupin",
+              "symbol": "LUPIN LTD.",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.082,
+              "time_of_day_rvol": 1.218,
+              "price_vs_vwap_percent": -0.4913,
+              "opening_range_breakout_percent": -0.6485,
+              "volume_acceleration_ratio": 0.244
+            },
+            {
+              "security_id": 500209,
+              "display_name": "Infosys",
+              "symbol": "INFOSYS LTD.",
+              "stage2_reason": "opening_range_breakout",
+              "miss_gap": 0.0908,
+              "time_of_day_rvol": 1.609,
+              "price_vs_vwap_percent": 0.0115,
+              "opening_range_breakout_percent": -0.0908,
+              "volume_acceleration_ratio": 0.8916
+            },
+            {
+              "security_id": 543526,
+              "display_name": "LIC of India",
+              "symbol": "LIFE INSURANCE CORPORATIO",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.119,
+              "time_of_day_rvol": 1.181,
+              "price_vs_vwap_percent": -0.0619,
+              "opening_range_breakout_percent": -1.2783,
+              "volume_acceleration_ratio": 0.9015
+            },
+            {
+              "security_id": 532281,
+              "display_name": "HCL Technologies",
+              "symbol": "HCL TECHNOLOGIES LTD.",
+              "stage2_reason": "volume_acceleration",
+              "miss_gap": 0.1409,
+              "time_of_day_rvol": 1.614,
+              "price_vs_vwap_percent": 0.1007,
+              "opening_range_breakout_percent": 0.1808,
+              "volume_acceleration_ratio": 0.9591
+            },
+            {
+              "security_id": 532777,
+              "display_name": "Info Edge",
+              "symbol": "INFO EDGE (INDIA) LTD.",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.144,
+              "time_of_day_rvol": 1.156,
+              "price_vs_vwap_percent": -1.6195,
+              "opening_range_breakout_percent": -2.4291,
+              "volume_acceleration_ratio": 0.4565
+            },
+            {
+              "security_id": 544569,
+              "display_name": "Tata Motors",
+              "symbol": "Tata Motors Limited",
+              "stage2_reason": "opening_range_breakout",
+              "miss_gap": 0.1567,
+              "time_of_day_rvol": 1.895,
+              "price_vs_vwap_percent": 0.5051,
+              "opening_range_breakout_percent": -0.1567,
+              "volume_acceleration_ratio": 0.6275
+            }
+          ],
+          "filter_reason_counts": {
+            "time_of_day_rvol": 135,
+            "opening_range_breakout": 10,
+            "volume_acceleration": 4,
+            "below_vwap": 7
+          },
+          "fetch_failure_reason_counts": {}
+        }
+      },
+      "agents": {
+        "last_trigger_at_utc": "2026-06-24T05:36:08.259490+00:00",
+        "last_trigger_reason": "candidate_score_improved_materially",
+        "last_request": {
+          "request_id": "auto-1782279368253-candidate_score_improved_materially",
+          "action": "start",
+          "user_id": "40a4c297-d2ce-49d9-aee4-464604ff063c",
+          "email": "prajwalghadge2005@gmail.com",
+          "requested_at_utc": "2026-06-24T05:36:08.253840+00:00",
+          "trade_mode": "manual",
+          "trade_amount": 399.0,
+          "regime_analysis_enabled": true,
+          "trigger_source": "session_supervisor",
+          "trigger_reason": "candidate_score_improved_materially"
+        },
+        "last_response": {
+          "ok": true,
+          "request": {
+            "request_id": "auto-1782279368253-candidate_score_improved_materially",
+            "action": "start",
+            "user_id": "40a4c297-d2ce-49d9-aee4-464604ff063c",
+            "email": "prajwalghadge2005@gmail.com",
+            "requested_at_utc": "2026-06-24T05:36:08.253840+00:00",
+            "trade_mode": "manual",
+            "trade_amount": 399.0,
+            "regime_analysis_enabled": true
+          }
+        },
+        "last_top_security_id": 544606,
+        "trigger_history": [
+          {
+            "triggered_at_utc": "2026-06-24T04:03:04.859317+00:00",
+            "reason": "first_stage2_result_of_day",
+            "stage2_generated_at_utc": "2026-06-24T04:03:04.613442+00:00",
+            "request_id": "auto-1782273784851-first_stage2_result_of_day",
+            "candidate_count": 12
+          },
+          {
+            "triggered_at_utc": "2026-06-24T04:34:14.971520+00:00",
+            "reason": "top_candidate_changed",
+            "stage2_generated_at_utc": "2026-06-24T04:34:14.819985+00:00",
+            "request_id": "auto-1782275654958-top_candidate_changed",
+            "candidate_count": 12
+          },
+          {
+            "triggered_at_utc": "2026-06-24T05:04:59.320853+00:00",
+            "reason": "top_candidate_changed",
+            "stage2_generated_at_utc": "2026-06-24T05:04:59.132284+00:00",
+            "request_id": "auto-1782277499307-top_candidate_changed",
+            "candidate_count": 16
+          },
+          {
+            "triggered_at_utc": "2026-06-24T05:36:08.259490+00:00",
+            "reason": "candidate_score_improved_materially",
+            "stage2_generated_at_utc": "2026-06-24T05:36:08.178035+00:00",
+            "request_id": "auto-1782279368253-candidate_score_improved_materially",
+            "candidate_count": 18
+          }
+        ]
+      },
+      "evaluated_candidate_count": 34
+    }
+  }
+}

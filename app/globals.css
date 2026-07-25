@@ -24,6 +24,19 @@
   --profit: #00FF9D;
   --loss: #FF5B5B;
 
+  /* Dashboard minimalist tokens */
+  --dash-canvas: #09090B;
+  --dash-surface: rgba(255, 255, 255, 0.025);
+  --dash-surface-hover: rgba(255, 255, 255, 0.04);
+  --dash-border: rgba(255, 255, 255, 0.06);
+  --dash-border-strong: rgba(255, 255, 255, 0.12);
+  --dash-text: #FAFAFA;
+  --dash-text-secondary: rgba(255, 255, 255, 0.50);
+  --dash-text-muted: rgba(255, 255, 255, 0.25);
+  --dash-positive: #34D399;
+  --dash-negative: #F87171;
+  --dash-warning: #FBBF24;
+
   /* Typography */
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-display: var(--font-neue), "Neue Montreal", "Inter Tight", system-ui, sans-serif;
@@ -1007,6 +1020,245 @@ body {
     left: 50%;
     top: 0;
     transform-origin: 50% calc(50vmax + 4px);
+  }
+}
+
+/* =====================================================================
+   DASHBOARD — Minimalist Utility Classes
+   Clean, spatial, typographically confident.
+   ===================================================================== */
+@layer utilities {
+  /* ── Dashboard surfaces ── */
+  .dash-surface {
+    background: var(--dash-surface);
+    border: 1px solid var(--dash-border);
+    border-radius: 16px;
+    transition: border-color 0.4s var(--ease-out-expo);
+  }
+  .dash-surface:hover {
+    border-color: var(--dash-border-strong);
+  }
+  .dash-surface-flat {
+    background: transparent;
+    border: 1px solid var(--dash-border);
+    border-radius: 12px;
+  }
+
+  /* ── Dashboard buttons ── */
+  .dash-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--dash-text-secondary);
+    background: transparent;
+    border: 1px solid var(--dash-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-out-expo);
+  }
+  .dash-btn:hover {
+    color: var(--dash-text);
+    border-color: var(--dash-border-strong);
+    background: var(--dash-surface);
+  }
+  .dash-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.625rem 1.25rem;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: #09090B;
+    background: #FAFAFA;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-out-expo);
+  }
+  .dash-btn-primary:hover {
+    background: #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 8px 30px -8px rgba(255,255,255,0.12);
+  }
+  .dash-btn-primary:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .dash-btn-primary:disabled:hover {
+    box-shadow: none;
+    background: #FAFAFA;
+  }
+  .dash-btn-accent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.625rem 1.25rem;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: #09090B;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-out-expo);
+  }
+  .dash-btn-accent:hover {
+    box-shadow: 0 0 0 1px var(--accent), 0 8px 30px -8px rgba(0,229,255,0.25);
+  }
+
+  /* ── Dashboard inputs ── */
+  .dash-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--dash-text);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--dash-border);
+    border-radius: 8px;
+    transition: border-color 0.3s var(--ease-out-expo);
+  }
+  .dash-input::placeholder {
+    color: var(--dash-text-muted);
+  }
+  .dash-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+  }
+  .dash-input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* ── Dashboard badges ── */
+  .dash-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 9999px;
+    border: 1px solid var(--dash-border);
+    color: var(--dash-text-secondary);
+  }
+  .dash-badge-positive {
+    color: var(--dash-positive);
+    border-color: rgba(52, 211, 153, 0.25);
+    background: rgba(52, 211, 153, 0.06);
+  }
+  .dash-badge-negative {
+    color: var(--dash-negative);
+    border-color: rgba(248, 113, 113, 0.25);
+    background: rgba(248, 113, 113, 0.06);
+  }
+  .dash-badge-warning {
+    color: var(--dash-warning);
+    border-color: rgba(251, 191, 36, 0.25);
+    background: rgba(251, 191, 36, 0.06);
+  }
+  .dash-badge-accent {
+    color: var(--accent);
+    border-color: rgba(0, 229, 255, 0.25);
+    background: rgba(0, 229, 255, 0.06);
+  }
+
+  /* ── Dashboard section label ── */
+  .dash-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dash-text-muted);
+  }
+
+  /* ── Dashboard metric number ── */
+  .dash-metric {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* ── Dashboard divider ── */
+  .dash-divider {
+    width: 100%;
+    height: 1px;
+    background: var(--dash-border);
+  }
+
+  /* ── Subtle status dot ── */
+  .dash-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+  .dash-dot-positive { background: var(--dash-positive); }
+  .dash-dot-negative { background: var(--dash-negative); }
+  .dash-dot-warning { background: var(--dash-warning); box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+  .dash-dot-accent { background: var(--accent); box-shadow: 0 0 8px rgba(0,229,255,0.4); }
+  .dash-dot-muted { background: var(--dash-text-muted); }
+  .dash-dot-pulse {
+    animation: dash-pulse 2s var(--ease-in-out) infinite;
+  }
+  @keyframes dash-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Toggle switch ── */
+  .dash-toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    border-radius: 9999px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--dash-border);
+    cursor: pointer;
+    transition: all 0.3s var(--ease-out-expo);
+    flex-shrink: 0;
+  }
+  .dash-toggle[aria-pressed="true"] {
+    background: rgba(52, 211, 153, 0.2);
+    border-color: rgba(52, 211, 153, 0.3);
+  }
+  .dash-toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: var(--dash-text-muted);
+    transition: all 0.3s var(--ease-out-expo);
+  }
+  .dash-toggle[aria-pressed="true"]::after {
+    left: 18px;
+    background: var(--dash-positive);
+  }
+  .dash-toggle:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 }
 
