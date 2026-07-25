@@ -1158,7 +1158,7 @@ function AITradingChatContent() {
     const rows = agentRows(runStatus, liveEvents, sessionAgents)
 
     return (
-        <div className="relative min-h-screen bg-[#050505] text-white overflow-x-hidden">
+        <div className="product-shell relative min-h-screen bg-[#050505] text-white overflow-x-hidden">
             {/* Ambient backdrop */}
             <div className="pointer-events-none fixed inset-0 bg-grid-fine opacity-50" />
             <div className="pointer-events-none fixed inset-0 bg-spotlight" />
@@ -1447,7 +1447,7 @@ function AITradingChatContent() {
 export default function AITradingChatPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+            <div className="product-shell min-h-screen bg-[#050505] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-5">
                     <div className="relative h-10 w-10">
                         <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-40 animate-pulse-ring" />
