@@ -1,15 +1,40 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { fetchWithTimeout } from '@/lib/supabase/fetch-with-timeout'
 
 export async function middleware(request: NextRequest) {
+    const pathname = request.nextUrl.pathname
+
+    // Public routes must remain available even when the auth service is down.
+    // Check this before making any network request to Supabase.
+    const publicPaths = ['/', '/login', '/signup', '/signin', '/singin', '/auth', '/api/dhan/callback', '/api/dhan/postback']
+    const isPublic = publicPaths.some(p =>
+        p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(`${p}/`)
+    )
+
+    if (isPublic) {
+        return NextResponse.next()
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+        console.error('Supabase auth is not configured')
+        return authUnavailableResponse(request)
+    }
+
     let supabaseResponse = NextResponse.next({
         request,
     })
 
     const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        supabaseUrl,
+        supabaseAnonKey,
         {
+            global: {
+                fetch: fetchWithTimeout,
+            },
             cookies: {
                 getAll() {
                     return request.cookies.getAll()
@@ -27,30 +52,45 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // Refresh session if expired
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Public routes - no auth required
-    const publicPaths = ['/', '/login', '/signup', '/auth', '/api/dhan/callback', '/api/dhan/postback']
-    const isPublic = publicPaths.some(p =>
-        p === '/' ? request.nextUrl.pathname === '/' : request.nextUrl.pathname.startsWith(p)
-    )
+    let user = null
+    try {
+        // Validate and refresh the session, but never let an upstream outage
+        // consume Vercel's entire middleware execution window.
+        const result = await supabase.auth.getUser()
+        if (result.error) {
+            console.warn('Supabase auth check failed:', result.error.message)
+            if (result.error.name === 'AuthRetryableFetchError') {
+                return authUnavailableResponse(request)
+            }
+        }
+        user = result.data.user
+    } catch (error) {
+        console.error('Supabase auth request failed:', error)
+        return authUnavailableResponse(request)
+    }
 
     // Protect private routes - redirect to login if not authenticated
-    if (!user && !isPublic) {
+    if (!user) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect authenticated users away from login/signup to the app
-    if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/dashboard'
-        return NextResponse.redirect(redirectUrl)
+    return supabaseResponse
+}
+
+function authUnavailableResponse(request: NextRequest) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json(
+            { error: 'Authentication service unavailable' },
+            { status: 503 },
+        )
     }
 
-    return supabaseResponse
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/login'
+    redirectUrl.searchParams.set('error', 'auth_unavailable')
+    return NextResponse.redirect(redirectUrl)
 }
 
 export const config = {
