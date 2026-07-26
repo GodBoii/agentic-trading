@@ -4,12 +4,14 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_executioner import ExecutionerRunner
 from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.dhan_service import DhanService
 from pipeline.stock import StockAgent
@@ -26,10 +28,17 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         trade_config: Optional[Dict[str, Any]] = None,
         use_regime_analysis: Optional[bool] = None,
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        run_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Stock agent is idling.")
             return None
+
+        effective_run_context = dict(run_context or {})
+        if not effective_run_context.get("trade_session_id"):
+            generated_id = f"auto-{int(time.time() * 1000)}"
+            effective_run_context["trade_session_id"] = generated_id
+            effective_run_context.setdefault("request_id", generated_id)
 
         regime_enabled = self._resolve_regime_gate(trade_config, use_regime_analysis)
         market_date = self.market_time.market_date_str()
@@ -106,7 +115,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             print("Stock agent batch is still fresh.")
             return existing
 
-        results = self._run_stock_agents(candidate_packets, effective_trade_config or {}, event_callback)
+        results = self._run_stock_agents(
+            candidate_packets,
+            effective_trade_config or {},
+            event_callback,
+            effective_run_context,
+        )
         generated_utc = datetime.now(timezone.utc)
         generated_market = self.market_time.now()
         payload = {
@@ -264,6 +278,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         candidate_packets: List[Dict[str, Any]],
         trade_config: Dict[str, Any],
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        run_context: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         max_workers = max(1, len(candidate_packets))
         results: Dict[int, Dict[str, Any]] = {}
@@ -271,7 +286,14 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
-                executor.submit(self._run_single_stock_agent, index, packet, trade_config, event_callback): index
+                executor.submit(
+                    self._run_single_stock_agent,
+                    index,
+                    packet,
+                    trade_config,
+                    event_callback,
+                    run_context or {},
+                ): index
                 for index, packet in enumerate(candidate_packets)
             }
             for future in as_completed(future_to_index):
@@ -309,8 +331,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         candidate_packet: Dict[str, Any],
         trade_config: Dict[str, Any],
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        run_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         security_id = int(candidate_packet["security_id"])
+        CloudPersistenceService.validate_agno_db()
         self._emit(
             event_callback,
             {
@@ -351,6 +375,13 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         chart_paths = chart_bundle.get("chart_paths_ordered", [])
         if not chart_paths:
             chart_paths = [info["path"] for info in chart_bundle.get("charts", {}).values()]
+        cloud_image_urls = self._upload_chart_images(
+            index + 1,
+            candidate_packet,
+            chart_bundle,
+            chart_paths,
+            run_context or {},
+        )
         self._emit(
             event_callback,
             {
@@ -388,7 +419,30 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         }
 
         print(f"[stock agent {index + 1}] Analyzing and trading {candidate_packet['display_name']}...")
-        report_text = agent.analyze(stock_packet, chart_paths, trade_config=trade_config)
+        agent_run_context = {
+            **(run_context or {}),
+            "agno_session_id": self._agno_session_id(
+                run_context or {},
+                index + 1,
+                security_id,
+            ),
+            "stage": "stock_agent",
+            "rank": index + 1,
+            "security_id": security_id,
+            "symbol": candidate_packet.get("symbol"),
+            "display_name": candidate_packet.get("display_name"),
+            "image_storage_paths": [
+                card.get("storage_path")
+                for card in self._chart_image_cards(chart_bundle)
+                if card.get("storage_path")
+            ],
+        }
+        report_text = agent.analyze(
+            stock_packet,
+            cloud_image_urls,
+            trade_config=trade_config,
+            run_context=agent_run_context,
+        )
         decision = self.execution_helper._parse_execution_report(report_text, stock_packet)
         attachments = self._build_agent_attachments(index + 1, candidate_packet, stock_packet, chart_bundle)
         result = {
@@ -441,8 +495,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 {
                     "id": key,
                     "title": f"{str(info.get('day_type') or '').title()} {info.get('label') or ''}".strip(),
-                    "filename": str(info.get("path") or "").split("/")[-1],
+                    "filename": Path(str(info.get("path") or "")).name,
                     "path": info.get("path"),
+                    "storage_path": info.get("storage_path"),
+                    "cloud_url": info.get("cloud_url"),
                     "day_type": info.get("day_type"),
                     "date": info.get("date"),
                     "timeframe": info.get("label"),
@@ -450,6 +506,55 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 }
             )
         return cards
+
+    def _upload_chart_images(
+        self,
+        rank: int,
+        candidate_packet: Dict[str, Any],
+        chart_bundle: Dict[str, Any],
+        chart_paths: List[str],
+        run_context: Dict[str, Any],
+    ) -> List[str]:
+        trade_session_id = str(run_context.get("trade_session_id") or "").strip()
+        if not trade_session_id:
+            raise RuntimeError("stock_agent_trade_session_id_required_for_cloud_images")
+
+        agent_slug = self._slugify(
+            candidate_packet.get("display_name")
+            or candidate_packet.get("symbol")
+            or f"agent-{rank}"
+        )
+        chart_records = chart_bundle.get("charts") if isinstance(chart_bundle, dict) else {}
+        by_path = {
+            str(info.get("path")): info
+            for info in (chart_records or {}).values()
+            if isinstance(info, dict) and info.get("path")
+        }
+        cloud_urls: List[str] = []
+        for chart_path in chart_paths:
+            filename = Path(str(chart_path)).name
+            storage_path = (
+                f"{trade_session_id}/agents/{rank}-{agent_slug}/images/{filename}"
+            )
+            uploaded = CloudPersistenceService.upload_image(chart_path, storage_path)
+            cloud_urls.append(uploaded["cloud_url"])
+            chart_info = by_path.get(str(chart_path))
+            if isinstance(chart_info, dict):
+                chart_info.update(uploaded)
+
+        chart_bundle["cloud_image_urls_ordered"] = cloud_urls
+        return cloud_urls
+
+    def _agno_session_id(
+        self,
+        run_context: Dict[str, Any],
+        rank: int,
+        security_id: int,
+    ) -> str:
+        trade_session_id = str(run_context.get("trade_session_id") or "").strip()
+        if not trade_session_id:
+            raise RuntimeError("stock_agent_trade_session_id_required_for_agno")
+        return f"{trade_session_id}--stock-{rank}-{security_id}"
 
     def _build_agent_attachments(
         self,

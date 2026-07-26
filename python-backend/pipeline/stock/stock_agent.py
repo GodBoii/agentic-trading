@@ -9,6 +9,7 @@ from agno.agent import Agent
 from agno.media import Image
 
 from pipeline.llm import create_multimodal_trading_model
+from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 
 
@@ -25,11 +26,23 @@ class StockAgent:
     def analyze(
         self,
         stock_packet: Dict[str, Any],
-        chart_paths: List[str],
+        image_urls: List[str],
         trade_config: Optional[Dict[str, Any]] = None,
+        run_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not self.is_enabled():
             raise RuntimeError("stock_agent_disabled")
+
+        persistence_context = dict(run_context or {})
+        agno_session_id = str(persistence_context.get("agno_session_id") or "").strip()
+        if not agno_session_id:
+            raise RuntimeError("stock_agent_agno_session_id_required")
+        user_id = str(persistence_context.get("user_id") or "").strip() or None
+        run_metadata = {
+            **persistence_context,
+            "image_urls": list(image_urls),
+            "media_persistence": "supabase_storage_public_url",
+        }
 
         trade_mode = str((trade_config or {}).get("trade_mode") or "auto").lower()
         trade_amount = (trade_config or {}).get("trade_amount")
@@ -42,8 +55,13 @@ class StockAgent:
             capital_instruction = "Size from available balance, Dhan margin validation, and supplied account context."
 
         agent = Agent(
+            id=os.getenv("STOCK_AGENT_ID", "stock-agent"),
             name=self.agent_name,
             model=create_multimodal_trading_model(),
+            db=CloudPersistenceService.agno_db(),
+            session_id=agno_session_id,
+            user_id=user_id,
+            metadata=run_metadata,
             description=(
                 "Analyze one intraday stock candidate and make the final entry-only execution decision "
                 "using supplied charts, market context, account context, optional quote confirmation, and Dhan tools."
@@ -82,12 +100,19 @@ class StockAgent:
                 "Use Execution Status: placed, planned, skipped, blocked, or failed.",
             ],
             markdown=True,
+            store_media=True,
+            store_tool_messages=True,
+            store_events=True,
             add_datetime_to_context=False,
             debug_mode=True,
         )
 
-        images = [Image(filepath=path) for path in chart_paths]
-        response = agent.run(self._build_prompt(stock_packet), images=images)
+        images = [Image(url=url) for url in image_urls]
+        response = agent.run(
+            self._build_prompt(stock_packet),
+            images=images,
+            metadata=run_metadata,
+        )
         self.last_run_metadata = self._extract_metadata(response)
         response_text = self._extract_text(response).strip()
         if not response_text:

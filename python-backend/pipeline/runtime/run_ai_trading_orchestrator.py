@@ -329,6 +329,11 @@ class AITradingOrchestrator:
             "trade_amount": float(trade_amount) if trade_amount else None,
             "regime_analysis_enabled": regime_analysis_enabled,
         }
+        run_context = {
+            "trade_session_id": self._slugify_session_id(self.last_request_id),
+            "request_id": self.last_request_id,
+            "user_id": user_id or None,
+        }
 
         stages = [
             (
@@ -338,6 +343,7 @@ class AITradingOrchestrator:
                     trade_config=trade_config,
                     use_regime_analysis=regime_analysis_enabled,
                     event_callback=self._broadcast_event,
+                    run_context=run_context,
                 ),
             ),
         ]
