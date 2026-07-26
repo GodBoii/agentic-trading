@@ -32,7 +32,8 @@ export function resolveTradingArtifactPath(input: string) {
 export async function loadTradeSession(sessionId: string) {
   const safeId = safeSegment(sessionId)
   if (!safeId) return null
-  return readJson(path.join(sessionsDir, safeId, 'session.json')) || loadTradeSessionFromSupabase(safeId)
+  const localSession = await readJson(path.join(sessionsDir, safeId, 'session.json'))
+  return localSession || loadTradeSessionFromSupabase(safeId)
 }
 
 export async function listTradeSessions() {
@@ -103,14 +104,9 @@ export async function syncLatestTradeSession(options: { status?: JsonRecord | nu
   await fs.writeFile(sessionPath, JSON.stringify(session, null, 2), 'utf8')
 
   if (options.uploadToCloud && status.status === 'completed') {
-    await syncSessionToSupabase(session)
+    await syncSessionImagesToSupabase(session)
     session.cloud_synced_at_utc = new Date().toISOString()
     await fs.writeFile(sessionPath, JSON.stringify(session, null, 2), 'utf8')
-    await uploadBuffer(
-      Buffer.from(JSON.stringify(session, null, 2), 'utf8'),
-      `${sessionId}/session.json`,
-      'application/json',
-    )
   }
 
   return session
@@ -254,13 +250,14 @@ function fallbackFiles(item: JsonRecord) {
   ]
 }
 
-async function syncSessionToSupabase(session: JsonRecord) {
+async function syncSessionImagesToSupabase(session: JsonRecord) {
   const client = serviceSupabase()
   if (!client) return
 
   for (const agent of session.agents || []) {
     const agentSlug = slugify(agent.display_name || agent.symbol || `agent-${agent.rank}`)
     for (const image of agent.attachments?.images || []) {
+      if (image.cloud_url) continue
       try {
         const localPath = resolveTradingArtifactPath(String(image.path || ''))
         const storagePath = `${session.session_id}/agents/${agent.rank}-${agentSlug}/images/${image.filename}`
@@ -270,10 +267,6 @@ async function syncSessionToSupabase(session: JsonRecord) {
       } catch (error) {
         image.upload_error = error instanceof Error ? error.message : String(error)
       }
-    }
-    for (const file of agent.attachments?.files || []) {
-      const publicUrl = await uploadBuffer(Buffer.from(String(file.content || ''), 'utf8'), file.storage_path, 'text/markdown')
-      file.cloud_url = publicUrl
     }
   }
 }
