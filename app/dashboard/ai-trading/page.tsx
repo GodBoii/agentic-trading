@@ -1,9 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
+import AgentMarkdown from '@/components/agent-markdown'
+import TradingStatus from '@/components/trading-status'
 
 interface AgentStage {
     status: string
@@ -185,9 +187,9 @@ function stageBody(stage: string, data?: AgentStage) {
                                 </div>
                             ))}
                         </div>
-                        <p className="text-[13px] text-ink-secondary mt-2 whitespace-pre-wrap leading-relaxed">
-                            {result.report_text || result.analysis}
-                        </p>
+                        <div className="mt-2">
+                            <AgentMarkdown>{result.report_text || result.analysis}</AgentMarkdown>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -209,9 +211,7 @@ function stageBody(stage: string, data?: AgentStage) {
                     </div>
                 ))}
             </div>
-            <p className="text-[13px] text-ink-secondary whitespace-pre-wrap leading-relaxed">
-                {data.details?.report_text}
-            </p>
+            <AgentMarkdown>{data.details?.report_text}</AgentMarkdown>
         </div>
     )
 }
@@ -255,8 +255,8 @@ function AttachmentStrip({ attachments }: { attachments?: AgentAttachments | nul
     return (
         <div className="space-y-4">
             {images.length > 0 && (
-                <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
-                    <div className="flex gap-3 min-w-0 pb-1">
+                <div className="attachment-rail -mx-1 px-1 pb-2">
+                    <div className="flex min-w-max gap-3 pb-2">
                         {images.map((image, index) => {
                             const src = attachmentImageUrl(image)
                             return (
@@ -265,7 +265,7 @@ function AttachmentStrip({ attachments }: { attachments?: AgentAttachments | nul
                                     href={src}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="group block w-[168px] sm:w-[210px] flex-shrink-0 overflow-hidden rounded-xl border border-line bg-white/[0.02] hover:border-accent/40 transition-colors"
+                                    className="group block w-[220px] sm:w-[280px] flex-shrink-0 overflow-hidden rounded-xl border border-line bg-white/[0.02] hover:border-accent/40 transition-colors"
                                 >
                                     <div className="aspect-[4/3] bg-[#050506] overflow-hidden">
                                         {src ? (
@@ -297,8 +297,8 @@ function AttachmentStrip({ attachments }: { attachments?: AgentAttachments | nul
             )}
 
             {files.length > 0 && (
-                <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
-                    <div className="flex gap-3 pb-1">
+                <div className="attachment-rail -mx-1 px-1 pb-2">
+                    <div className="flex min-w-max gap-3 pb-2">
                         {files.map((file, index) => {
                             const href = attachmentFileUrl(file)
                             return (
@@ -386,9 +386,9 @@ function AgentMetadataPanel({ metadata }: { metadata?: Record<string, any> | nul
                     <p className="text-[10px] text-warning font-mono uppercase tracking-[0.16em] mb-2">
                         Reasoning trace
                     </p>
-                    <p className="text-[12px] text-ink-secondary whitespace-pre-wrap leading-relaxed max-h-56 overflow-auto">
-                        {reasoning}
-                    </p>
+                    <div className="max-h-80 overflow-auto">
+                        <AgentMarkdown>{reasoning}</AgentMarkdown>
+                    </div>
                 </div>
             )}
         </div>
@@ -420,53 +420,6 @@ function agentRows(
             failed: latest?.type === 'stock_agent_failed',
         }
     })
-}
-
-function FloatingPanel({
-    title,
-    open,
-    onClose,
-    children,
-}: {
-    title: string
-    open: boolean
-    onClose: () => void
-    children: ReactNode
-}) {
-    if (!open) return null
-    return (
-        <div className="fixed inset-0 z-50 pointer-events-none">
-            <button
-                type="button"
-                aria-label={`Close ${title}`}
-                className="absolute inset-0 bg-black/40 pointer-events-auto"
-                onClick={onClose}
-            />
-            <motion.div
-                initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.35, ease }}
-                className="absolute right-3 left-3 top-24 sm:left-auto sm:right-6 sm:w-[420px] max-h-[72vh] overflow-hidden rounded-2xl border border-line bg-[#08080a]/95 backdrop-blur-xl shadow-2xl pointer-events-auto"
-            >
-                <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
-                    <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-white">
-                        {title}
-                    </p>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="h-8 w-8 rounded-full border border-line text-ink-secondary hover:text-white hover:border-line-strong transition-colors"
-                        aria-label={`Close ${title}`}
-                    >
-                        x
-                    </button>
-                </div>
-                <div className="max-h-[calc(72vh-65px)] overflow-y-auto p-4">
-                    {children}
-                </div>
-            </motion.div>
-        </div>
-    )
 }
 
 function AgentChatBoard({
@@ -518,160 +471,202 @@ function AgentChatBoard({
         return events
     }
 
-    const activeEvents = mergedEvents(activeAgent)
-    const activeCompleted = completedResults.find((item: any) => Number(item.rank) === activeAgent)
+    const [focusedAgent, setFocusedAgent] = useState<number | null>(null)
+    const runIdentity = runStatus?.request?.request_id || sessionAgents?.[0]?.symbol || 'current'
+
+    useEffect(() => {
+        setFocusedAgent(null)
+    }, [runIdentity])
+
+    const focusAgent = (rank: number) => {
+        setActiveAgent(rank)
+        setFocusedAgent(rank)
+    }
+
+    if (focusedAgent === null) {
+        return (
+            <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease }}
+                className="surface min-h-[calc(100vh-240px)] rounded-3xl border border-line p-5 sm:p-8"
+            >
+                <div className="flex flex-col justify-between gap-5 border-b border-line pb-6 sm:flex-row sm:items-end">
+                    <div>
+                        <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
+                            Agent run
+                        </p>
+                        <h2 className="mt-2 text-[26px] font-semibold tracking-[-0.035em] text-white sm:text-[34px]">
+                            Running agents
+                        </h2>
+                        <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-ink-secondary">
+                            Select an agent to open its live workspace, charts, files, decisions, and response.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-full border border-line bg-black/30 px-3 py-2">
+                        <span className={`h-2 w-2 rounded-full ${connectionState.includes('live') ? 'bg-success' : 'bg-warning animate-pulse-soft'}`} />
+                        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-secondary">
+                            {connectionState}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="attachment-rail mt-7 pb-3">
+                    <div className="flex min-w-max gap-3 pb-3">
+                        {agentSlots.map((rank) => {
+                            const events = mergedEvents(rank)
+                            const latest = events[events.length - 1]
+                            const completed = completedResults.find((item: any) => Number(item.rank) === rank)
+                            const complete = latest?.type === 'stock_agent_completed' || Boolean(completed)
+                            const failed = latest?.type === 'stock_agent_failed'
+                            const name = agentDisplayName(latest || completed, `Agent ${rank}`)
+                            return (
+                                <button
+                                    key={rank}
+                                    type="button"
+                                    onClick={() => focusAgent(rank)}
+                                    className="group w-[220px] flex-shrink-0 rounded-2xl border border-line bg-[#0a0a0d] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-accent/50 hover:bg-accent/[0.04]"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-tertiary">
+                                            Agent {rank}
+                                        </span>
+                                        <span className={`h-2 w-2 rounded-full ${failed ? 'bg-danger' : complete ? 'bg-success' : events.length ? 'bg-warning animate-pulse-soft' : 'bg-ink-tertiary'}`} />
+                                    </div>
+                                    <p className="mt-5 truncate text-[15px] font-medium text-white">{name}</p>
+                                    <p className="mt-1 truncate text-[11px] text-ink-secondary">
+                                        {latest ? eventTitle(latest) : 'Waiting for assignment'}
+                                    </p>
+                                    <div className="mt-5 flex items-center justify-between border-t border-line pt-3">
+                                        <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-tertiary">
+                                            {complete ? 'Complete' : failed ? 'Failed' : 'Open workspace'}
+                                        </span>
+                                        <span className="text-[14px] text-accent transition-transform group-hover:translate-x-1">→</span>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {agentSlots.length === 1 && mergedEvents(agentSlots[0]).length === 0 && (
+                    <div className="mt-4 grid min-h-[240px] place-items-center rounded-2xl border border-dashed border-line">
+                        <div className="text-center">
+                            <span className="mx-auto block h-2 w-2 animate-pulse rounded-full bg-warning" />
+                            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-tertiary">
+                                Waiting for agent selection
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </motion.section>
+        )
+    }
+
+    const activeEvents = mergedEvents(focusedAgent)
+    const activeCompleted = completedResults.find((item: any) => Number(item.rank) === focusedAgent)
     const latestActiveEvent = activeEvents[activeEvents.length - 1]
     const activeName = agentDisplayName(
         activeEvents.find((event) => event.display_name || event.symbol) || activeCompleted,
-        `Agent ${activeAgent}`,
+        `Agent ${focusedAgent}`,
     )
     const activeAttachments = activeCompleted?.attachments || latestActiveEvent?.attachments
     const activeMetadata = activeCompleted?.agent_metadata || latestActiveEvent?.agent_metadata
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 12 }}
+        <motion.section
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease, delay: 0.18 }}
-            className="surface rounded-2xl p-5 border border-line"
+            transition={{ duration: 0.45, ease }}
+            className="min-h-[calc(100vh-150px)]"
         >
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
-                <div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
-                        Stock Agents
-                    </p>
-                    <p className="text-[13px] text-ink-secondary mt-1">
-                        Stream: <span className="font-mono uppercase text-[11px]">{connectionState}</span>
-                    </p>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                    {agentSlots.map((rank) => {
-                        const events = mergedEvents(rank)
-                        const latest = events[events.length - 1]
-                        const complete = latest?.type === 'stock_agent_completed'
-                        const failed = latest?.type === 'stock_agent_failed'
-                        const active = activeAgent === rank
-                        return (
-                            <button
-                                key={rank}
-                                type="button"
-                                onClick={() => setActiveAgent(rank)}
-                                className={`min-w-0 rounded-xl border px-3 py-2 text-left transition-colors ${active
-                                    ? 'border-accent/60 bg-accent/10'
-                                    : 'border-line bg-[#08080a] hover:border-line-strong'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className={`h-1.5 w-1.5 rounded-full ${failed ? 'bg-danger' : complete ? 'bg-success' : events.length ? 'bg-warning animate-pulse-soft' : 'bg-ink-tertiary'}`} />
-                                    <p className="text-[11px] text-white font-mono uppercase tracking-[0.12em] truncate">
-                                        Agent {rank}
-                                    </p>
-                                </div>
-                                <p className="text-[10px] text-ink-tertiary font-mono mt-1 truncate">
-                                    {latest ? eventTitle(latest) : 'Waiting'}
-                                </p>
-                            </button>
-                        )
-                    })}
+            <div className="sticky top-[88px] z-30 mb-5 flex items-center justify-between gap-4 rounded-2xl border border-line bg-[#08080a]/95 px-4 py-3 backdrop-blur-xl sm:px-5">
+                <button
+                    type="button"
+                    onClick={() => setFocusedAgent(null)}
+                    className="flex items-center gap-2 rounded-full border border-line px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-secondary transition-colors hover:border-line-strong hover:text-white"
+                >
+                    <span aria-hidden>←</span>
+                    All agents
+                </button>
+                <div className="min-w-0 text-right">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-success">Agent {focusedAgent}</p>
+                    <p className="truncate text-[14px] font-medium text-white">{activeName}</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[280px,1fr] gap-5">
-                <div className="space-y-2">
-                    {agentSlots.map((rank) => {
-                        const events = mergedEvents(rank)
-                        const latest = events[events.length - 1]
-                        return (
-                            <button
-                                key={rank}
-                                type="button"
-                                onClick={() => setActiveAgent(rank)}
-                                className={`w-full text-left rounded-xl border p-4 transition-colors ${activeAgent === rank
-                                    ? 'border-success/40 bg-success/[0.04]'
-                                    : 'border-line bg-white/[0.015] hover:border-line-strong'
-                                    }`}
-                            >
-                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
-                                    Agent {rank}
-                                </p>
-                                <p className="text-[13px] text-white mt-1 truncate">
-                                    {agentDisplayName(latest || completedResults.find((item: any) => Number(item.rank) === rank))}
-                                </p>
-                                <p className="text-[11px] text-ink-secondary mt-1 truncate">
-                                    {latest?.message || (latest ? eventTitle(latest) : 'No stream events yet')}
-                                </p>
-                            </button>
-                        )
-                    })}
+            <div className="surface overflow-hidden rounded-3xl border border-line">
+                <div className="flex flex-col justify-between gap-5 border-b border-line px-5 py-6 sm:flex-row sm:items-end sm:px-8">
+                    <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+                            Agent workspace
+                        </p>
+                        <h2 className="mt-2 text-[28px] font-semibold tracking-[-0.035em] text-white sm:text-[38px]">
+                            {activeName}
+                        </h2>
+                    </div>
+                    <span className="self-start rounded-full border border-line bg-black/30 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-ink-secondary sm:self-auto">
+                        {latestActiveEvent ? eventTitle(latestActiveEvent) : 'Waiting'}
+                    </span>
                 </div>
 
-                <div className="rounded-2xl border border-line bg-[#08080a]/70 overflow-hidden">
-                    <div className="border-b border-line px-5 py-4 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-success">
-                                Agent {activeAgent}
+                <div className="space-y-6 p-4 sm:p-8">
+                    <AttachmentStrip attachments={activeAttachments} />
+                    <AgentMetadataPanel metadata={activeMetadata} />
+
+                    {activeEvents.length === 0 ? (
+                        <div className="grid min-h-[340px] place-items-center rounded-2xl border border-dashed border-line">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-tertiary">
+                                Waiting for agent output
                             </p>
-                            <h2 className="text-white text-[16px] font-medium mt-1 truncate">
-                                {activeName}
-                            </h2>
                         </div>
-                        <p className="text-[10px] text-ink-tertiary font-mono uppercase tracking-[0.16em]">
-                            {activeEvents.length ? eventTitle(activeEvents[activeEvents.length - 1]) : 'Waiting'}
-                        </p>
-                    </div>
-                    <div className="p-4 sm:p-5 space-y-5 min-h-[360px] max-h-[720px] overflow-y-auto">
-                        <AttachmentStrip attachments={activeAttachments} />
-                        <AgentMetadataPanel metadata={activeMetadata} />
-                        {activeEvents.length === 0 ? (
-                            <div className="h-full min-h-[300px] flex items-center justify-center border border-dashed border-line rounded-xl">
-                                <p className="text-[12px] text-ink-tertiary font-mono">
-                                    Waiting for assignment
-                                </p>
-                            </div>
-                        ) : (
-                            activeEvents.map((event, index) => (
-                                <div key={`${event.type}-${index}-${event.sent_at_utc || ''}`} className="rounded-xl border border-line bg-[#0c0c0f] p-4">
-                                    <div className="flex items-center justify-between gap-3 mb-2">
-                                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-accent">
+                    ) : (
+                        <div className="space-y-4">
+                            {activeEvents.map((event, index) => (
+                                <article key={`${event.type}-${index}-${event.sent_at_utc || ''}`} className="rounded-2xl border border-line bg-[#0b0b0e] p-4 sm:p-6">
+                                    <div className="mb-4 flex items-center justify-between gap-3">
+                                        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">
                                             {eventTitle(event)}
                                         </p>
-                                        <p className="text-[10px] text-ink-tertiary font-mono">
+                                        <p className="font-mono text-[9px] text-ink-tertiary">
                                             {formatTime(event.sent_at_utc)}
                                         </p>
                                     </div>
-                                    {event.message && (
-                                        <p className="text-[13px] text-ink-secondary leading-relaxed">
-                                            {event.message}
-                                        </p>
-                                    )}
+
+                                    {event.message && <AgentMarkdown>{event.message}</AgentMarkdown>}
+
                                     {event.decision && (
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line rounded-lg overflow-hidden border border-line mt-3">
+                                        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-4">
                                             {Object.entries(event.decision).slice(0, 8).map(([key, value]) => (
                                                 <div key={key} className="bg-[#08080a] p-3">
-                                                    <p className="text-[9px] text-ink-tertiary font-mono uppercase tracking-[0.15em]">
+                                                    <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-tertiary">
                                                         {key.replaceAll('_', ' ')}
                                                     </p>
-                                                    <p className="text-[12px] text-white font-mono font-medium break-words nums mt-1">
-                                                        {String(value)}
+                                                    <p className="nums mt-1 break-words font-mono text-[12px] font-medium text-white">
+                                                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                                                     </p>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
-                                    {event.attachments && <div className="mt-3"><AttachmentStrip attachments={event.attachments} /></div>}
-                                    {event.agent_metadata && <div className="mt-3"><AgentMetadataPanel metadata={event.agent_metadata} /></div>}
-                                    {(event.report_text || event.error) && (
-                                        <p className={`text-[13px] mt-3 whitespace-pre-wrap leading-relaxed ${event.error ? 'text-danger' : 'text-ink-secondary'}`}>
-                                            {event.error || event.report_text}
-                                        </p>
+
+                                    {event.report_text && event.report_text !== event.message && (
+                                        <div className="mt-5 border-t border-line pt-5">
+                                            <AgentMarkdown>{event.report_text}</AgentMarkdown>
+                                        </div>
                                     )}
-                                </div>
-                            ))
-                        )}
-                    </div>
+                                    {event.error && (
+                                        <div className="mt-5 border-t border-danger/20 pt-5">
+                                            <AgentMarkdown tone="danger">{event.error}</AgentMarkdown>
+                                        </div>
+                                    )}
+                                </article>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
-        </motion.div>
+        </motion.section>
     )
 }
 
@@ -679,249 +674,149 @@ function TradeHistoryView({
     tradeSessions,
     selectedSession,
     openTradeSession,
+    closeTradeSession,
     activeAgent,
     setActiveAgent,
 }: {
     tradeSessions: TradeSessionSummary[]
     selectedSession: TradeSession | null
     openTradeSession: (sessionId: string) => void
+    closeTradeSession: () => void
     activeAgent: number
     setActiveAgent: (rank: number) => void
 }) {
-    const sessionRunStatus = selectedSession?.status_snapshot || null
-    const sessionAgents = selectedSession?.agents || []
-    const stageMessages = ['stage2'].map((stage) => ({
-        stage,
-        data: sessionRunStatus?.stages?.[stage],
-    }))
-    const selectedUpdatedAt = selectedSession?.updated_at_utc || selectedSession?.created_at_utc
+    if (selectedSession) {
+        const sessionAgents = selectedSession.agents || []
+        const selectedUpdatedAt = selectedSession.updated_at_utc || selectedSession.created_at_utc
+        return (
+            <section className="space-y-5">
+                <button
+                    type="button"
+                    onClick={closeTradeSession}
+                    className="flex items-center gap-2 rounded-full border border-line px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-secondary transition-colors hover:border-line-strong hover:text-white"
+                >
+                    <span aria-hidden>←</span>
+                    Trade history
+                </button>
 
-    return (
-        <div className="grid grid-cols-1 xl:grid-cols-[340px,1fr] gap-6 items-start">
-            <aside className="surface rounded-2xl border border-line overflow-hidden xl:sticky xl:top-28">
-                <div className="border-b border-line px-5 py-4">
-                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
-                        Past Trades
-                    </p>
-                    <div className="flex items-end justify-between gap-4 mt-1">
-                        <h2 className="text-white text-[18px] font-medium">
-                            Trade Sessions
-                        </h2>
-                        <span className="text-[10px] text-ink-tertiary font-mono uppercase tracking-[0.14em]">
-                            {pluralize(tradeSessions.length, 'session')}
-                        </span>
+                <div className="surface rounded-3xl border border-line p-5 sm:p-8">
+                    <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+                        <div className="min-w-0">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-success">
+                                Archived agent run
+                            </p>
+                            <h2 className="mt-2 max-w-3xl break-words text-[26px] font-semibold tracking-[-0.035em] text-white sm:text-[36px]">
+                                {selectedSession.title}
+                            </h2>
+                            <p className="mt-3 break-all font-mono text-[10px] text-ink-tertiary">
+                                {selectedSession.request_id || selectedSession.session_id}
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4 lg:min-w-[430px]">
+                            {[
+                                ['Status', selectedSession.status],
+                                ['Agents', sessionAgents.length],
+                                ['Executed', selectedSession.summary?.executed_count ?? 0],
+                                ['Updated', formatTime(selectedUpdatedAt)],
+                            ].map(([label, value]) => (
+                                <div key={String(label)} className="bg-[#08080a] p-3">
+                                    <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-tertiary">{label}</p>
+                                    <p className="nums mt-1 break-words font-mono text-[12px] text-white">{String(value)}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                {tradeSessions.length === 0 ? (
-                    <div className="p-5">
-                        <div className="rounded-xl border border-dashed border-line p-8 text-center">
-                            <p className="text-[12px] text-ink-tertiary font-mono">
-                                No saved trade sessions yet
-                            </p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="max-h-[68vh] overflow-y-auto p-3 space-y-2">
-                        {tradeSessions.map((session) => {
-                            const active = selectedSession?.session_id === session.session_id
-                            return (
-                                <button
-                                    key={session.session_id}
-                                    type="button"
-                                    onClick={() => openTradeSession(session.session_id)}
-                                    className={`w-full rounded-xl border p-4 text-left transition-colors ${active
-                                        ? 'border-success/50 bg-success/[0.06]'
-                                        : 'border-line bg-white/[0.02] hover:border-line-strong'
-                                        }`}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-ink-tertiary">
-                                                {formatDateTime(session.updated_at_utc || session.created_at_utc)}
-                                            </p>
-                                            <p className="text-[14px] text-white mt-1 truncate">
-                                                {session.title}
-                                            </p>
-                                        </div>
-                                        <span className={`mt-0.5 h-2 w-2 rounded-full flex-shrink-0 ${session.status === 'completed'
-                                            ? 'bg-success'
-                                            : session.status === 'failed'
-                                                ? 'bg-danger'
-                                                : 'bg-warning'
-                                            }`}
-                                        />
-                                    </div>
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <span className="rounded-full border border-line bg-black/30 px-2.5 py-1 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.12em]">
-                                            {session.status}
-                                        </span>
-                                        <span className="rounded-full border border-line bg-black/30 px-2.5 py-1 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.12em]">
-                                            {session.agent_count || 0} agents
-                                        </span>
-                                        {session.loaded_from_cloud && (
-                                            <span className="rounded-full border border-accent/30 bg-accent/[0.08] px-2.5 py-1 text-[10px] text-accent font-mono uppercase tracking-[0.12em]">
-                                                cloud
-                                            </span>
-                                        )}
-                                    </div>
-                                </button>
-                            )
-                        })}
-                    </div>
-                )}
-            </aside>
-
-            <section className="min-w-0 space-y-5">
-                {!selectedSession ? (
-                    <div className="surface rounded-2xl border border-line p-10 text-center min-h-[420px] flex items-center justify-center">
-                        <div>
-                            <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
-                                Session Reader
-                            </p>
-                            <p className="text-white text-[18px] mt-3">
-                                Select a saved trade session to read the agent conversation.
-                            </p>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        <motion.div
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, ease }}
-                            className="surface rounded-2xl p-5 sm:p-6 border border-line"
-                        >
-                            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
-                                        Saved Trade Conversation
-                                    </p>
-                                    <h2 className="text-white text-[22px] sm:text-[26px] font-medium tracking-[-0.02em] mt-2 break-words">
-                                        {selectedSession.title}
-                                    </h2>
-                                    <p className="text-[12px] text-ink-secondary font-mono mt-3 break-all">
-                                        {selectedSession.request_id || selectedSession.session_id}
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line rounded-xl overflow-hidden border border-line min-w-0 lg:min-w-[420px]">
-                                    {[
-                                        ['Status', selectedSession.status],
-                                        ['Agents', sessionAgents.length],
-                                        ['Executed', selectedSession.summary?.executed_count ?? 0],
-                                        ['Updated', formatTime(selectedUpdatedAt)],
-                                    ].map(([label, value]) => (
-                                        <div key={String(label)} className="bg-[#08080a] p-3">
-                                            <p className="text-[9px] text-ink-tertiary font-mono uppercase tracking-[0.15em]">
-                                                {label}
-                                            </p>
-                                            <p className="text-[12px] text-white font-mono nums mt-1 break-words">
-                                                {String(value)}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="mt-5 flex flex-wrap gap-2">
-                                <span className="rounded-full border border-line bg-white/[0.02] px-3 py-1.5 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.14em]">
-                                    Created {formatDateTime(selectedSession.created_at_utc)}
-                                </span>
-                                <span className="rounded-full border border-line bg-white/[0.02] px-3 py-1.5 text-[10px] text-ink-secondary font-mono uppercase tracking-[0.14em]">
-                                    {selectedSession.cloud_synced_at_utc ? `Synced ${formatDateTime(selectedSession.cloud_synced_at_utc)}` : 'Local session'}
-                                </span>
-                                {selectedSession.loaded_from_cloud && (
-                                    <span className="rounded-full border border-accent/30 bg-accent/[0.08] px-3 py-1.5 text-[10px] text-accent font-mono uppercase tracking-[0.14em]">
-                                        Loaded from Supabase
-                                    </span>
-                                )}
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, ease, delay: 0.05 }}
-                            className="flex justify-end"
-                        >
-                            <div className="max-w-3xl bg-accent/[0.08] border border-accent/30 rounded-2xl rounded-tr-md px-5 py-4">
-                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-accent mb-1.5">
-                                    Operator
-                                </p>
-                                <p className="text-white text-[14px] leading-relaxed">
-                                    Start AI Trading
-                                </p>
-                                <p className="text-ink-secondary text-[12px] mt-1.5 leading-relaxed">
-                                    Saved run from {formatDateTime(selectedSession.created_at_utc)}.
-                                </p>
-                            </div>
-                        </motion.div>
-
-                        <AgentChatBoard
-                            runStatus={sessionRunStatus}
-                            liveEvents={{}}
-                            sessionAgents={sessionAgents}
-                            activeAgent={activeAgent}
-                            setActiveAgent={setActiveAgent}
-                            connectionState={selectedSession.loaded_from_cloud ? 'cloud archive' : 'saved archive'}
-                        />
-
-                        {stageMessages.map(({ stage, data }, index) => {
-                            const complete = data?.status === 'completed'
-                            if (!data) return null
-                            return (
-                                <motion.div
-                                    key={stage}
-                                    initial={{ opacity: 0, y: 12 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.5, ease, delay: 0.1 + index * 0.05 }}
-                                    className="flex justify-start"
-                                >
-                                    <div className={`max-w-4xl w-full rounded-2xl rounded-tl-md p-5 border ${complete
-                                        ? 'border-success/30 bg-success/[0.03]'
-                                        : 'border-line bg-[#0a0a0c]/50'
-                                        }`}>
-                                        <div className="flex items-start justify-between gap-4 mb-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${complete ? 'bg-success' : 'bg-ink-tertiary'}`} />
-                                                <div className="min-w-0">
-                                                    <p className="text-white font-medium text-[14px]">
-                                                        {stageLabels[stage]}
-                                                    </p>
-                                                    <p className={`text-[10px] font-mono uppercase tracking-[0.18em] mt-0.5 ${complete ? 'text-success' : 'text-ink-tertiary'}`}>
-                                                        {data.status || 'pending'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <p className="text-[10px] text-ink-tertiary font-mono flex-shrink-0">
-                                                {formatTime(data.generated_at_utc)}
-                                            </p>
-                                        </div>
-                                        <p className="text-[13px] text-ink-secondary mb-4 leading-relaxed">
-                                            {statusText(stage, data)}
-                                        </p>
-                                        {stageBody(stage, data)}
-                                    </div>
-                                </motion.div>
-                            )
-                        })}
-                    </>
-                )}
+                <AgentChatBoard
+                    runStatus={selectedSession.status_snapshot || null}
+                    liveEvents={{}}
+                    sessionAgents={sessionAgents}
+                    activeAgent={activeAgent}
+                    setActiveAgent={setActiveAgent}
+                    connectionState={selectedSession.loaded_from_cloud ? 'cloud archive' : 'saved archive'}
+                />
             </section>
-        </div>
+        )
+    }
+
+    return (
+        <section>
+            <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-success">Past runs</p>
+                    <h2 className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-white sm:text-[38px]">
+                        Trade history
+                    </h2>
+                    <p className="mt-2 text-[13px] text-ink-secondary">
+                        Open any completed run to review its agents, charts, artifacts, and responses.
+                    </p>
+                </div>
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-tertiary">
+                    {pluralize(tradeSessions.length, 'session')}
+                </span>
+            </div>
+
+            {tradeSessions.length === 0 ? (
+                <div className="surface grid min-h-[420px] place-items-center rounded-3xl border border-dashed border-line">
+                    <div className="text-center">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-tertiary">
+                            No saved agent runs yet
+                        </p>
+                        <Link href="/dashboard/ai-trading" className="mt-4 inline-flex text-[13px] text-accent hover:underline">
+                            Start your first run
+                        </Link>
+                    </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {tradeSessions.map((session) => (
+                        <button
+                            key={session.session_id}
+                            type="button"
+                            onClick={() => openTradeSession(session.session_id)}
+                            className="group min-h-[190px] rounded-2xl border border-line bg-[#0a0a0d] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-success/45 hover:bg-success/[0.025]"
+                        >
+                            <div className="flex items-start justify-between gap-4">
+                                <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-tertiary">
+                                    {formatDateTime(session.updated_at_utc || session.created_at_utc)}
+                                </p>
+                                <span className={`mt-0.5 h-2 w-2 flex-shrink-0 rounded-full ${session.status === 'completed' ? 'bg-success' : session.status === 'failed' ? 'bg-danger' : 'bg-warning'}`} />
+                            </div>
+                            <h3 className="mt-5 line-clamp-2 text-[17px] font-medium leading-snug text-white">{session.title}</h3>
+                            <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
+                                <div className="flex gap-2">
+                                    <span className="rounded-full border border-line px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-secondary">
+                                        {session.agent_count || 0} agents
+                                    </span>
+                                    {session.loaded_from_cloud && (
+                                        <span className="rounded-full border border-accent/25 bg-accent/[0.06] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
+                                            cloud
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-accent transition-transform group-hover:translate-x-1">→</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </section>
     )
 }
 
 function AITradingChatContent() {
     const searchParams = useSearchParams()
     const expectedRun = searchParams.get('run')
-    const initialView = searchParams.get('view') === 'trades' ? 'trades' : 'live'
+    const requestedView = searchParams.get('view')
+    const initialView: 'agent' | 'live' | 'trades' =
+        requestedView === 'trades' ? 'trades' : requestedView === 'live' || expectedRun ? 'live' : 'agent'
     const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [liveEvents, setLiveEvents] = useState<Record<number, LiveAgentEvent[]>>({})
     const [activeAgent, setActiveAgent] = useState(1)
     const [connectionState, setConnectionState] = useState('connecting')
-    const [viewMode, setViewMode] = useState<'live' | 'trades'>(initialView)
-    const [runningPanelOpen, setRunningPanelOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<'agent' | 'live' | 'trades'>(initialView)
     const [tradeSessions, setTradeSessions] = useState<TradeSessionSummary[]>([])
     const [selectedSession, setSelectedSession] = useState<TradeSession | null>(null)
     const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -949,6 +844,15 @@ function AITradingChatContent() {
     useEffect(() => {
         selectedSessionRef.current = selectedSession
     }, [selectedSession])
+
+    useEffect(() => {
+        if (requestedView === 'live' || expectedRun) {
+            setSelectedSession(null)
+            setViewMode('live')
+        } else if (requestedView === 'trades') {
+            setViewMode('trades')
+        }
+    }, [requestedView, expectedRun])
 
     const fetchTradeSessions = async () => {
         try {
@@ -988,6 +892,23 @@ function AITradingChatContent() {
         fetchStatus()
     }
 
+    const showAgentLauncher = () => {
+        setSelectedSession(null)
+        setViewMode('agent')
+    }
+
+    const showTradeHistory = () => {
+        setSelectedSession(null)
+        setViewMode('trades')
+        fetchTradeSessions()
+    }
+
+    const closeTradeSession = () => {
+        setSelectedSession(null)
+        setLiveEvents({})
+        setViewMode('trades')
+    }
+
     useEffect(() => {
         fetchStatus()
         fetchTradeSessions()
@@ -1000,12 +921,6 @@ function AITradingChatContent() {
             fetchTradeSessions()
         }
     }, [viewMode])
-
-    useEffect(() => {
-        if (viewMode === 'trades' && !selectedSession && tradeSessions.length > 0) {
-            openTradeSession(tradeSessions[0].session_id)
-        }
-    }, [viewMode, tradeSessions, selectedSession])
 
     useEffect(() => {
         let socket: WebSocket | null = null
@@ -1163,11 +1078,10 @@ function AITradingChatContent() {
             <div className="pointer-events-none fixed inset-0 bg-grid-fine opacity-50" />
             <div className="pointer-events-none fixed inset-0 bg-spotlight" />
 
-            {/* Header */}
             <header className="sticky top-0 z-40">
-                <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-5">
-                    <div className="glass rounded-2xl sm:rounded-full px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+                    <div className="glass flex flex-col justify-between gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:items-center sm:rounded-full sm:px-6">
+                        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                             <Link href="/" className="flex items-center gap-2.5 flex-shrink-0" aria-label="Home">
                                 <div className="relative h-7 w-7">
                                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent to-success opacity-80 blur-md" />
@@ -1178,92 +1092,45 @@ function AITradingChatContent() {
                             </Link>
                             <div className="border-l border-white/10 pl-3 sm:pl-4 min-w-0">
                                 <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
-                                    {viewMode === 'trades' ? 'Trade History' : 'Live Agent Run'}
+                                    {viewMode === 'agent' ? 'Agent launcher' : viewMode === 'trades' ? 'Trade history' : 'Live run'}
                                 </p>
                                 <h1 className="font-display text-[18px] sm:text-[20px] text-white tracking-[-0.02em] leading-[1.1] mt-0.5">
-                                    AI Trading <span className="font-serif-italic text-ink-secondary">{viewMode === 'trades' ? 'Sessions' : 'Terminal'}</span>
+                                    AI Trading <span className="font-serif-italic text-ink-secondary">{viewMode === 'agent' ? 'Control' : viewMode === 'trades' ? 'Archive' : 'Workspace'}</span>
                                 </h1>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar">
-                            {viewMode === 'trades' && (
-                                <button
-                                    type="button"
-                                    onClick={resumeLiveRun}
-                                    className="flex-shrink-0 rounded-full border border-line bg-white/[0.03] px-4 py-2 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-line-strong transition-colors"
-                                >
-                                    Live
-                                </button>
-                            )}
+                        <nav className="no-scrollbar flex w-full items-center gap-2 overflow-x-auto sm:w-auto" aria-label="AI trading navigation">
                             <button
                                 type="button"
-                                onClick={() => setRunningPanelOpen(true)}
-                                className="flex-shrink-0 rounded-full border border-accent/30 bg-accent/[0.08] px-4 py-2 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-accent/60 transition-colors"
+                                onClick={showAgentLauncher}
+                                className={`flex-shrink-0 rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${viewMode === 'agent' ? 'border-accent/40 bg-accent/[0.09] text-white' : 'border-line bg-white/[0.03] text-ink-secondary hover:text-white'}`}
                             >
-                                running agents
+                                Agent
                             </button>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    fetchTradeSessions()
-                                    setViewMode('trades')
-                                }}
-                                className={`flex-shrink-0 rounded-full border px-4 py-2 text-[11px] font-mono uppercase tracking-[0.14em] text-white transition-colors ${viewMode === 'trades'
-                                    ? 'border-success/50 bg-success/[0.08]'
-                                    : 'border-line bg-white/[0.03] hover:border-line-strong'
-                                    }`}
+                                onClick={resumeLiveRun}
+                                className={`flex-shrink-0 rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${viewMode === 'live' ? 'border-warning/40 bg-warning/[0.08] text-white' : 'border-line bg-white/[0.03] text-ink-secondary hover:text-white'}`}
+                            >
+                                Live run {rows.length > 1 ? `· ${rows.length}` : ''}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={showTradeHistory}
+                                className={`flex-shrink-0 rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${viewMode === 'trades' ? 'border-success/50 bg-success/[0.08] text-white' : 'border-line bg-white/[0.03] text-ink-secondary hover:text-white'}`}
                             >
                                 Trades
                             </button>
-                            <Link href="/dashboard" className="flex-shrink-0 rounded-full border border-line bg-white/[0.03] px-4 py-2 text-[11px] font-mono uppercase tracking-[0.14em] text-white hover:border-line-strong transition-colors">
+                            <Link href="/dashboard" className="flex-shrink-0 rounded-full border border-line bg-white/[0.03] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-secondary transition-colors hover:text-white">
                                 Dashboard
                             </Link>
-                        </div>
+                        </nav>
                     </div>
                 </div>
             </header>
 
-            <FloatingPanel
-                title="running agents"
-                open={runningPanelOpen}
-                onClose={() => setRunningPanelOpen(false)}
-            >
-                <div className="space-y-2">
-                    {rows.map((row) => (
-                        <button
-                            key={row.rank}
-                            type="button"
-                            onClick={() => {
-                                setActiveAgent(row.rank)
-                                setRunningPanelOpen(false)
-                                bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-                            }}
-                            className={`w-full rounded-xl border p-4 text-left transition-colors ${activeAgent === row.rank
-                                ? 'border-accent/50 bg-accent/[0.08]'
-                                : 'border-line bg-white/[0.02] hover:border-line-strong'
-                                }`}
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-ink-tertiary">
-                                        Agent {row.rank}
-                                    </p>
-                                    <p className="text-[14px] text-white mt-1 truncate">
-                                        {row.name}
-                                    </p>
-                                </div>
-                                <span className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${row.failed ? 'bg-danger' : row.complete ? 'bg-success' : 'bg-warning animate-pulse-soft'}`} />
-                            </div>
-                            <p className="text-[11px] text-ink-secondary mt-2 truncate">
-                                {row.status}
-                            </p>
-                        </button>
-                    ))}
-                </div>
-            </FloatingPanel>
-
-            <main className="relative mx-auto max-w-6xl px-6 lg:px-8 pt-10 pb-24">
-                {/* Run metadata */}
+            <main className="relative mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
+                {viewMode === 'live' && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1302,6 +1169,7 @@ function AITradingChatContent() {
                         </div>
                     )}
                 </motion.div>
+                )}
 
                 {error && (
                     <motion.div
@@ -1315,47 +1183,42 @@ function AITradingChatContent() {
                     </motion.div>
                 )}
 
-                {viewMode === 'trades' ? (
+                {viewMode === 'agent' ? (
+                    <section className="mx-auto max-w-3xl">
+                        <div className="mb-7 text-center">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+                                Configure one run
+                            </p>
+                            <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.045em] text-white sm:text-[46px]">
+                                Put your agents to work.
+                            </h2>
+                            <p className="mx-auto mt-3 max-w-xl text-[13px] leading-relaxed text-ink-secondary">
+                                Choose automatic sizing or a fixed trade amount, decide whether regime analysis should run, then launch.
+                            </p>
+                        </div>
+                        <TradingStatus />
+                    </section>
+                ) : viewMode === 'trades' ? (
                     <TradeHistoryView
                         tradeSessions={tradeSessions}
                         selectedSession={selectedSession}
                         openTradeSession={openTradeSession}
+                        closeTradeSession={closeTradeSession}
                         activeAgent={activeAgent}
                         setActiveAgent={setActiveAgent}
                     />
                 ) : (
                     <div className="space-y-5 pb-8">
-                        {/* Conversation stream */}
-                    {/* User input bubble */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, ease, delay: 0.1 }}
-                        className="flex justify-end"
-                    >
-                        <div className="max-w-3xl bg-accent/[0.08] border border-accent/30 rounded-2xl rounded-tr-md px-5 py-4">
-                            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-accent mb-1.5">
-                                Operator
-                            </p>
-                            <p className="text-white text-[14px] leading-relaxed">
-                                Start AI Trading
-                            </p>
-                            <p className="text-ink-secondary text-[12px] mt-1.5 leading-relaxed">
-                                Run the stock agents once, only after Stage 2 is ready.
-                            </p>
-                        </div>
-                    </motion.div>
-
                     <AgentChatBoard
                         runStatus={runStatus}
                         liveEvents={liveEvents}
-                        sessionAgents={sessionAgents}
+                        sessionAgents={[]}
                         activeAgent={activeAgent}
                         setActiveAgent={setActiveAgent}
                         connectionState={connectionState}
                     />
 
-                    {messages.map(({ stage, data }, index) => {
+                    {false && messages.map(({ stage, data }, index) => {
                         const active = data?.status === 'running'
                         const complete = data?.status === 'completed'
                         const pending = !data || data.status === 'pending'
@@ -1415,7 +1278,7 @@ function AITradingChatContent() {
                         </motion.div>
                     )}
 
-                    {runStatus?.status === 'completed' && (
+                    {false && runStatus?.status === 'completed' && (
                         <motion.div
                             initial={{ opacity: 0, y: 12 }}
                             animate={{ opacity: 1, y: 0 }}

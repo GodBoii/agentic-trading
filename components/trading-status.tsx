@@ -19,11 +19,6 @@ interface AgentRunStatus {
     stages?: Record<string, { status: string; summary?: any }>
 }
 
-const stageLabels: Record<string, string> = {
-    stage2: 'Stage 2',
-    stock_agent: 'Stock Agent',
-}
-
 export default function TradingStatus() {
     const router = useRouter()
     const [tradingKeys, setTradingKeys] = useState<TradingKeys | null>(null)
@@ -74,7 +69,7 @@ export default function TradingStatus() {
         }
         const resPayload = await response.json()
         await fetchRunStatus()
-        router.push(`/dashboard/ai-trading?run=${encodeURIComponent(resPayload?.request?.request_id || '')}`)
+        router.push(`/dashboard/ai-trading?view=live&run=${encodeURIComponent(resPayload?.request?.request_id || '')}`)
     }
 
     const fetchRunStatus = async () => {
@@ -164,9 +159,9 @@ export default function TradingStatus() {
         return (
             <div className="dash-surface p-6 h-full flex flex-col">
                 <div className="mb-4">
-                    <span className="dash-label">Agent Engine</span>
+                    <span className="dash-label">Agent launcher</span>
                     <h3 className="text-[20px] font-display text-[var(--dash-text)] tracking-[-0.02em] mt-1">
-                        Trading Status
+                        Connect your broker
                     </h3>
                 </div>
                 <p className="text-[13px] text-[var(--dash-text-secondary)] leading-relaxed mb-6">
@@ -190,9 +185,9 @@ export default function TradingStatus() {
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
                 <div>
-                    <span className="dash-label">Agent Engine</span>
-                    <h3 className="text-[20px] font-display text-[var(--dash-text)] tracking-[-0.02em] mt-1">
-                        Trading Status
+                    <span className="dash-label">Agent launcher</span>
+                    <h3 className="text-[24px] font-display text-[var(--dash-text)] tracking-[-0.035em] mt-1">
+                        Launch trading agents
                     </h3>
                 </div>
                 <span className={`dash-badge ${isRunning ? 'dash-badge-warning' : isActive ? 'dash-badge-positive' : ''}`}>
@@ -289,55 +284,27 @@ export default function TradingStatus() {
             </div>
 
             {/* Start Action */}
-            <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-[var(--dash-border)]">
+            <div className="flex items-center justify-between gap-3">
                 <div>
                     <p className="text-[12px] text-[var(--dash-text-secondary)]">
-                        {isRunning ? 'Agents are running' : 'Press start to run agents'}
+                        {isRunning ? 'Your live run is already active' : 'Your configuration applies to this run only'}
                     </p>
                 </div>
                 <button
-                    onClick={handleStart}
-                    disabled={updating || tokenExpired || isRunning || (tradeMode === 'manual' && (!tradeAmount || parseFloat(tradeAmount) <= 0))}
+                    onClick={() => isRunning ? router.push('/dashboard/ai-trading?view=live') : handleStart()}
+                    disabled={updating || tokenExpired || (!isRunning && tradeMode === 'manual' && (!tradeAmount || parseFloat(tradeAmount) <= 0))}
                     className="dash-btn-primary !text-[12px] !px-4 !py-2"
-                    aria-label="Start AI trading"
+                    aria-label={isRunning ? 'View live agent run' : 'Start AI trading'}
                 >
-                    {updating ? 'Starting…' : isRunning ? 'Running…' : 'Start Agent'}
+                    {updating ? 'Starting…' : isRunning ? 'View live run' : 'Start trading'}
                 </button>
             </div>
 
-            {/* Agent Stages */}
-            <div className="flex-1 space-y-3">
-                <p className="dash-label">Agent Run</p>
-                <div className="space-y-1.5">
-                    {Object.entries(stageLabels).map(([stage, label]) => {
-                        const status = runStatus?.stages?.[stage]?.status || 'pending'
-                        const active = status === 'running'
-                        const complete = status === 'completed'
-                        return (
-                            <div
-                                key={stage}
-                                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/[0.01] transition-colors"
-                            >
-                                <div className="flex items-center gap-2.5">
-                                    <span className={`dash-dot ${complete ? 'dash-dot-positive' : active ? 'dash-dot-warning dash-dot-pulse' : 'dash-dot-muted'}`} />
-                                    <span className="text-[12px] font-mono text-[var(--dash-text)]">{label}</span>
-                                </div>
-                                <span className="dash-label">{status}</span>
-                            </div>
-                        )
-                    })}
-                </div>
-                {runStatus?.error && (
-                    <p className="text-[11px] text-[var(--dash-negative)] font-mono mt-1">
-                        {runStatus.error}
-                    </p>
-                )}
-            </div>
-
-            {/* Safety note */}
-            <p className="mt-4 pt-3 border-t border-[var(--dash-border)] text-[11px] text-[var(--dash-text-muted)] leading-relaxed">
-                AI trading runs only when you press start. Agents analyze and execute once.
-            </p>
+            {runStatus?.error && (
+                <p className="mt-4 border-t border-[var(--dash-border)] pt-3 font-mono text-[11px] text-[var(--dash-negative)]">
+                    {runStatus.error}
+                </p>
+            )}
         </div>
     )
 }
