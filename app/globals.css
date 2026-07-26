@@ -1065,6 +1065,140 @@ body {
   font-feature-settings: "tnum" 1, "zero" 1;
 }
 
+.attachment-rail {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 255, 0.38) rgba(255, 255, 255, 0.04);
+}
+
+.attachment-rail > * > * {
+  scroll-snap-align: start;
+}
+
+.attachment-rail::-webkit-scrollbar {
+  height: 6px;
+}
+
+.attachment-rail::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.attachment-rail::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.38);
+  border-radius: 999px;
+}
+
+.agent-markdown {
+  color: var(--dash-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.agent-markdown > * + * {
+  margin-top: 0.9rem;
+}
+
+.agent-markdown h1,
+.agent-markdown h2,
+.agent-markdown h3,
+.agent-markdown h4 {
+  color: var(--dash-text);
+  font-family: var(--font-grotesk);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.agent-markdown h1 { font-size: 1.25rem; }
+.agent-markdown h2 { font-size: 1.0625rem; }
+.agent-markdown h3,
+.agent-markdown h4 { font-size: 0.9375rem; }
+
+.agent-markdown ul,
+.agent-markdown ol {
+  padding-left: 1.35rem;
+}
+
+.agent-markdown ul { list-style: disc; }
+.agent-markdown ol { list-style: decimal; }
+.agent-markdown li + li { margin-top: 0.35rem; }
+.agent-markdown li::marker { color: var(--accent); }
+.agent-markdown strong { color: var(--dash-text); font-weight: 600; }
+
+.agent-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.agent-markdown blockquote {
+  border-left: 2px solid rgba(0, 229, 255, 0.45);
+  padding-left: 1rem;
+  color: var(--dash-text-secondary);
+}
+
+.agent-markdown code {
+  border: 1px solid var(--dash-border);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.12rem 0.35rem;
+  color: var(--dash-text);
+  font-size: 0.78em;
+}
+
+.agent-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background: #050506;
+  padding: 1rem;
+}
+
+.agent-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--dash-text-secondary);
+}
+
+.agent-markdown-table {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--dash-border);
+  border-radius: 10px;
+}
+
+.agent-markdown table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+}
+
+.agent-markdown th,
+.agent-markdown td {
+  border-bottom: 1px solid var(--dash-border);
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+}
+
+.agent-markdown th {
+  color: var(--dash-text);
+  font-family: var(--font-product-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.agent-markdown-danger,
+.agent-markdown-danger strong {
+  color: var(--dash-negative);
+}
+
 @layer utilities {
   /* ── Dashboard surfaces ── */
   .dash-surface {
