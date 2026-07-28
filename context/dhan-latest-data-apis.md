@@ -1,6 +1,6 @@
 # Dhan Latest Data APIs
 
-This document captures the latest Dhan data API understanding used in this project as of April 7, 2026.
+This document captures the latest Dhan data API understanding used in this project as of July 28, 2026.
 
 It is focused on the practical data features we verified in code:
 
@@ -16,12 +16,10 @@ It is focused on the practical data features we verified in code:
 The project virtual environment was updated to:
 
 ```text
-dhanhq==2.2.0rc1
+dhanhq==2.2.0
 ```
 
-This is important because older `dhanhq` versions exposed older-style APIs and did not cleanly expose the latest depth helpers we needed.
-
-Latest stable on PyPI was `2.0.2`, but the newer pre-release `2.2.0rc1` adds newer classes like:
+This is important because older `dhanhq` versions exposed older-style APIs and did not cleanly expose the latest depth helpers we needed. Version `2.2.0` exposes the required classes:
 
 - `DhanContext`
 - `MarketFeed`
@@ -288,7 +286,9 @@ This is different from ordinary equity historical data because expired options n
 - expiry code
 - derivative instrument identity
 
-In our current project, this test is still pending because we have not yet supplied a valid expired option security id and related option metadata in `.env`.
+Live verification on July 28, 2026 succeeded against `/v2/charts/rollingoption`
+using the NIFTY underlying (`securityId=13`), `OPTIDX`, monthly expiry code 1,
+and an expired June 2026 date range.
 
 ## Practical Summary
 
@@ -318,10 +318,16 @@ After upgrading the SDK and fixing the implementation:
 - 20 Market Depth: working
 - Option Chain: working
 - Full Market Depth: working
-- Expired Options Data: not yet configured with valid expired option instrument inputs
+- Expired Options Data: working
 
 ## Notes
 
 - Dhan rate limits can affect quote/depth style endpoints if hit too quickly.
 - Websocket connections should be closed cleanly after tests.
 - Tokens should never be printed into logs or saved into docs.
+- Keep `.env` and `python-backend/.env` synchronized. Docker must load the root
+  file first and `python-backend/.env` second so the dedicated, current data
+  token wins if values ever diverge.
+- Refresh `security_id_list.csv` from Dhan's detailed instrument master before
+  resolving current futures and options; stale masters cause local contract
+  resolution failures even when the Dhan APIs are healthy.
