@@ -34,6 +34,7 @@ class PipelineConfig:
     tick_stats_latest_path: Path = backend_dir / "stage2_tick_stats_latest.json"
     tick_stats_history_latest_path: Path = backend_dir / "stage2_tick_stats_history_latest.json"
     dhan_rate_limit_state_path: Path = backend_dir / "dhan_rate_limit_state.json"
+    dhan_quote_rate_limit_state_path: Path = backend_dir / "dhan_quote_rate_limit_state.json"
     nifty_depth_latest_path: Path = backend_dir / "nifty_market_depth_latest.json"
     nifty_depth_data_dir: Path = backend_dir / "nifty_market_depth"
     nifty_depth_charts_latest_path: Path = backend_dir / "nifty_market_depth_charts_latest.json"
@@ -73,6 +74,13 @@ class PipelineConfig:
     tick_collector_refresh_check_interval_seconds: int = 30
 
     historical_rate_limit_per_sec: int = 4
+    quote_request_gap_seconds: float = 1.1
+    quote_request_retries: int = 3
+    historical_circuit_breaker_threshold: int = 12
+    historical_circuit_breaker_cooldown_seconds: int = 300
+    stage1_max_missing_ohlc_ratio: float = 0.20
+    stage1_max_fetch_failure_ratio: float = 0.10
+    stage2_max_fetch_failure_ratio: float = 0.10
     stage1_workers: int = 8
     stage2_workers: int = 8
     regime_workers: int = 8
@@ -83,6 +91,7 @@ class PipelineConfig:
     regime_alpha_vantage_news_limit: int = 25
     regime_source_max_staleness_seconds: int = 900
     stage2_loop_interval_seconds: int = 1800
+    stage1_degraded_retry_interval_seconds: int = 900
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
     regime_schedule_times: tuple[str, ...] = ("09:15", "09:45", "12:30")
@@ -130,8 +139,14 @@ class PipelineConfig:
     def stage1_daily_path(self, market_date: str) -> Path:
         return self.backend_dir / f"stage1-{market_date}.json"
 
+    def stage1_degraded_path(self, market_date: str) -> Path:
+        return self.backend_dir / f"stage1-degraded-{market_date}.json"
+
     def stage2_daily_path(self, market_date: str) -> Path:
         return self.backend_dir / f"stage2-{market_date}.json"
+
+    def stage2_degraded_path(self, market_date: str) -> Path:
+        return self.backend_dir / f"stage2-degraded-{market_date}.json"
 
     def monitor_daily_path(self, market_date: str) -> Path:
         return self.backend_dir / f"monitor-{market_date}.json"

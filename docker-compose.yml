@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: python-backend/Dockerfile
     env_file:
-      - python-backend/.env
       - .env
+      - python-backend/.env
     working_dir: /app/python-backend
     command: python -m pipeline.runtime.run_market_data_gateway
     volumes:
@@ -18,8 +18,8 @@ services:
       context: .
       dockerfile: python-backend/Dockerfile
     env_file:
-      - python-backend/.env
       - .env
+      - python-backend/.env
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
@@ -38,8 +38,8 @@ services:
       context: .
       dockerfile: python-backend/Dockerfile
     env_file:
-      - python-backend/.env
       - .env
+      - python-backend/.env
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
@@ -58,8 +58,8 @@ services:
       context: .
       dockerfile: python-backend/Dockerfile
     env_file:
-      - python-backend/.env
       - .env
+      - python-backend/.env
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
@@ -77,8 +77,8 @@ services:
       dockerfile: python-backend/Dockerfile
     container_name: trader-ai-trading-agents
     env_file:
-      - python-backend/.env
       - .env
+      - python-backend/.env
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
