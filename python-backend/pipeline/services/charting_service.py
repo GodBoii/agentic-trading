@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -77,6 +77,7 @@ class CandlestickChartService:
         today_frame = self._day_frame(local_frame, market_date)
         if today_frame.empty:
             raise ValueError("No intraday candles available for the requested market date.")
+        data_as_of = today_frame.index[-1]
 
         # Get previous day frame for S/R computation
         prev_date = self._previous_trading_day(market_date)
@@ -105,7 +106,10 @@ class CandlestickChartService:
             self._render_chart(
                 frame=enriched,
                 title=f"{display_name} {tf_label}",
-                subtitle=f"CURRENT DAY \u2014 {market_date}",
+                subtitle=(
+                    f"CURRENT DAY \u2014 {market_date} | "
+                    f"DATA THROUGH {data_as_of.strftime('%H:%M:%S IST')}"
+                ),
                 output_path=path,
                 market_date=market_date,
                 timeframe_minutes=timeframe,
@@ -122,6 +126,12 @@ class CandlestickChartService:
                 "date": market_date,
                 "path": str(path),
                 "candles": int(len(resampled)),
+                "data_as_of_ist": data_as_of.isoformat(),
+                "last_candle_start_ist": resampled.index[-1].isoformat(),
+                "last_candle_complete": bool(
+                    datetime.now(self.resolved_timezone)
+                    >= resampled.index[-1].to_pydatetime() + timedelta(minutes=timeframe)
+                ),
             }
             chart_paths_ordered.append(str(path))
 
@@ -129,6 +139,13 @@ class CandlestickChartService:
             if timeframe == 5:
                 technical_metadata = self._build_technical_metadata(
                     enriched, sr_levels, sd_zones, patterns, prev_day_levels
+                )
+                technical_metadata.update(
+                    {
+                        "data_as_of_ist": data_as_of.isoformat(),
+                        "last_candle_start_ist": resampled.index[-1].isoformat(),
+                        "last_candle_complete": charts[key]["last_candle_complete"],
+                    }
                 )
 
         # Previous day charts
@@ -169,6 +186,8 @@ class CandlestickChartService:
 
         return {
             "market_date": market_date,
+            "data_as_of_ist": data_as_of.isoformat(),
+            "charts_built_at_ist": datetime.now(self.resolved_timezone).isoformat(),
             "previous_market_date": prev_date_str if not prev_frame.empty else None,
             "chart_count": len(charts),
             "charts": charts,
@@ -202,12 +221,6 @@ class CandlestickChartService:
         avg_loss = loss.ewm(alpha=1.0 / 14, min_periods=14, adjust=False).mean()
         rs = avg_gain / avg_loss.replace(0, np.nan)
         df["rsi"] = 100 - (100 / (1 + rs))
-        df["rsi"] = df["rsi"].fillna(50)
-
-        # Backfill Bollinger Bands for early candles
-        df["bb_mid"] = df["bb_mid"].bfill()
-        df["bb_upper"] = df["bb_upper"].bfill()
-        df["bb_lower"] = df["bb_lower"].bfill()
 
         return df
 

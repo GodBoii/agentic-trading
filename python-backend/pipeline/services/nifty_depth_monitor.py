@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict, deque
 from contextlib import redirect_stdout
 from io import StringIO
+import inspect
 import json
 import os
 import threading
@@ -46,6 +47,7 @@ class NiftyDepthMonitor:
         self.raw_write_interval_seconds = self._env_float("NIFTY_DEPTH_RAW_WRITE_SECONDS", 0.0)
         self.persist_every_packet = self._env_bool("NIFTY_DEPTH_PERSIST_EVERY_PACKET", True)
         self.first_packet_timeout_seconds = self._env_float("NIFTY_DEPTH_FIRST_PACKET_TIMEOUT_SECONDS", 20.0)
+        self.depth_idle_timeout_limit = max(1, self._env_int("NIFTY_DEPTH_IDLE_TIMEOUT_LIMIT", 3))
         self.max_latest_depth_levels = self._env_int("NIFTY_DEPTH_LATEST_LEVELS", 20)
         self.charts_enabled = self._env_bool("NIFTY_DEPTH_CHARTS_ENABLED", True)
         self.chart_interval_seconds = self._env_float("NIFTY_DEPTH_CHART_INTERVAL_SECONDS", 60.0)
@@ -220,11 +222,30 @@ class NiftyDepthMonitor:
             method = getattr(feed, method_name, None)
             if not method:
                 continue
+            result = None
             try:
-                method()
+                result = method()
+                if inspect.isawaitable(result):
+                    loop = getattr(feed, "loop", None)
+                    if loop is not None and not loop.is_closed():
+                        if loop.is_running():
+                            asyncio.run_coroutine_threadsafe(result, loop)
+                        else:
+                            loop.run_until_complete(result)
+                    else:
+                        asyncio.run(result)
                 return
             except Exception:
+                if inspect.iscoroutine(result):
+                    result.close()
                 continue
+
+    @staticmethod
+    def _configure_depth_websocket(feed: Any) -> None:
+        """Use packet-idle detection instead of the SDK's incompatible Pong timeout."""
+        websocket = getattr(feed, "ws", None)
+        if websocket is not None and hasattr(websocket, "ping_timeout"):
+            websocket.ping_timeout = None
 
     def _append_event(self, stream_name: str, payload: Dict[str, Any], *, throttle: bool = True) -> None:
         now = time.time()
@@ -1094,8 +1115,10 @@ class NiftyDepthMonitor:
                 print("NIFTY 200-depth WebSocket URL is hidden to avoid leaking the access token.")
                 with redirect_stdout(StringIO()):
                     feed.run_forever()
+                self._configure_depth_websocket(feed)
                 self._set_stream_state(stream_name, status="connected_waiting_for_first_packet")
                 first_packet_seen = False
+                consecutive_idle_timeouts = 0
                 while not self.stop_event.is_set() and self.market_time.is_market_hours():
                     try:
                         raw = feed.loop.run_until_complete(
@@ -1123,6 +1146,12 @@ class NiftyDepthMonitor:
                                 f"{self.first_packet_timeout_seconds}s after connect"
                             )
                         self._set_stream_state(stream_name, status="idle_after_packets")
+                        consecutive_idle_timeouts += 1
+                        if consecutive_idle_timeouts >= self.depth_idle_timeout_limit:
+                            raise TimeoutError(
+                                f"{stream_name} received no packets for "
+                                f"{self.first_packet_timeout_seconds * consecutive_idle_timeouts:.0f}s"
+                            )
                         continue
                     remaining_data = raw
                     while remaining_data:
@@ -1132,6 +1161,7 @@ class NiftyDepthMonitor:
                         remaining_data = update.pop("remaining_data", None)
                         if update.get("type") in {"Bid", "Ask"}:
                             first_packet_seen = True
+                            consecutive_idle_timeouts = 0
                             self._record_depth_packet(update)
             except Exception as exc:
                 self._record_error(stream_name, exc)
