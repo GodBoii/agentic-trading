@@ -1,11 +1,13 @@
 import json
 import math
+import os
 import random
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
-from threading import Condition
+from datetime import datetime, time as dt_time, timedelta
+from threading import Condition, local
 from typing import Any, DefaultDict, Dict, List, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 import requests
@@ -20,9 +22,15 @@ except Exception:  # pragma: no cover - non-posix fallback
     fcntl = None
 
 
+class DhanAPIError(RuntimeError):
+    def __init__(self, message: str, code: Optional[str] = None):
+        super().__init__(message)
+        self.code = code
+
+
 class DhanService:
-    RATE_LIMIT_ERROR_CODES = {"dh-904", "dh-805"}
-    FOREVER_ORDER_LIST_ENDPOINTS = ("/forever/all", "/forever/orders")
+    RATE_LIMIT_ERROR_CODES = {"904", "805", "dh-904", "dh904", "dh-805", "dh805"}
+    FOREVER_ORDER_LIST_ENDPOINTS = ("/forever/orders", "/forever/all")
     VALID_HISTORICAL_INSTRUMENTS = {
         "INDEX",
         "FUTIDX",
@@ -41,10 +49,17 @@ class DhanService:
         self.request_times = deque()
         self.rate_limit_hits = deque()
         self.rate_condition = Condition()
-        self.quote_request_gap = 1.1
+        self.quote_condition = Condition()
+        self.quote_request_gap = self.config.quote_request_gap_seconds
+        self.last_quote_request_ts = 0.0
         self.option_chain_request_gap = 3.1
         self.last_option_chain_request_ts = 0.0
         self.prefer_gateway = prefer_gateway
+        self.thread_local = local()
+        self.historical_circuit_condition = Condition()
+        self.historical_failure_signature: Optional[str] = None
+        self.historical_consecutive_failures = 0
+        self.historical_circuit_open_until = 0.0
 
         root_env = dotenv_values(config.root_dir / ".env")
         backend_env = dotenv_values(config.backend_dir / ".env")
@@ -52,8 +67,18 @@ class DhanService:
         merged.update({k: v for k, v in root_env.items() if v is not None})
         merged.update({k: v for k, v in backend_env.items() if v is not None})
 
-        self.client_id = merged.get("DHAN_DATA_CLIENT_ID") or merged.get("DHAN_CLIENT_ID")
-        self.access_token = merged.get("DHAN_DATA_ACCESS_TOKEN") or merged.get("DHAN_ACCESS_TOKEN")
+        self.client_id = (
+            merged.get("DHAN_DATA_CLIENT_ID")
+            or merged.get("DHAN_CLIENT_ID")
+            or os.getenv("DHAN_DATA_CLIENT_ID")
+            or os.getenv("DHAN_CLIENT_ID")
+        )
+        self.access_token = (
+            merged.get("DHAN_DATA_ACCESS_TOKEN")
+            or merged.get("DHAN_ACCESS_TOKEN")
+            or os.getenv("DHAN_DATA_ACCESS_TOKEN")
+            or os.getenv("DHAN_ACCESS_TOKEN")
+        )
         self.app_id = merged.get("DHAN_APP_ID")
         self.app_secret = merged.get("DHAN_APP_SECRET")
 
@@ -73,6 +98,32 @@ class DhanService:
         self.gateway_timeout_seconds = self.config.market_data_gateway_timeout_seconds
         self.gateway_session = requests.Session() if self.gateway_url else None
         self.base_url = "https://api.dhan.co/v2"
+
+    def _market_timezone(self):
+        for timezone_name in (self.config.market_timezone, "Asia/Kolkata"):
+            try:
+                return ZoneInfo(timezone_name)
+            except ZoneInfoNotFoundError:
+                continue
+        return None
+
+    def _market_now(self) -> datetime:
+        timezone_info = self._market_timezone()
+        return datetime.now(timezone_info) if timezone_info else datetime.now()
+
+    def _historical_client(self) -> HistoricalData:
+        client = getattr(self.thread_local, "historical_api", None)
+        if client is None:
+            client = HistoricalData(self.dhan_context)
+            self.thread_local.historical_api = client
+        return client
+
+    def _market_client(self):
+        client = getattr(self.thread_local, "market_api", None)
+        if client is None:
+            client = dhanhq(self.dhan_context)
+            self.thread_local.market_api = client
+        return client
 
     def _headers(self) -> Dict[str, str]:
         return {
@@ -151,6 +202,28 @@ class DhanService:
         enriched.update(payload)
         return enriched
 
+    def _normalize_sdk_response(
+        self,
+        response: Any,
+        *,
+        empty_error_codes: Optional[set[str]] = None,
+    ) -> Dict[str, Any]:
+        """Preserve the SDK's real success/failure status and unwrap nothing twice."""
+        if not isinstance(response, dict):
+            return {"status": "success", "data": response}
+
+        code = self._normalized_error_code(response)
+        if (
+            str(response.get("status", "")).lower() == "failure"
+            and code in (empty_error_codes or set())
+        ):
+            return {
+                "status": "success",
+                "remarks": response.get("remarks"),
+                "data": [],
+            }
+        return response
+
     def _normalize_historical_instruments(self, instrument_candidates: Optional[List[str]]) -> List[str]:
         # Dhan historical API accepts Dhan instrument names (e.g. EQUITY), not exchange-type tags like ES.
         normalized: List[str] = []
@@ -219,49 +292,52 @@ class DhanService:
     def fetch_holdings(self) -> Dict[str, Any]:
         try:
             response = self.market_api.get_holdings()
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(
+                response,
+                empty_error_codes={"1111", "dh-1111"},
+            )
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": []}
 
     def fetch_positions(self) -> Dict[str, Any]:
         try:
             response = self.market_api.get_positions()
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": []}
 
     def fetch_fund_limits(self) -> Dict[str, Any]:
         try:
             response = self.market_api.get_fund_limits()
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
     def fetch_order_book(self) -> Dict[str, Any]:
         try:
             response = self.market_api.get_order_list()
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": []}
 
     def fetch_order_by_id(self, order_id: str) -> Dict[str, Any]:
         try:
             response = self.market_api.get_order_by_id(order_id)
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
     def fetch_order_by_correlation_id(self, correlation_id: str) -> Dict[str, Any]:
         try:
             response = self.market_api.get_order_by_correlationID(correlation_id)
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
     def fetch_trade_book(self, order_id: Optional[str] = None) -> Dict[str, Any]:
         try:
             response = self.market_api.get_trade_book(order_id)
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": []}
 
@@ -304,7 +380,7 @@ class DhanService:
                 tag=correlation_id,
                 should_slice=should_slice,
             )
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
@@ -396,8 +472,8 @@ class DhanService:
         payload = self._with_client_id(
             {
                 "includePosition": bool(include_position),
-                "includeOrders": bool(include_orders),
-                "scripts": normalized_scripts,
+                "includeOrder": bool(include_orders),
+                "scripList": normalized_scripts,
             }
         )
         return self._request("POST", "/margincalculator/multi", payload=payload)
@@ -651,14 +727,14 @@ class DhanService:
                 disclosed_quantity=int(disclosed_quantity),
                 validity=validity,
             )
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
     def cancel_order(self, order_id: str) -> Dict[str, Any]:
         try:
             response = self.market_api.cancel_order(order_id)
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
@@ -681,7 +757,7 @@ class DhanService:
                 convert_qty=int(convert_qty),
                 to_product_type=to_product_type,
             )
-            return {"status": "success", "data": response}
+            return self._normalize_sdk_response(response)
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
 
@@ -790,6 +866,141 @@ class DhanService:
 
             time.sleep(wait_time)
 
+    def _acquire_shared_gap(self, state_path, gap_seconds: float) -> None:
+        if fcntl is None:
+            return
+
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        if not state_path.exists():
+            state_path.write_text('{"last_request_ts": 0.0}', encoding="utf-8")
+
+        while True:
+            with state_path.open("r+", encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    raw = handle.read().strip()
+                    payload = json.loads(raw) if raw else {"last_request_ts": 0.0}
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    payload = {"last_request_ts": 0.0}
+
+                now = time.time()
+                last_request_ts = float(payload.get("last_request_ts") or 0.0)
+                wait_time = gap_seconds - (now - last_request_ts)
+                if wait_time <= 0:
+                    handle.seek(0)
+                    handle.truncate()
+                    json.dump({"last_request_ts": now}, handle)
+                    handle.flush()
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    return
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            time.sleep(max(0.01, wait_time))
+
+    def acquire_quote_slot(self) -> None:
+        self._acquire_shared_gap(
+            self.config.dhan_quote_rate_limit_state_path,
+            self.quote_request_gap,
+        )
+        with self.quote_condition:
+            while True:
+                now = time.monotonic()
+                wait_time = self.quote_request_gap - (now - self.last_quote_request_ts)
+                if wait_time <= 0:
+                    self.last_quote_request_ts = now
+                    self.quote_condition.notify_all()
+                    return
+                self.quote_condition.wait(timeout=wait_time)
+
+    @staticmethod
+    def _find_error_value(payload: Any, keys: set[str]) -> Optional[str]:
+        if isinstance(payload, dict):
+            for key, value in payload.items():
+                if str(key).lower() in keys and value not in (None, ""):
+                    return str(value)
+            for value in payload.values():
+                found = DhanService._find_error_value(value, keys)
+                if found:
+                    return found
+        elif isinstance(payload, list):
+            for value in payload:
+                found = DhanService._find_error_value(value, keys)
+                if found:
+                    return found
+        return None
+
+    @classmethod
+    def _normalized_error_code(cls, resp: Any) -> Optional[str]:
+        raw_code = cls._find_error_value(
+            resp,
+            {"errorcode", "error_code", "code", "statuscode", "status_code"},
+        )
+        if not raw_code:
+            return None
+        normalized = raw_code.strip().lower().replace("_", "-").replace(" ", "")
+        if normalized.startswith("dh") and not normalized.startswith("dh-"):
+            normalized = f"dh-{normalized[2:]}"
+        return normalized
+
+    @classmethod
+    def _response_error_details(cls, resp: Any) -> tuple[Optional[str], str, str]:
+        code = cls._normalized_error_code(resp)
+        error_type = cls._find_error_value(resp, {"errortype", "error_type", "type"}) or ""
+        message = cls._find_error_value(
+            resp,
+            {"errormessage", "error_message", "message"},
+        ) or ""
+        if not message and isinstance(resp, dict) and isinstance(resp.get("remarks"), str):
+            message = str(resp["remarks"])
+        return code, error_type, message
+
+    def _historical_circuit_response_if_open(self) -> Optional[Dict[str, Any]]:
+        with self.historical_circuit_condition:
+            remaining = self.historical_circuit_open_until - time.monotonic()
+            if remaining <= 0:
+                if self.historical_circuit_open_until:
+                    self.historical_circuit_open_until = 0.0
+                    self.historical_consecutive_failures = 0
+                    self.historical_failure_signature = None
+                return None
+            return {
+                "status": "failure",
+                "remarks": {
+                    "error_code": "LOCAL-CIRCUIT-OPEN",
+                    "error_type": "Historical_Service_Degraded",
+                    "error_message": (
+                        "Historical API circuit is open after repeated DH-905 responses; "
+                        f"retry available in {max(1, int(remaining))} seconds."
+                    ),
+                },
+                "data": "",
+            }
+
+    def _record_historical_response(self, resp: Any) -> None:
+        success = isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success"
+        with self.historical_circuit_condition:
+            if success:
+                self.historical_consecutive_failures = 0
+                self.historical_failure_signature = None
+                self.historical_circuit_open_until = 0.0
+                return
+
+            code, error_type, message = self._response_error_details(resp)
+            if code not in {"905", "dh-905"}:
+                return
+
+            signature = f"{code}|{error_type.lower()}|{message.lower()}"
+            if signature == self.historical_failure_signature:
+                self.historical_consecutive_failures += 1
+            else:
+                self.historical_failure_signature = signature
+                self.historical_consecutive_failures = 1
+
+            if self.historical_consecutive_failures >= self.config.historical_circuit_breaker_threshold:
+                self.historical_circuit_open_until = (
+                    time.monotonic() + self.config.historical_circuit_breaker_cooldown_seconds
+                )
+
     def fetch_daily_history(
         self,
         security_id: int,
@@ -810,15 +1021,22 @@ class DhanService:
                 },
             )
 
-        end_date = datetime.now().date()
+        circuit_response = self._historical_circuit_response_if_open()
+        if circuit_response:
+            return circuit_response
+
+        end_date = self._market_now().date()
         start_date = end_date - timedelta(days=days)
         last_response = None
         candidates = self._normalize_historical_instruments(instrument_candidates or ["EQUITY"])
 
         for instrument_name in candidates:
             for attempt in range(retries):
+                circuit_response = self._historical_circuit_response_if_open()
+                if circuit_response:
+                    return circuit_response
                 self.acquire_data_slot()
-                resp = self.historical_api.historical_daily_data(
+                resp = self._historical_client().historical_daily_data(
                     security_id=str(security_id),
                     exchange_segment=exchange_segment,
                     instrument_type=instrument_name,
@@ -830,8 +1048,9 @@ class DhanService:
                     resp["_debug"]["instrument_used"] = instrument_name
                     resp["_debug"]["exchange_segment_used"] = exchange_segment
                 last_response = resp
+                self._record_historical_response(resp)
 
-                if str(resp.get("status", "")).lower() == "success":
+                if isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success":
                     return resp
 
                 if self._is_rate_limited(resp):
@@ -863,20 +1082,36 @@ class DhanService:
                 },
             )
 
-        end_date = datetime.now().date()
+        circuit_response = self._historical_circuit_response_if_open()
+        if circuit_response:
+            return circuit_response
+
+        end_at = self._market_now()
+        end_date = end_at.date()
         start_date = end_date - timedelta(days=days)
+        start_at = datetime.combine(
+            start_date,
+            dt_time(self.config.market_open_hour, self.config.market_open_minute),
+        )
+        if end_at.tzinfo is not None:
+            end_at = end_at.replace(tzinfo=None)
+        from_date = start_at.strftime("%Y-%m-%d %H:%M:%S")
+        to_date = end_at.strftime("%Y-%m-%d %H:%M:%S")
         last_response = None
         candidates = self._normalize_historical_instruments(instrument_candidates or ["EQUITY"])
 
         for instrument_name in candidates:
             for attempt in range(retries):
+                circuit_response = self._historical_circuit_response_if_open()
+                if circuit_response:
+                    return circuit_response
                 self.acquire_data_slot()
-                resp = self.historical_api.intraday_minute_data(
+                resp = self._historical_client().intraday_minute_data(
                     security_id=str(security_id),
                     exchange_segment=exchange_segment,
                     instrument_type=instrument_name,
-                    from_date=start_date.isoformat(),
-                    to_date=end_date.isoformat(),
+                    from_date=from_date,
+                    to_date=to_date,
                     interval=interval,
                 )
                 if isinstance(resp, dict):
@@ -884,8 +1119,9 @@ class DhanService:
                     resp["_debug"]["instrument_used"] = instrument_name
                     resp["_debug"]["exchange_segment_used"] = exchange_segment
                 last_response = resp
+                self._record_historical_response(resp)
 
-                if str(resp.get("status", "")).lower() == "success":
+                if isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success":
                     return resp
 
                 if self._is_rate_limited(resp):
@@ -906,21 +1142,51 @@ class DhanService:
                 for raw_security_id, value in (response or {}).items()
             }
 
-        self.acquire_data_slot()
-        time.sleep(self.quote_request_gap)
-        normalized_exchange_segment = str(exchange_segment).strip().upper()
-        resp = self.market_api.quote_data({normalized_exchange_segment: security_ids})
-        if str(resp.get("status", "")).lower() != "success":
-            return {}
+        return self._fetch_market_batch(
+            "quote_data",
+            security_ids,
+            exchange_segment,
+        )
 
-        data = resp.get("data", {}).get("data", {}).get(normalized_exchange_segment, {})
-        parsed: Dict[int, Dict[str, Any]] = {}
-        for raw_security_id, value in data.items():
-            try:
-                parsed[int(raw_security_id)] = value
-            except Exception:
+    def _fetch_market_batch(
+        self,
+        method_name: str,
+        security_ids: List[int],
+        exchange_segment: str,
+    ) -> Dict[int, Dict[str, Any]]:
+        if not security_ids:
+            return {}
+        if len(security_ids) > 1000:
+            raise ValueError("Dhan market quote APIs accept at most 1000 instruments per request.")
+
+        normalized_exchange_segment = str(exchange_segment).strip().upper()
+        last_response: Any = None
+        for attempt in range(self.config.quote_request_retries):
+            self.acquire_quote_slot()
+            method = getattr(self._market_client(), method_name)
+            resp = method({normalized_exchange_segment: security_ids})
+            last_response = resp
+            if isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success":
+                data = resp.get("data", {}).get("data", {}).get(normalized_exchange_segment, {})
+                parsed: Dict[int, Dict[str, Any]] = {}
+                for raw_security_id, value in data.items():
+                    try:
+                        parsed[int(raw_security_id)] = value
+                    except Exception:
+                        continue
+                return parsed
+
+            if self._is_rate_limited(resp) and attempt < self.config.quote_request_retries - 1:
+                time.sleep(self._compute_rate_limit_delay(attempt))
                 continue
-        return parsed
+            break
+
+        code, error_type, message = self._response_error_details(last_response)
+        detail = " | ".join(part for part in (code, error_type, message) if part)
+        raise DhanAPIError(
+            f"Dhan {method_name} failed: {detail or 'unknown API failure'}",
+            code=code,
+        )
 
     def fetch_ohlc_batch(self, security_ids: List[int], exchange_segment: str = "BSE_EQ") -> Dict[int, Dict[str, Any]]:
         if self.gateway_url:
@@ -933,21 +1199,11 @@ class DhanService:
                 for raw_security_id, value in (response or {}).items()
             }
 
-        self.acquire_data_slot()
-        time.sleep(self.quote_request_gap)
-        normalized_exchange_segment = str(exchange_segment).strip().upper()
-        resp = self.market_api.ohlc_data({normalized_exchange_segment: security_ids})
-        if str(resp.get("status", "")).lower() != "success":
-            return {}
-
-        data = resp.get("data", {}).get("data", {}).get(normalized_exchange_segment, {})
-        parsed: Dict[int, Dict[str, Any]] = {}
-        for raw_security_id, value in data.items():
-            try:
-                parsed[int(raw_security_id)] = value
-            except Exception:
-                continue
-        return parsed
+        return self._fetch_market_batch(
+            "ohlc_data",
+            security_ids,
+            exchange_segment,
+        )
 
     def _enforce_option_chain_gap(self) -> None:
         now = time.time()
@@ -1019,12 +1275,25 @@ class DhanService:
             }
         )
         if not frame.empty:
-            frame["timestamp"] = pd.to_datetime(frame["timestamp"], unit="s", errors="coerce")
+            frame["timestamp"] = pd.to_datetime(
+                frame["timestamp"],
+                unit="s",
+                errors="coerce",
+                utc=True,
+            )
+            timezone_info = self._market_timezone()
+            if timezone_info is not None:
+                frame["timestamp"] = frame["timestamp"].dt.tz_convert(timezone_info)
             frame = frame.dropna(subset=["timestamp"]).sort_values("timestamp")
         return frame
 
     def intraday_response_to_df(self, resp: Dict[str, Any]) -> pd.DataFrame:
-        return self.daily_response_to_df(resp)
+        frame = self.daily_response_to_df(resp)
+        if not frame.empty and frame["timestamp"].dt.tz is not None:
+            # Existing intraday consumers localize naive epoch values as UTC.
+            # Preserve that contract while daily candles retain their IST date.
+            frame["timestamp"] = frame["timestamp"].dt.tz_convert("UTC").dt.tz_localize(None)
+        return frame
 
     def compute_atr_percent(self, frame: pd.DataFrame, period: int = 14) -> float:
         tr1 = frame["high"] - frame["low"]
@@ -1069,14 +1338,15 @@ class DhanService:
             return None
         return today_cum_volume / baseline_avg
 
-    def _is_rate_limited(self, resp: Dict[str, Any]) -> bool:
-        remarks = str(resp.get("remarks", "")).lower()
-        data_blob = str(resp.get("data", "")).lower()
-        joined = f"{remarks} {data_blob}"
+    def _is_rate_limited(self, resp: Any) -> bool:
+        code = self._normalized_error_code(resp)
+        joined = str(resp or "").lower()
         return (
             "too many requests" in joined
             or "rate limit" in joined
-            or any(code in joined for code in self.RATE_LIMIT_ERROR_CODES)
+            or "too many connections" in joined
+            or code in self.RATE_LIMIT_ERROR_CODES
+            or any(rate_code in joined for rate_code in self.RATE_LIMIT_ERROR_CODES if rate_code.startswith("dh"))
         )
 
     def is_auth_invalid(self, resp: Optional[Dict[str, Any]]) -> bool:

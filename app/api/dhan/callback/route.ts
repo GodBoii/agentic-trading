@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
         // 4. Exchange tokenId for access token using correct Dhan v2.0 endpoint
         const dhanTokenUrl = `https://auth.dhan.co/app/consumeApp-consent?tokenId=${tokenId}`
-        console.log('[DhanCb] Fetching tokens from:', dhanTokenUrl)
+        console.log('[DhanCb] Exchanging one-time token with Dhan')
 
         const dhanResponse = await fetch(dhanTokenUrl, {
             headers: {

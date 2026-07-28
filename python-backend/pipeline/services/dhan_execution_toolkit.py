@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
+from hashlib import sha256
 from typing import Any, Dict, List, Optional
 
 from agno.tools import Toolkit
@@ -331,7 +333,7 @@ class DhanExecutionToolkit(Toolkit):
         if normalized_product_type not in {"INTRADAY", "CNC", "MARGIN", "MTF", "CO", "BO"}:
             return json.dumps({"status": "failure", "remarks": "invalid_product_type"}, ensure_ascii=True)
 
-        tag = correlation_id or f"exec-{uuid.uuid4().hex[:12]}"
+        tag = self._normalize_correlation_id(correlation_id, prefix="exec")
         order_kwargs = dict(
             security_id=int(security_id),
             exchange_segment=normalized_exchange_segment,
@@ -394,7 +396,7 @@ class DhanExecutionToolkit(Toolkit):
         if normalized_product_type not in {"INTRADAY", "CNC", "MARGIN", "MTF"}:
             return json.dumps({"status": "failure", "remarks": "invalid_product_type"}, ensure_ascii=True)
 
-        tag = correlation_id or f"exec-so-{uuid.uuid4().hex[:10]}"
+        tag = self._normalize_correlation_id(correlation_id, prefix="exec-so")
         response = self.dhan.place_super_order(
             security_id=int(security_id),
             exchange_segment=normalized_exchange_segment,
@@ -503,7 +505,7 @@ class DhanExecutionToolkit(Toolkit):
                 },
                 ensure_ascii=True,
             )
-        tag = correlation_id or f"exec-fo-{uuid.uuid4().hex[:10]}"
+        tag = self._normalize_correlation_id(correlation_id, prefix="exec-fo")
         response = self.dhan.place_forever_order(
             security_id=int(security_id),
             exchange_segment=self._normalize_exchange_segment(exchange_segment, int(security_id)),
@@ -608,7 +610,7 @@ class DhanExecutionToolkit(Toolkit):
         validation_error = self._validate_order_inputs(side_to_exit, quantity)
         if validation_error:
             return validation_error
-        tag = correlation_id or f"exit-{uuid.uuid4().hex[:10]}"
+        tag = self._normalize_correlation_id(correlation_id, prefix="exit")
         response = self.dhan.place_order(
             security_id=security_id,
             exchange_segment=self._normalize_exchange_segment(exchange_segment, int(security_id)),
@@ -781,6 +783,24 @@ class DhanExecutionToolkit(Toolkit):
 
     def _blocked(self, remarks: str) -> str:
         return json.dumps({"status": "blocked", "remarks": remarks}, ensure_ascii=True)
+
+    @staticmethod
+    def _normalize_correlation_id(correlation_id: Optional[str], *, prefix: str) -> str:
+        """Return a Dhan-compatible correlation ID.
+
+        Dhan accepts only letters, digits, spaces, underscores and hyphens, with
+        a maximum length of 30 characters. Preserve a stable hash suffix when a
+        model supplies a longer value so distinct requests do not collapse to
+        the same truncated ID.
+        """
+        raw = str(correlation_id or f"{prefix}-{uuid.uuid4().hex[:12]}").strip()
+        normalized = re.sub(r"[^A-Za-z0-9 _-]+", "-", raw).strip(" -_")
+        if not normalized:
+            normalized = f"{prefix}-{uuid.uuid4().hex[:12]}"
+        if len(normalized) <= 30:
+            return normalized
+        digest = sha256(normalized.encode("utf-8")).hexdigest()[:8]
+        return f"{normalized[:21]}-{digest}"
 
     def _validate_order_inputs(self, side: str, quantity: int) -> Optional[str]:
         normalized_side = str(side).strip().upper()

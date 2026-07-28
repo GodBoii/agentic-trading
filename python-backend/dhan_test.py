@@ -1,8 +1,9 @@
 import json
 import os
 import sys
-from datetime import date, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values
 from dhanhq import dhanhq
@@ -69,9 +70,15 @@ def main() -> int:
     exchange_segment = cfg.get("DHAN_TEST_EXCHANGE_SEGMENT", dhan.NSE)
     instrument_type = cfg.get("DHAN_TEST_INSTRUMENT_TYPE", "EQUITY")
 
-    today = date.today()
-    from_date = (today - timedelta(days=4)).isoformat()
-    to_date = today.isoformat()
+    market_tz = ZoneInfo("Asia/Kolkata")
+    now = datetime.now(market_tz)
+    start = datetime.combine(
+        (now - timedelta(days=4)).date(),
+        time(hour=9, minute=15),
+        tzinfo=market_tz,
+    )
+    from_date = start.strftime("%Y-%m-%d %H:%M:%S")
+    to_date = now.strftime("%Y-%m-%d %H:%M:%S")
 
     print("Running Dhan data checks...")
     masked_client = f"{client_id[:2]}***{client_id[-2:]}" if len(client_id) >= 4 else "***"
