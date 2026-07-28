@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 
 from pipeline.config import PipelineConfig
+from pipeline.services.storage_service import StorageService
 
 _HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 _GSM_URL = "https://www.bseindia.com/downloads1/List_of_GSM_Securities_{date}.CSV"
@@ -99,9 +100,19 @@ class SurveillanceService:
         return ids
 
     def load_asm_ids(self) -> Set[int]:
-        asm_path = self._download_asm_xlsx()
-        if asm_path is None:
-            return set()
-        ids = self._load_security_ids_from_xlsx(asm_path, col_name="SCRIP_CODE")
-        print(f"Loaded {len(ids)} ASM security ids")
+        # Applicable_Beta_for_ASM_Framework.xlsx is a beta-reference universe,
+        # not the consolidated list of securities currently under ASM. Using
+        # it as membership data incorrectly excludes most of the BSE universe.
+        # Dhan's daily detailed master carries the current exchange-provided
+        # ASM/GSM flag for each instrument.
+        payload = StorageService.load_snapshot(self.config.bse_list_path) or {}
+        ids: Set[int] = set()
+        for stock in payload.get("stocks") or []:
+            if str(stock.get("asm_gsm_flag") or "").strip().upper() != "Y":
+                continue
+            try:
+                ids.add(int(stock["security_id"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+        print(f"Loaded {len(ids)} ASM/GSM-flagged security ids from Dhan master")
         return ids
