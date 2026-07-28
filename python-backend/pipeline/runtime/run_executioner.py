@@ -221,14 +221,22 @@ class ExecutionerRunner:
                 quote_payload,
                 ("last_price", "lastPrice", "ltp", "LTP", "close", "price"),
             )
-            bid_price = self._extract_first_number(quote_payload, ("bid_price", "bidPrice", "bestBidPrice", "bid"))
-            ask_price = self._extract_first_number(quote_payload, ("ask_price", "askPrice", "bestAskPrice", "ask"))
+            bid_price = self._extract_best_depth_price(quote_payload, "buy")
+            ask_price = self._extract_best_depth_price(quote_payload, "sell")
             spread_percent = None
             if bid_price and ask_price and latest_price:
                 spread_percent = round(((ask_price - bid_price) / latest_price) * 100.0, 4)
             latest_timestamp = self._extract_first_value(
                 quote_payload,
-                ("last_traded_time", "lastTradedTime", "lastTradeTime", "timestamp", "exchangeTime", "time"),
+                (
+                    "last_trade_time",
+                    "last_traded_time",
+                    "lastTradedTime",
+                    "lastTradeTime",
+                    "timestamp",
+                    "exchangeTime",
+                    "time",
+                ),
             )
             staleness_seconds = self._age_seconds(latest_timestamp, fetched_at)
             snapshots[security_id] = {
@@ -310,39 +318,49 @@ class ExecutionerRunner:
                     return nested
         return None
 
-    def _age_seconds(self, value: Any, now: Optional[datetime] = None) -> Optional[float]:
+    def _extract_best_depth_price(self, payload: Dict[str, Any], side: str) -> Optional[float]:
+        depth = payload.get("depth")
+        levels = depth.get(side) if isinstance(depth, dict) else None
+        if isinstance(levels, list) and levels:
+            try:
+                return float((levels[0] or {}).get("price"))
+            except (AttributeError, TypeError, ValueError):
+                pass
+        keys = (
+            ("bid_price", "bidPrice", "bestBidPrice", "bid")
+            if side == "buy"
+            else ("ask_price", "askPrice", "bestAskPrice", "ask")
+        )
+        return self._extract_first_number(payload, keys)
+
+    def _parse_market_timestamp(self, value: Any) -> Optional[datetime]:
         if not value:
             return None
+        if isinstance(value, (int, float)):
+            candidate = float(value)
+            if candidate > 10_000_000_000:
+                candidate /= 1000.0
+            return datetime.fromtimestamp(candidate, tz=timezone.utc)
+        raw = str(value).strip()
         try:
-            if isinstance(value, (int, float)):
-                candidate = float(value)
-                if candidate > 10_000_000_000:
-                    candidate = candidate / 1000.0
-                dt = datetime.fromtimestamp(candidate, tz=timezone.utc)
-            else:
-                dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-            return round(((now or datetime.now(timezone.utc)) - dt.astimezone(timezone.utc)).total_seconds(), 3)
-        except Exception:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                parsed = datetime.strptime(raw, "%d/%m/%Y %H:%M:%S")
+            except ValueError:
+                return None
+            return parsed.replace(tzinfo=self.market_time.tz)
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=self.market_time.tz)
+
+    def _age_seconds(self, value: Any, now: Optional[datetime] = None) -> Optional[float]:
+        dt = self._parse_market_timestamp(value)
+        if dt is None:
             return None
+        return round(((now or datetime.now(timezone.utc)) - dt.astimezone(timezone.utc)).total_seconds(), 3)
 
     def _to_market_iso(self, value: Any) -> Optional[str]:
-        if not value:
-            return None
-        try:
-            if isinstance(value, (int, float)):
-                candidate = float(value)
-                if candidate > 10_000_000_000:
-                    candidate = candidate / 1000.0
-                dt = datetime.fromtimestamp(candidate, tz=timezone.utc)
-            else:
-                dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(self.market_time.tz).isoformat()
-        except Exception:
-            return None
+        dt = self._parse_market_timestamp(value)
+        return dt.astimezone(self.market_time.tz).isoformat() if dt is not None else None
 
     def _human_age(self, age_seconds: Optional[float]) -> Optional[str]:
         if age_seconds is None:

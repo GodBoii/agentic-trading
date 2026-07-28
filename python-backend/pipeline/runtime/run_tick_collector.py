@@ -49,11 +49,20 @@ class TickCollector:
         market_date = self.market_time.market_date_str()
         stage2_path = self.config.stage2_daily_path(market_date)
         payload = StorageService.load_snapshot(stage2_path)
-        if payload:
+        if StorageService.is_stage_snapshot_usable(
+            payload,
+            self.config.stage2_max_fetch_failure_ratio,
+        ):
             return payload
 
         latest_payload = StorageService.load_snapshot(self.config.stage2_latest_path)
-        if self._payload_market_date(latest_payload) == market_date:
+        if (
+            self._payload_market_date(latest_payload) == market_date
+            and StorageService.is_stage_snapshot_usable(
+                latest_payload,
+                self.config.stage2_max_fetch_failure_ratio,
+            )
+        ):
             return latest_payload
         return None
 

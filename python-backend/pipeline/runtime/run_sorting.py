@@ -2,6 +2,7 @@ import time
 
 from pipeline.config import PipelineConfig
 from pipeline.services.market_time_service import MarketTimeService
+from pipeline.services.storage_service import StorageService
 from pipeline.stages.stage1_sanitation import Stage1Sanitation
 from pipeline.stages.stage2_momentum_ignition import Stage2MomentumIgnition
 
@@ -10,7 +11,11 @@ def ensure_current_stage1_snapshot(config: PipelineConfig) -> str:
     clock = MarketTimeService(config)
     market_date = clock.market_date_str()
     stage1_daily_path = config.stage1_daily_path(market_date)
-    if stage1_daily_path.exists():
+    stage1_payload = StorageService.load_snapshot(stage1_daily_path)
+    if StorageService.is_stage_snapshot_usable(
+        stage1_payload,
+        config.stage1_max_fetch_failure_ratio,
+    ):
         print(
             f"Stage 1 daily output found: {stage1_daily_path.name}. "
             "Skipping Stage 1 and continuing."
@@ -21,8 +26,13 @@ def ensure_current_stage1_snapshot(config: PipelineConfig) -> str:
         f"Stage 1 daily output not found: {stage1_daily_path.name}. "
         "Running Stage 1 now."
     )
-    Stage1Sanitation(config).run()
-    print("Stage 1 finished for current market date.")
+    payload = Stage1Sanitation(config).run()
+    if not StorageService.is_stage_snapshot_usable(
+        payload,
+        config.stage1_max_fetch_failure_ratio,
+    ):
+        raise RuntimeError("Stage 1 completed in a degraded state; Stage 2 is blocked.")
+    print("Stage 1 finished successfully for current market date.")
     return market_date
 
 
@@ -34,7 +44,10 @@ def wait_for_current_stage1_snapshot(
     market_date = clock.market_date_str()
     stage1_daily_path = config.stage1_daily_path(market_date)
 
-    while not stage1_daily_path.exists():
+    while not StorageService.is_stage_snapshot_usable(
+        StorageService.load_snapshot(stage1_daily_path),
+        config.stage1_max_fetch_failure_ratio,
+    ):
         print(
             f"Stage 1 daily output not found yet: {stage1_daily_path.name}. "
             f"Waiting {poll_seconds}s for sorting to produce it."
@@ -56,7 +69,10 @@ def wait_for_current_stage2_snapshot(
     market_date = clock.market_date_str()
     stage2_daily_path = config.stage2_daily_path(market_date)
 
-    while not stage2_daily_path.exists():
+    while not StorageService.is_stage_snapshot_usable(
+        StorageService.load_snapshot(stage2_daily_path),
+        config.stage2_max_fetch_failure_ratio,
+    ):
         print(
             f"Stage 2 daily output not found yet: {stage2_daily_path.name}. "
             f"Waiting {poll_seconds}s for sorting to produce it."

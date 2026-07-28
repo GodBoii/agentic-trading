@@ -135,7 +135,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "status": "completed",
                 "selected_count": len(results),
                 "evaluated_count": len(results),
-                "executed_count": sum(1 for item in results if (item.get("decision") or {}).get("action") == "trade"),
+                "executed_count": sum(1 for item in results if self._is_placed_result(item)),
                 "selected_symbols": [(item.get("candidate") or {}).get("symbol") for item in results],
                 "selected_security_ids": [
                     int((item.get("candidate") or {}).get("security_id") or 0) for item in results
@@ -148,7 +148,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             "results": results,
             "decision": {
                 "action": "batch",
-                "executed_count": sum(1 for item in results if (item.get("decision") or {}).get("action") == "trade"),
+                "executed_count": sum(1 for item in results if self._is_placed_result(item)),
                 "evaluated_count": len(results),
             },
             "report_text": self._build_batch_report(results),
@@ -675,14 +675,22 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             quote_payload,
             ("last_price", "lastPrice", "ltp", "LTP", "close", "price"),
         )
-        bid_price = self.execution_helper._extract_first_number(quote_payload, ("bid_price", "bidPrice", "bestBidPrice", "bid"))
-        ask_price = self.execution_helper._extract_first_number(quote_payload, ("ask_price", "askPrice", "bestAskPrice", "ask"))
+        bid_price = self.execution_helper._extract_best_depth_price(quote_payload, "buy")
+        ask_price = self.execution_helper._extract_best_depth_price(quote_payload, "sell")
         spread_percent = None
         if bid_price and ask_price and latest_price:
             spread_percent = round(((ask_price - bid_price) / latest_price) * 100.0, 4)
         latest_timestamp = self.execution_helper._extract_first_value(
             quote_payload,
-            ("last_traded_time", "lastTradedTime", "lastTradeTime", "timestamp", "exchangeTime", "time"),
+            (
+                "last_trade_time",
+                "last_traded_time",
+                "lastTradedTime",
+                "lastTradeTime",
+                "timestamp",
+                "exchangeTime",
+                "time",
+            ),
         )
         staleness_seconds = self.execution_helper._age_seconds(latest_timestamp, fetched_at)
         return {
@@ -749,6 +757,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             self.config.stock_agent_daily_path(self.market_time.market_date_str()),
             payload,
         )
+
+    @staticmethod
+    def _is_placed_result(item: Dict[str, Any]) -> bool:
+        return str((item.get("decision") or {}).get("execution_status") or "").strip().lower() == "placed"
 
     def _build_batch_report(self, results: List[Dict[str, Any]]) -> str:
         chunks = []

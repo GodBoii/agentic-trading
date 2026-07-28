@@ -113,10 +113,22 @@ class MultiStockAnalyzerRunner:
 
     def _load_required_snapshot(self, daily_path: Path, latest_path: Path, label: str) -> Dict[str, Any]:
         payload = self.storage.load_snapshot(daily_path)
-        if payload:
+        if payload and (
+            label != "Stage 2"
+            or StorageService.is_stage_snapshot_usable(
+                payload,
+                self.config.stage2_max_fetch_failure_ratio,
+            )
+        ):
             return payload
         payload = self.storage.load_snapshot(latest_path)
-        if payload:
+        if payload and (
+            label != "Stage 2"
+            or StorageService.is_stage_snapshot_usable(
+                payload,
+                self.config.stage2_max_fetch_failure_ratio,
+            )
+        ):
             return payload
         raise FileNotFoundError(f"{label} snapshot not found for stock analyzer.")
 

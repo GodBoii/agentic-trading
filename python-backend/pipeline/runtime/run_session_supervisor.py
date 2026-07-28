@@ -69,7 +69,7 @@ class SessionSupervisor:
             print(f"Supervisor idle: {session.reason} ({session.source}).")
             return
 
-        if self._stage1_due(session):
+        if self._stage1_due(session, state):
             self._run_stage1(state, session)
             state = self._load_state()
 
@@ -82,11 +82,19 @@ class SessionSupervisor:
 
         print(f"Supervisor idle: {session.reason}; next check in {self.loop_interval_seconds}s.")
 
-    def _stage1_due(self, session: MarketSessionStatus) -> bool:
+    def _stage1_due(self, session: MarketSessionStatus, state: Dict[str, Any]) -> bool:
         if self._stage1_snapshot_exists(session.market_date):
             return False
         now = self.market_time.now()
-        return now.time() >= self._parse_hhmm(self.config.stage1_schedule_time)
+        if now.time() < self._parse_hhmm(self.config.stage1_schedule_time):
+            return False
+
+        day_state = state.setdefault("days", {}).setdefault(session.market_date, {})
+        last_attempt = self._parse_iso(day_state.get("stage1", {}).get("last_run_at_utc"))
+        if last_attempt is None:
+            return True
+        elapsed = (datetime.now(timezone.utc) - last_attempt).total_seconds()
+        return elapsed >= self.config.stage1_degraded_retry_interval_seconds
 
     def _stage2_due(self, session: MarketSessionStatus, state: Dict[str, Any]) -> bool:
         if not session.is_new_entry_window:
@@ -116,6 +124,14 @@ class SessionSupervisor:
             "summary": payload.get("summary"),
         }
         self._save_state(state)
+        status = str((payload.get("summary") or {}).get("status") or "").lower()
+        if status != "completed":
+            self._save_status(
+                "stage1_degraded",
+                {"session": session.to_dict(), "stage1": day_state["stage1"]},
+            )
+            print("Stage 1 was degraded; Stage 2 remains blocked.")
+            return
         self._save_status("stage1_completed", {"session": session.to_dict(), "stage1": day_state["stage1"]})
 
     def _run_stage2(self, state: Dict[str, Any], session: MarketSessionStatus) -> Optional[Dict[str, Any]]:
@@ -123,6 +139,21 @@ class SessionSupervisor:
         self._save_status("stage2_running", {"session": session.to_dict()})
         payload = self.stage2.run()
         day_state = state.setdefault("days", {}).setdefault(session.market_date, {})
+        status = str((payload.get("summary") or {}).get("status") or "").lower()
+        if status != "completed":
+            day_state["stage2"] = {
+                "last_run_at_utc": self._now_utc(),
+                "generated_at_utc": payload.get("generated_at_utc"),
+                "summary": payload.get("summary"),
+            }
+            self._save_state(state)
+            self._save_status(
+                "stage2_degraded",
+                {"session": session.to_dict(), "stage2": day_state["stage2"]},
+            )
+            print("Stage 2 was degraded; AI agent triggering is blocked.")
+            return None
+
         signature = self._stage2_signature(payload)
         signatures = list(day_state.get("stage2_signatures") or [])
         signatures.append({"generated_at_utc": payload.get("generated_at_utc"), "signature": signature})
@@ -400,7 +431,11 @@ class SessionSupervisor:
         return json.dumps(rows, sort_keys=True, ensure_ascii=True)
 
     def _stage1_snapshot_exists(self, market_date: str) -> bool:
-        return self.config.stage1_daily_path(market_date).exists()
+        payload = StorageService.load_snapshot(self.config.stage1_daily_path(market_date))
+        return StorageService.is_stage_snapshot_usable(
+            payload,
+            self.config.stage1_max_fetch_failure_ratio,
+        )
 
     def _load_state(self) -> Dict[str, Any]:
         payload = StorageService.load_snapshot(self.config.session_supervisor_state_path)
