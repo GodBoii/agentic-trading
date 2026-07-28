@@ -1,11 +1,11 @@
 {
   "stage": "session_supervisor",
   "status": "running",
-  "generated_at_utc": "2026-06-24T05:56:05.571924+00:00",
-  "generated_at_ist": "2026-06-24T11:26:05.571950+05:30",
+  "generated_at_utc": "2026-07-28T04:38:45.814306+00:00",
+  "generated_at_ist": "2026-07-28T10:08:45.814326+05:30",
   "details": {
     "session": {
-      "market_date": "2026-06-24",
+      "market_date": "2026-07-28",
       "is_trading_day": true,
       "is_market_hours": true,
       "is_before_open": false,
@@ -13,39 +13,63 @@
       "is_new_entry_window": true,
       "reason": "market_open_new_entries_allowed",
       "source": "nse_holiday_cache",
-      "open_at_ist": "2026-06-24T09:15:00+05:30",
-      "close_at_ist": "2026-06-24T15:30:00+05:30",
-      "new_entry_cutoff_ist": "2026-06-24T15:00:00+05:30",
-      "protect_positions_at_ist": "2026-06-24T15:20:00+05:30",
-      "calendar_checked_at_ist": "2026-06-24T11:26:05.555599+05:30",
+      "open_at_ist": "2026-07-28T09:15:00+05:30",
+      "close_at_ist": "2026-07-28T15:30:00+05:30",
+      "new_entry_cutoff_ist": "2026-07-28T15:00:00+05:30",
+      "protect_positions_at_ist": "2026-07-28T15:20:00+05:30",
+      "calendar_checked_at_ist": "2026-07-28T10:08:45.802399+05:30",
       "external_status": {
         "status": "success",
         "source": "nse_holiday_master",
-        "generated_at_utc": "2026-06-24T01:03:51Z",
+        "generated_at_utc": "2026-07-28T03:18:03Z",
         "holiday_count": 25,
         "last_sync_error": null
       }
     },
     "state": {
-      "current_market_date": "2026-06-24",
+      "current_market_date": "2026-07-28",
       "stage1": {
-        "last_run_at_utc": "2026-06-24T03:23:54.633946+00:00",
-        "generated_at_utc": "2026-06-24T03:23:54.599598+00:00",
+        "last_run_at_utc": "2026-07-28T03:44:33.051882+00:00",
+        "generated_at_utc": "2026-07-28T03:44:33.014589+00:00",
         "summary": {
-          "market_date": "2026-06-24",
-          "output_file": "stage1-2026-06-24.json",
-          "input_universe": 5287,
-          "gsm_excluded": 382,
+          "status": "completed",
+          "market_date": "2026-07-28",
+          "output_file": "stage1-2026-07-28.json",
+          "input_universe": 5333,
+          "gsm_excluded": 523,
           "asm_excluded": 0,
-          "missing_ohlc": 765,
-          "price_filtered": 2150,
-          "historical_candidates": 1990,
-          "data_retrieved": 1951,
-          "failed_fetch": 39,
+          "missing_ohlc": 730,
+          "missing_ohlc_ratio": 0.151767,
+          "max_missing_ohlc_ratio": 0.2,
+          "ohlc_failed_batches": 0,
+          "ohlc_api_failed_stocks": 0,
+          "price_filtered": 2084,
+          "historical_candidates": 1996,
+          "data_retrieved": 1947,
+          "failed_fetch": 49,
           "rate_limited_count": 0,
-          "insufficient_history_count": 31,
-          "true_no_data_count": 8,
-          "stage1_passed": 164,
+          "insufficient_history_count": 39,
+          "true_no_data_count": 10,
+          "fetch_failure_ratio": 0.024549,
+          "max_fetch_failure_ratio": 0.1,
+          "degraded_reasons": [],
+          "failure_reason_counts": {
+            "insufficient_history_points=9": 6,
+            "insufficient_history_points=10": 3,
+            "insufficient_history_points=8": 6,
+            "DH-905 | Input_Exception | System is unable to fetch data due to incorrect parameters or no data present": 10,
+            "insufficient_history_points=2": 3,
+            "insufficient_history_points=6": 3,
+            "insufficient_history_points=12": 2,
+            "insufficient_history_points=13": 3,
+            "insufficient_history_points=7": 3,
+            "insufficient_history_points=11": 2,
+            "insufficient_history_points=4": 1,
+            "insufficient_history_points=5": 2,
+            "insufficient_history_points=3": 2,
+            "insufficient_history_points=1": 3
+          },
+          "stage1_passed": 182,
           "stage1_filters": {
             "min_price": 100.0,
             "max_price": 3000.0,
@@ -55,20 +79,29 @@
           "unsupported_today": [
             "corporate_actions_today",
             "recent_circuit_hit_last_5_sessions"
+          ],
+          "stage1_enrichments": [
+            "previous_session_ohlcv",
+            "avg_volume_20",
+            "static_tradability",
+            "local_derivatives_reference"
           ]
         }
       },
       "stage2": {
-        "last_run_at_utc": "2026-06-24T05:36:08.185485+00:00",
-        "generated_at_utc": "2026-06-24T05:36:08.178035+00:00",
-        "signature": "[{\"accel\": 8.0, \"orb\": 2.7922, \"reason\": null, \"rvol\": 14.583, \"score\": 360.36, \"security_id\": 544606, \"vwap\": 2.1736}, {\"accel\": 8.0, \"orb\": 1.092, \"reason\": null, \"rvol\": 11.406, \"score\": 308.46, \"security_id\": 511243, \"vwap\": 0.8538}, {\"accel\": 2.0854, \"orb\": 0.2021, \"reason\": null, \"rvol\": 4.568, \"score\": 231.93, \"security_id\": 500493, \"vwap\": 0.952}, {\"accel\": 3.5354, \"orb\": 0.5675, \"reason\": null, \"rvol\": 3.245, \"score\": 211.75, \"security_id\": 500425, \"vwap\": 0.5028}, {\"accel\": 8.0, \"orb\": 1.3446, \"reason\": null, \"rvol\": 2.632, \"score\": 207.62, \"security_id\": 500034, \"vwap\": 0.3586}, {\"accel\": 3.8139, \"orb\": 0.855, \"reason\": null, \"rvol\": 1.399, \"score\": 155.26, \"security_id\": 532215, \"vwap\": 0.8063}, {\"accel\": 2.0848, \"orb\": 1.5037, \"reason\": null, \"rvol\": 1.656, \"score\": 135.56, \"security_id\": 500086, \"vwap\": 0.9821}, {\"accel\": 1.4482, \"orb\": 0.1381, \"reason\": null, \"rvol\": 1.746, \"score\": 98.73, \"security_id\": 500188, \"vwap\": 0.7809}, {\"accel\": 0.0486, \"orb\": 1.004, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.255, \"score\": 0.0, \"security_id\": 544081, \"vwap\": -0.1071}, {\"accel\": 0.3884, \"orb\": -0.0592, \"reason\": \"opening_range_breakout\", \"rvol\": 1.376, \"score\": 0.0, \"security_id\": 500113, \"vwap\": 0.8325}]",
+        "last_run_at_utc": "2026-07-28T04:34:15.296275+00:00",
+        "generated_at_utc": "2026-07-28T04:34:15.283661+00:00",
+        "signature": "[{\"accel\": 1.2583, \"orb\": 3.0, \"reason\": null, \"rvol\": 12.483, \"score\": 286.59, \"security_id\": 544362, \"vwap\": 1.7565}, {\"accel\": 2.1448, \"orb\": 1.2704, \"reason\": null, \"rvol\": 1.361, \"score\": 155.93, \"security_id\": 522163, \"vwap\": 2.6907}, {\"accel\": 1.2985, \"orb\": 0.3468, \"reason\": null, \"rvol\": 2.356, \"score\": 115.63, \"security_id\": 500209, \"vwap\": 0.4365}, {\"accel\": 1.4074, \"orb\": 0.0277, \"reason\": null, \"rvol\": 2.224, \"score\": 103.38, \"security_id\": 507685, \"vwap\": 0.1909}, {\"accel\": 4.4567, \"orb\": -2.4935, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.295, \"score\": 0.0, \"security_id\": 533553, \"vwap\": -0.267}, {\"accel\": 0.6313, \"orb\": -1.4993, \"reason\": \"below_vwap\", \"rvol\": 1.807, \"score\": 0.0, \"security_id\": 532234, \"vwap\": -0.0328}, {\"accel\": 0.7732, \"orb\": -0.9575, \"reason\": \"below_vwap\", \"rvol\": 3.257, \"score\": 0.0, \"security_id\": 534816, \"vwap\": -0.0377}, {\"accel\": 0.4854, \"orb\": -0.1418, \"reason\": \"below_vwap\", \"rvol\": 2.068, \"score\": 0.0, \"security_id\": 533150, \"vwap\": -0.0724}, {\"accel\": 1.6768, \"orb\": -0.0748, \"reason\": \"opening_range_breakout\", \"rvol\": 11.146, \"score\": 0.0, \"security_id\": 543287, \"vwap\": 0.0187}, {\"accel\": 1.2768, \"orb\": -1.4391, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.22, \"score\": 0.0, \"security_id\": 513599, \"vwap\": -0.6148}]",
         "summary": {
-          "market_date": "2026-06-24",
-          "input_stage1_count": 164,
-          "data_retrieved": 164,
+          "market_date": "2026-07-28",
+          "input_stage1_count": 182,
+          "data_retrieved": 182,
           "failed_fetch": 0,
-          "stage2_passed": 8,
+          "stage2_passed": 4,
           "status": "completed",
+          "fetch_failure_ratio": 0.0,
+          "max_fetch_failure_ratio": 0.1,
+          "degraded_reasons": [],
           "stage2_filters": {
             "history_days": 15,
             "min_time_of_day_rvol": 1.3,
@@ -78,207 +111,203 @@
             "volume_acceleration_denominator_floor_fraction": 0.35,
             "volume_acceleration_max_ratio": 8.0,
             "opening_range_minutes": 15,
-            "min_breakout_percent": 0.0
+            "min_breakout_percent": 0.0,
+            "live_quote_enrichment_enabled": true,
+            "good_spread_percent": 0.08,
+            "acceptable_spread_percent": 0.2,
+            "min_intraday_value_cr": 1.0
           },
           "stage_funnel_counts": {
-            "input_stage1_count": 164,
-            "after_fetch": 164,
-            "after_rvol": 29,
-            "after_vwap": 22,
-            "after_opening_range": 12,
-            "after_volume_acceleration": 8,
-            "passed": 8
+            "input_stage1_count": 182,
+            "after_fetch": 182,
+            "after_rvol": 37,
+            "after_vwap": 21,
+            "after_opening_range": 11,
+            "after_volume_acceleration": 4,
+            "passed": 4
           },
           "score_distribution": {
-            "count": 8,
-            "min": 98.73,
-            "median": 211.75,
-            "p90": 308.46,
-            "max": 360.36,
-            "avg": 213.7088
+            "count": 4,
+            "min": 103.38,
+            "median": 155.93,
+            "p90": 286.59,
+            "max": 286.59,
+            "avg": 165.3825
           },
           "near_misses": [
             {
-              "security_id": 544081,
-              "display_name": "Jyoti CNC Automation",
-              "symbol": "Jyoti CNC Automation Limi",
+              "security_id": 533553,
+              "display_name": "TD Power Systems",
+              "symbol": "T D POWER SYSTEMS LTD.",
               "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.045,
-              "time_of_day_rvol": 1.255,
-              "price_vs_vwap_percent": -0.1071,
-              "opening_range_breakout_percent": 1.004,
-              "volume_acceleration_ratio": 0.0486
+              "miss_gap": 0.005,
+              "time_of_day_rvol": 1.295,
+              "price_vs_vwap_percent": -0.267,
+              "opening_range_breakout_percent": -2.4935,
+              "volume_acceleration_ratio": 4.4567
             },
             {
-              "security_id": 500113,
-              "display_name": "Steel Authority of India",
-              "symbol": "STEEL AUTHORITY OF INDIA ",
+              "security_id": 532234,
+              "display_name": "NALCO",
+              "symbol": "NATIONAL ALUMINIUM CO.LTD",
+              "stage2_reason": "below_vwap",
+              "miss_gap": 0.0328,
+              "time_of_day_rvol": 1.807,
+              "price_vs_vwap_percent": -0.0328,
+              "opening_range_breakout_percent": -1.4993,
+              "volume_acceleration_ratio": 0.6313
+            },
+            {
+              "security_id": 534816,
+              "display_name": "Indus Towers",
+              "symbol": "INDUS TOWERS LIMITED",
+              "stage2_reason": "below_vwap",
+              "miss_gap": 0.0377,
+              "time_of_day_rvol": 3.257,
+              "price_vs_vwap_percent": -0.0377,
+              "opening_range_breakout_percent": -0.9575,
+              "volume_acceleration_ratio": 0.7732
+            },
+            {
+              "security_id": 533150,
+              "display_name": "Godrej Properties",
+              "symbol": "GODREJ PROPERTIES LTD",
+              "stage2_reason": "below_vwap",
+              "miss_gap": 0.0724,
+              "time_of_day_rvol": 2.068,
+              "price_vs_vwap_percent": -0.0724,
+              "opening_range_breakout_percent": -0.1418,
+              "volume_acceleration_ratio": 0.4854
+            },
+            {
+              "security_id": 543287,
+              "display_name": "Lodha Developers",
+              "symbol": "Lodha Developers Limited",
               "stage2_reason": "opening_range_breakout",
-              "miss_gap": 0.0592,
-              "time_of_day_rvol": 1.376,
-              "price_vs_vwap_percent": 0.8325,
-              "opening_range_breakout_percent": -0.0592,
-              "volume_acceleration_ratio": 0.3884
+              "miss_gap": 0.0748,
+              "time_of_day_rvol": 11.146,
+              "price_vs_vwap_percent": 0.0187,
+              "opening_range_breakout_percent": -0.0748,
+              "volume_acceleration_ratio": 1.6768
             },
             {
-              "security_id": 540678,
-              "display_name": "Cochin Shipyard",
-              "symbol": "Cochin Shipyard Limited",
+              "security_id": 513599,
+              "display_name": "Hindustan Copper",
+              "symbol": "HINDUSTAN COPPER LTD.",
               "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.064,
-              "time_of_day_rvol": 1.236,
-              "price_vs_vwap_percent": 0.0305,
-              "opening_range_breakout_percent": -0.29,
-              "volume_acceleration_ratio": 0.5462
+              "miss_gap": 0.08,
+              "time_of_day_rvol": 1.22,
+              "price_vs_vwap_percent": -0.6148,
+              "opening_range_breakout_percent": -1.4391,
+              "volume_acceleration_ratio": 1.2768
             },
             {
-              "security_id": 532921,
-              "display_name": "Adani Ports & SEZ",
-              "symbol": "ADANI PORTS AND SPECIAL E",
-              "stage2_reason": "opening_range_breakout",
-              "miss_gap": 0.0778,
-              "time_of_day_rvol": 58.388,
-              "price_vs_vwap_percent": 0.7815,
-              "opening_range_breakout_percent": -0.0778,
-              "volume_acceleration_ratio": 0.052
-            },
-            {
-              "security_id": 500257,
-              "display_name": "Lupin",
-              "symbol": "LUPIN LTD.",
+              "security_id": 500086,
+              "display_name": "Exide Industries",
+              "symbol": "EXIDE INDUSTRIES LTD.",
               "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.082,
-              "time_of_day_rvol": 1.218,
-              "price_vs_vwap_percent": -0.4913,
-              "opening_range_breakout_percent": -0.6485,
-              "volume_acceleration_ratio": 0.244
+              "miss_gap": 0.108,
+              "time_of_day_rvol": 1.192,
+              "price_vs_vwap_percent": 0.4133,
+              "opening_range_breakout_percent": -1.0038,
+              "volume_acceleration_ratio": 0.459
             },
             {
-              "security_id": 500209,
-              "display_name": "Infosys",
-              "symbol": "INFOSYS LTD.",
-              "stage2_reason": "opening_range_breakout",
-              "miss_gap": 0.0908,
-              "time_of_day_rvol": 1.609,
-              "price_vs_vwap_percent": 0.0115,
-              "opening_range_breakout_percent": -0.0908,
-              "volume_acceleration_ratio": 0.8916
-            },
-            {
-              "security_id": 543526,
-              "display_name": "LIC of India",
-              "symbol": "LIFE INSURANCE CORPORATIO",
+              "security_id": 532407,
+              "display_name": "Moschip Technologies",
+              "symbol": "MOSCHIP TECHNOLOGIES LIMI",
               "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.119,
-              "time_of_day_rvol": 1.181,
-              "price_vs_vwap_percent": -0.0619,
-              "opening_range_breakout_percent": -1.2783,
-              "volume_acceleration_ratio": 0.9015
+              "miss_gap": 0.112,
+              "time_of_day_rvol": 1.188,
+              "price_vs_vwap_percent": 0.2869,
+              "opening_range_breakout_percent": -1.1058,
+              "volume_acceleration_ratio": 0.4019
             },
             {
-              "security_id": 532281,
-              "display_name": "HCL Technologies",
-              "symbol": "HCL TECHNOLOGIES LTD.",
-              "stage2_reason": "volume_acceleration",
-              "miss_gap": 0.1409,
-              "time_of_day_rvol": 1.614,
-              "price_vs_vwap_percent": 0.1007,
-              "opening_range_breakout_percent": 0.1808,
-              "volume_acceleration_ratio": 0.9591
+              "security_id": 541556,
+              "display_name": "RITES",
+              "symbol": "RITES Limited",
+              "stage2_reason": "below_vwap",
+              "miss_gap": 0.1343,
+              "time_of_day_rvol": 1.385,
+              "price_vs_vwap_percent": -0.1343,
+              "opening_range_breakout_percent": -1.2164,
+              "volume_acceleration_ratio": 1.3264
             },
             {
-              "security_id": 532777,
-              "display_name": "Info Edge",
-              "symbol": "INFO EDGE (INDIA) LTD.",
+              "security_id": 500820,
+              "display_name": "Asian Paints",
+              "symbol": "ASIAN PAINTS LTD.",
               "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.144,
-              "time_of_day_rvol": 1.156,
-              "price_vs_vwap_percent": -1.6195,
-              "opening_range_breakout_percent": -2.4291,
-              "volume_acceleration_ratio": 0.4565
-            },
-            {
-              "security_id": 544569,
-              "display_name": "Tata Motors",
-              "symbol": "Tata Motors Limited",
-              "stage2_reason": "opening_range_breakout",
-              "miss_gap": 0.1567,
-              "time_of_day_rvol": 1.895,
-              "price_vs_vwap_percent": 0.5051,
-              "opening_range_breakout_percent": -0.1567,
-              "volume_acceleration_ratio": 0.6275
+              "miss_gap": 0.141,
+              "time_of_day_rvol": 1.159,
+              "price_vs_vwap_percent": 0.1462,
+              "opening_range_breakout_percent": 0.2897,
+              "volume_acceleration_ratio": 2.3528
             }
           ],
           "filter_reason_counts": {
-            "time_of_day_rvol": 135,
+            "time_of_day_rvol": 145,
+            "volume_acceleration": 7,
             "opening_range_breakout": 10,
-            "volume_acceleration": 4,
-            "below_vwap": 7
+            "below_vwap": 16
           },
-          "fetch_failure_reason_counts": {}
+          "fetch_failure_reason_counts": {},
+          "quote_enrichment": {
+            "status": "completed",
+            "quotes": 182,
+            "failed_batches": 0,
+            "batch_count": 1
+          }
         }
       },
       "agents": {
-        "last_trigger_at_utc": "2026-06-24T05:36:08.259490+00:00",
-        "last_trigger_reason": "candidate_score_improved_materially",
+        "last_trigger_at_utc": "2026-07-28T04:34:15.528012+00:00",
+        "last_trigger_reason": "top_candidate_changed",
         "last_request": {
-          "request_id": "auto-1782279368253-candidate_score_improved_materially",
+          "request_id": "auto-1785213255519-top_candidate_changed",
           "action": "start",
           "user_id": "40a4c297-d2ce-49d9-aee4-464604ff063c",
           "email": "prajwalghadge2005@gmail.com",
-          "requested_at_utc": "2026-06-24T05:36:08.253840+00:00",
+          "requested_at_utc": "2026-07-28T04:34:15.519133+00:00",
           "trade_mode": "manual",
-          "trade_amount": 399.0,
+          "trade_amount": 500.0,
           "regime_analysis_enabled": true,
           "trigger_source": "session_supervisor",
-          "trigger_reason": "candidate_score_improved_materially"
+          "trigger_reason": "top_candidate_changed"
         },
         "last_response": {
           "ok": true,
           "request": {
-            "request_id": "auto-1782279368253-candidate_score_improved_materially",
+            "request_id": "auto-1785213255519-top_candidate_changed",
             "action": "start",
             "user_id": "40a4c297-d2ce-49d9-aee4-464604ff063c",
             "email": "prajwalghadge2005@gmail.com",
-            "requested_at_utc": "2026-06-24T05:36:08.253840+00:00",
+            "requested_at_utc": "2026-07-28T04:34:15.519133+00:00",
             "trade_mode": "manual",
-            "trade_amount": 399.0,
+            "trade_amount": 500.0,
             "regime_analysis_enabled": true
           }
         },
-        "last_top_security_id": 544606,
+        "last_top_security_id": 544362,
         "trigger_history": [
           {
-            "triggered_at_utc": "2026-06-24T04:03:04.859317+00:00",
+            "triggered_at_utc": "2026-07-28T04:03:10.144951+00:00",
             "reason": "first_stage2_result_of_day",
-            "stage2_generated_at_utc": "2026-06-24T04:03:04.613442+00:00",
-            "request_id": "auto-1782273784851-first_stage2_result_of_day",
-            "candidate_count": 12
+            "stage2_generated_at_utc": "2026-07-28T04:03:10.043490+00:00",
+            "request_id": "auto-1785211390134-first_stage2_result_of_day",
+            "candidate_count": 13
           },
           {
-            "triggered_at_utc": "2026-06-24T04:34:14.971520+00:00",
+            "triggered_at_utc": "2026-07-28T04:34:15.528012+00:00",
             "reason": "top_candidate_changed",
-            "stage2_generated_at_utc": "2026-06-24T04:34:14.819985+00:00",
-            "request_id": "auto-1782275654958-top_candidate_changed",
-            "candidate_count": 12
-          },
-          {
-            "triggered_at_utc": "2026-06-24T05:04:59.320853+00:00",
-            "reason": "top_candidate_changed",
-            "stage2_generated_at_utc": "2026-06-24T05:04:59.132284+00:00",
-            "request_id": "auto-1782277499307-top_candidate_changed",
-            "candidate_count": 16
-          },
-          {
-            "triggered_at_utc": "2026-06-24T05:36:08.259490+00:00",
-            "reason": "candidate_score_improved_materially",
-            "stage2_generated_at_utc": "2026-06-24T05:36:08.178035+00:00",
-            "request_id": "auto-1782279368253-candidate_score_improved_materially",
-            "candidate_count": 18
+            "stage2_generated_at_utc": "2026-07-28T04:34:15.283661+00:00",
+            "request_id": "auto-1785213255519-top_candidate_changed",
+            "candidate_count": 14
           }
         ]
       },
-      "evaluated_candidate_count": 34
+      "evaluated_candidate_count": 22
     }
   }
 }
