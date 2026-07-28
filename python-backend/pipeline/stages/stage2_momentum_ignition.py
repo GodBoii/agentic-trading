@@ -81,11 +81,13 @@ class Stage2MomentumIgnition:
         }
 
     def _save_payload(self, payload: Dict[str, Any]) -> None:
-        StorageService.save_snapshot(self.config.stage2_latest_path, payload)
-        StorageService.save_snapshot(
-            self.config.stage2_daily_path(self.market_time.market_date_str()),
-            payload,
-        )
+        status = str((payload.get("summary") or {}).get("status") or "").lower()
+        market_date = self.market_time.market_date_str()
+        if status == "completed":
+            StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+            StorageService.save_snapshot(self.config.stage2_daily_path(market_date), payload)
+            return
+        StorageService.save_snapshot(self.config.stage2_degraded_path(market_date), payload)
 
     def _payload_market_date(self, payload: Optional[Dict[str, Any]]) -> Optional[str]:
         if not payload:
@@ -111,6 +113,14 @@ class Stage2MomentumIgnition:
         if not payload:
             raise FileNotFoundError(
                 f"Stage 1 snapshot not found for {market_date}. Run Stage 1 before Stage 2."
+            )
+        if not StorageService.is_stage_snapshot_usable(
+            payload,
+            self.config.stage1_max_fetch_failure_ratio,
+        ):
+            raise RuntimeError(
+                f"Stage 1 snapshot for {market_date} is degraded or incomplete; "
+                "Stage 2 will not consume it."
             )
 
         return payload.get("stocks", [])
@@ -752,7 +762,8 @@ class Stage2MomentumIgnition:
                     "data_retrieved": 0,
                     "failed_fetch": 0,
                     "stage2_passed": 0,
-                    "status": "no_stage1_stocks",
+                    "status": "blocked",
+                    "degraded_reasons": ["no_stage1_stocks"],
                     "stage2_filters": self._build_filters_summary(),
                 },
                 "stocks",
@@ -809,6 +820,21 @@ class Stage2MomentumIgnition:
             [float(row.get("stage2_score") or 0.0) for row in passed_records]
         )
         near_misses = self._build_near_misses(all_records)
+        fetch_failure_ratio = (failed_count / total) if total else 0.0
+        quote_degraded = (
+            self.config.stage2_live_quote_enrichment_enabled
+            and int(quote_summary.get("failed_batches") or 0) > 0
+        )
+        is_degraded = (
+            fetch_failure_ratio > self.config.stage2_max_fetch_failure_ratio
+            or quote_degraded
+        )
+        stage_status = "degraded" if is_degraded else "completed"
+        degraded_reasons: List[str] = []
+        if fetch_failure_ratio > self.config.stage2_max_fetch_failure_ratio:
+            degraded_reasons.append("intraday_fetch_failure_ratio")
+        if quote_degraded:
+            degraded_reasons.append("quote_enrichment_failure")
 
         summary = {
             "market_date": self.market_time.market_date_str(),
@@ -816,7 +842,10 @@ class Stage2MomentumIgnition:
             "data_retrieved": len(all_records),
             "failed_fetch": failed_count,
             "stage2_passed": len(passed_records),
-            "status": "completed",
+            "status": stage_status,
+            "fetch_failure_ratio": round(fetch_failure_ratio, 6),
+            "max_fetch_failure_ratio": self.config.stage2_max_fetch_failure_ratio,
+            "degraded_reasons": degraded_reasons,
             "stage2_filters": self._build_filters_summary(),
             "stage_funnel_counts": stage_funnel,
             "score_distribution": score_distribution,
@@ -834,13 +863,21 @@ class Stage2MomentumIgnition:
         )
         self._save_payload(payload)
 
-        daily_path = self.config.stage2_daily_path(self.market_time.market_date_str())
-        print("\nStage 2 complete")
+        daily_path = (
+            self.config.stage2_degraded_path(self.market_time.market_date_str())
+            if is_degraded
+            else self.config.stage2_daily_path(self.market_time.market_date_str())
+        )
+        print(f"\nStage 2 {stage_status}")
         print(f"Passed Stage 2: {len(passed_records)}")
         print(f"Stage 2 records evaluated: {len(all_records)}")
         print(f"Stage 2 records skipped / fetch failed: {failed_count}")
-        print(f"Saved official daily snapshot: {daily_path.name}")
-        print(f"Saved latest snapshot: {self.config.stage2_latest_path.name}")
+        if is_degraded:
+            print(f"Saved diagnostic degraded snapshot: {daily_path.name}")
+            print("Official Stage 2 snapshots were not published.")
+        else:
+            print(f"Saved official daily snapshot: {daily_path.name}")
+            print(f"Saved latest snapshot: {self.config.stage2_latest_path.name}")
 
         print("\nStage 2 Funnel:")
         print("-" * 60)

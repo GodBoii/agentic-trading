@@ -78,6 +78,8 @@ class Stage1Sanitation:
             "gsm_filtered": 0,
             "asm_filtered": 0,
             "missing_ohlc": 0,
+            "ohlc_failed_batches": 0,
+            "ohlc_api_failed_stocks": 0,
             "price_filtered": 0,
             "historical_candidates": 0,
         }
@@ -101,7 +103,16 @@ class Stage1Sanitation:
 
         for index, batch in enumerate(batches, 1):
             batch_ids = [int(stock["security_id"]) for stock in batch]
-            ohlc_map = self.dhan.fetch_ohlc_batch(batch_ids)
+            try:
+                ohlc_map = self.dhan.fetch_ohlc_batch(batch_ids)
+            except Exception as exc:
+                summary["ohlc_failed_batches"] += 1
+                summary["ohlc_api_failed_stocks"] += len(batch)
+                print(
+                    f"  Stage 1 OHLC batch {index}/{len(batches)} failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                continue
             for stock in batch:
                 security_id = int(stock["security_id"])
                 quote_item = ohlc_map.get(security_id)
@@ -131,6 +142,13 @@ class Stage1Sanitation:
             print(f"  Stage 1 OHLC batch {index}/{len(batches)} complete")
 
         summary["historical_candidates"] = len(candidates)
+        static_survivor_count = len(static_survivors)
+        summary["ohlc_coverage_count"] = static_survivor_count - summary["missing_ohlc"]
+        summary["missing_ohlc_ratio"] = (
+            summary["missing_ohlc"] / static_survivor_count
+            if static_survivor_count
+            else 0.0
+        )
         return candidates, summary
 
     def _normalize_failure_reason(self, resp: Optional[Dict[str, Any]]) -> str:
@@ -165,7 +183,14 @@ class Stage1Sanitation:
             reason_lower = reason.lower()
             if reason.startswith("insufficient_history_points="):
                 self.insufficient_history_count += 1
-            elif "dh-904" in reason_lower or "rate_limit" in reason_lower or "too many requests" in reason_lower:
+            elif (
+                "dh-904" in reason_lower
+                or "dh-805" in reason_lower
+                or "error_code': '805" in reason_lower
+                or "rate_limit" in reason_lower
+                or "too many requests" in reason_lower
+                or "too many connections" in reason_lower
+            ):
                 self.rate_limited_count += 1
             else:
                 self.true_no_data_count += 1
@@ -419,6 +444,7 @@ class Stage1Sanitation:
         print(f"  - GSM filtered: {prefilter_summary['gsm_filtered']}")
         print(f"  - ASM filtered: {prefilter_summary['asm_filtered']}")
         print(f"  - Missing OHLC: {prefilter_summary['missing_ohlc']}")
+        print(f"  - Missing OHLC ratio: {prefilter_summary['missing_ohlc_ratio']:.1%}")
         print(f"  - Price filtered: {prefilter_summary['price_filtered']}")
         print(f"  - Remaining for historical scan: {historical_total}")
         print(f"Rough lower-bound runtime estimate for historical phase: ~{estimated_minutes:.1f} minutes plus network overhead")
@@ -450,13 +476,33 @@ class Stage1Sanitation:
                         print(f"Stage 1 task error: {exc}")
 
         passed_records.sort(key=lambda row: row["adv_20_cr"], reverse=True)
+        fetch_failure_ratio = (failed_count / historical_total) if historical_total else 0.0
+        is_degraded = (
+            prefilter_summary["ohlc_failed_batches"] > 0
+            or prefilter_summary["missing_ohlc_ratio"] > self.config.stage1_max_missing_ohlc_ratio
+            or fetch_failure_ratio > self.config.stage1_max_fetch_failure_ratio
+        )
+        stage_status = "degraded" if is_degraded else "completed"
+        degraded_reasons: List[str] = []
+        if prefilter_summary["ohlc_failed_batches"] > 0:
+            degraded_reasons.append("ohlc_batch_api_failure")
+        if prefilter_summary["missing_ohlc_ratio"] > self.config.stage1_max_missing_ohlc_ratio:
+            degraded_reasons.append("ohlc_coverage_too_low")
+        if fetch_failure_ratio > self.config.stage1_max_fetch_failure_ratio:
+            degraded_reasons.append("historical_fetch_failure_ratio")
+
         summary = {
+            "status": stage_status,
             "market_date": self.market_time.market_date_str(),
             "output_file": "",
             "input_universe": total,
             "gsm_excluded": prefilter_summary["gsm_filtered"],
             "asm_excluded": prefilter_summary["asm_filtered"],
             "missing_ohlc": prefilter_summary["missing_ohlc"],
+            "missing_ohlc_ratio": round(prefilter_summary["missing_ohlc_ratio"], 6),
+            "max_missing_ohlc_ratio": self.config.stage1_max_missing_ohlc_ratio,
+            "ohlc_failed_batches": prefilter_summary["ohlc_failed_batches"],
+            "ohlc_api_failed_stocks": prefilter_summary["ohlc_api_failed_stocks"],
             "price_filtered": prefilter_summary["price_filtered"],
             "historical_candidates": historical_total,
             "data_retrieved": len(all_records),
@@ -464,6 +510,10 @@ class Stage1Sanitation:
             "rate_limited_count": self.rate_limited_count,
             "insufficient_history_count": self.insufficient_history_count,
             "true_no_data_count": self.true_no_data_count,
+            "fetch_failure_ratio": round(fetch_failure_ratio, 6),
+            "max_fetch_failure_ratio": self.config.stage1_max_fetch_failure_ratio,
+            "degraded_reasons": degraded_reasons,
+            "failure_reason_counts": dict(self.failure_reasons),
             "stage1_passed": len(passed_records),
             "stage1_filters": {
                 "min_price": self.config.stage1_min_price,
@@ -483,24 +533,31 @@ class Stage1Sanitation:
             ],
         }
 
-        payload = StorageService.build_payload("stage1_sanitation", summary, "stocks", passed_records)
-        StorageService.save_snapshot(self.config.stage1_latest_path, payload)
-
         market_date = summary["market_date"]
-        daily_path = self.config.stage1_daily_path(market_date)
+        daily_path = (
+            self.config.stage1_degraded_path(market_date)
+            if is_degraded
+            else self.config.stage1_daily_path(market_date)
+        )
         summary["output_file"] = daily_path.name
-        payload["summary"] = summary
+        payload = StorageService.build_payload("stage1_sanitation", summary, "stocks", passed_records)
         StorageService.save_snapshot(daily_path, payload)
+        if not is_degraded:
+            StorageService.save_snapshot(self.config.stage1_latest_path, payload)
 
         elapsed_seconds = time.time() - started_at
         elapsed_minutes = elapsed_seconds / 60 if elapsed_seconds else 0.0
         pass_rate = (len(passed_records) / len(all_records) * 100) if all_records else 0.0
         speed = (historical_total / elapsed_seconds) if elapsed_seconds > 0 else 0.0
 
-        print("\nStage 1 complete")
+        print(f"\nStage 1 {stage_status}")
         print(f"Passed Stage 1: {len(passed_records)}")
-        print(f"Saved official daily snapshot: {daily_path.name}")
-        print(f"Saved latest snapshot: {self.config.stage1_latest_path.name}")
+        if is_degraded:
+            print(f"Saved diagnostic degraded snapshot: {daily_path.name}")
+            print("Official Stage 1 snapshots were not published.")
+        else:
+            print(f"Saved official daily snapshot: {daily_path.name}")
+            print(f"Saved latest snapshot: {self.config.stage1_latest_path.name}")
         print("\n" + "=" * 60)
         print("SCAN COMPLETE")
         print("=" * 60)
