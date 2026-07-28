@@ -109,6 +109,7 @@ class PipelineConfig:
     stock_analyzer_report_refresh_seconds: int = 300
     stock_analyzer_top_n: int = 3
     stock_agent_manual_scan_limit: int = 30
+    stock_agent_max_workers: int = 4
     risk_analyzer_loop_interval_seconds: int = 30
     risk_analyzer_report_refresh_seconds: int = 300
     executioner_loop_interval_seconds: int = 30
