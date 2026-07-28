@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -12,9 +11,15 @@ from pipeline.runtime.run_executioner import ExecutionerRunner
 from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
-from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.dhan_service import DhanService
 from pipeline.stock import StockAgent
+from pipeline.stock.toolkits import (
+    StockAccountToolkit,
+    StockExecutionCoordinator,
+    StockExecutionToolkit,
+    StockMarketDataToolkit,
+    StockTechnicalToolkit,
+)
 
 
 class MultiStockAgentRunner(MultiStockAnalyzerRunner):
@@ -280,9 +285,13 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         run_context: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
-        max_workers = max(1, len(candidate_packets))
+        max_workers = min(
+            max(1, len(candidate_packets)),
+            max(1, int(self.config.stock_agent_max_workers)),
+        )
         results: Dict[int, Dict[str, Any]] = {}
         failures: List[Dict[str, Any]] = []
+        execution_coordinator = StockExecutionCoordinator()
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
@@ -293,6 +302,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                     trade_config,
                     event_callback,
                     run_context or {},
+                    execution_coordinator,
                 ): index
                 for index, packet in enumerate(candidate_packets)
             }
@@ -332,6 +342,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         trade_config: Dict[str, Any],
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         run_context: Optional[Dict[str, Any]] = None,
+        execution_coordinator: Optional[StockExecutionCoordinator] = None,
     ) -> Dict[str, Any]:
         security_id = int(candidate_packet["security_id"])
         CloudPersistenceService.validate_agno_db()
@@ -359,6 +370,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 raise RuntimeError(f"stock_agent_auth_invalid::{remarks}")
             raise RuntimeError(f"stock_agent_intraday_history_failed::{security_id}::{remarks}")
 
+        intraday_frame_fetched_at = self.market_time.now()
         intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
         artifacts_dir = (
             self.config.stock_analyzer_artifacts_dir
@@ -401,21 +413,48 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             {"rank": index + 1, "candidate": candidate_packet}
         )
         isolated_dhan = DhanService(self.config, prefer_gateway=False)
-        toolkit = DhanExecutionToolkit(isolated_dhan, entry_only=True)
-        toolkit.set_allowed_security_id(security_id)
-        agent = StockAgent(toolkit)
-        fresh_market_snapshot = self._build_fresh_market_snapshot(security_id, isolated_dhan)
+        margin_budget = self._resolve_margin_budget(trade_config, candidate_packet)
+        market_data_toolkit = StockMarketDataToolkit(
+            dhan=isolated_dhan,
+            market_time=self.market_time,
+            security_id=security_id,
+            symbol=str(candidate_packet.get("symbol") or ""),
+            display_name=str(candidate_packet.get("display_name") or candidate_packet.get("symbol") or ""),
+            stock_context=candidate_packet,
+            instrument=candidate_packet.get("instrument"),
+            intraday_frame=intraday_frame,
+            intraday_frame_fetched_at=intraday_frame_fetched_at,
+        )
+        technical_toolkit = StockTechnicalToolkit(chart_bundle, market_time=self.market_time)
+        account_toolkit = StockAccountToolkit(
+            isolated_dhan,
+            security_id=security_id,
+            margin_budget=margin_budget,
+        )
+        execution_toolkit = StockExecutionToolkit(
+            isolated_dhan,
+            security_id=security_id,
+            margin_budget=margin_budget,
+            coordinator=execution_coordinator,
+        )
+        research_toolkit = self._build_research_toolkit(candidate_packet)
+        stock_toolkits = [
+            market_data_toolkit,
+            technical_toolkit,
+            account_toolkit,
+            execution_toolkit,
+        ]
+        if research_toolkit is not None:
+            stock_toolkits.append(research_toolkit)
+        agent = StockAgent(stock_toolkits)
         stock_packet = {
             "market_date": candidate_packet.get("market_date"),
-            "summary": {"source_snapshots": candidate_packet.get("source_snapshots")},
             "timing_context": self._build_stock_agent_timing_context(candidate_packet),
-            "candidate": candidate_packet,
-            "selected_stock": selected_stock,
-            "regime_report": candidate_packet.get("regime_report"),
-            "fresh_market_snapshot": fresh_market_snapshot,
-            "account_context": candidate_packet.get("account_context") or self._build_account_context(),
-            "user_profile": isolated_dhan.fetch_user_profile(),
-            "trade_config": trade_config,
+            "selected_stock": {
+                "security_id": selected_stock.get("security_id"),
+                "symbol": selected_stock.get("symbol"),
+                "display_name": selected_stock.get("display_name"),
+            },
         }
 
         print(f"[stock agent {index + 1}] Analyzing and trading {candidate_packet['display_name']}...")
@@ -440,10 +479,11 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         report_text = agent.analyze(
             stock_packet,
             cloud_image_urls,
-            trade_config=trade_config,
             run_context=agent_run_context,
         )
-        decision = self.execution_helper._parse_execution_report(report_text, stock_packet)
+        decision = execution_toolkit.decision_snapshot(
+            str(candidate_packet.get("display_name") or candidate_packet.get("symbol") or "")
+        )
         attachments = self._build_agent_attachments(index + 1, candidate_packet, stock_packet, chart_bundle)
         result = {
             "rank": index + 1,
@@ -585,135 +625,91 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         }
 
     def _build_instructions_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
-        trade_config = stock_packet.get("trade_config") or {}
         selected_stock = stock_packet.get("selected_stock") or {}
         lines = [
             f"# {display_name} Agent Instructions",
             "",
-            "- Analyze the assigned intraday Indian equity candidate.",
-            "- Use chart images and technical metadata as the primary current market evidence.",
-            "- Use current 1m/5m charts for execution timing and higher timeframes for structure.",
-            "- Check existing orders and positions for the selected security before any new entry.",
-            "- Use Dhan margin and order tools before any live placement.",
-            "- Prefer protected intraday Super Orders when available.",
-            "- Stop after one protected-order attempt and one fallback normal-entry attempt.",
-            "- Return parseable Decision and Execution Status headers exactly once.",
+            "- Analyze the assigned stock for a sound intraday entry using the attached charts and available tools.",
+            "- Focus only on the assigned stock.",
+            "- Never modify, cancel, exit, hedge, convert, or otherwise touch another stock's position or order.",
+            "- Any trade opened is for the current trading day only.",
+            "- After the main analysis, call get_current_stock_state once and use the newly fetched quote and OHLC data before the final decision or order.",
+            "- Return the analysis and outcome naturally and concisely.",
             "",
-            "## Selected Stock",
-            "```json",
-            json.dumps(selected_stock, indent=2, ensure_ascii=True, default=str),
-            "```",
-            "",
-            "## Trade Config",
-            "```json",
-            json.dumps(trade_config, indent=2, ensure_ascii=True, default=str),
-            "```",
+            "## Assignment",
+            f"- Security ID: {selected_stock.get('security_id')}",
+            f"- Stock: {selected_stock.get('display_name') or selected_stock.get('symbol')}",
         ]
+        if selected_stock.get("symbol"):
+            lines.append(f"- Symbol: {selected_stock.get('symbol')}")
         return "\n".join(lines)
 
     def _build_data_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
-        candidate = stock_packet.get("candidate") or {}
-        data = {
-            "display_name": display_name,
-            "market_date": stock_packet.get("market_date"),
-            "timing_context": stock_packet.get("timing_context"),
-            "selected_stock": stock_packet.get("selected_stock"),
-            "technical_metadata": (candidate.get("chart_artifacts") or {}).get("technical_metadata"),
-            "stage2": candidate.get("stage2"),
-            "fresh_market_snapshot": stock_packet.get("fresh_market_snapshot"),
-            "account_context": stock_packet.get("account_context"),
-        }
-        return "\n".join(
-            [
-                f"# {display_name} Agent Data",
-                "",
-                "```json",
-                json.dumps(data, indent=2, ensure_ascii=True, default=str),
-                "```",
-            ]
-        )
+        timing = stock_packet.get("timing_context") or {}
+        session = timing.get("market_session") or {}
+        lines = [
+            f"# {display_name} Agent Context",
+            "",
+            f"- Indian date and time: {timing.get('current_market_time_ist')}",
+            f"- Regular market session: {session.get('regular_session') or '09:15-15:30 IST'}",
+            f"- Market open now: {session.get('is_open_now')}",
+            f"- Minutes to close: {session.get('minutes_to_close')}",
+            "",
+            "Detailed market, technical, account, and execution information is available to the agent through scoped tools.",
+        ]
+        return "\n".join(line for line in lines if not line.endswith(": None"))
 
     def _build_stock_agent_timing_context(self, candidate_packet: Dict[str, Any]) -> Dict[str, Any]:
-        now_utc = datetime.now(timezone.utc)
-        context = dict(candidate_packet.get("timing_context") or {})
-        context.update(
-            {
-                "stock_agent_started_at_utc": now_utc.isoformat(),
-                "stock_agent_started_at_ist": now_utc.astimezone(self.market_time.tz).isoformat(),
-                "current_market_time_ist": self.market_time.now().isoformat(),
-            }
+        now = self.market_time.now()
+        open_at = now.replace(
+            hour=self.config.market_open_hour,
+            minute=self.config.market_open_minute,
+            second=0,
+            microsecond=0,
         )
-        source_times = dict(context.get("source_snapshot_times") or {})
-        source_times.pop("monitor_generated_at_utc", None)
-        source_times.pop("monitor_generated_at_ist", None)
-        context["source_snapshot_times"] = source_times
-        source_ages = dict(context.get("source_snapshot_ages_seconds") or {})
-        source_ages.pop("monitor", None)
-        context["source_snapshot_ages_seconds"] = source_ages
-        return context
-
-    def _build_fresh_market_snapshot(self, security_id: int, dhan: DhanService) -> Dict[str, Any]:
-        if not self.config.executioner_fresh_snapshot_enabled:
-            return self.execution_helper._empty_fresh_market_snapshot(security_id, "fresh_snapshot_disabled")
-        fetched_at = datetime.now(timezone.utc)
-        try:
-            quotes = dhan.fetch_quote_batch([security_id], exchange_segment="BSE_EQ")
-            quote_error = None
-        except Exception as exc:
-            quotes = {}
-            quote_error = f"{type(exc).__name__}: {exc}"
-        try:
-            ohlc = dhan.fetch_ohlc_batch([security_id], exchange_segment="BSE_EQ")
-            ohlc_error = None
-        except Exception as exc:
-            ohlc = {}
-            ohlc_error = f"{type(exc).__name__}: {exc}"
-
-        quote_payload = quotes.get(security_id) or {}
-        ohlc_payload = ohlc.get(security_id) or {}
-        latest_price = self.execution_helper._extract_first_number(
-            quote_payload,
-            ("last_price", "lastPrice", "ltp", "LTP", "close", "price"),
+        close_at = now.replace(
+            hour=self.config.market_close_hour,
+            minute=self.config.market_close_minute,
+            second=0,
+            microsecond=0,
         )
-        bid_price = self.execution_helper._extract_best_depth_price(quote_payload, "buy")
-        ask_price = self.execution_helper._extract_best_depth_price(quote_payload, "sell")
-        spread_percent = None
-        if bid_price and ask_price and latest_price:
-            spread_percent = round(((ask_price - bid_price) / latest_price) * 100.0, 4)
-        latest_timestamp = self.execution_helper._extract_first_value(
-            quote_payload,
-            (
-                "last_trade_time",
-                "last_traded_time",
-                "lastTradedTime",
-                "lastTradeTime",
-                "timestamp",
-                "exchangeTime",
-                "time",
-            ),
-        )
-        staleness_seconds = self.execution_helper._age_seconds(latest_timestamp, fetched_at)
         return {
-            "security_id": security_id,
-            "exchange_segment": "BSE_EQ",
-            "fetched_at_utc": fetched_at.isoformat(),
-            "fetched_at_ist": fetched_at.astimezone(self.market_time.tz).isoformat(),
-            "fetch_status": "success" if quote_payload or ohlc_payload else "failure",
-            "fetch_errors": {"quote": quote_error, "ohlc": ohlc_error},
-            "latest_price": latest_price,
-            "bid_price": bid_price,
-            "ask_price": ask_price,
-            "spread_percent": spread_percent,
-            "latest_market_timestamp": latest_timestamp,
-            "latest_market_timestamp_ist": self.execution_helper._to_market_iso(latest_timestamp),
-            "staleness_seconds": staleness_seconds,
-            "is_stale": bool(
-                staleness_seconds is not None
-                and staleness_seconds > self.config.executioner_max_market_snapshot_staleness_seconds
-            ),
-            "quote": quote_payload,
-            "ohlc": ohlc_payload,
+            "current_market_time_ist": now.strftime("%d %B %Y, %H:%M:%S IST"),
+            "market_session": {
+                "regular_session": "09:15-15:30 IST",
+                "is_open_now": bool(open_at <= now <= close_at),
+                "minutes_to_close": max(0, int((close_at - now).total_seconds() // 60)),
+            },
         }
+
+    def _resolve_margin_budget(
+        self,
+        trade_config: Dict[str, Any],
+        candidate_packet: Dict[str, Any],
+    ) -> float:
+        try:
+            configured = float(trade_config.get("trade_amount") or 0)
+        except Exception:
+            configured = 0.0
+        if configured > 0:
+            return configured
+        margin_filter = candidate_packet.get("manual_margin_filter") or {}
+        try:
+            return max(0.0, float(margin_filter.get("margin_budget") or 0))
+        except Exception:
+            return 0.0
+
+    def _build_research_toolkit(self, candidate_packet: Dict[str, Any]) -> Any:
+        try:
+            from pipeline.stock.toolkits.research_toolkit import StockResearchToolkit
+
+            return StockResearchToolkit(
+                display_name=str(candidate_packet.get("display_name") or ""),
+                symbol=str(candidate_packet.get("symbol") or ""),
+                market_time=self.market_time,
+            )
+        except ImportError:
+            return None
 
     def _save_no_trade_payload(
         self,

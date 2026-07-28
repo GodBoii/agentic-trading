@@ -7,17 +7,18 @@ from typing import Any, Dict, List, Optional
 
 from agno.agent import Agent
 from agno.media import Image
+from agno.tools import Toolkit
 
 from pipeline.llm import create_multimodal_trading_model
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
-from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 
 
 class StockAgent:
-    def __init__(self, toolkit: DhanExecutionToolkit) -> None:
+    def __init__(self, toolkits: List[Toolkit]) -> None:
         self.agent_name = os.getenv("STOCK_AGENT_NAME", "STOCK_AGENT")
         self.use_agno = os.getenv("STOCK_AGENT_USE_AGNO", "1").strip().lower() not in {"0", "false"}
-        self.toolkit = toolkit
+        self.debug_mode = os.getenv("STOCK_AGENT_DEBUG", "0").strip().lower() in {"1", "true", "yes"}
+        self.toolkits = list(toolkits)
         self.last_run_metadata: Dict[str, Any] = {}
 
     def is_enabled(self) -> bool:
@@ -27,7 +28,6 @@ class StockAgent:
         self,
         stock_packet: Dict[str, Any],
         image_urls: List[str],
-        trade_config: Optional[Dict[str, Any]] = None,
         run_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not self.is_enabled():
@@ -44,16 +44,6 @@ class StockAgent:
             "media_persistence": "supabase_storage_public_url",
         }
 
-        trade_mode = str((trade_config or {}).get("trade_mode") or "auto").lower()
-        trade_amount = (trade_config or {}).get("trade_amount")
-        if trade_mode == "manual" and trade_amount:
-            capital_instruction = (
-                f"Treat Rs {trade_amount} as this stock's intraday margin budget. "
-                "Size from Dhan margin, not from notional stock value."
-            )
-        else:
-            capital_instruction = "Size from available balance, Dhan margin validation, and supplied account context."
-
         agent = Agent(
             id=os.getenv("STOCK_AGENT_ID", "stock-agent"),
             name=self.agent_name,
@@ -63,48 +53,27 @@ class StockAgent:
             user_id=user_id,
             metadata=run_metadata,
             description=(
-                "Analyze one intraday stock candidate and make the final entry-only execution decision "
-                "using supplied charts, market context, account context, optional quote confirmation, and Dhan tools."
+                "Analyze one assigned Indian equity for an intraday entry and act when a sound setup exists."
             ),
-            tools=[self.toolkit],
+            tools=self.toolkits,
+            tool_call_limit=12,
             instructions=[
-                "You are a combined stock agent for an intraday Indian equity trading pipeline.",
-                "Analyze the assigned stock and then decide whether to place one new entry trade now.",
-                "Target trades that can complete within 1 minute to 1 hour.",
-                "Use chart images and technical metadata as the primary current market evidence; they are generated immediately before this stock agent runs.",
-                "Use the supplied *_ist fields and Asia/Calcutta market timezone for time-sensitive reasoning.",
-                "You receive chart images in this order: current day 1m, 5m, 15m, 30m, 1h; previous day 5m, 15m, 1h.",
-                "Use 1m for execution timing, 5m for primary setup, and 15m/30m/1h plus previous-day charts for structure.",
-                "Use stage2.live_quote, stage2.live_liquidity, stage2.data_quality, previous_session, static_tradability, and derivatives reference as structured evidence when present.",
-                "Treat missing live quote/spread/derivatives data as a data-quality warning, not as permission to invent those values.",
-                "If a regime report is supplied, treat it as non-binding background context only.",
-                "fresh_market_snapshot is optional extra quote/OHLC confirmation, not a second-agent freshness gate.",
-                "Do not reject a trade solely because fresh_market_snapshot is missing or failed. Use it as a veto only when it directly contradicts chart/technical metadata, shows dangerous spread/staleness, or exposes an execution feasibility problem.",
-                "Hard scope: only act on selected_stock.security_id from the stock packet.",
-                "Other holdings, orders, and positions are read-only context.",
-                "If there is any existing order or open intraday position for the selected stock, do not trade; report overlap and stop.",
-                "Never cancel, modify, exit, hedge, convert, or manage existing trades.",
-                "Never place an exit-only order. This agent only creates a new entry when there is no selected-stock overlap.",
-                "Use Dhan tools for execution checks: calculate_intraday_equity_order_quantity first, calculate_margin_requirement before live placement, and prefer place_protected_intraday_super_order.",
-                "Use place_intraday_equity_order only as a new-entry fallback when protected Super Order is unavailable for a non-input-error reason.",
-                "Make at most one protected order placement attempt and at most one fallback normal entry attempt.",
-                "If a Dhan tool returns DH-905, Input_Exception, invalid parameters, bad values, or missing fields, stop and report failed.",
-                "Use only Dhan order_type values: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_MARKET.",
-                "For BUY Super Orders, stop_loss_price must be below entry_price and target_price above entry_price.",
-                "For SELL Super Orders, target_price must be below entry_price and stop_loss_price above entry_price.",
-                "Do not invent order ids, correlation ids, funds, margins, quantities, or tool results.",
-                capital_instruction,
-                "After acting or deciding not to act, output a concise final outcome in normal markdown/text.",
-                "Always include these parseable headers exactly once: Decision, Execution Status, Selected Security ID, Selected Display Name, Trade Side, Order Type, Quantity, Reference Price, Correlation ID, Order ID.",
-                "Use Decision: trade only if an order was planned or placed after concrete checks. Otherwise use Decision: avoid.",
-                "Use Execution Status: placed, planned, skipped, blocked, or failed.",
+                "You are an expert intraday Indian equity trader.",
+                "Study the assigned stock using the attached charts and any available tools that are useful.",
+                "Understand how price is moving and evaluate price action, volume, momentum, liquidity, liquidity pools or sweeps, market structure, and risk-reward wherever relevant.",
+                "Decide whether a sound intraday entry exists and place it when appropriate. Any trade opened by you is for the current trading day only.",
+                "Focus only on the stock assigned to you.",
+                "Any live position or order in another stock belongs to another agent or workflow. Never modify, cancel, exit, hedge, convert, or otherwise touch it.",
+                "If the assigned stock already has a live position or active order, do not create another entry.",
+                "After completing your analysis and before your final decision or order, call get_current_stock_state once, use its newly fetched quote and OHLC data to update your view, and then proceed.",
+                "Give your final analysis and outcome naturally and concisely. Do not use a fixed response template.",
             ],
             markdown=True,
             store_media=True,
             store_tool_messages=True,
             store_events=True,
             add_datetime_to_context=False,
-            debug_mode=True,
+            debug_mode=self.debug_mode,
         )
 
         images = [Image(url=url) for url in image_urls]
@@ -120,88 +89,30 @@ class StockAgent:
         return response_text
 
     def _build_prompt(self, stock_packet: Dict[str, Any]) -> str:
-        candidate = stock_packet.get("candidate") or {}
         selected_stock = stock_packet.get("selected_stock") or {}
         timing_context = stock_packet.get("timing_context") or {}
-        fresh_market_snapshot = stock_packet.get("fresh_market_snapshot") or {}
-        has_optional_quote_snapshot = str(fresh_market_snapshot.get("fetch_status") or "").lower() == "success"
-        account_context = stock_packet.get("account_context") or {}
-        trade_config = stock_packet.get("trade_config") or {}
-        technical_metadata = (candidate.get("chart_artifacts") or {}).get("technical_metadata") or {}
-        regime_report = str(stock_packet.get("regime_report") or candidate.get("regime_report") or "").strip()
-        margin_filter = candidate.get("manual_margin_filter") or {}
-
+        market_session = timing_context.get("market_session") or {}
+        current_time = (
+            timing_context.get("current_market_time_ist")
+            or timing_context.get("stock_agent_started_at_ist")
+            or ""
+        )
         lines = [
-            "Analyze the supplied intraday stock candidate and make the final entry-only execution decision.",
-            "Use the charts, technical metadata, Stage 2 context, optional quote confirmation, and account context together.",
+            "Analyze the assigned stock for an intraday trade using the attached charts and available tools.",
             "",
-            "## Timing Context",
-            json.dumps(timing_context, ensure_ascii=True),
-            "",
-            "## Selected Stock",
-            json.dumps(
-                {
-                    "rank": selected_stock.get("rank"),
-                    "security_id": selected_stock.get("security_id"),
-                    "symbol": selected_stock.get("symbol"),
-                    "display_name": selected_stock.get("display_name"),
-                    "candidate_source": selected_stock.get("candidate_source"),
-                    "stock": selected_stock.get("stock"),
-                    "stage2": selected_stock.get("stage2"),
-                    "manual_margin_filter": margin_filter,
-                },
-                ensure_ascii=True,
-            ),
+            "## Assignment",
+            f"- Security ID: {selected_stock.get('security_id')}",
+            f"- Stock: {selected_stock.get('display_name') or selected_stock.get('symbol')}",
         ]
-
-        if regime_report:
-            lines.extend(
-                [
-                    "",
-                    "## Regime Context",
-                    "Use this only as non-binding background context:",
-                    regime_report,
-                ]
-            )
-
-        lines.extend(
-            [
-                "",
-                "## Technical Metadata",
-                json.dumps(technical_metadata, ensure_ascii=True),
-                "",
-                "## Stage 2 Structured Evidence",
-                json.dumps(
-                    {
-                        "stock": selected_stock.get("stock"),
-                        "stage2": selected_stock.get("stage2"),
-                    },
-                    ensure_ascii=True,
-                ),
-            ]
-        )
-        if has_optional_quote_snapshot:
-            lines.extend(
-                [
-                    "",
-                    "## Optional Quote/OHLC Snapshot",
-                    json.dumps(fresh_market_snapshot, ensure_ascii=True),
-                ]
-            )
-        lines.extend(
-            [
-                "",
-                "## Account Context",
-                json.dumps(account_context, ensure_ascii=True),
-                "",
-                "## Trade Config",
-                json.dumps(trade_config, ensure_ascii=True),
-                "",
-                "## Output Requirements",
-                "First give a compact analysis covering chart read, setup quality, risk, and execution rationale.",
-                "Then provide the required headers exactly as plain text lines.",
-            ]
-        )
+        if selected_stock.get("symbol"):
+            lines.append(f"- Symbol: {selected_stock.get('symbol')}")
+        if current_time:
+            lines.append(f"- Indian date and time: {current_time}")
+        lines.append(f"- Regular market session: {market_session.get('regular_session') or '09:15-15:30 IST'}")
+        if market_session.get("is_open_now") is not None:
+            lines.append(f"- Market open now: {bool(market_session.get('is_open_now'))}")
+        if market_session.get("minutes_to_close") is not None:
+            lines.append(f"- Minutes to close: {market_session.get('minutes_to_close')}")
         return "\n".join(lines)
 
     def _extract_metadata(self, response: Any) -> Dict[str, Any]:
