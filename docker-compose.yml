@@ -82,6 +82,7 @@ services:
     working_dir: /app/python-backend
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
+      STOCK_AGENT_DEBUG: "1"
     command: python -m pipeline.runtime.run_ai_trading_orchestrator
     depends_on:
       - market-data-gateway
