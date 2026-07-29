@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import math
 import os
-from collections import defaultdict, deque
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -29,8 +30,11 @@ class NiftyDepthChartGenerator:
         self.dom_levels = self._env_int("NIFTY_CHART_DOM_LEVELS", 48)
         self.sample_mode = os.getenv("NIFTY_CHART_SAMPLE_MODE", "tail").strip().lower()
         self.cvd_max_rows = self._env_int("NIFTY_CHART_MAX_CVD_ROWS", 5000)
+        self.chart_window_minutes = max(1, self._env_int("NIFTY_CHART_WINDOW_MINUTES", 15))
+        self.chart_time_bin_seconds = max(1, self._env_int("NIFTY_CHART_TIME_BIN_SECONDS", 5))
         self.option_chain_strikes_each_side = self._env_int("NIFTY_OPTION_CHAIN_CHART_STRIKES_EACH_SIDE", 5)
         self.reference = MarketReferenceService(config)
+        self.market_timezone = self._resolve_timezone(config.market_timezone)
 
     def _env_int(self, key: str, default: int) -> int:
         try:
@@ -46,6 +50,18 @@ class NiftyDepthChartGenerator:
 
     def _now_utc(self) -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _resolve_timezone(timezone_name: str) -> ZoneInfo:
+        aliases = [timezone_name]
+        if timezone_name == "Asia/Calcutta":
+            aliases.append("Asia/Kolkata")
+        for alias in aliases:
+            try:
+                return ZoneInfo(alias)
+            except ZoneInfoNotFoundError:
+                continue
+        return ZoneInfo("UTC")
 
     def _parse_ndjson_line(self, line: str) -> Optional[Dict[str, Any]]:
         if not line.strip():
@@ -67,13 +83,31 @@ class NiftyDepthChartGenerator:
                         rows.append(row)
             return rows
 
-        tail: deque[Dict[str, Any]] = deque(maxlen=max_rows)
-        with path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                row = self._parse_ndjson_line(line)
-                if row is not None:
-                    tail.append(row)
-        return list(tail)
+        # These recorder files can grow past a gigabyte during one session.
+        # Seek backwards instead of scanning the entire file to obtain a tail.
+        chunk_size = 1024 * 1024
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            position = handle.tell()
+            chunks: List[bytes] = []
+            newline_count = 0
+            while position > 0 and newline_count <= max_rows:
+                read_size = min(chunk_size, position)
+                position -= read_size
+                handle.seek(position)
+                chunk = handle.read(read_size)
+                chunks.append(chunk)
+                newline_count += chunk.count(b"\n")
+        raw_lines = b"".join(reversed(chunks)).splitlines()[-max_rows:]
+        rows: List[Dict[str, Any]] = []
+        for raw_line in raw_lines:
+            try:
+                row = json.loads(raw_line.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+        return rows
 
     def _count_ndjson_rows(self, path: Path) -> int:
         count = 0
@@ -155,7 +189,7 @@ class NiftyDepthChartGenerator:
         if not value:
             return None
         try:
-            return pd.to_datetime(value, utc=True)
+            return pd.to_datetime(value, utc=True).tz_convert(self.market_timezone)
         except Exception:
             return None
 
@@ -213,11 +247,20 @@ class NiftyDepthChartGenerator:
 
     def _depth_dataframe(self, rows: List[Dict[str, Any]]) -> pd.DataFrame:
         records: List[Dict[str, Any]] = []
+        # A 200-level feed can emit several updates per second. One complete
+        # snapshot per side/time bin preserves the heatmap while preventing an
+        # unnecessary multi-million-row expansion.
+        snapshots: Dict[Tuple[pd.Timestamp, str], Tuple[pd.Timestamp, Dict[str, Any]]] = {}
         for row in rows:
             ts = self._parse_ts(row.get("captured_at_utc"))
             side = str(row.get("side") or "").lower()
             if ts is None or side not in {"bid", "ask"}:
                 continue
+            time_bin = ts.floor(f"{self.chart_time_bin_seconds}s")
+            snapshots[(time_bin, side)] = (ts, row)
+
+        for _, (ts, row) in sorted(snapshots.items(), key=lambda item: item[1][0]):
+            side = str(row.get("side") or "").lower()
             for level in self._extract_depth_levels(row.get("depth"), side):
                 records.append(
                     {
@@ -286,7 +329,10 @@ class NiftyDepthChartGenerator:
                 if previous_volume is not None and volume >= previous_volume:
                     quantity = volume - previous_volume
                 previous_volume = volume
-            if quantity <= 0 and ltq is not None:
+            # Only fall back to LTQ when cumulative volume is unavailable. A
+            # known zero cumulative-volume delta is a repeated quote packet,
+            # not another execution.
+            if volume is None and ltq is not None:
                 quantity = ltq
             if quantity <= 0:
                 previous_ltp = ltp
@@ -354,7 +400,7 @@ class NiftyDepthChartGenerator:
             if ts is None or price is None:
                 continue
             quantity = self._number(row.get("volume_delta"))
-            if quantity is None or quantity <= 0:
+            if quantity is None:
                 quantity = self._number(row.get("last_traded_quantity")) or 0.0
             if quantity <= 0:
                 continue
@@ -387,6 +433,29 @@ class NiftyDepthChartGenerator:
             )
         return pd.DataFrame.from_records(records).sort_values("timestamp")
 
+    def _cvd_from_trade_dataframe(self, trade_df: pd.DataFrame) -> pd.DataFrame:
+        if trade_df.empty:
+            return pd.DataFrame(
+                columns=["timestamp", "price", "cvd", "cvd_5min", "cvd_ma_20", "tick_volume", "aggressor"]
+            )
+        frame = trade_df.copy().sort_values("timestamp")
+        signed = frame["quantity"].where(frame["aggressor"] == "buy", 0.0)
+        signed = signed - frame["quantity"].where(frame["aggressor"] == "sell", 0.0)
+        cvd = signed.cumsum()
+        result = pd.DataFrame(
+            {
+                "timestamp": frame["timestamp"],
+                "price": frame["price"],
+                "cvd": cvd,
+                "tick_volume": frame["quantity"],
+                "aggressor": frame["aggressor"],
+            }
+        )
+        signed_by_time = pd.Series(signed.to_numpy(), index=pd.DatetimeIndex(result["timestamp"]))
+        result["cvd_5min"] = signed_by_time.rolling("5min", min_periods=1).sum().to_numpy()
+        result["cvd_ma_20"] = result["cvd"].rolling(20, min_periods=1).mean()
+        return result
+
     def _cvd_dataframe(self, rows: List[Dict[str, Any]]) -> pd.DataFrame:
         records: List[Dict[str, Any]] = []
         for row in rows:
@@ -411,7 +480,9 @@ class NiftyDepthChartGenerator:
         return pd.DataFrame.from_records(records).sort_values("timestamp")
 
     def _load_volume_profile_levels(self, path: Path, trade_df: pd.DataFrame) -> List[Dict[str, Any]]:
-        if path.exists():
+        # Prefer a profile rebuilt from deduplicated trade rows. Older saved
+        # profiles may contain the pre-fix LTQ double counting.
+        if trade_df.empty and path.exists():
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 levels = payload.get("levels")
@@ -468,7 +539,7 @@ class NiftyDepthChartGenerator:
     def _pick_nearest_expiry(self, expiries: List[str]) -> Optional[str]:
         if not expiries:
             return None
-        today = pd.Timestamp.now(tz=self.config.market_timezone).normalize().tz_localize(None)
+        today = pd.Timestamp.now(tz=self.market_timezone).normalize().tz_localize(None)
         dated = [(self._parse_iso_date(item), item) for item in expiries]
         valid = [(parsed, raw) for parsed, raw in dated if parsed is not None and parsed >= today]
         if not valid:
@@ -567,19 +638,57 @@ class NiftyDepthChartGenerator:
             "summary": output_dir / "chart_summary.json",
         }
 
+    def _synchronize_chart_window(
+        self,
+        depth_df: pd.DataFrame,
+        quote_df: pd.DataFrame,
+        trade_df: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        endpoints: List[pd.Timestamp] = []
+        if not depth_df.empty:
+            endpoints.append(pd.Timestamp(depth_df["timestamp"].max()))
+        if not trade_df.empty:
+            endpoints.append(pd.Timestamp(trade_df["timestamp"].max()))
+        if not endpoints:
+            return depth_df, quote_df, trade_df
+
+        window_end = min(endpoints) if len(endpoints) > 1 else endpoints[0]
+        requested_start = window_end - pd.Timedelta(minutes=self.chart_window_minutes)
+        available_starts: List[pd.Timestamp] = []
+        if not depth_df.empty:
+            available_starts.append(pd.Timestamp(depth_df["timestamp"].min()))
+        if not trade_df.empty:
+            available_starts.append(pd.Timestamp(trade_df["timestamp"].min()))
+        # Never compare trades and liquidity from different time spans. When a
+        # bounded tail does not cover the whole requested duration, use the
+        # overlapping interval and report its actual coverage.
+        window_start = max([requested_start, *available_starts])
+        if not depth_df.empty:
+            depth_df = depth_df[
+                (depth_df["timestamp"] >= window_start) & (depth_df["timestamp"] <= window_end)
+            ].copy()
+        if not quote_df.empty:
+            quote_df = quote_df[(quote_df.index >= window_start) & (quote_df.index <= window_end)].copy()
+        if not trade_df.empty:
+            trade_df = trade_df[
+                (trade_df["timestamp"] >= window_start) & (trade_df["timestamp"] <= window_end)
+            ].copy()
+        return depth_df, quote_df, trade_df
+
     def generate_for_market_date(self, market_date: str) -> Dict[str, Any]:
         data_dir = self.config.nifty_depth_data_dir / market_date
         paths = self._chart_paths(market_date)
         depth_rows = self._load_ndjson(data_dir / "depth_200.ndjson", self.max_depth_packets)
         trade_tick_rows = self._load_ndjson(data_dir / "trade_ticks.ndjson", self.max_full_packets)
         full_rows = self._load_ndjson(data_dir / "full_market.ndjson", self.max_full_packets)
-        cvd_rows = self._load_ndjson(data_dir / "cvd_series.ndjson", self.cvd_max_rows)
-
         depth_df = self._depth_dataframe(depth_rows)
         quote_df = self._best_quotes_from_depth(depth_rows)
         trade_tick_source = "trade_ticks.ndjson" if trade_tick_rows else "full_market.ndjson_fallback"
         trade_df = self._trade_tick_dataframe(trade_tick_rows) if trade_tick_rows else self._trade_dataframe(full_rows, quote_df)
-        cvd_df = self._cvd_dataframe(cvd_rows)
+        depth_df, quote_df, trade_df = self._synchronize_chart_window(depth_df, quote_df, trade_df)
+        # Always rebuild CVD from the corrected trade rows. Persisted pre-fix
+        # CVD files can contain duplicated LTQ volume.
+        cvd_df = self._cvd_from_trade_dataframe(trade_df)
         volume_profile_levels = self._load_volume_profile_levels(data_dir / "volume_profile.json", trade_df)
 
         if depth_df.empty and trade_df.empty:
@@ -604,13 +713,13 @@ class NiftyDepthChartGenerator:
             (
                 "nifty_futures_5m_candles",
                 lambda: self._render_nifty_candle_chart(5, paths["candle_5m"], market_date),
-                "5-minute NIFTY futures technical chart with VWAP, EMAs, RSI, volume, and CVD proxy.",
+                "5-minute NIFTY futures price chart with VWAP and EMAs.",
                 paths["candle_5m"],
             ),
             (
                 "nifty_futures_15m_candles",
                 lambda: self._render_nifty_candle_chart(15, paths["candle_15m"], market_date),
-                "15-minute NIFTY futures higher-timeframe technical chart.",
+                "15-minute NIFTY futures higher-timeframe price chart with VWAP and EMAs.",
                 paths["candle_15m"],
             ),
             (
@@ -837,7 +946,7 @@ class NiftyDepthChartGenerator:
         ax_price.legend(loc="upper left")
         ax_cvd.legend(loc="upper left")
         ax_cvd.set_ylabel("CVD", color="#d7e2ea")
-        ax_cvd.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        ax_cvd.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=self.market_timezone))
         fig.autofmt_xdate()
         fig.savefig(output_path, dpi=170, bbox_inches="tight")
         plt.close(fig)
@@ -962,6 +1071,13 @@ class NiftyDepthChartGenerator:
     def _render_option_chain_oi(self, output_path: Path, market_date: str) -> Dict[str, Any]:
         from pipeline.services.dhan_service import DhanService
 
+        current_market_date = datetime.now(self.market_timezone).date().isoformat()
+        if market_date != current_market_date:
+            raise ValueError(
+                "Dhan option-chain OI is a live snapshot and cannot be backfilled "
+                f"for historical market date {market_date}"
+            )
+
         index = self.reference.find_index("NIFTY", "NSE")
         if not index:
             raise RuntimeError("Could not resolve NIFTY index for option chain")
@@ -1066,6 +1182,8 @@ class NiftyDepthChartGenerator:
         matplotlib.use("Agg")
         import matplotlib.dates as mdates
         import matplotlib.pyplot as plt
+        import numpy as np
+        from matplotlib.colors import TwoSlopeNorm
 
         plt.style.use("dark_background")
         fig, ax = plt.subplots(figsize=(19, 10))
@@ -1073,50 +1191,51 @@ class NiftyDepthChartGenerator:
         ax.set_facecolor("#0f1b20")
 
         if not depth_df.empty:
-            limit = max(float(depth_df["quantity"].quantile(0.98)), 1.0)
-            bids = depth_df[depth_df["side"] == "bid"]
-            asks = depth_df[depth_df["side"] == "ask"]
-            if not bids.empty:
-                ax.scatter(
-                    bids["timestamp"],
-                    bids["price"],
-                    c=bids["quantity"].clip(upper=limit),
-                    cmap="winter",
-                    s=18,
-                    marker="s",
-                    alpha=0.42,
-                    edgecolors="none",
+            local = depth_df.copy()
+            local["time_bin"] = local["timestamp"].dt.floor(f"{self.chart_time_bin_seconds}s")
+            local["price_bin"] = local["price"].map(self._round_price)
+            local["signed_log_quantity"] = np.log1p(local["quantity"].clip(lower=0.0))
+            local.loc[local["side"] == "bid", "signed_log_quantity"] *= -1.0
+
+            matrix = local.pivot_table(
+                index="price_bin",
+                columns="time_bin",
+                values="signed_log_quantity",
+                aggfunc="last",
+                fill_value=0.0,
+            ).sort_index()
+            if not matrix.empty:
+                values = matrix.to_numpy(dtype=float)
+                nonzero = np.abs(values[np.nonzero(values)])
+                limit = float(np.quantile(nonzero, 0.98)) if nonzero.size else 1.0
+                limit = max(limit, 1.0)
+                mesh = ax.pcolormesh(
+                    matrix.columns.to_pydatetime(),
+                    matrix.index.to_numpy(dtype=float),
+                    values,
+                    cmap="coolwarm",
+                    norm=TwoSlopeNorm(vmin=-limit, vcenter=0.0, vmax=limit),
+                    shading="nearest",
+                    alpha=0.82,
                     zorder=1,
                 )
-            if not asks.empty:
-                ask_scatter = ax.scatter(
-                    asks["timestamp"],
-                    asks["price"],
-                    c=asks["quantity"].clip(upper=limit),
-                    cmap="hot",
-                    s=18,
-                    marker="s",
-                    alpha=0.42,
-                    edgecolors="none",
-                    zorder=1,
-                )
-                cbar = fig.colorbar(ask_scatter, ax=ax, pad=0.01, shrink=0.75)
-                cbar.set_label("Resting quantity intensity")
+                cbar = fig.colorbar(mesh, ax=ax, pad=0.01, shrink=0.78)
+                cbar.set_label("Resting liquidity: bids \u2190 log(quantity) \u2192 asks")
 
         if not quote_df.empty:
-            ax.plot(quote_df.index, quote_df["best_bid"], color="#39d98a", linewidth=1.0, label="Best bid", zorder=3)
-            ax.plot(quote_df.index, quote_df["best_ask"], color="#ff5d57", linewidth=1.0, label="Best ask", zorder=3)
+            ax.plot(quote_df.index, quote_df["best_bid"], color="#5ee6a8", linewidth=1.0, label="Best bid", zorder=3)
+            ax.plot(quote_df.index, quote_df["best_ask"], color="#ff7a73", linewidth=1.0, label="Best ask", zorder=3)
 
         if not trade_df.empty:
             color_map = {"buy": "#00e676", "sell": "#ff3b30", "neutral": "#ffd54f"}
             max_qty = max(float(trade_df["quantity"].quantile(0.95)), 1.0)
-            sizes = 30 + (trade_df["quantity"].clip(upper=max_qty) / max_qty) * 650
+            sizes = 10 + (trade_df["quantity"].clip(upper=max_qty) / max_qty) * 120
             ax.scatter(
                 trade_df["timestamp"],
                 trade_df["price"],
                 s=sizes,
                 c=[color_map.get(side, "#ffd54f") for side in trade_df["aggressor"]],
-                alpha=0.78,
+                alpha=0.72,
                 edgecolors="#d8eef2",
                 linewidth=0.35,
                 zorder=5,
@@ -1126,12 +1245,30 @@ class NiftyDepthChartGenerator:
         ylim = self._price_ylim(depth_df, trade_df)
         if ylim:
             ax.set_ylim(*ylim)
-        ax.set_title(f"NIFTY 200-Depth Liquidity Heatmap + Trade Bubbles ({market_date})", fontsize=16)
-        ax.set_xlabel("Time")
+        coverage_frames: List[pd.Series] = []
+        if not depth_df.empty:
+            coverage_frames.append(depth_df["timestamp"])
+        if not trade_df.empty:
+            coverage_frames.append(trade_df["timestamp"])
+        if coverage_frames:
+            coverage_start = max(series.min() for series in coverage_frames)
+            coverage_end = min(series.max() for series in coverage_frames)
+            coverage_text = (
+                f"{pd.Timestamp(coverage_start).strftime('%H:%M:%S')}–"
+                f"{pd.Timestamp(coverage_end).strftime('%H:%M:%S')} IST"
+            )
+        else:
+            coverage_text = "no synchronized window"
+        ax.set_title(
+            f"NIFTY 200-Depth Liquidity Heatmap + Trades "
+            f"({coverage_text}, {market_date})",
+            fontsize=16,
+        )
+        ax.set_xlabel("Time (IST)")
         ax.set_ylabel("NIFTY future price")
         ax.grid(True, color="#44616a", linestyle=":", alpha=0.35)
         ax.legend(loc="upper left")
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=self.market_timezone))
         fig.autofmt_xdate()
         fig.savefig(output_path, dpi=170, bbox_inches="tight")
         plt.close(fig)

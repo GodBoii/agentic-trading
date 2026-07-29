@@ -14,12 +14,18 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 class CandlestickChartService:
     """Generates professional candlestick chart images optimized for LLM vision analysis.
 
-    Charts include: Price (candlesticks + EMA9/21 + Bollinger Bands + VWAP + S/R + S/D zones),
-    Volume, RSI(14), and CVD panels. Full trading session x-axis (9:15-15:30).
+    Produces a compact, role-specific price dossier for multimodal agents:
+    1m execution, 5m setup, and 15m structure. Numeric indicators remain in
+    structured metadata instead of being repeated as lower image panels.
     """
 
-    CURRENT_DAY_TIMEFRAMES: List[int] = [1, 5, 15, 30, 60]
-    PREVIOUS_DAY_TIMEFRAMES: List[int] = [5, 15, 60]
+    CURRENT_DAY_TIMEFRAMES: List[int] = [1, 5, 15]
+    PREVIOUS_DAY_TIMEFRAMES: List[int] = [15]
+    CHART_ROLES = {
+        1: "execution",
+        5: "setup",
+        15: "structure",
+    }
 
     # Color palette — carefully chosen for LLM visual clarity
     COLORS = {
@@ -80,7 +86,19 @@ class CandlestickChartService:
         data_as_of = today_frame.index[-1]
 
         # Get previous day frame for S/R computation
-        prev_date = self._previous_trading_day(market_date)
+        market_day = date.fromisoformat(market_date)
+        available_previous_dates = sorted(
+            {
+                timestamp.date()
+                for timestamp in local_frame["timestamp"]
+                if timestamp.date() < market_day
+            }
+        )
+        prev_date = (
+            available_previous_dates[-1]
+            if available_previous_dates
+            else self._previous_trading_day(market_date)
+        )
         prev_date_str = prev_date.isoformat()
         prev_frame = self._day_frame(local_frame, prev_date_str)
 
@@ -122,6 +140,7 @@ class CandlestickChartService:
             charts[key] = {
                 "timeframe_minutes": timeframe,
                 "label": tf_label,
+                "role": self.CHART_ROLES.get(timeframe, "price"),
                 "day_type": "current",
                 "date": market_date,
                 "path": str(path),
@@ -192,6 +211,7 @@ class CandlestickChartService:
             "chart_count": len(charts),
             "charts": charts,
             "chart_paths_ordered": chart_paths_ordered,
+            "chart_contract_version": "price-dossier-v3",
             "technical_metadata": technical_metadata,
         }
 
@@ -432,8 +452,6 @@ class CandlestickChartService:
         meta["bb_upper"] = round(float(last["bb_upper"]), 2) if "bb_upper" in frame.columns and not pd.isna(last.get("bb_upper")) else None
         meta["bb_lower"] = round(float(last["bb_lower"]), 2) if "bb_lower" in frame.columns and not pd.isna(last.get("bb_lower")) else None
         meta["atr"] = round(float(last["atr"]), 2) if "atr" in frame.columns and not pd.isna(last.get("atr")) else None
-        meta["cvd_direction"] = "positive" if "cvd" in frame.columns and float(last.get("cvd", 0)) > 0 else "negative"
-
         # EMA crossover state
         if meta["ema9"] and meta["ema21"]:
             meta["ema_state"] = "bullish_cross" if meta["ema9"] > meta["ema21"] else "bearish_cross"
@@ -469,7 +487,7 @@ class CandlestickChartService:
         df = self._add_base_indicators(frame)
 
         ohlcv = (
-            df[["open", "high", "low", "close", "volume", "vwap", "cvd"]]
+            df[["open", "high", "low", "close", "volume", "vwap"]]
             .resample(rule, label="left", closed="left")
             .agg({
                 "open": "first",
@@ -478,7 +496,6 @@ class CandlestickChartService:
                 "close": "last",
                 "volume": "sum",
                 "vwap": "last",
-                "cvd": "last",
             })
             .dropna(subset=["open", "high", "low", "close"])
         )
@@ -507,16 +524,361 @@ class CandlestickChartService:
         df["cum_vol"] = df["volume"].cumsum()
         df["vwap"] = df["cum_vp"] / df["cum_vol"]
 
-        # CVD
-        df["delta"] = df["volume"]
-        df.loc[df["close"] < df["open"], "delta"] = -df["volume"]
-        df["cvd"] = df["delta"].cumsum()
-
         return df
 
     # ─── CHART RENDERING ───────────────────────────────────────────────────
 
     def _render_chart(
+        self,
+        frame: pd.DataFrame,
+        title: str,
+        subtitle: str,
+        output_path: Path,
+        market_date: str,
+        timeframe_minutes: int,
+        sr_levels: List[Dict[str, Any]],
+        sd_zones: List[Dict[str, Any]],
+        patterns: List[Dict[str, Any]],
+        prev_day_levels: Dict[str, float],
+    ) -> None:
+        """Render one uncluttered price chart for a specific decision role.
+
+        Oscillators, volume statistics, and candlestick detections are deliberately
+        kept in the JSON metadata. The image is reserved for price geometry.
+        """
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+        from matplotlib.ticker import FuncFormatter
+
+        if frame.empty:
+            raise ValueError(f"Cannot render empty chart for {title}.")
+
+        colors = self.COLORS
+        visible_bars = {1: 90, 5: 90, 15: 64}.get(timeframe_minutes, 80)
+        plot_frame = frame.iloc[-visible_bars:].copy()
+        if plot_frame.index.tz is not None:
+            plot_frame.index = plot_frame.index.tz_localize(None)
+
+        candle_count = len(plot_frame)
+        x_positions = np.arange(candle_count, dtype=float)
+        timestamps = plot_frame.index.to_pydatetime()
+        candle_width = 0.72 if candle_count > 60 else 0.64
+        x_right = candle_count - 1 + 4.5
+
+        candle_low = float(plot_frame["low"].min())
+        candle_high = float(plot_frame["high"].max())
+        visible_span = max(candle_high - candle_low, 0.01)
+        latest_atr = self._latest_finite(plot_frame, "atr")
+        y_padding = max(visible_span * 0.06, latest_atr * 0.35, 0.02)
+        y_min = candle_low - y_padding
+        y_max = candle_high + y_padding
+
+        latest_close = float(plot_frame["close"].iloc[-1])
+        selected_levels = sorted(
+            (
+                level for level in sr_levels
+                if y_min <= float(level.get("price", math.nan)) <= y_max
+            ),
+            key=lambda level: abs(float(level["price"]) - latest_close),
+        )[:4]
+        selected_zones: List[Dict[str, Any]] = []
+        for zone_type in ("demand", "supply"):
+            candidates = [
+                zone for zone in sd_zones
+                if zone.get("type") == zone_type
+                and float(zone.get("zone_high", -math.inf)) >= y_min
+                and float(zone.get("zone_low", math.inf)) <= y_max
+            ]
+            if candidates:
+                selected_zones.append(
+                    min(
+                        candidates,
+                        key=lambda zone: abs(
+                            (float(zone["zone_low"]) + float(zone["zone_high"])) / 2
+                            - latest_close
+                        ),
+                    )
+                )
+
+        fig, ax_price = plt.subplots(figsize=(16, 9))
+        fig.patch.set_facecolor(colors["bg"])
+        ax_price.set_facecolor(colors["panel_bg"])
+
+        for zone in selected_zones:
+            zone_low = max(float(zone["zone_low"]), y_min)
+            zone_high = min(float(zone["zone_high"]), y_max)
+            zone_color = (
+                colors["sd_demand"]
+                if zone["type"] == "demand"
+                else colors["sd_supply"]
+            )
+            zone_alpha = 0.13 if zone.get("strength") == "strong" else 0.08
+            ax_price.axhspan(
+                zone_low,
+                zone_high,
+                color=zone_color,
+                alpha=zone_alpha,
+                zorder=0,
+            )
+            ax_price.text(
+                x_right - 0.25,
+                (zone_low + zone_high) / 2,
+                f"{zone['type'].upper()} ZONE",
+                color=zone_color,
+                fontsize=8,
+                fontweight="bold",
+                ha="right",
+                va="center",
+                zorder=7,
+            )
+
+        for level in selected_levels:
+            level_price = float(level["price"])
+            level_color = (
+                colors["sr_support"]
+                if level["type"] == "support"
+                else colors["sr_resistance"]
+            )
+            ax_price.axhline(
+                level_price,
+                color=level_color,
+                linestyle="--",
+                linewidth=0.8,
+                alpha=0.38,
+                zorder=1,
+            )
+
+        previous_level_specs = (
+            ("prev_high", "PDH", colors["prev_high"]),
+            ("prev_low", "PDL", colors["prev_low"]),
+            ("prev_close", "PDC", colors["prev_close"]),
+        )
+        offscreen_top: List[str] = []
+        offscreen_bottom: List[str] = []
+        for key, label, level_color in previous_level_specs:
+            value = prev_day_levels.get(key)
+            if value is None or not math.isfinite(float(value)):
+                continue
+            price = float(value)
+            if y_min <= price <= y_max:
+                ax_price.axhline(
+                    price,
+                    color=level_color,
+                    linestyle=":",
+                    linewidth=1.0,
+                    alpha=0.78,
+                    zorder=1,
+                )
+                ax_price.text(
+                    x_right - 0.25,
+                    price,
+                    f"{label} {price:.2f}",
+                    fontsize=8,
+                    color=level_color,
+                    ha="right",
+                    va="bottom",
+                    fontweight="bold",
+                    zorder=7,
+                )
+            elif price > y_max:
+                offscreen_top.append(f"↑ {label} {price:.2f}")
+            else:
+                offscreen_bottom.append(f"↓ {label} {price:.2f}")
+
+        for column, color, label, width in (
+            ("ema9", colors["ema9"], "EMA 9", 1.25),
+            ("ema21", colors["ema21"], "EMA 21", 1.25),
+            ("vwap", colors["vwap"], "VWAP", 1.7),
+        ):
+            if column in plot_frame.columns and not plot_frame[column].isna().all():
+                ax_price.plot(
+                    x_positions,
+                    plot_frame[column].to_numpy(dtype=float),
+                    color=color,
+                    linewidth=width,
+                    alpha=0.88,
+                    label=label,
+                    zorder=3,
+                )
+
+        for idx in range(candle_count):
+            row = plot_frame.iloc[idx]
+            x_value = x_positions[idx]
+            open_price = float(row["open"])
+            high_price = float(row["high"])
+            low_price = float(row["low"])
+            close_price = float(row["close"])
+            is_up = close_price >= open_price
+            face_color = colors["candle_up"] if is_up else colors["candle_down"]
+            edge_color = (
+                colors["candle_up_edge"] if is_up else colors["candle_down_edge"]
+            )
+            wick_color = colors["wick_up"] if is_up else colors["wick_down"]
+
+            ax_price.vlines(
+                x_value,
+                low_price,
+                high_price,
+                color=wick_color,
+                linewidth=1.45,
+                zorder=5,
+            )
+            body_low = min(open_price, close_price)
+            body_height = max(
+                abs(close_price - open_price),
+                visible_span * 0.0018,
+            )
+            ax_price.add_patch(
+                Rectangle(
+                    (x_value - candle_width / 2, body_low),
+                    candle_width,
+                    body_height,
+                    facecolor=face_color,
+                    edgecolor=edge_color,
+                    linewidth=0.85,
+                    zorder=6,
+                )
+            )
+
+        ax_price.axhline(
+            latest_close,
+            color=colors["text"],
+            linewidth=0.75,
+            alpha=0.30,
+            zorder=2,
+        )
+        ax_price.text(
+            x_right - 0.15,
+            latest_close,
+            f"LAST {latest_close:.2f}",
+            color=colors["text"],
+            fontsize=8,
+            fontweight="bold",
+            ha="right",
+            va="bottom",
+            bbox={
+                "boxstyle": "round,pad=0.2",
+                "facecolor": colors["bg"],
+                "edgecolor": colors["spine"],
+                "alpha": 0.92,
+            },
+            zorder=8,
+        )
+
+        index_to_time = {idx: timestamps[idx] for idx in range(candle_count)}
+
+        def format_time(x_value: float, _position: int) -> str:
+            index = int(round(x_value))
+            if 0 <= index < candle_count:
+                return index_to_time[index].strftime("%H:%M")
+            return ""
+
+        tick_step = max(1, candle_count // 10)
+        ax_price.set_xticks(np.arange(0, candle_count, tick_step))
+        ax_price.xaxis.set_major_formatter(FuncFormatter(format_time))
+        ax_price.set_xlim(-0.9, x_right)
+        ax_price.set_ylim(y_min, y_max)
+
+        role = (
+            "CONTEXT"
+            if subtitle.strip().upper().startswith("PREVIOUS DAY")
+            else self.CHART_ROLES.get(timeframe_minutes, "price").upper()
+        )
+        latest_vwap = self._latest_finite(plot_frame, "vwap")
+        latest_rsi = self._latest_finite(plot_frame, "rsi")
+        market_day = date.fromisoformat(market_date)
+        last_start = pd.Timestamp(timestamps[-1]).to_pydatetime().replace(
+            tzinfo=self.resolved_timezone
+        )
+        is_complete = (
+            datetime.now(self.resolved_timezone)
+            >= last_start + timedelta(minutes=timeframe_minutes)
+        ) or market_day < datetime.now(self.resolved_timezone).date()
+        partial_marker = "" if is_complete else " | PARTIAL LAST CANDLE"
+        ax_price.set_title(
+            (
+                f"{title} · {role} | LAST ₹{latest_close:.2f} | "
+                f"VWAP ₹{latest_vwap:.2f} | RSI {latest_rsi:.0f}"
+                f"{partial_marker}"
+            ),
+            color=colors["text"],
+            fontsize=14,
+            pad=14,
+            fontweight="bold",
+        )
+        fig.suptitle(
+            subtitle,
+            color="#82aaff",
+            fontsize=11,
+            fontweight="bold",
+            y=0.985,
+        )
+
+        if offscreen_top:
+            ax_price.text(
+                0.99,
+                0.985,
+                "  |  ".join(offscreen_top),
+                transform=ax_price.transAxes,
+                color=colors["text_dim"],
+                fontsize=8,
+                ha="right",
+                va="top",
+            )
+        if offscreen_bottom:
+            ax_price.text(
+                0.99,
+                0.015,
+                "  |  ".join(offscreen_bottom),
+                transform=ax_price.transAxes,
+                color=colors["text_dim"],
+                fontsize=8,
+                ha="right",
+                va="bottom",
+            )
+
+        ax_price.legend(
+            loc="upper left",
+            ncol=3,
+            facecolor=colors["bg"],
+            edgecolor=colors["spine"],
+            labelcolor=colors["text"],
+            fontsize=9,
+            framealpha=0.92,
+        )
+        ax_price.grid(
+            color=colors["grid"],
+            linestyle="--",
+            linewidth=0.5,
+            alpha=0.45,
+        )
+        ax_price.tick_params(colors=colors["text_dim"], labelsize=9)
+        for spine in ax_price.spines.values():
+            spine.set_color(colors["spine"])
+        ax_price.set_ylabel("Price (₹)", color=colors["text_dim"], fontsize=10)
+        ax_price.set_xlabel("Time (IST)", color=colors["text_dim"], fontsize=10)
+        plt.setp(ax_price.get_xticklabels(), rotation=35, ha="right")
+        plt.subplots_adjust(left=0.07, right=0.985, top=0.91, bottom=0.11)
+        fig.savefig(
+            output_path,
+            dpi=180,
+            bbox_inches="tight",
+            facecolor=colors["bg"],
+        )
+        plt.close(fig)
+
+    def _latest_finite(self, frame: pd.DataFrame, column: str) -> float:
+        if column not in frame.columns:
+            return 0.0
+        values = pd.to_numeric(frame[column], errors="coerce").dropna()
+        if values.empty:
+            return 0.0
+        value = float(values.iloc[-1])
+        return value if math.isfinite(value) else 0.0
+
+    def _render_chart_legacy(
         self,
         frame: pd.DataFrame,
         title: str,

@@ -54,6 +54,8 @@ class NiftyDepthMonitor:
         self.depth_imbalance_interval_seconds = self._env_float("NIFTY_DEPTH_IMBALANCE_SECONDS", 30.0)
         self.large_order_threshold = self._env_float("NIFTY_LARGE_ORDER_THRESHOLD", 300.0)
         self.large_order_hysteresis = self._env_float("NIFTY_LARGE_ORDER_HYSTERESIS", 0.80)
+        self.large_order_confirm_updates = max(1, self._env_int("NIFTY_LARGE_ORDER_CONFIRM_UPDATES", 3))
+        self.large_order_removal_updates = max(1, self._env_int("NIFTY_LARGE_ORDER_REMOVAL_UPDATES", 3))
         self.volume_profile_save_interval_seconds = self._env_float("NIFTY_VOLUME_PROFILE_SAVE_SECONDS", 300.0)
         self.options_feed_enabled = self._env_bool("NIFTY_OPTIONS_FEED_ENABLED", True)
         self.options_strikes_each_side = self._env_int("NIFTY_OPTIONS_STRIKES_EACH_SIDE", 2)
@@ -85,6 +87,7 @@ class NiftyDepthMonitor:
         self.last_volume_profile_save_at = 0.0
         self.last_depth_imbalance_saved_at = 0.0
         self.active_large_orders: Dict[str, Dict[str, Any]] = {}
+        self.large_order_candidates: Dict[str, Dict[str, Any]] = {}
         self.option_instruments_by_id: Dict[str, Dict[str, Any]] = {}
         self.latest_option_packets: Dict[str, Dict[str, Any]] = {}
         self.metrics = {
@@ -453,7 +456,12 @@ class NiftyDepthMonitor:
 
     def _tick_quantity(self, tick: Dict[str, Any]) -> float:
         quantity = self._first_number(tick, ("volume_delta",))
-        if quantity is None or quantity <= 0:
+        # A known zero delta means the cumulative exchange volume did not move,
+        # so this packet did not add executed volume. Falling back to LTQ here
+        # double-counts repeated Full packets.
+        if quantity is not None:
+            return max(float(quantity), 0.0)
+        if quantity is None:
             quantity = self._first_number(tick, ("last_traded_quantity",)) or 0.0
         return float(quantity or 0.0)
 
@@ -620,35 +628,84 @@ class NiftyDepthMonitor:
                     "distance_percent": round(((price - ltp) / ltp) * 100, 4) if ltp else None,
                 }
 
-        previous_keys = {key for key in self.active_large_orders if key.startswith(f"{side}:")}
+        active_keys = {key for key in self.active_large_orders if key.startswith(f"{side}:")}
+        candidate_keys = {key for key in self.large_order_candidates if key.startswith(f"{side}:")}
         current_keys = set(current)
         events: List[Dict[str, Any]] = []
-        for key in sorted(current_keys - previous_keys):
-            payload = dict(current[key])
-            payload.update({"type": "large_order_appeared", "timestamp_ist": self.market_time.now().isoformat(), "threshold": self.large_order_threshold})
-            events.append(payload)
 
         removal_threshold = self.large_order_threshold * self.large_order_hysteresis
-        for key in sorted(previous_keys - current_keys):
-            previous = self.active_large_orders.get(key) or {}
-            price = previous.get("price")
-            same_level = next((level for level in levels if self._first_number(level, ("price",)) == price), None)
-            quantity = self._first_number(same_level or {}, ("quantity",)) if same_level else 0.0
-            if quantity and quantity >= removal_threshold:
-                continue
-            payload = dict(previous)
-            payload.update({
-                "type": "large_order_removed",
-                "timestamp_ist": self.market_time.now().isoformat(),
-                "quantity": quantity or 0.0,
-                "previous_quantity": previous.get("quantity"),
-                "threshold": self.large_order_threshold,
-            })
-            events.append(payload)
+        level_qty_by_price = {
+            float(level.get("price")): float(level.get("quantity") or 0.0)
+            for level in levels
+            if level.get("price") not in (None, "")
+        }
 
-        for key in previous_keys:
+        # A wall must persist across several complete book updates before it is
+        # promoted. This prevents ordinary one-packet churn from becoming an
+        # "appeared/removed" event storm.
+        for key in sorted(current_keys - active_keys):
+            candidate = dict(self.large_order_candidates.get(key) or current[key])
+            candidate.update(current[key])
+            candidate["confirm_updates"] = int(candidate.get("confirm_updates") or 0) + 1
+            candidate["last_seen_ist"] = self.market_time.now().isoformat()
+            self.large_order_candidates[key] = candidate
+            if candidate["confirm_updates"] < self.large_order_confirm_updates:
+                continue
+            payload = dict(current[key])
+            payload.update(
+                {
+                    "type": "large_order_appeared",
+                    "timestamp_ist": self.market_time.now().isoformat(),
+                    "threshold": self.large_order_threshold,
+                    "confirmed_updates": candidate["confirm_updates"],
+                }
+            )
+            events.append(payload)
+            active = dict(current[key])
+            active["missing_updates"] = 0
+            self.active_large_orders[key] = active
+            self.large_order_candidates.pop(key, None)
+
+        # Refresh active walls without emitting an event for every quantity
+        # change. Removal also needs persistence below the hysteresis threshold.
+        for key in sorted(active_keys):
+            active = dict(self.active_large_orders.get(key) or {})
+            price = float(active.get("price") or 0.0)
+            quantity = level_qty_by_price.get(price, 0.0)
+            if key in current_keys or quantity >= removal_threshold:
+                if key in current:
+                    active.update(current[key])
+                else:
+                    active["quantity"] = quantity
+                active["missing_updates"] = 0
+                self.active_large_orders[key] = active
+                continue
+
+            missing_updates = int(active.get("missing_updates") or 0) + 1
+            active["missing_updates"] = missing_updates
+            self.active_large_orders[key] = active
+            if missing_updates < self.large_order_removal_updates:
+                continue
+            payload = {
+                key_name: value
+                for key_name, value in active.items()
+                if key_name != "missing_updates"
+            }
+            payload.update(
+                {
+                    "type": "large_order_removed",
+                    "timestamp_ist": self.market_time.now().isoformat(),
+                    "quantity": quantity,
+                    "previous_quantity": active.get("quantity"),
+                    "threshold": self.large_order_threshold,
+                    "confirmed_missing_updates": missing_updates,
+                }
+            )
+            events.append(payload)
             self.active_large_orders.pop(key, None)
-        self.active_large_orders.update(current)
+
+        for key in sorted(candidate_keys - current_keys):
+            self.large_order_candidates.pop(key, None)
 
         for event in events:
             self._append_event("large_order_events", event, throttle=False)
@@ -762,8 +819,6 @@ class NiftyDepthMonitor:
         }
 
     def _should_write_trade_tick(self, tick: Dict[str, Any]) -> bool:
-        if self.persist_every_packet:
-            return True
         fingerprint = json.dumps(
             {
                 "ltp": tick.get("latest_price"),
@@ -776,6 +831,9 @@ class NiftyDepthMonitor:
         if fingerprint == self.last_trade_fingerprint:
             return False
         self.last_trade_fingerprint = fingerprint
+        volume_delta = self._first_number(tick, ("volume_delta",))
+        if volume_delta is not None and volume_delta <= 0:
+            return False
         return True
 
     def _save_latest(
