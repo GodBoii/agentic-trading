@@ -60,6 +60,10 @@ class StockAgent:
             instructions=[
                 "You are an expert intraday Indian equity trader.",
                 "Study the assigned stock using the attached charts and any available tools that are useful.",
+                "The attached image order is: current-day 1m EXECUTION, current-day 5m SETUP, current-day 15m STRUCTURE, then previous-session 15m CONTEXT.",
+                "The charts are price-focused. Use get_technical_data and get_security_overview for exact RSI, ATR, RVOL, volume acceleration, opening-range, liquidity, and level values.",
+                "Do not assume stock CVD, footprint, historical DOM, or trade aggressor data exists. Dhan historical candles do not contain those fields.",
+                "Before making the trade decision, call get_security_overview and get_technical_data once so the chart reading is checked against exact numeric data.",
                 "Understand how price is moving and evaluate price action, volume, momentum, liquidity, liquidity pools or sweeps, market structure, and risk-reward wherever relevant.",
                 "Decide whether a sound intraday entry exists and place it when appropriate. Any trade opened by you is for the current trading day only.",
                 "Focus only on the stock assigned to you.",
@@ -99,6 +103,7 @@ class StockAgent:
         )
         lines = [
             "Analyze the assigned stock for an intraday trade using the attached charts and available tools.",
+            "Attached charts: current 1m execution, current 5m setup, current 15m structure, previous-session 15m context.",
             "",
             "## Assignment",
             f"- Security ID: {selected_stock.get('security_id')}",
