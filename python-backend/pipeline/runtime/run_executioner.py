@@ -419,11 +419,6 @@ class ExecutionerRunner:
                 "current_1m",
                 "current_5m",
                 "current_15m",
-                "current_30m",
-                "current_1h",
-                "previous_5m",
-                "previous_15m",
-                "previous_1h",
             ]
             for key in preferred_order:
                 path = (charts.get(key) or {}).get("path")
