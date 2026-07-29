@@ -2,7 +2,7 @@
   "stage": "market_calendar_cache",
   "source": "nse_holiday_master",
   "source_url": "https://www.nseindia.com/api/holiday-master?type=trading",
-  "generated_at_utc": "2026-07-28T03:18:03Z",
+  "generated_at_utc": "2026-07-29T03:58:39Z",
   "status": "success",
   "holiday_dates": [
     "2026-01-01",

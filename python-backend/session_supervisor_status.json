@@ -1,11 +1,11 @@
 {
   "stage": "session_supervisor",
   "status": "running",
-  "generated_at_utc": "2026-07-28T09:27:33.034635+00:00",
-  "generated_at_ist": "2026-07-28T14:57:33.034677+05:30",
+  "generated_at_utc": "2026-07-29T04:51:02.281649+00:00",
+  "generated_at_ist": "2026-07-29T10:21:02.281664+05:30",
   "details": {
     "session": {
-      "market_date": "2026-07-28",
+      "market_date": "2026-07-29",
       "is_trading_day": true,
       "is_market_hours": true,
       "is_before_open": false,
@@ -13,28 +13,28 @@
       "is_new_entry_window": true,
       "reason": "market_open_new_entries_allowed",
       "source": "nse_holiday_cache",
-      "open_at_ist": "2026-07-28T09:15:00+05:30",
-      "close_at_ist": "2026-07-28T15:30:00+05:30",
-      "new_entry_cutoff_ist": "2026-07-28T15:00:00+05:30",
-      "protect_positions_at_ist": "2026-07-28T15:20:00+05:30",
-      "calendar_checked_at_ist": "2026-07-28T14:57:33.010226+05:30",
+      "open_at_ist": "2026-07-29T09:15:00+05:30",
+      "close_at_ist": "2026-07-29T15:30:00+05:30",
+      "new_entry_cutoff_ist": "2026-07-29T15:00:00+05:30",
+      "protect_positions_at_ist": "2026-07-29T15:20:00+05:30",
+      "calendar_checked_at_ist": "2026-07-29T10:21:02.269823+05:30",
       "external_status": {
         "status": "success",
         "source": "nse_holiday_master",
-        "generated_at_utc": "2026-07-28T03:18:03Z",
+        "generated_at_utc": "2026-07-29T03:58:39Z",
         "holiday_count": 25,
         "last_sync_error": null
       }
     },
     "state": {
-      "current_market_date": "2026-07-28",
+      "current_market_date": "2026-07-29",
       "stage1": {
-        "last_run_at_utc": "2026-07-28T03:44:33.051882+00:00",
-        "generated_at_utc": "2026-07-28T03:44:33.014589+00:00",
+        "last_run_at_utc": "2026-07-29T04:08:00.108831+00:00",
+        "generated_at_utc": "2026-07-29T04:08:00.064164+00:00",
         "summary": {
           "status": "completed",
-          "market_date": "2026-07-28",
-          "output_file": "stage1-2026-07-28.json",
+          "market_date": "2026-07-29",
+          "output_file": "stage1-2026-07-29.json",
           "input_universe": 5333,
           "gsm_excluded": 523,
           "asm_excluded": 0,
@@ -45,31 +45,30 @@
           "ohlc_api_failed_stocks": 0,
           "price_filtered": 2084,
           "historical_candidates": 1996,
-          "data_retrieved": 1947,
-          "failed_fetch": 49,
+          "data_retrieved": 1948,
+          "failed_fetch": 48,
           "rate_limited_count": 0,
-          "insufficient_history_count": 39,
+          "insufficient_history_count": 38,
           "true_no_data_count": 10,
-          "fetch_failure_ratio": 0.024549,
+          "fetch_failure_ratio": 0.024048,
           "max_fetch_failure_ratio": 0.1,
           "degraded_reasons": [],
           "failure_reason_counts": {
             "insufficient_history_points=9": 6,
-            "insufficient_history_points=10": 3,
-            "insufficient_history_points=8": 6,
-            "DH-905 | Input_Exception | System is unable to fetch data due to incorrect parameters or no data present": 10,
-            "insufficient_history_points=2": 3,
-            "insufficient_history_points=6": 3,
-            "insufficient_history_points=12": 2,
-            "insufficient_history_points=13": 3,
-            "insufficient_history_points=7": 3,
             "insufficient_history_points=11": 2,
-            "insufficient_history_points=4": 1,
-            "insufficient_history_points=5": 2,
+            "insufficient_history_points=8": 3,
+            "insufficient_history_points=10": 4,
+            "DH-905 | Input_Exception | System is unable to fetch data due to incorrect parameters or no data present": 10,
             "insufficient_history_points=3": 2,
-            "insufficient_history_points=1": 3
+            "insufficient_history_points=6": 4,
+            "insufficient_history_points=12": 4,
+            "insufficient_history_points=7": 4,
+            "insufficient_history_points=4": 2,
+            "insufficient_history_points=1": 4,
+            "insufficient_history_points=13": 1,
+            "insufficient_history_points=2": 2
           },
-          "stage1_passed": 182,
+          "stage1_passed": 177,
           "stage1_filters": {
             "min_price": 100.0,
             "max_price": 3000.0,
@@ -89,13 +88,13 @@
         }
       },
       "stage2": {
-        "last_run_at_utc": "2026-07-28T09:23:32.388239+00:00",
-        "generated_at_utc": "2026-07-28T09:23:32.370484+00:00",
-        "signature": "[{\"accel\": 4.8995, \"orb\": 0.9811, \"reason\": null, \"rvol\": 4.904, \"score\": 318.18, \"security_id\": 544285, \"vwap\": 1.6152}, {\"accel\": 1.1617, \"orb\": 1.2546, \"reason\": null, \"rvol\": 2.419, \"score\": 152.32, \"security_id\": 500113, \"vwap\": 1.6351}, {\"accel\": 1.5167, \"orb\": 1.5146, \"reason\": null, \"rvol\": 1.742, \"score\": 125.98, \"security_id\": 540222, \"vwap\": 1.0334}, {\"accel\": 0.4645, \"orb\": 2.9609, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.299, \"score\": 0.0, \"security_id\": 543320, \"vwap\": 1.7459}, {\"accel\": 5.0883, \"orb\": -1.8076, \"reason\": \"below_vwap\", \"rvol\": 2.02, \"score\": 0.0, \"security_id\": 532523, \"vwap\": -0.0024}, {\"accel\": 1.0262, \"orb\": 0.986, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.274, \"score\": 0.0, \"security_id\": 532300, \"vwap\": 1.3208}, {\"accel\": 4.8127, \"orb\": -0.7124, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.268, \"score\": 0.0, \"security_id\": 532898, \"vwap\": 0.1569}, {\"accel\": 1.0587, \"orb\": 2.0907, \"reason\": \"volume_acceleration\", \"rvol\": 3.758, \"score\": 0.0, \"security_id\": 543287, \"vwap\": 1.6465}, {\"accel\": 0.5898, \"orb\": -0.6095, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.252, \"score\": 0.0, \"security_id\": 500251, \"vwap\": 0.0423}, {\"accel\": 2.2859, \"orb\": -3.4895, \"reason\": \"below_vwap\", \"rvol\": 1.944, \"score\": 0.0, \"security_id\": 544179, \"vwap\": -0.0545}]",
+        "last_run_at_utc": "2026-07-29T04:39:31.666449+00:00",
+        "generated_at_utc": "2026-07-29T04:39:31.657480+00:00",
+        "signature": "[{\"accel\": 1.1972, \"orb\": 0.9622, \"reason\": null, \"rvol\": 6.385, \"score\": 243.3, \"security_id\": 500696, \"vwap\": 1.1969}, {\"accel\": 1.2326, \"orb\": 0.1435, \"reason\": null, \"rvol\": 8.424, \"score\": 237.52, \"security_id\": 500113, \"vwap\": 1.4776}, {\"accel\": 1.3425, \"orb\": 0.2988, \"reason\": null, \"rvol\": 2.141, \"score\": 109.66, \"security_id\": 507685, \"vwap\": 0.5488}, {\"accel\": 2.8032, \"orb\": -0.0023, \"reason\": \"opening_range_breakout\", \"rvol\": 1.361, \"score\": 0.0, \"security_id\": 533150, \"vwap\": 0.2978}, {\"accel\": 0.5164, \"orb\": -0.3697, \"reason\": \"below_vwap\", \"rvol\": 4.185, \"score\": 0.0, \"security_id\": 532155, \"vwap\": -0.013}, {\"accel\": 0.2281, \"orb\": -0.2874, \"reason\": \"below_vwap\", \"rvol\": 1.886, \"score\": 0.0, \"security_id\": 542649, \"vwap\": -0.019}, {\"accel\": 0.4842, \"orb\": -0.1055, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.278, \"score\": 0.0, \"security_id\": 543458, \"vwap\": 0.0907}, {\"accel\": 0.0021, \"orb\": -0.1669, \"reason\": \"below_vwap\", \"rvol\": 2.968, \"score\": 0.0, \"security_id\": 532432, \"vwap\": -0.0286}, {\"accel\": 8.0, \"orb\": -1.0373, \"reason\": \"below_vwap\", \"rvol\": 5.123, \"score\": 0.0, \"security_id\": 543384, \"vwap\": -0.0383}, {\"accel\": 3.2232, \"orb\": 0.0903, \"reason\": \"time_of_day_rvol\", \"rvol\": 1.255, \"score\": 0.0, \"security_id\": 543573, \"vwap\": 0.4433}]",
         "summary": {
-          "market_date": "2026-07-28",
-          "input_stage1_count": 182,
-          "data_retrieved": 182,
+          "market_date": "2026-07-29",
+          "input_stage1_count": 177,
+          "data_retrieved": 177,
           "failed_fetch": 0,
           "stage2_passed": 3,
           "status": "completed",
@@ -118,224 +117,189 @@
             "min_intraday_value_cr": 1.0
           },
           "stage_funnel_counts": {
-            "input_stage1_count": 182,
-            "after_fetch": 182,
-            "after_rvol": 33,
-            "after_vwap": 14,
-            "after_opening_range": 11,
+            "input_stage1_count": 177,
+            "after_fetch": 177,
+            "after_rvol": 40,
+            "after_vwap": 26,
+            "after_opening_range": 14,
             "after_volume_acceleration": 3,
             "passed": 3
           },
           "score_distribution": {
             "count": 3,
-            "min": 125.98,
-            "median": 152.32,
-            "p90": 318.18,
-            "max": 318.18,
-            "avg": 198.8267
+            "min": 109.66,
+            "median": 237.52,
+            "p90": 243.3,
+            "max": 243.3,
+            "avg": 196.8267
           },
           "near_misses": [
             {
-              "security_id": 543320,
-              "display_name": "Eternal",
-              "symbol": "Eternal Limited",
-              "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.001,
-              "time_of_day_rvol": 1.299,
-              "price_vs_vwap_percent": 1.7459,
-              "opening_range_breakout_percent": 2.9609,
-              "volume_acceleration_ratio": 0.4645
+              "security_id": 533150,
+              "display_name": "Godrej Properties",
+              "symbol": "GODREJ PROPERTIES LTD",
+              "stage2_reason": "opening_range_breakout",
+              "miss_gap": 0.0023,
+              "time_of_day_rvol": 1.361,
+              "price_vs_vwap_percent": 0.2978,
+              "opening_range_breakout_percent": -0.0023,
+              "volume_acceleration_ratio": 2.8032
             },
             {
-              "security_id": 532523,
-              "display_name": "Biocon",
-              "symbol": "BIOCON LTD.",
+              "security_id": 532155,
+              "display_name": "GAIL",
+              "symbol": "GAIL (INDIA) LTD.",
               "stage2_reason": "below_vwap",
-              "miss_gap": 0.0024,
-              "time_of_day_rvol": 2.02,
-              "price_vs_vwap_percent": -0.0024,
-              "opening_range_breakout_percent": -1.8076,
-              "volume_acceleration_ratio": 5.0883
+              "miss_gap": 0.013,
+              "time_of_day_rvol": 4.185,
+              "price_vs_vwap_percent": -0.013,
+              "opening_range_breakout_percent": -0.3697,
+              "volume_acceleration_ratio": 0.5164
             },
             {
-              "security_id": 532300,
-              "display_name": "Wockhardt",
-              "symbol": "WOCKHARDT LTD.",
-              "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.026,
-              "time_of_day_rvol": 1.274,
-              "price_vs_vwap_percent": 1.3208,
-              "opening_range_breakout_percent": 0.986,
-              "volume_acceleration_ratio": 1.0262
-            },
-            {
-              "security_id": 532898,
-              "display_name": "Power Grid Corporation of India",
-              "symbol": "POWER GRID CORPORATION OF",
-              "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.032,
-              "time_of_day_rvol": 1.268,
-              "price_vs_vwap_percent": 0.1569,
-              "opening_range_breakout_percent": -0.7124,
-              "volume_acceleration_ratio": 4.8127
-            },
-            {
-              "security_id": 543287,
-              "display_name": "Lodha Developers",
-              "symbol": "Lodha Developers Limited",
-              "stage2_reason": "volume_acceleration",
-              "miss_gap": 0.0413,
-              "time_of_day_rvol": 3.758,
-              "price_vs_vwap_percent": 1.6465,
-              "opening_range_breakout_percent": 2.0907,
-              "volume_acceleration_ratio": 1.0587
-            },
-            {
-              "security_id": 500251,
-              "display_name": "Trent",
-              "symbol": "TRENT LTD.",
-              "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.048,
-              "time_of_day_rvol": 1.252,
-              "price_vs_vwap_percent": 0.0423,
-              "opening_range_breakout_percent": -0.6095,
-              "volume_acceleration_ratio": 0.5898
-            },
-            {
-              "security_id": 544179,
-              "display_name": "Go Digit General Insurance",
-              "symbol": "Go Digit General Insuranc",
+              "security_id": 542649,
+              "display_name": "Rail Vikas Nigam",
+              "symbol": "Rail Vikas Nigam Limited",
               "stage2_reason": "below_vwap",
-              "miss_gap": 0.0545,
-              "time_of_day_rvol": 1.944,
-              "price_vs_vwap_percent": -0.0545,
-              "opening_range_breakout_percent": -3.4895,
-              "volume_acceleration_ratio": 2.2859
+              "miss_gap": 0.019,
+              "time_of_day_rvol": 1.886,
+              "price_vs_vwap_percent": -0.019,
+              "opening_range_breakout_percent": -0.2874,
+              "volume_acceleration_ratio": 0.2281
             },
             {
-              "security_id": 540879,
-              "display_name": "Apollo Micro Systems",
-              "symbol": "Apollo Micro Systems Limi",
-              "stage2_reason": "below_vwap",
-              "miss_gap": 0.0569,
-              "time_of_day_rvol": 1.609,
-              "price_vs_vwap_percent": -0.0569,
-              "opening_range_breakout_percent": -2.7887,
-              "volume_acceleration_ratio": 1.8172
-            },
-            {
-              "security_id": 533106,
-              "display_name": "Oil India",
-              "symbol": "OIL INDIA LTD.",
+              "security_id": 543458,
+              "display_name": "AWL Agri Business",
+              "symbol": "AWL AGRI BUSINESS LIMITED",
               "stage2_reason": "time_of_day_rvol",
-              "miss_gap": 0.1,
-              "time_of_day_rvol": 1.2,
-              "price_vs_vwap_percent": 0.8654,
-              "opening_range_breakout_percent": 1.4213,
-              "volume_acceleration_ratio": 0.6056
+              "miss_gap": 0.022,
+              "time_of_day_rvol": 1.278,
+              "price_vs_vwap_percent": 0.0907,
+              "opening_range_breakout_percent": -0.1055,
+              "volume_acceleration_ratio": 0.4842
             },
             {
-              "security_id": 532555,
-              "display_name": "NTPC",
-              "symbol": "NTPC LTD.",
+              "security_id": 532432,
+              "display_name": "United Spirits",
+              "symbol": "UNITED SPIRITS LTD.",
               "stage2_reason": "below_vwap",
-              "miss_gap": 0.109,
-              "time_of_day_rvol": 2.728,
-              "price_vs_vwap_percent": -0.109,
-              "opening_range_breakout_percent": -2.0394,
-              "volume_acceleration_ratio": 1.2102
+              "miss_gap": 0.0286,
+              "time_of_day_rvol": 2.968,
+              "price_vs_vwap_percent": -0.0286,
+              "opening_range_breakout_percent": -0.1669,
+              "volume_acceleration_ratio": 0.0021
+            },
+            {
+              "security_id": 543384,
+              "display_name": "Nykaa",
+              "symbol": "FSN E-Commerce Ventures L",
+              "stage2_reason": "below_vwap",
+              "miss_gap": 0.0383,
+              "time_of_day_rvol": 5.123,
+              "price_vs_vwap_percent": -0.0383,
+              "opening_range_breakout_percent": -1.0373,
+              "volume_acceleration_ratio": 8.0
+            },
+            {
+              "security_id": 543573,
+              "display_name": "Syrma SGS",
+              "symbol": "Syrma SGS Technology Limi",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.045,
+              "time_of_day_rvol": 1.255,
+              "price_vs_vwap_percent": 0.4433,
+              "opening_range_breakout_percent": 0.0903,
+              "volume_acceleration_ratio": 3.2232
+            },
+            {
+              "security_id": 532483,
+              "display_name": "Canara Bank",
+              "symbol": "CANARA BANK",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.068,
+              "time_of_day_rvol": 1.232,
+              "price_vs_vwap_percent": 0.2091,
+              "opening_range_breakout_percent": -0.2786,
+              "volume_acceleration_ratio": 2.9904
+            },
+            {
+              "security_id": 500790,
+              "display_name": "Nestle",
+              "symbol": "NESTLE INDIA LTD.",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.071,
+              "time_of_day_rvol": 1.229,
+              "price_vs_vwap_percent": -0.1627,
+              "opening_range_breakout_percent": -0.9117,
+              "volume_acceleration_ratio": 0.8066
+            },
+            {
+              "security_id": 532370,
+              "display_name": "Ramco Systems",
+              "symbol": "RAMCO SYSTEMS LTD.",
+              "stage2_reason": "time_of_day_rvol",
+              "miss_gap": 0.092,
+              "time_of_day_rvol": 1.208,
+              "price_vs_vwap_percent": 1.9875,
+              "opening_range_breakout_percent": -0.7215,
+              "volume_acceleration_ratio": 4.8534
             }
           ],
           "filter_reason_counts": {
-            "time_of_day_rvol": 149,
-            "below_vwap": 19,
-            "volume_acceleration": 8,
-            "opening_range_breakout": 3
+            "time_of_day_rvol": 137,
+            "opening_range_breakout": 12,
+            "volume_acceleration": 11,
+            "below_vwap": 14
           },
           "fetch_failure_reason_counts": {},
           "quote_enrichment": {
             "status": "completed",
-            "quotes": 182,
+            "quotes": 177,
             "failed_batches": 0,
             "batch_count": 1
           }
         }
       },
       "agents": {
-        "last_trigger_at_utc": "2026-07-28T09:23:32.524442+00:00",
-        "last_trigger_reason": "top_candidate_changed",
+        "last_trigger_at_utc": "2026-07-29T04:39:31.715264+00:00",
+        "last_trigger_reason": "first_stage2_result_of_day",
         "last_request": {
-          "request_id": "auto-1785230612511-top_candidate_changed",
+          "request_id": "auto-1785299971710-first_stage2_result_of_day",
           "action": "start",
           "user_id": "40a4c297-d2ce-49d9-aee4-464604ff063c",
           "email": "prajwalghadge2005@gmail.com",
-          "requested_at_utc": "2026-07-28T09:23:32.511549+00:00",
+          "requested_at_utc": "2026-07-29T04:39:31.710300+00:00",
           "trade_mode": "manual",
-          "trade_amount": 500.0,
+          "trade_amount": 1000.0,
           "regime_analysis_enabled": true,
           "trigger_source": "session_supervisor",
-          "trigger_reason": "top_candidate_changed"
+          "trigger_reason": "first_stage2_result_of_day"
         },
         "last_response": {
           "ok": true,
           "request": {
-            "request_id": "auto-1785230612511-top_candidate_changed",
+            "request_id": "auto-1785299971710-first_stage2_result_of_day",
             "action": "start",
             "user_id": "40a4c297-d2ce-49d9-aee4-464604ff063c",
             "email": "prajwalghadge2005@gmail.com",
-            "requested_at_utc": "2026-07-28T09:23:32.511549+00:00",
+            "requested_at_utc": "2026-07-29T04:39:31.710300+00:00",
             "trade_mode": "manual",
-            "trade_amount": 500.0,
+            "trade_amount": 1000.0,
             "regime_analysis_enabled": true
           }
         },
-        "last_top_security_id": 544285,
+        "last_top_security_id": 500696,
         "trigger_history": [
           {
-            "triggered_at_utc": "2026-07-28T04:03:10.144951+00:00",
+            "triggered_at_utc": "2026-07-29T04:39:31.715264+00:00",
             "reason": "first_stage2_result_of_day",
-            "stage2_generated_at_utc": "2026-07-28T04:03:10.043490+00:00",
-            "request_id": "auto-1785211390134-first_stage2_result_of_day",
-            "candidate_count": 13
-          },
-          {
-            "triggered_at_utc": "2026-07-28T04:34:15.528012+00:00",
-            "reason": "top_candidate_changed",
-            "stage2_generated_at_utc": "2026-07-28T04:34:15.283661+00:00",
-            "request_id": "auto-1785213255519-top_candidate_changed",
-            "candidate_count": 14
-          },
-          {
-            "triggered_at_utc": "2026-07-28T07:20:03.161126+00:00",
-            "reason": "top_candidate_changed",
-            "stage2_generated_at_utc": "2026-07-28T07:20:02.208482+00:00",
-            "request_id": "auto-1785223203109-top_candidate_changed",
-            "candidate_count": 14
-          },
-          {
-            "triggered_at_utc": "2026-07-28T08:21:50.982727+00:00",
-            "reason": "top_candidate_changed",
-            "stage2_generated_at_utc": "2026-07-28T08:21:50.888959+00:00",
-            "request_id": "auto-1785226910973-top_candidate_changed",
-            "candidate_count": 16
-          },
-          {
-            "triggered_at_utc": "2026-07-28T08:52:41.212127+00:00",
-            "reason": "new_candidate_entered_stage2_pool",
-            "stage2_generated_at_utc": "2026-07-28T08:52:40.997533+00:00",
-            "request_id": "auto-1785228761196-new_candidate_entered_stage2_pool",
-            "candidate_count": 15
-          },
-          {
-            "triggered_at_utc": "2026-07-28T09:23:32.524442+00:00",
-            "reason": "top_candidate_changed",
-            "stage2_generated_at_utc": "2026-07-28T09:23:32.370484+00:00",
-            "request_id": "auto-1785230612511-top_candidate_changed",
+            "stage2_generated_at_utc": "2026-07-29T04:39:31.657480+00:00",
+            "request_id": "auto-1785299971710-first_stage2_result_of_day",
             "candidate_count": 13
           }
         ]
       },
-      "evaluated_candidate_count": 48
+      "evaluated_candidate_count": 13
     }
   }
 }
