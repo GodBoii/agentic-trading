@@ -1,7 +1,10 @@
 for agno related context and understanding refer this :-
 folder :- "How to Access v2 Changelog Documentation in Markdown"
+folder :- "docs"
 
 files :- python-backend\trade\Lib\site-packages\agno\agent\agent.py
+
+dhan related docs are in "context" folder for latest infromation refer to there website from below urls.
 
 https://dhanhq.co/docs/v2/
 https://dhanhq.co/docs/v2/authentication/
