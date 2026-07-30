@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from agno.agent import Agent
 from agno.media import Image
@@ -29,6 +29,7 @@ class StockAgent:
         stock_packet: Dict[str, Any],
         image_urls: List[str],
         run_context: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> str:
         if not self.is_enabled():
             raise RuntimeError("stock_agent_disabled")
@@ -60,9 +61,10 @@ class StockAgent:
             instructions=[
                 "You are an expert intraday Indian equity trader.",
                 "Study the assigned stock using the attached charts and any available tools that are useful.",
-                "The attached image order is: current-day 1m EXECUTION, current-day 5m SETUP, current-day 15m STRUCTURE, then previous-session 15m CONTEXT.",
-                "The charts are price-focused. Use get_technical_data and get_security_overview for exact RSI, ATR, RVOL, volume acceleration, opening-range, liquidity, and level values.",
+                "The attached image order is: current-day 1m, current-day 5m, current-day 15m, previous-session 5m, previous-session 15m, volume and participation, momentum and volatility, OHLCV-derived price-structure liquidity, then current/previous TPO market profile.",
+                "Use get_technical_data and get_security_overview for exact numeric values that complement the charts.",
                 "Do not assume stock CVD, footprint, historical DOM, or trade aggressor data exists. Dhan historical candles do not contain those fields.",
+                "The price-structure liquidity image is derived from OHLCV and the TPO image is time at price, not order-book liquidity or exact volume at price.",
                 "Before making the trade decision, call get_security_overview and get_technical_data once so the chart reading is checked against exact numeric data.",
                 "Understand how price is moving and evaluate price action, volume, momentum, liquidity, liquidity pools or sweeps, market structure, and risk-reward wherever relevant.",
                 "Decide whether a sound intraday entry exists and place it when appropriate. Any trade opened by you is for the current trading day only.",
@@ -81,16 +83,212 @@ class StockAgent:
         )
 
         images = [Image(url=url) for url in image_urls]
-        response = agent.run(
-            self._build_prompt(stock_packet),
+        prompt = self._build_prompt(stock_packet)
+        response_stream = agent.run(
+            prompt,
             images=images,
             metadata=run_metadata,
+            stream=True,
+            stream_events=True,
+            yield_run_output=True,
         )
-        self.last_run_metadata = self._extract_metadata(response)
-        response_text = self._extract_text(response).strip()
+        timeline: List[Dict[str, Any]] = []
+        content_chunks: List[str] = []
+        completed_content = ""
+        final_response: Any = None
+
+        for item in response_stream:
+            event_name = str(getattr(item, "event", "") or "")
+            if event_name:
+                normalized = self._normalize_stream_event(item)
+                if normalized is not None:
+                    timeline.append(normalized)
+                    if progress_callback is not None:
+                        progress_callback(dict(normalized))
+                if event_name == "RunContent":
+                    content = getattr(item, "content", None)
+                    if isinstance(content, str):
+                        content_chunks.append(content)
+                elif event_name == "RunCompleted":
+                    content = getattr(item, "content", None)
+                    if isinstance(content, str):
+                        completed_content = content
+                    final_response = item
+            else:
+                final_response = item
+
+        self.last_run_metadata = self._extract_metadata(final_response)
+        self.last_run_metadata["timeline"] = timeline
+        self.last_run_metadata["tool_summary"] = self._build_tool_summary(timeline)
+        response_text = self._extract_text(final_response).strip()
+        if not response_text:
+            response_text = completed_content.strip() or "".join(content_chunks).strip()
         if not response_text:
             raise RuntimeError("stock_agent_empty_response")
         return response_text
+
+    def _normalize_stream_event(self, event: Any) -> Optional[Dict[str, Any]]:
+        event_name = str(getattr(event, "event", "") or "")
+        run_id = getattr(event, "run_id", None)
+        base: Dict[str, Any] = {
+            "agno_event": event_name,
+            "agno_run_id": run_id,
+            "created_at": getattr(event, "created_at", None),
+        }
+        if event_name in {"ReasoningContentDelta", "ReasoningStep"}:
+            text = (
+                getattr(event, "reasoning_content", None)
+                or getattr(event, "content", None)
+            )
+            if not text:
+                return None
+            return {
+                **base,
+                "type": "stock_agent_thinking",
+                "message": str(text),
+            }
+        if event_name == "RunContent":
+            reasoning = getattr(event, "reasoning_content", None)
+            if reasoning:
+                return {
+                    **base,
+                    "type": "stock_agent_thinking",
+                    "message": str(reasoning),
+                }
+            content = getattr(event, "content", None)
+            if not content:
+                return None
+            return {
+                **base,
+                "type": "stock_agent_response_delta",
+                "message": str(content),
+            }
+        if event_name == "ToolCallStarted":
+            return {
+                **base,
+                "type": "stock_agent_tool_call_started",
+                **self._tool_event_payload(getattr(event, "tool", None), include_result=False),
+            }
+        if event_name in {"ToolCallCompleted", "ToolCallError"}:
+            tool_payload = self._tool_event_payload(
+                getattr(event, "tool", None),
+                include_result=True,
+            )
+            error = getattr(event, "error", None)
+            if event_name == "ToolCallError" or tool_payload.get("tool_call_error"):
+                return {
+                    **base,
+                    "type": "stock_agent_tool_call_error",
+                    **tool_payload,
+                    "error": str(error or tool_payload.get("result_preview") or "tool_call_failed"),
+                }
+            return {
+                **base,
+                "type": "stock_agent_tool_call_completed",
+                **tool_payload,
+            }
+        if event_name == "RunError":
+            return {
+                **base,
+                "type": "stock_agent_run_error",
+                "error": str(getattr(event, "content", None) or "agent_run_failed"),
+            }
+        return None
+
+    def _tool_event_payload(
+        self,
+        tool: Any,
+        *,
+        include_result: bool,
+    ) -> Dict[str, Any]:
+        if tool is None:
+            return {
+                "tool_call_id": None,
+                "tool_name": "unknown_tool",
+                "tool_args": {},
+            }
+        result = getattr(tool, "result", None)
+        result_text = "" if result is None else str(result)
+        metrics = getattr(tool, "metrics", None)
+        duration = getattr(metrics, "duration", None) if metrics is not None else None
+        payload: Dict[str, Any] = {
+            "tool_call_id": getattr(tool, "tool_call_id", None),
+            "tool_name": getattr(tool, "tool_name", None) or "unknown_tool",
+            "tool_args": self._json_safe(getattr(tool, "tool_args", None) or {}),
+            "tool_call_error": bool(getattr(tool, "tool_call_error", False)),
+        }
+        if duration is not None:
+            payload["duration_seconds"] = round(float(duration), 4)
+        if include_result:
+            payload["result_length"] = len(result_text)
+            payload["result_preview"] = result_text[:2000]
+            payload["result"] = result_text
+            try:
+                parsed = json.loads(result_text)
+            except (TypeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict):
+                status = str(parsed.get("status") or "success").lower()
+                payload["result_status"] = status
+                payload["result_partial"] = status == "partial" or bool(parsed.get("partial"))
+                for key in (
+                    "as_of_ist",
+                    "snapshot_fetched_at_ist",
+                    "candle_data_as_of_ist",
+                    "market_data_age_seconds",
+                    "candle_data_age_seconds",
+                ):
+                    if parsed.get(key) is not None:
+                        payload[key] = parsed.get(key)
+        return payload
+
+    @staticmethod
+    def _build_tool_summary(timeline: List[Dict[str, Any]]) -> Dict[str, Any]:
+        completed = [
+            item
+            for item in timeline
+            if item.get("type") in {
+                "stock_agent_tool_call_completed",
+                "stock_agent_tool_call_error",
+            }
+        ]
+        succeeded = [
+            item
+            for item in completed
+            if item.get("type") == "stock_agent_tool_call_completed"
+            and not item.get("result_partial")
+        ]
+        partial = [item for item in completed if item.get("result_partial")]
+        failed = [item for item in completed if item.get("type") == "stock_agent_tool_call_error"]
+        result_lengths = [int(item.get("result_length") or 0) for item in completed]
+        durations = [
+            float(item["duration_seconds"])
+            for item in completed
+            if item.get("duration_seconds") is not None
+        ]
+        largest = max(completed, key=lambda item: int(item.get("result_length") or 0), default=None)
+        return {
+            "tool_calls": len(completed),
+            "succeeded": len(succeeded),
+            "partial": len(partial),
+            "failed": len(failed),
+            "success_rate": round(len(succeeded) / len(completed), 4) if completed else None,
+            "total_result_characters": sum(result_lengths),
+            "average_result_characters": (
+                round(sum(result_lengths) / len(result_lengths), 2)
+                if result_lengths
+                else 0
+            ),
+            "total_duration_seconds": round(sum(durations), 4),
+            "largest_result": (
+                {
+                    "tool": largest.get("tool_name"),
+                    "characters": int(largest.get("result_length") or 0),
+                }
+                if largest
+                else None
+            ),
+        }
 
     def _build_prompt(self, stock_packet: Dict[str, Any]) -> str:
         selected_stock = stock_packet.get("selected_stock") or {}
@@ -103,7 +301,7 @@ class StockAgent:
         )
         lines = [
             "Analyze the assigned stock for an intraday trade using the attached charts and available tools.",
-            "Attached charts: current 1m execution, current 5m setup, current 15m structure, previous-session 15m context.",
+            "Attached charts in order: current 1m, current 5m, current 15m, previous-session 5m, previous-session 15m, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO market profile.",
             "",
             "## Assignment",
             f"- Security ID: {selected_stock.get('security_id')}",

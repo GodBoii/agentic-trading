@@ -242,12 +242,47 @@ class StockExecutionToolkit(Toolkit):
 
     def decision_snapshot(self, display_name: str) -> Dict[str, Any]:
         """Build authoritative internal state without parsing the agent's prose."""
+        if isinstance(self.last_execution, dict):
+            existing_response = self.last_execution.get("response")
+            if (
+                isinstance(existing_response, dict)
+                and str(existing_response.get("status") or "").lower() == "success"
+            ):
+                self.last_execution["response"] = self._reconcile_order_status(
+                    str(self.last_execution.get("kind") or "normal"),
+                    existing_response,
+                )
         event = self.last_execution or {}
         response = event.get("response") if isinstance(event.get("response"), dict) else {}
         response_status = str(response.get("status") or "").lower()
-        if response_status == "success":
-            execution_status = "placed"
+        broker_status = str(
+            response.get("broker_order_status")
+            or self._find_value(response, "orderStatus", "order_status")
+            or ""
+        ).upper()
+        requested_quantity = int(event.get("quantity") or 0)
+        filled_quantity = self._filled_quantity(response, broker_status, requested_quantity)
+        if broker_status == "TRADED":
+            execution_status = "traded"
             action = "trade"
+        elif broker_status == "PART_TRADED":
+            execution_status = "part_traded"
+            action = "trade"
+        elif broker_status in {
+            "PENDING",
+            "TRANSIT",
+            "AMO_REQ_RECEIVED",
+            "AFTER_MARKET_ORDER",
+            "TRADED_PENDING",
+        }:
+            execution_status = "pending"
+            action = "pending"
+        elif broker_status in {"REJECTED", "CANCELLED", "EXPIRED"}:
+            execution_status = broker_status.lower()
+            action = "avoid"
+        elif response_status == "success":
+            execution_status = "submitted"
+            action = "pending"
         elif self.last_execution:
             execution_status = "blocked" if response_status == "blocked" else "failed"
             action = "avoid"
@@ -263,9 +298,12 @@ class StockExecutionToolkit(Toolkit):
             "selected_display_name": display_name,
             "action": action,
             "execution_status": execution_status,
+            "broker_order_status": broker_status or "UNKNOWN",
             "trade_side": str(event.get("side") or "avoid").lower(),
             "order_type": str(event.get("order_type") or "NONE").upper(),
-            "quantity": int(event.get("quantity") or 0),
+            "quantity": filled_quantity,
+            "filled_quantity": filled_quantity,
+            "requested_quantity": requested_quantity,
             "reference_price": float(event.get("reference_price") or 0.0),
             "correlation_id": str(response.get("correlation_id") or "NONE"),
             "order_id": str(self._find_value(response, "orderId", "order_id") or "NONE"),
@@ -317,6 +355,7 @@ class StockExecutionToolkit(Toolkit):
 
     def _record_execution(self, kind: str, response: str, request: Dict[str, Any]) -> str:
         parsed = self._parse(response)
+        parsed = self._reconcile_order_status(kind, parsed)
         self.last_execution = {
             "kind": kind,
             **request,
@@ -332,13 +371,94 @@ class StockExecutionToolkit(Toolkit):
                     "response": parsed,
                 }
             )
-        return response
+        return json.dumps(parsed, ensure_ascii=True)
+
+    def _reconcile_order_status(self, kind: str, response: Dict[str, Any]) -> Dict[str, Any]:
+        """Attach the freshest observable broker state without claiming a fill."""
+        reconciled = dict(response)
+        order_id = self._find_value(response, "orderId", "order_id")
+        broker_payload: Optional[Dict[str, Any]] = None
+        try:
+            if kind == "protected":
+                super_orders = self._dhan_tools.dhan.fetch_super_orders()
+                candidates = self._extract_rows(super_orders)
+                broker_payload = next(
+                    (
+                        row
+                        for row in candidates
+                        if str(self._find_value(row, "orderId", "order_id") or "")
+                        == str(order_id or "")
+                    ),
+                    None,
+                )
+            elif order_id not in (None, ""):
+                fetched = self._dhan_tools.dhan.fetch_order_by_id(str(order_id))
+                broker_payload = self._extract_first_dict(fetched)
+        except Exception as exc:
+            reconciled["order_reconciliation_error"] = f"{type(exc).__name__}: {exc}"
+
+        observed = broker_payload or response
+        broker_status = self._find_value(observed, "orderStatus", "order_status")
+        if broker_status not in (None, ""):
+            reconciled["broker_order_status"] = str(broker_status).upper()
+        if broker_payload:
+            reconciled["broker_order_snapshot"] = broker_payload
+        return reconciled
 
     def _has_successful_placement(self) -> bool:
         if not isinstance(self.last_execution, dict):
             return False
         response = self.last_execution.get("response")
         return isinstance(response, dict) and str(response.get("status") or "").lower() == "success"
+
+    @classmethod
+    def _filled_quantity(
+        cls,
+        response: Dict[str, Any],
+        broker_status: str,
+        requested_quantity: int,
+    ) -> int:
+        value = cls._find_value(
+            response,
+            "filledQty",
+            "filledQuantity",
+            "filled_quantity",
+            "tradedQty",
+            "tradedQuantity",
+            "quantityTraded",
+        )
+        try:
+            filled = max(0, int(float(value)))
+        except Exception:
+            filled = 0
+        if broker_status == "TRADED" and filled == 0:
+            return max(0, requested_quantity)
+        return filled
+
+    @classmethod
+    def _extract_rows(cls, response: Any) -> list[Dict[str, Any]]:
+        if isinstance(response, list):
+            return [item for item in response if isinstance(item, dict)]
+        if not isinstance(response, dict):
+            return []
+        for key in ("data", "orders", "orderList"):
+            value = response.get(key)
+            rows = cls._extract_rows(value)
+            if rows:
+                return rows
+        return []
+
+    @classmethod
+    def _extract_first_dict(cls, response: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(response, dict):
+            return None
+        data = response.get("data")
+        if isinstance(data, dict):
+            nested = data.get("data")
+            if isinstance(nested, dict):
+                return nested
+            return data
+        return response
 
     def _record_preflight_failure(
         self,

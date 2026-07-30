@@ -359,7 +359,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         )
         intraday_resp = self.dhan.fetch_intraday_history(
             security_id,
-            days=5,
+            days=25,
             interval=1,
             exchange_segment="BSE_EQ",
             instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
@@ -383,6 +383,11 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             market_date=candidate_packet["market_date"],
             output_dir=artifacts_dir,
         )
+        if int(chart_bundle.get("chart_count") or 0) != 9:
+            raise RuntimeError(
+                f"stock_agent_chart_contract_incomplete::{security_id}::"
+                f"{chart_bundle.get('chart_count')} charts"
+            )
         candidate_packet["chart_artifacts"] = chart_bundle
         chart_paths = chart_bundle.get("chart_paths_ordered", [])
         if not chart_paths:
@@ -476,11 +481,40 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 if card.get("storage_path")
             ],
         }
+        timeline: List[Dict[str, Any]] = []
+        sequence = 0
+
+        def emit_agent_progress(progress: Dict[str, Any]) -> None:
+            nonlocal sequence
+            sequence += 1
+            enriched = {
+                **progress,
+                "sequence": sequence,
+                "rank": index + 1,
+                "security_id": security_id,
+                "symbol": candidate_packet.get("symbol"),
+                "display_name": candidate_packet.get("display_name"),
+            }
+            timeline.append(enriched)
+            self._emit(event_callback, enriched)
+
+        emit_agent_progress(
+            {
+                "type": "stock_agent_input",
+                "message": (
+                    f"Analyze {candidate_packet.get('display_name') or candidate_packet.get('symbol')} "
+                    "using the nine attached evidence charts and scoped tools."
+                ),
+                "input": stock_packet,
+            }
+        )
         report_text = agent.analyze(
             stock_packet,
             cloud_image_urls,
             run_context=agent_run_context,
+            progress_callback=emit_agent_progress,
         )
+        agent.last_run_metadata["timeline"] = timeline
         decision = execution_toolkit.decision_snapshot(
             str(candidate_packet.get("display_name") or candidate_packet.get("symbol") or "")
         )
@@ -531,10 +565,20 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             if isinstance(info, dict) and not any(existing_key == key for existing_key, _ in ordered_items):
                 ordered_items.append((key, info))
         for key, info in ordered_items:
+            analytical_titles = {
+                "volume_participation": "Volume and Participation",
+                "momentum_volatility": "Momentum and Volatility",
+                "price_structure_liquidity": "Price-Structure Liquidity",
+                "tpo_profile": "TPO Market Profile",
+            }
+            title = analytical_titles.get(
+                key,
+                f"{str(info.get('day_type') or '').title()} {info.get('label') or ''}".strip(),
+            )
             cards.append(
                 {
                     "id": key,
-                    "title": f"{str(info.get('day_type') or '').title()} {info.get('label') or ''}".strip(),
+                    "title": title,
                     "filename": Path(str(info.get("path") or "")).name,
                     "path": info.get("path"),
                     "storage_path": info.get("storage_path"),
@@ -633,7 +677,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             "- Focus only on the assigned stock.",
             "- Never modify, cancel, exit, hedge, convert, or otherwise touch another stock's position or order.",
             "- Any trade opened is for the current trading day only.",
-            "- After the main analysis, call get_current_stock_state once and use the newly fetched quote and OHLC data before the final decision or order.",
+            "- After the main analysis, call get_current_stock_state once and use its compact fresh quote and latest completed/partial candles before the final decision or order.",
             "- Return the analysis and outcome naturally and concisely.",
             "",
             "## Assignment",
@@ -756,7 +800,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
 
     @staticmethod
     def _is_placed_result(item: Dict[str, Any]) -> bool:
-        return str((item.get("decision") or {}).get("execution_status") or "").strip().lower() == "placed"
+        return str((item.get("decision") or {}).get("execution_status") or "").strip().lower() in {
+            "traded",
+            "part_traded",
+        }
 
     def _build_batch_report(self, results: List[Dict[str, Any]]) -> str:
         chunks = []
