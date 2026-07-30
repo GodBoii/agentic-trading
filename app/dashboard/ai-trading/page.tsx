@@ -30,6 +30,7 @@ interface AgentRunStatus {
 
 interface LiveAgentEvent {
     type: string
+    sequence?: number
     rank?: number
     security_id?: number
     symbol?: string
@@ -42,6 +43,17 @@ interface LiveAgentEvent {
     report_text?: string
     error?: string
     sent_at_utc?: string
+    created_at?: number
+    input?: Record<string, any>
+    tool_call_id?: string
+    tool_name?: string
+    tool_args?: Record<string, any>
+    duration_seconds?: number
+    result_length?: number
+    result_preview?: string
+    result?: string
+    result_status?: string
+    result_partial?: boolean
 }
 
 interface AgentImageCard {
@@ -232,7 +244,68 @@ function eventTitle(event: LiveAgentEvent) {
     if (event.type === 'stock_agent_completed') return 'Completed'
     if (event.type === 'stock_agent_failed') return 'Failed'
     if (event.type === 'stock_agent_selection') return 'Selected'
+    if (event.type === 'stock_agent_input') return 'Input'
+    if (event.type === 'stock_agent_thinking') return 'Thinking'
+    if (event.type === 'stock_agent_tool_call_started') return `Tool · ${event.tool_name || 'Started'}`
+    if (event.type === 'stock_agent_tool_call_completed') return `Tool · ${event.tool_name || 'Completed'}`
+    if (event.type === 'stock_agent_tool_call_error') return `Tool · ${event.tool_name || 'Failed'}`
+    if (event.type === 'stock_agent_response_delta') return 'Response'
+    if (event.type === 'stock_agent_run_error') return 'Run error'
     return event.type.replaceAll('_', ' ')
+}
+
+function coalesceAgentEvents(events: LiveAgentEvent[]) {
+    const merged: LiveAgentEvent[] = []
+    for (const event of events) {
+        const previous = merged[merged.length - 1]
+        const mergeable = event.type === 'stock_agent_thinking' || event.type === 'stock_agent_response_delta'
+        if (previous && mergeable && previous.type === event.type) {
+            previous.message = `${previous.message || ''}${event.message || ''}`
+            previous.sequence = event.sequence || previous.sequence
+            previous.sent_at_utc = event.sent_at_utc || previous.sent_at_utc
+            continue
+        }
+        merged.push({ ...event })
+    }
+    return merged
+}
+
+function ToolTimelineCard({ event }: { event: LiveAgentEvent }) {
+    const completed = event.type === 'stock_agent_tool_call_completed'
+    const failed = event.type === 'stock_agent_tool_call_error'
+    const status = failed ? 'Failed' : completed ? (event.result_partial ? 'Partial' : 'Succeeded') : 'Running'
+    const tone = failed ? 'text-danger' : completed ? (event.result_partial ? 'text-warning' : 'text-success') : 'text-accent'
+    return (
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <span className={`font-mono text-[11px] font-medium ${tone}`}>{status}</span>
+                {event.duration_seconds !== undefined && (
+                    <span className="font-mono text-[10px] text-ink-tertiary">{event.duration_seconds.toFixed(2)}s</span>
+                )}
+                {event.result_length !== undefined && (
+                    <span className="font-mono text-[10px] text-ink-tertiary">{event.result_length.toLocaleString()} characters</span>
+                )}
+            </div>
+            {event.tool_args && Object.keys(event.tool_args).length > 0 && (
+                <details className="rounded-xl border border-line bg-black/20 p-3">
+                    <summary className="cursor-pointer font-mono text-[9px] uppercase tracking-[0.15em] text-ink-tertiary">Arguments</summary>
+                    <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] text-ink-secondary">
+                        {JSON.stringify(event.tool_args, null, 2)}
+                    </pre>
+                </details>
+            )}
+            {(event.result_preview || event.result) && (
+                <details className="rounded-xl border border-line bg-black/20 p-3" open={failed}>
+                    <summary className="cursor-pointer font-mono text-[9px] uppercase tracking-[0.15em] text-ink-tertiary">
+                        {event.result ? 'Tool result' : 'Result preview'}
+                    </summary>
+                    <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[11px] text-ink-secondary">
+                        {event.result || event.result_preview}
+                    </pre>
+                </details>
+            )}
+        </div>
+    )
 }
 
 function agentDisplayName(agent?: Partial<AgentResult | LiveAgentEvent> | null, fallback = 'Awaiting stock') {
@@ -343,8 +416,12 @@ function AgentMetadataPanel({ metadata }: { metadata?: Record<string, any> | nul
         : reasoningValue
             ? JSON.stringify(reasoningValue, null, 2)
             : ''
+    const toolSummary = metadata?.tool_summary || {}
+    const summaryEntries = Object.entries(toolSummary).filter(
+        ([key, value]) => key !== 'largest_result' && value !== null && value !== undefined,
+    )
 
-    if (!tokenEntries.length && !toolCalls.length && !reasoning) {
+    if (!tokenEntries.length && !toolCalls.length && !reasoning && !summaryEntries.length) {
         return (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {['Thinking tokens', 'Tool calls', 'Reasoning trace'].map((label) => (
@@ -359,6 +436,18 @@ function AgentMetadataPanel({ metadata }: { metadata?: Record<string, any> | nul
 
     return (
         <div className="space-y-3">
+            {summaryEntries.length > 0 && (
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
+                    {summaryEntries.map(([key, value]) => (
+                        <div key={key} className="bg-[#08080a] p-3">
+                            <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-tertiary">
+                                {key.replaceAll('_', ' ')}
+                            </p>
+                            <p className="nums mt-1 break-words font-mono text-[12px] text-white">{String(value)}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
             {tokenEntries.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line rounded-xl overflow-hidden border border-line">
                     {tokenEntries.map(([key, value]) => (
@@ -371,25 +460,22 @@ function AgentMetadataPanel({ metadata }: { metadata?: Record<string, any> | nul
                     ))}
                 </div>
             )}
-            {toolCalls.length > 0 && (
-                <div className="rounded-xl border border-line bg-white/[0.015] p-4">
-                    <p className="text-[10px] text-accent font-mono uppercase tracking-[0.16em] mb-2">
-                        Tool calls
-                    </p>
-                    <pre className="text-[11px] text-ink-secondary whitespace-pre-wrap break-words max-h-56 overflow-auto">
-                        {JSON.stringify(toolCalls, null, 2)}
-                    </pre>
-                </div>
-            )}
-            {reasoning && (
-                <div className="rounded-xl border border-line bg-white/[0.015] p-4">
-                    <p className="text-[10px] text-warning font-mono uppercase tracking-[0.16em] mb-2">
-                        Reasoning trace
-                    </p>
-                    <div className="max-h-80 overflow-auto">
-                        <AgentMarkdown>{reasoning}</AgentMarkdown>
-                    </div>
-                </div>
+            {(toolCalls.length > 0 || reasoning) && (
+                <details className="rounded-xl border border-line bg-white/[0.015] p-4">
+                    <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.16em] text-ink-tertiary">
+                        Raw run metadata
+                    </summary>
+                    {toolCalls.length > 0 && (
+                        <pre className="mt-4 max-h-56 overflow-auto whitespace-pre-wrap break-words text-[11px] text-ink-secondary">
+                            {JSON.stringify(toolCalls, null, 2)}
+                        </pre>
+                    )}
+                    {reasoning && (
+                        <div className="mt-4 max-h-80 overflow-auto border-t border-line pt-4">
+                            <AgentMarkdown>{reasoning}</AgentMarkdown>
+                        </div>
+                    )}
+                </details>
             )}
         </div>
     )
@@ -448,10 +534,19 @@ function AgentChatBoard({
     const agentSlots = slotRanks.length ? slotRanks : [activeAgent]
 
     const mergedEvents = (rank: number): LiveAgentEvent[] => {
-        const events = liveEvents[rank] || []
+        let events = liveEvents[rank] || []
         const completed = completedResults.find((item: any) => Number(item.rank) === rank)
+        if (!events.length && Array.isArray(completed?.agent_metadata?.timeline)) {
+            events = completed.agent_metadata.timeline.map((event: LiveAgentEvent) => ({
+                ...event,
+                rank,
+                symbol: event.symbol || completed.symbol,
+                display_name: event.display_name || completed.display_name,
+                sent_at_utc: event.sent_at_utc || (event.created_at ? new Date(event.created_at * 1000).toISOString() : undefined),
+            }))
+        }
         if (completed && !events.some((event) => event.type === 'stock_agent_completed')) {
-            return [
+            return coalesceAgentEvents([
                 ...events,
                 {
                     type: 'stock_agent_completed',
@@ -466,9 +561,9 @@ function AgentChatBoard({
                     error: undefined,
                     sent_at_utc: stockStage?.generated_at_utc || runStatus?.updated_at_utc,
                 },
-            ]
+            ])
         }
-        return events
+        return coalesceAgentEvents(events)
     }
 
     const [focusedAgent, setFocusedAgent] = useState<number | null>(null)
@@ -634,6 +729,23 @@ function AgentChatBoard({
                                     </div>
 
                                     {event.message && <AgentMarkdown>{event.message}</AgentMarkdown>}
+
+                                    {event.type.startsWith('stock_agent_tool_call_') && (
+                                        <div className={event.message ? 'mt-4' : ''}>
+                                            <ToolTimelineCard event={event} />
+                                        </div>
+                                    )}
+
+                                    {event.input && (
+                                        <details className="mt-4 rounded-xl border border-line bg-black/20 p-3">
+                                            <summary className="cursor-pointer font-mono text-[9px] uppercase tracking-[0.15em] text-ink-tertiary">
+                                                Structured input
+                                            </summary>
+                                            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] text-ink-secondary">
+                                                {JSON.stringify(event.input, null, 2)}
+                                            </pre>
+                                        </details>
+                                    )}
 
                                     {event.decision && (
                                         <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-4">
@@ -993,27 +1105,24 @@ function AITradingChatContent() {
                     }
                     if (typeof payload.rank === 'number') {
                         const rank = Number(payload.rank)
-                        setLiveEvents((current) => ({
-                            ...current,
-                            [rank]: [
-                                ...(current[rank] || []),
-                                {
-                                    type: payload.type,
-                                    rank,
-                                    security_id: payload.security_id,
-                                    symbol: payload.symbol,
-                                    display_name: payload.display_name,
-                                    message: payload.message,
-                                    decision: payload.decision,
-                                    attachments: payload.attachments,
-                                    agent_metadata: payload.agent_metadata,
-                                    chart_count: payload.chart_count,
-                                    report_text: payload.report_text,
-                                    error: payload.error,
-                                    sent_at_utc: payload.sent_at_utc,
-                                },
-                            ],
-                        }))
+                        setLiveEvents((current) => {
+                            const existing = current[rank] || []
+                            const isDuplicate = payload.sequence !== undefined && existing.some(
+                                (item) => item.sequence === Number(payload.sequence) && item.type === payload.type,
+                            )
+                            if (isDuplicate) return current
+                            return {
+                                ...current,
+                                [rank]: [
+                                    ...existing,
+                                    {
+                                        ...payload,
+                                        rank,
+                                        sequence: payload.sequence !== undefined ? Number(payload.sequence) : undefined,
+                                    } as LiveAgentEvent,
+                                ],
+                            }
+                        })
                     }
                 } catch (streamError) {
                     console.error('AI trading stream payload error:', streamError)
