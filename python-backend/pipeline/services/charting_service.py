@@ -14,18 +14,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 class CandlestickChartService:
     """Generates professional candlestick chart images optimized for LLM vision analysis.
 
-    Produces a compact, role-specific price dossier for multimodal agents:
-    1m execution, 5m setup, and 15m structure. Numeric indicators remain in
-    structured metadata instead of being repeated as lower image panels.
+    Produces five neutral price charts and four dedicated evidence charts.
+    Every chart is derived from OHLCV; order-flow data is never synthesized.
     """
 
     CURRENT_DAY_TIMEFRAMES: List[int] = [1, 5, 15]
-    PREVIOUS_DAY_TIMEFRAMES: List[int] = [15]
-    CHART_ROLES = {
-        1: "execution",
-        5: "setup",
-        15: "structure",
-    }
+    PREVIOUS_DAY_TIMEFRAMES: List[int] = [5, 15]
 
     # Color palette — carefully chosen for LLM visual clarity
     COLORS = {
@@ -140,8 +134,8 @@ class CandlestickChartService:
             charts[key] = {
                 "timeframe_minutes": timeframe,
                 "label": tf_label,
-                "role": self.CHART_ROLES.get(timeframe, "price"),
                 "day_type": "current",
+                "chart_type": "price",
                 "date": market_date,
                 "path": str(path),
                 "candles": int(len(resampled)),
@@ -197,11 +191,57 @@ class CandlestickChartService:
                     "timeframe_minutes": timeframe,
                     "label": tf_label,
                     "day_type": "previous",
+                    "chart_type": "price",
                     "date": prev_date_str,
                     "path": str(path),
                     "candles": int(len(resampled)),
                 }
                 chart_paths_ordered.append(str(path))
+
+        analytical_specs = [
+            (
+                "volume_participation",
+                f"{self._slugify(display_name)}-{market_date}-volume-participation.png",
+                self._render_volume_participation_chart,
+            ),
+            (
+                "momentum_volatility",
+                f"{self._slugify(display_name)}-{market_date}-momentum-volatility.png",
+                self._render_momentum_volatility_chart,
+            ),
+            (
+                "price_structure_liquidity",
+                f"{self._slugify(display_name)}-{market_date}-price-structure-liquidity.png",
+                self._render_price_structure_liquidity_chart,
+            ),
+            (
+                "tpo_profile",
+                f"{self._slugify(display_name)}-{market_date}-tpo-profile.png",
+                self._render_tpo_profile_chart,
+            ),
+        ]
+        for key, filename, renderer in analytical_specs:
+            path = output_dir / filename
+            metadata = renderer(
+                local_frame=local_frame,
+                today_frame=today_frame,
+                previous_frame=prev_frame,
+                display_name=display_name,
+                market_date=market_date,
+                previous_market_date=prev_date_str,
+                data_as_of=data_as_of,
+                output_path=path,
+                prev_day_levels=prev_day_levels,
+            )
+            charts[key] = {
+                "chart_type": key,
+                "day_type": "analytical",
+                "date": market_date,
+                "path": str(path),
+                "data_as_of_ist": data_as_of.isoformat(),
+                "metadata": metadata,
+            }
+            chart_paths_ordered.append(str(path))
 
         return {
             "market_date": market_date,
@@ -211,7 +251,7 @@ class CandlestickChartService:
             "chart_count": len(charts),
             "charts": charts,
             "chart_paths_ordered": chart_paths_ordered,
-            "chart_contract_version": "price-dossier-v3",
+            "chart_contract_version": "stock-evidence-v4",
             "technical_metadata": technical_metadata,
         }
 
@@ -781,13 +821,8 @@ class CandlestickChartService:
         ax_price.set_xlim(-0.9, x_right)
         ax_price.set_ylim(y_min, y_max)
 
-        role = (
-            "CONTEXT"
-            if subtitle.strip().upper().startswith("PREVIOUS DAY")
-            else self.CHART_ROLES.get(timeframe_minutes, "price").upper()
-        )
         latest_vwap = self._latest_finite(plot_frame, "vwap")
-        latest_rsi = self._latest_finite(plot_frame, "rsi")
+        latest_atr = self._latest_finite(plot_frame, "atr")
         market_day = date.fromisoformat(market_date)
         last_start = pd.Timestamp(timestamps[-1]).to_pydatetime().replace(
             tzinfo=self.resolved_timezone
@@ -799,8 +834,8 @@ class CandlestickChartService:
         partial_marker = "" if is_complete else " | PARTIAL LAST CANDLE"
         ax_price.set_title(
             (
-                f"{title} · {role} | LAST ₹{latest_close:.2f} | "
-                f"VWAP ₹{latest_vwap:.2f} | RSI {latest_rsi:.0f}"
+                f"{title} | LAST ₹{latest_close:.2f} | "
+                f"VWAP ₹{latest_vwap:.2f} | ATR(14) ₹{latest_atr:.2f}"
                 f"{partial_marker}"
             ),
             color=colors["text"],
@@ -868,6 +903,757 @@ class CandlestickChartService:
             facecolor=colors["bg"],
         )
         plt.close(fig)
+
+    def _render_volume_participation_chart(
+        self,
+        *,
+        local_frame: pd.DataFrame,
+        today_frame: pd.DataFrame,
+        display_name: str,
+        market_date: str,
+        data_as_of: pd.Timestamp,
+        output_path: Path,
+        **_: Any,
+    ) -> Dict[str, Any]:
+        """Render volume evidence without pretending candle color is trade side."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+
+        five = self._resample_frame(today_frame, 5)
+        if five.empty:
+            raise ValueError("No current-session volume data.")
+
+        current_day = date.fromisoformat(market_date)
+        session_curves: List[pd.DataFrame] = []
+        for session_date, session in local_frame.groupby(local_frame["timestamp"].dt.date, sort=True):
+            session = session.copy()
+            first_minute = session["timestamp"].min()
+            last_minute = session["timestamp"].max()
+            if session_date < current_day and (
+                first_minute.hour * 60 + first_minute.minute > 9 * 60 + 20
+                or last_minute.hour * 60 + last_minute.minute < 15 * 60 + 25
+            ):
+                continue
+            session_start = pd.Timestamp(
+                datetime(
+                    session_date.year,
+                    session_date.month,
+                    session_date.day,
+                    self.market_open[0],
+                    self.market_open[1],
+                    tzinfo=self.resolved_timezone,
+                )
+            )
+            session_end = pd.Timestamp(
+                datetime(
+                    session_date.year,
+                    session_date.month,
+                    session_date.day,
+                    self.market_close[0],
+                    self.market_close[1],
+                    tzinfo=self.resolved_timezone,
+                )
+            ) - pd.Timedelta(minutes=1)
+            if session_date == current_day:
+                session_end = min(session_end, last_minute.floor("min"))
+            minute_index = pd.date_range(session_start, session_end, freq="1min")
+            minute_volume = (
+                session.set_index("timestamp")["volume"]
+                .groupby(level=0)
+                .sum()
+                .reindex(minute_index, fill_value=0.0)
+            )
+            curve = pd.DataFrame(
+                {
+                    "timestamp": minute_index,
+                    "market_date": session_date,
+                    "minute_of_day": minute_index.hour * 60 + minute_index.minute,
+                    "volume": minute_volume.to_numpy(dtype=float),
+                }
+            )
+            curve["cumulative_volume"] = curve["volume"].cumsum()
+            session_curves.append(curve)
+        history = pd.concat(session_curves, ignore_index=True) if session_curves else pd.DataFrame()
+        prior = history.loc[history["market_date"] < current_day]
+        completed_dates = sorted(prior["market_date"].unique())[-15:]
+        prior = prior.loc[prior["market_date"].isin(completed_dates)]
+        expected_by_minute = (
+            prior.groupby("minute_of_day")["cumulative_volume"].median()
+            if not prior.empty
+            else pd.Series(dtype=float)
+        )
+
+        current = history.loc[history["market_date"] == current_day].copy()
+        current_expected = current["minute_of_day"].map(expected_by_minute)
+        current_rvol = current["cumulative_volume"] / current_expected.replace(0, np.nan)
+        latest_rvol = self._latest_series_value(current_rvol)
+
+        completed_five = five.copy()
+        now = datetime.now(self.resolved_timezone)
+        completed_mask = [
+            now >= value.to_pydatetime() + timedelta(minutes=5)
+            or current_day < now.date()
+            for value in completed_five.index
+        ]
+        completed_volumes = completed_five.loc[completed_mask, "volume"]
+        volume_acceleration = None
+        if len(completed_volumes) >= 2:
+            denominator_floor = max(
+                float(completed_volumes.median()) * 0.10,
+                1.0,
+            )
+            volume_acceleration = float(completed_volumes.iloc[-1]) / max(
+                float(completed_volumes.iloc[-2]),
+                denominator_floor,
+            )
+
+        fig, axes = plt.subplots(
+            3,
+            1,
+            figsize=(16, 10),
+            sharex=True,
+            gridspec_kw={"height_ratios": [2.0, 1.35, 1.0]},
+        )
+        fig.patch.set_facecolor(self.COLORS["bg"])
+        for axis in axes:
+            self._style_evidence_axis(axis)
+
+        five_times = five.index.tz_localize(None)
+        bar_colors = np.where(
+            five["close"].to_numpy() >= five["open"].to_numpy(),
+            self.COLORS["candle_up"],
+            self.COLORS["candle_down"],
+        )
+        axes[0].bar(
+            five_times,
+            five["volume"].to_numpy(dtype=float),
+            width=4.2 / (24 * 60),
+            color=bar_colors,
+            alpha=0.82,
+        )
+        axes[0].set_ylabel("5m volume", color=self.COLORS["text_dim"])
+        axes[0].set_title(
+            f"{display_name} | VOLUME AND PARTICIPATION | DATA THROUGH {data_as_of.strftime('%H:%M IST')}",
+            color=self.COLORS["text"],
+            fontweight="bold",
+            fontsize=14,
+        )
+
+        current_times = current["timestamp"].dt.tz_localize(None)
+        axes[1].plot(
+            current_times,
+            current["cumulative_volume"],
+            color=self.COLORS["ema9"],
+            linewidth=1.8,
+            label="Current cumulative volume",
+        )
+        if current_expected.notna().any():
+            axes[1].plot(
+                current_times,
+                current_expected,
+                color=self.COLORS["text_dim"],
+                linewidth=1.4,
+                linestyle="--",
+                label="Prior-session same-time median",
+            )
+        axes[1].set_ylabel("Cumulative", color=self.COLORS["text_dim"])
+        axes[1].legend(
+            loc="upper left",
+            facecolor=self.COLORS["bg"],
+            edgecolor=self.COLORS["spine"],
+            labelcolor=self.COLORS["text"],
+        )
+
+        axes[2].plot(
+            current_times,
+            current_rvol,
+            color=self.COLORS["rsi_line"],
+            linewidth=1.7,
+            label="Time-of-day RVOL",
+        )
+        axes[2].axhline(1.0, color=self.COLORS["text_dim"], linestyle="--", linewidth=0.9)
+        axes[2].set_ylabel("RVOL", color=self.COLORS["text_dim"])
+        axes[2].set_xlabel("Time (IST)", color=self.COLORS["text_dim"])
+        axes[2].xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        suffix = "unavailable"
+        if latest_rvol is not None:
+            suffix = f"{latest_rvol:.2f}x"
+        acceleration_text = (
+            f"{volume_acceleration:.2f}x"
+            if volume_acceleration is not None
+            else "unavailable"
+        )
+        axes[2].text(
+            0.99,
+            0.90,
+            f"Latest RVOL: {suffix} | Completed 5m acceleration: {acceleration_text}",
+            transform=axes[2].transAxes,
+            ha="right",
+            va="top",
+            color=self.COLORS["text"],
+            fontsize=9,
+        )
+        plt.setp(axes[2].get_xticklabels(), rotation=30, ha="right")
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
+        plt.close(fig)
+        return {
+            "source": "dhan_historical_ohlcv",
+            "baseline_completed_sessions": int(prior["market_date"].nunique()),
+            "time_of_day_rvol": round(latest_rvol, 3) if latest_rvol is not None else None,
+            "completed_5m_volume_acceleration": (
+                round(volume_acceleration, 3)
+                if volume_acceleration is not None
+                else None
+            ),
+            "trade_side_inference": False,
+        }
+
+    def _render_momentum_volatility_chart(
+        self,
+        *,
+        local_frame: pd.DataFrame,
+        display_name: str,
+        market_date: str,
+        data_as_of: pd.Timestamp,
+        output_path: Path,
+        **_: Any,
+    ) -> Dict[str, Any]:
+        """Render warm-started RSI and ATR% for the three current timeframes."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+
+        fig, axes = plt.subplots(2, 1, figsize=(16, 9), sharex=True)
+        fig.patch.set_facecolor(self.COLORS["bg"])
+        for axis in axes:
+            self._style_evidence_axis(axis)
+
+        palette = {1: self.COLORS["ema9"], 5: self.COLORS["rsi_line"], 15: self.COLORS["ema21"]}
+        latest: Dict[str, Any] = {}
+        target_day = date.fromisoformat(market_date)
+        for timeframe in self.CURRENT_DAY_TIMEFRAMES:
+            resampled = self._resample_all_sessions(local_frame, timeframe)
+            enriched = self._compute_warm_indicators(resampled)
+            visible = enriched.loc[enriched.index.date == target_day].copy()
+            if visible.empty:
+                continue
+            times = visible.index.tz_localize(None)
+            color = palette[timeframe]
+            axes[0].plot(
+                times,
+                visible["rsi"],
+                color=color,
+                linewidth=1.5,
+                label=f"RSI(14) {timeframe}m",
+            )
+            axes[1].plot(
+                times,
+                visible["atr_percent"],
+                color=color,
+                linewidth=1.5,
+                label=f"ATR(14)% {timeframe}m",
+            )
+            latest[str(timeframe)] = {
+                "rsi": self._latest_series_value(visible["rsi"]),
+                "atr": self._latest_series_value(visible["atr"]),
+                "atr_percent": self._latest_series_value(visible["atr_percent"]),
+            }
+
+        axes[0].axhline(70, color=self.COLORS["rsi_ob"], linestyle="--", linewidth=0.9)
+        axes[0].axhline(30, color=self.COLORS["rsi_os"], linestyle="--", linewidth=0.9)
+        axes[0].axhline(50, color=self.COLORS["text_dim"], linestyle=":", linewidth=0.8)
+        axes[0].set_ylim(0, 100)
+        axes[0].set_ylabel("RSI(14)", color=self.COLORS["text_dim"])
+        axes[0].set_title(
+            f"{display_name} | MOMENTUM AND VOLATILITY | DATA THROUGH {data_as_of.strftime('%H:%M IST')}",
+            color=self.COLORS["text"],
+            fontweight="bold",
+            fontsize=14,
+        )
+        axes[1].set_ylabel("ATR(14) % of close", color=self.COLORS["text_dim"])
+        axes[1].set_xlabel("Time (IST)", color=self.COLORS["text_dim"])
+        axes[1].xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        for axis in axes:
+            axis.legend(
+                loc="upper left",
+                facecolor=self.COLORS["bg"],
+                edgecolor=self.COLORS["spine"],
+                labelcolor=self.COLORS["text"],
+                ncol=3,
+            )
+        plt.setp(axes[1].get_xticklabels(), rotation=30, ha="right")
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
+        plt.close(fig)
+        return {
+            "source": "dhan_historical_ohlcv",
+            "indicator_warmup_uses_prior_sessions": True,
+            "latest": latest,
+        }
+
+    def _render_price_structure_liquidity_chart(
+        self,
+        *,
+        today_frame: pd.DataFrame,
+        display_name: str,
+        market_date: str,
+        data_as_of: pd.Timestamp,
+        output_path: Path,
+        prev_day_levels: Dict[str, float],
+        **_: Any,
+    ) -> Dict[str, Any]:
+        """Render only OHLCV-observable structure and deterministic sweep events."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+
+        frame = self._compute_full_indicators(self._resample_frame(today_frame, 5))
+        if frame.empty:
+            raise ValueError("No data for price-structure liquidity chart.")
+        opening = frame.iloc[: min(3, len(frame))]
+        references: List[Dict[str, Any]] = []
+        if not opening.empty:
+            references.extend(
+                [
+                    {"label": "ORH", "kind": "high", "price": float(opening["high"].max()), "available_index": len(opening) - 1},
+                    {"label": "ORL", "kind": "low", "price": float(opening["low"].min()), "available_index": len(opening) - 1},
+                ]
+            )
+        for key, label, kind in (
+            ("prev_high", "PDH", "high"),
+            ("prev_low", "PDL", "low"),
+            ("prev_close", "PDC", "both"),
+        ):
+            if prev_day_levels.get(key) is not None:
+                references.append(
+                    {
+                        "label": label,
+                        "kind": kind,
+                        "price": float(prev_day_levels[key]),
+                        "available_index": 0,
+                    }
+                )
+
+        highs = frame["high"].to_numpy(dtype=float)
+        lows = frame["low"].to_numpy(dtype=float)
+        atr = frame["atr"].to_numpy(dtype=float)
+        confirmed_pivots: List[Dict[str, Any]] = []
+        for index in range(2, len(frame) - 2):
+            if highs[index] >= max(highs[index - 2:index + 3]):
+                confirmed_pivots.append(
+                    {
+                        "kind": "high",
+                        "price": float(highs[index]),
+                        "available_index": index + 2,
+                    }
+                )
+            if lows[index] <= min(lows[index - 2:index + 3]):
+                confirmed_pivots.append(
+                    {
+                        "kind": "low",
+                        "price": float(lows[index]),
+                        "available_index": index + 2,
+                    }
+                )
+
+        latest_atr = self._latest_finite(frame, "atr")
+        tolerance = max(float(frame["close"].iloc[-1]) * 0.0005, latest_atr * 0.12, 0.05)
+        pools: List[Dict[str, Any]] = []
+        for kind in ("high", "low"):
+            pivots = [item for item in confirmed_pivots if item["kind"] == kind]
+            used: set[int] = set()
+            for index, pivot in enumerate(pivots):
+                if index in used:
+                    continue
+                cluster = [
+                    (other_index, other)
+                    for other_index, other in enumerate(pivots)
+                    if abs(other["price"] - pivot["price"]) <= tolerance
+                ]
+                if len(cluster) >= 2:
+                    used.update(item[0] for item in cluster)
+                    pools.append(
+                        {
+                            "label": "EQUAL HIGHS" if kind == "high" else "EQUAL LOWS",
+                            "kind": kind,
+                            "price": float(np.mean([item[1]["price"] for item in cluster])),
+                            "available_index": max(item[1]["available_index"] for item in cluster),
+                            "touches": len(cluster),
+                        }
+                    )
+
+        sweep_references = references + pools
+        sweeps: List[Dict[str, Any]] = []
+        completed_limit = len(frame)
+        now = datetime.now(self.resolved_timezone)
+        if date.fromisoformat(market_date) == now.date() and frame.index[-1].to_pydatetime() + timedelta(minutes=5) > now:
+            completed_limit -= 1
+        for reference in sweep_references:
+            price = float(reference["price"])
+            for index in range(int(reference["available_index"]) + 1, completed_limit):
+                buffer = max(0.05, (atr[index] if math.isfinite(atr[index]) else latest_atr) * 0.05)
+                row = frame.iloc[index]
+                if (
+                    reference.get("kind") in {"high", "both"}
+                    and float(row["high"]) >= price + buffer
+                    and float(row["close"]) < price
+                ):
+                    sweeps.append({"index": index, "side": "high", "price": price, "label": reference["label"]})
+                    break
+                if (
+                    reference.get("kind") in {"low", "both"}
+                    and float(row["low"]) <= price - buffer
+                    and float(row["close"]) > price
+                ):
+                    sweeps.append({"index": index, "side": "low", "price": price, "label": reference["label"]})
+                    break
+
+        plot = frame.iloc[-90:].copy()
+        offset = len(frame) - len(plot)
+        x = np.arange(len(plot))
+        span = max(float(plot["high"].max() - plot["low"].min()), 0.01)
+        y_padding = max(span * 0.08, latest_atr * 0.35, 0.05)
+        y_min = float(plot["low"].min()) - y_padding
+        y_max = float(plot["high"].max()) + y_padding
+        fig, axis = plt.subplots(figsize=(16, 9))
+        fig.patch.set_facecolor(self.COLORS["bg"])
+        self._style_evidence_axis(axis)
+        for local_index, (_, row) in enumerate(plot.iterrows()):
+            up = float(row["close"]) >= float(row["open"])
+            color = self.COLORS["candle_up"] if up else self.COLORS["candle_down"]
+            axis.vlines(local_index, row["low"], row["high"], color=color, linewidth=1.2)
+            bottom = min(float(row["open"]), float(row["close"]))
+            height = max(abs(float(row["close"]) - float(row["open"])), span * 0.0015)
+            axis.add_patch(Rectangle((local_index - 0.31, bottom), 0.62, height, color=color, alpha=0.9))
+
+        line_specs = references + pools
+        offscreen: List[str] = []
+        for reference in line_specs:
+            price = float(reference["price"])
+            if not y_min <= price <= y_max:
+                direction = "↑" if price > y_max else "↓"
+                offscreen.append(f"{direction} {reference['label']} {price:.2f}")
+                continue
+            color = (
+                self.COLORS["rsi_line"]
+                if reference["label"] in {"ORH", "ORL"}
+                else self.COLORS["ema21"]
+                if reference["label"].startswith("EQUAL")
+                else self.COLORS["text_dim"]
+            )
+            axis.axhline(price, color=color, linestyle="--", linewidth=1.0, alpha=0.75)
+            axis.text(
+                len(plot) - 0.2,
+                price,
+                f"{reference['label']} {price:.2f}",
+                color=color,
+                ha="right",
+                va="bottom",
+                fontsize=8,
+            )
+        for sweep in sweeps:
+            local_index = int(sweep["index"]) - offset
+            if 0 <= local_index < len(plot):
+                marker = "v" if sweep["side"] == "high" else "^"
+                y = float(plot.iloc[local_index]["high" if sweep["side"] == "high" else "low"])
+                axis.scatter(
+                    [local_index],
+                    [y],
+                    marker=marker,
+                    s=80,
+                    color=self.COLORS["rsi_line"],
+                    edgecolor=self.COLORS["text"],
+                    zorder=8,
+                )
+                axis.annotate(
+                    f"{sweep['label']} SWEEP",
+                    (local_index, y),
+                    xytext=(0, 15 if sweep["side"] == "high" else -20),
+                    textcoords="offset points",
+                    ha="center",
+                    color=self.COLORS["text"],
+                    fontsize=8,
+                )
+        tick_step = max(1, len(plot) // 10)
+        ticks = np.arange(0, len(plot), tick_step)
+        axis.set_xticks(ticks)
+        axis.set_xticklabels([plot.index[value].strftime("%H:%M") for value in ticks], rotation=30, ha="right")
+        axis.set_xlim(-1, len(plot) + 1)
+        axis.set_ylim(y_min, y_max)
+        axis.set_ylabel("Price (₹)", color=self.COLORS["text_dim"])
+        axis.set_xlabel("Time (IST)", color=self.COLORS["text_dim"])
+        axis.set_title(
+            (
+                f"{display_name} | PRICE-STRUCTURE LIQUIDITY MAP — OHLCV DERIVED | "
+                f"DATA THROUGH {data_as_of.strftime('%H:%M IST')}"
+            ),
+            color=self.COLORS["text"],
+            fontweight="bold",
+            fontsize=14,
+        )
+        if offscreen:
+            axis.text(
+                0.99,
+                0.02,
+                "  |  ".join(offscreen),
+                transform=axis.transAxes,
+                ha="right",
+                va="bottom",
+                color=self.COLORS["text_dim"],
+                fontsize=8,
+            )
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
+        plt.close(fig)
+        return {
+            "source": "dhan_historical_ohlcv",
+            "order_book_data": False,
+            "equal_high_low_pools": len(pools),
+            "confirmed_sweeps": len(sweeps),
+            "sweep_requires_completed_candle": True,
+        }
+
+    def _render_tpo_profile_chart(
+        self,
+        *,
+        today_frame: pd.DataFrame,
+        previous_frame: pd.DataFrame,
+        display_name: str,
+        market_date: str,
+        previous_market_date: str,
+        data_as_of: pd.Timestamp,
+        output_path: Path,
+        **_: Any,
+    ) -> Dict[str, Any]:
+        """Render TPO time-at-price profiles; no volume-at-price is invented."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        current_profile = self._build_tpo_profile(today_frame)
+        previous_profile = self._build_tpo_profile(previous_frame)
+        fig, axes = plt.subplots(1, 2, figsize=(16, 9))
+        fig.patch.set_facecolor(self.COLORS["bg"])
+        for axis in axes:
+            self._style_evidence_axis(axis)
+        self._plot_tpo_profile(
+            axes[0],
+            current_profile,
+            f"CURRENT {market_date} · THROUGH {data_as_of.strftime('%H:%M IST')}",
+            self.COLORS["ema9"],
+        )
+        self._plot_tpo_profile(
+            axes[1],
+            previous_profile,
+            f"PREVIOUS {previous_market_date}",
+            self.COLORS["ema21"],
+        )
+        fig.suptitle(
+            f"{display_name} | TPO MARKET PROFILE — TIME AT PRICE, NOT VOLUME AT PRICE",
+            color=self.COLORS["text"],
+            fontweight="bold",
+            fontsize=14,
+        )
+        fig.tight_layout(rect=(0, 0, 1, 0.96))
+        fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
+        plt.close(fig)
+        return {
+            "source": "dhan_historical_ohlcv",
+            "profile_type": "tpo_time_at_price",
+            "volume_at_price": False,
+            "current": self._profile_metadata(current_profile),
+            "previous": self._profile_metadata(previous_profile),
+        }
+
+    def _resample_all_sessions(
+        self,
+        local_frame: pd.DataFrame,
+        timeframe_minutes: int,
+    ) -> pd.DataFrame:
+        if local_frame.empty:
+            return pd.DataFrame()
+        sessions: List[pd.DataFrame] = []
+        for _, session in local_frame.groupby(local_frame["timestamp"].dt.date, sort=True):
+            indexed = session.set_index("timestamp")
+            resampled = (
+                indexed[["open", "high", "low", "close", "volume"]]
+                .resample(f"{timeframe_minutes}min", label="left", closed="left")
+                .agg(
+                    {
+                        "open": "first",
+                        "high": "max",
+                        "low": "min",
+                        "close": "last",
+                        "volume": "sum",
+                    }
+                )
+                .dropna(subset=["open", "high", "low", "close"])
+            )
+            sessions.append(resampled)
+        return pd.concat(sessions).sort_index() if sessions else pd.DataFrame()
+
+    def _compute_warm_indicators(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame
+        enriched = frame.copy()
+        delta = enriched["close"].diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
+        rs = avg_gain / avg_loss.replace(0, np.nan)
+        enriched["rsi"] = 100 - (100 / (1 + rs))
+        true_range = pd.concat(
+            [
+                enriched["high"] - enriched["low"],
+                (enriched["high"] - enriched["close"].shift(1)).abs(),
+                (enriched["low"] - enriched["close"].shift(1)).abs(),
+            ],
+            axis=1,
+        ).max(axis=1)
+        enriched["atr"] = true_range.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
+        enriched["atr_percent"] = enriched["atr"] / enriched["close"].replace(0, np.nan) * 100
+        return enriched
+
+    def _build_tpo_profile(self, frame: pd.DataFrame) -> Dict[str, Any]:
+        if frame.empty:
+            return {}
+        low = float(frame["low"].min())
+        high = float(frame["high"].max())
+        span = max(high - low, 0.05)
+        raw_row_size = max(0.05, span / 80.0)
+        row_size = math.ceil(raw_row_size / 0.05) * 0.05
+        rows = np.arange(
+            math.floor(low / row_size) * row_size,
+            math.ceil(high / row_size) * row_size + row_size / 2,
+            row_size,
+        )
+        counts = np.zeros(len(rows), dtype=int)
+        letters: List[List[str]] = [[] for _ in rows]
+        brackets = list(frame.groupby(frame.index.floor("30min"), sort=True))
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        for bracket_index, (_, bracket) in enumerate(brackets):
+            bracket_low = float(bracket["low"].min())
+            bracket_high = float(bracket["high"].max())
+            mask = (rows >= bracket_low - row_size / 2) & (rows <= bracket_high + row_size / 2)
+            label = alphabet[bracket_index % len(alphabet)]
+            for row_index in np.flatnonzero(mask):
+                counts[row_index] += 1
+                letters[row_index].append(label)
+        if not counts.any():
+            return {}
+        poc_index = int(np.argmax(counts))
+        target = int(math.ceil(counts.sum() * 0.70))
+        included = {poc_index}
+        total = int(counts[poc_index])
+        lower = poc_index - 1
+        upper = poc_index + 1
+        while total < target and (lower >= 0 or upper < len(counts)):
+            lower_count = int(counts[lower]) if lower >= 0 else -1
+            upper_count = int(counts[upper]) if upper < len(counts) else -1
+            chosen = upper if upper_count >= lower_count else lower
+            included.add(chosen)
+            total += int(counts[chosen])
+            if chosen == upper:
+                upper += 1
+            else:
+                lower -= 1
+        session_start = frame.index.min().replace(
+            hour=self.market_open[0],
+            minute=self.market_open[1],
+            second=0,
+            microsecond=0,
+        )
+        initial_balance = frame.loc[
+            (frame.index >= session_start)
+            & (frame.index < session_start + pd.Timedelta(minutes=60))
+        ]
+        if initial_balance.empty:
+            initial_balance = frame.iloc[:1]
+        return {
+            "rows": rows,
+            "counts": counts,
+            "letters": ["".join(value) for value in letters],
+            "row_size": row_size,
+            "poc": float(rows[poc_index]),
+            "vah": float(rows[max(included)]),
+            "val": float(rows[min(included)]),
+            "initial_balance_high": float(initial_balance["high"].max()),
+            "initial_balance_low": float(initial_balance["low"].min()),
+            "brackets": len(brackets),
+        }
+
+    def _plot_tpo_profile(
+        self,
+        axis: Any,
+        profile: Dict[str, Any],
+        title: str,
+        color: str,
+    ) -> None:
+        axis.set_title(title, color=self.COLORS["text"], fontweight="bold")
+        if not profile:
+            axis.text(
+                0.5,
+                0.5,
+                "PROFILE UNAVAILABLE",
+                transform=axis.transAxes,
+                ha="center",
+                va="center",
+                color=self.COLORS["text_dim"],
+            )
+            return
+        rows = profile["rows"]
+        counts = profile["counts"]
+        axis.barh(rows, counts, height=profile["row_size"] * 0.82, color=color, alpha=0.68)
+        for row, letters in zip(rows, profile["letters"]):
+            if letters:
+                axis.text(0.1, row, letters, va="center", color=self.COLORS["text"], fontsize=6)
+        for key, label, line_color in (
+            ("poc", "TPO POC", self.COLORS["rsi_line"]),
+            ("vah", "VAH", self.COLORS["candle_up"]),
+            ("val", "VAL", self.COLORS["candle_down"]),
+            ("initial_balance_high", "IBH", self.COLORS["text_dim"]),
+            ("initial_balance_low", "IBL", self.COLORS["text_dim"]),
+        ):
+            value = float(profile[key])
+            axis.axhline(value, color=line_color, linestyle="--", linewidth=1.0)
+            axis.text(max(counts) * 0.98, value, f"{label} {value:.2f}", ha="right", va="bottom", color=line_color, fontsize=8)
+        axis.set_xlabel("TPO count", color=self.COLORS["text_dim"])
+        axis.set_ylabel("Price (₹)", color=self.COLORS["text_dim"])
+
+    @staticmethod
+    def _profile_metadata(profile: Dict[str, Any]) -> Dict[str, Any]:
+        if not profile:
+            return {"status": "unavailable"}
+        return {
+            "status": "available",
+            "row_size": round(float(profile["row_size"]), 4),
+            "poc": round(float(profile["poc"]), 4),
+            "vah": round(float(profile["vah"]), 4),
+            "val": round(float(profile["val"]), 4),
+            "initial_balance_high": round(float(profile["initial_balance_high"]), 4),
+            "initial_balance_low": round(float(profile["initial_balance_low"]), 4),
+            "brackets": int(profile["brackets"]),
+        }
+
+    def _style_evidence_axis(self, axis: Any) -> None:
+        axis.set_facecolor(self.COLORS["panel_bg"])
+        axis.grid(color=self.COLORS["grid"], linestyle="--", linewidth=0.5, alpha=0.45)
+        axis.tick_params(colors=self.COLORS["text_dim"], labelsize=9)
+        for spine in axis.spines.values():
+            spine.set_color(self.COLORS["spine"])
+
+    @staticmethod
+    def _latest_series_value(series: pd.Series) -> Optional[float]:
+        values = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if values.empty:
+            return None
+        return float(values.iloc[-1])
 
     def _latest_finite(self, frame: pd.DataFrame, column: str) -> float:
         if column not in frame.columns:
