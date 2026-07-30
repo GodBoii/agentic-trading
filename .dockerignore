@@ -10,3 +10,4 @@ __pycache__
 .env
 python-backend/.env
 *.log
+context/stocks-data
