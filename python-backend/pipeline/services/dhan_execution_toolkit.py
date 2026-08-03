@@ -73,6 +73,8 @@ class DhanExecutionToolkit(Toolkit):
         }
         self.default_risk_fraction = self._env_float("EXECUTIONER_RISK_FRACTION", 0.01)
         self.max_allocation_fraction = self._env_float("EXECUTIONER_MAX_ALLOCATION_FRACTION", 0.25)
+        # Legacy/manual callers may omit a venue. The new event-driven path
+        # always supplies the selected venue explicitly.
         self.default_exchange_segment = os.getenv("EXECUTIONER_DEFAULT_EXCHANGE_SEGMENT", "BSE_EQ")
         self.allowed_security_id: Optional[int] = None
 
@@ -951,11 +953,6 @@ class DhanExecutionToolkit(Toolkit):
         }
         normalized = aliases.get(raw, raw)
 
-        # This pipeline's equity universe is BSE-sourced. If the model passes an NSE
-        # alias for a BSE-style security id, keep the order/margin call on BSE_EQ.
-        if security_id is not None and 500000 <= int(security_id) < 600000 and normalized == "NSE_EQ":
-            return "BSE_EQ"
-
         allowed = {
             "NSE_EQ",
             "NSE_FNO",
@@ -966,7 +963,9 @@ class DhanExecutionToolkit(Toolkit):
             "MCX_COMM",
             "IDX_I",
         }
-        return normalized if normalized in allowed else default
+        if normalized in allowed:
+            return normalized
+        raise ValueError("A valid exchange segment is required; venue inference is disabled.")
 
     def _parse_condition_payload(self, condition_json: str, orders_json: str) -> tuple[Dict[str, Any], List[Dict[str, Any]], Optional[str]]:
         try:
