@@ -15,6 +15,10 @@ from dhanhq import DhanContext, HistoricalData, MarketFeed, OptionChain, dhanhq
 from dotenv import dotenv_values
 
 from pipeline.config import PipelineConfig
+from pipeline.services.dhan_credentials import (
+    CredentialUnavailable,
+    DhanCredentialStore,
+)
 
 try:
     import fcntl  # type: ignore
@@ -67,13 +71,13 @@ class DhanService:
         merged.update({k: v for k, v in root_env.items() if v is not None})
         merged.update({k: v for k, v in backend_env.items() if v is not None})
 
-        self.client_id = (
+        env_client_id = (
             merged.get("DHAN_DATA_CLIENT_ID")
             or merged.get("DHAN_CLIENT_ID")
             or os.getenv("DHAN_DATA_CLIENT_ID")
             or os.getenv("DHAN_CLIENT_ID")
         )
-        self.access_token = (
+        env_access_token = (
             merged.get("DHAN_DATA_ACCESS_TOKEN")
             or merged.get("DHAN_ACCESS_TOKEN")
             or os.getenv("DHAN_DATA_ACCESS_TOKEN")
@@ -82,14 +86,24 @@ class DhanService:
         self.app_id = merged.get("DHAN_APP_ID")
         self.app_secret = merged.get("DHAN_APP_SECRET")
 
+        self.credential_store = DhanCredentialStore(config)
+        self.credential_mtime_ns = 0
+        self.credential_version = 0
+        runtime_credentials = None
+        try:
+            runtime_credentials = self.credential_store.load(required=False)
+        except CredentialUnavailable:
+            runtime_credentials = None
+        self.client_id = runtime_credentials.client_id if runtime_credentials else env_client_id
+        self.access_token = runtime_credentials.access_token if runtime_credentials else env_access_token
+        if runtime_credentials:
+            self.credential_version = runtime_credentials.version
+            self.credential_mtime_ns = self.credential_store.mtime_ns()
+
         if not self.client_id or not self.access_token:
             raise ValueError("Missing Dhan credentials. Expected DHAN_DATA_CLIENT_ID and DHAN_DATA_ACCESS_TOKEN.")
 
-        self.dhan_context = DhanContext(self.client_id, self.access_token)
-        self.market_api = dhanhq(self.dhan_context)
-        self.historical_api = HistoricalData(self.dhan_context)
-        self.option_chain_api = OptionChain(self.dhan_context)
-        self.login_api = self.dhan_context.get_dhan_login()
+        self._rebuild_clients()
         self.gateway_url = (
             self.config.market_data_gateway_url()
             if self.prefer_gateway
@@ -98,6 +112,33 @@ class DhanService:
         self.gateway_timeout_seconds = self.config.market_data_gateway_timeout_seconds
         self.gateway_session = requests.Session() if self.gateway_url else None
         self.base_url = "https://api.dhan.co/v2"
+
+    def _rebuild_clients(self) -> None:
+        self.dhan_context = DhanContext(self.client_id, self.access_token)
+        self.market_api = dhanhq(self.dhan_context)
+        self.historical_api = HistoricalData(self.dhan_context)
+        self.option_chain_api = OptionChain(self.dhan_context)
+        self.login_api = self.dhan_context.get_dhan_login()
+        self.thread_local = local()
+
+    def reload_credentials_if_changed(self, *, force: bool = False) -> bool:
+        # Some isolated tests and compatibility callers construct a lightweight
+        # service without running __init__. They have no runtime credential store.
+        if not hasattr(self, "credential_store"):
+            return False
+        current_mtime = self.credential_store.mtime_ns()
+        if not force and (current_mtime == 0 or current_mtime == self.credential_mtime_ns):
+            return False
+        credentials = self.credential_store.load(required=False)
+        if not credentials or credentials.version == self.credential_version:
+            self.credential_mtime_ns = current_mtime
+            return False
+        self.client_id = credentials.client_id
+        self.access_token = credentials.access_token
+        self.credential_version = credentials.version
+        self.credential_mtime_ns = current_mtime
+        self._rebuild_clients()
+        return True
 
     def _market_timezone(self):
         for timezone_name in (self.config.market_timezone, "Asia/Kolkata"):
@@ -126,6 +167,7 @@ class DhanService:
         return client
 
     def _headers(self) -> Dict[str, str]:
+        self.reload_credentials_if_changed()
         return {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -1006,9 +1048,11 @@ class DhanService:
         security_id: int,
         days: int = 30,
         retries: int = 3,
-        exchange_segment: str = "BSE_EQ",
+        exchange_segment: Optional[str] = None,
         instrument_candidates: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
+        self.reload_credentials_if_changed()
+        exchange_segment = self._require_exchange_segment(exchange_segment)
         if self.gateway_url:
             return self._gateway_post(
                 "/v1/daily-history",
@@ -1066,9 +1110,11 @@ class DhanService:
         days: int = 5,
         interval: int = 1,
         retries: int = 3,
-        exchange_segment: str = "BSE_EQ",
+        exchange_segment: Optional[str] = None,
         instrument_candidates: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
+        self.reload_credentials_if_changed()
+        exchange_segment = self._require_exchange_segment(exchange_segment)
         if self.gateway_url:
             return self._gateway_post(
                 "/v1/intraday-history",
@@ -1131,7 +1177,8 @@ class DhanService:
 
         return last_response
 
-    def fetch_quote_batch(self, security_ids: List[int], exchange_segment: str = "BSE_EQ") -> Dict[int, Dict[str, Any]]:
+    def fetch_quote_batch(self, security_ids: List[int], exchange_segment: Optional[str] = None) -> Dict[int, Dict[str, Any]]:
+        exchange_segment = self._require_exchange_segment(exchange_segment)
         if self.gateway_url:
             response = self._gateway_post(
                 "/v1/quote-batch",
@@ -1154,6 +1201,7 @@ class DhanService:
         security_ids: List[int],
         exchange_segment: str,
     ) -> Dict[int, Dict[str, Any]]:
+        self.reload_credentials_if_changed()
         if not security_ids:
             return {}
         if len(security_ids) > 1000:
@@ -1188,7 +1236,8 @@ class DhanService:
             code=code,
         )
 
-    def fetch_ohlc_batch(self, security_ids: List[int], exchange_segment: str = "BSE_EQ") -> Dict[int, Dict[str, Any]]:
+    def fetch_ohlc_batch(self, security_ids: List[int], exchange_segment: Optional[str] = None) -> Dict[int, Dict[str, Any]]:
+        exchange_segment = self._require_exchange_segment(exchange_segment)
         if self.gateway_url:
             response = self._gateway_post(
                 "/v1/ohlc-batch",
@@ -1260,7 +1309,42 @@ class DhanService:
         )
 
     def build_marketfeed(self, instruments: List[tuple]) -> MarketFeed:
+        self.reload_credentials_if_changed()
         return MarketFeed(self.dhan_context, instruments, version="v2")
+
+    @staticmethod
+    def configure_marketfeed_websocket(feed: MarketFeed) -> None:
+        """Use Dhan's server-driven keepalive and application packet-idle checks.
+
+        Dhan sends protocol pings from the server. Some Dhan feed endpoints do
+        not answer the websockets package's separate client-initiated ping,
+        which otherwise causes false ``keepalive ping timeout`` disconnects.
+        The client may still send its periodic ping, but an unanswered client
+        ping no longer closes a feed that is demonstrably delivering packets.
+        """
+
+        websocket = getattr(feed, "ws", None)
+        if websocket is None:
+            return
+        if hasattr(websocket, "ping_timeout"):
+            websocket.ping_timeout = None
+
+    @staticmethod
+    def _require_exchange_segment(exchange_segment: Optional[str]) -> str:
+        normalized = str(exchange_segment or "").strip().upper()
+        allowed = {
+            "NSE_EQ",
+            "NSE_FNO",
+            "NSE_CURRENCY",
+            "BSE_EQ",
+            "BSE_FNO",
+            "BSE_CURRENCY",
+            "MCX_COMM",
+            "IDX_I",
+        }
+        if normalized not in allowed:
+            raise ValueError("A valid Dhan exchange segment must be supplied explicitly.")
+        return normalized
 
     def daily_response_to_df(self, resp: Dict[str, Any]) -> pd.DataFrame:
         data = resp.get("data", {})
