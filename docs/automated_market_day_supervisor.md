@@ -224,3 +224,10 @@ If agents are not triggering, check `session_supervisor_status.json`, `session_s
 If NIFTY tick data is missing, check `nifty_market_depth_latest.json`, `stream_states`, and `errors.ndjson`.
 
 If the frontend was offline, open the AI trading page later and inspect past sessions. The backend should have saved the run independently.
+# Archived Architecture
+
+This document describes the retired `sorting`/Session Supervisor design. The
+active architecture is documented in
+[`architecture/trading-pipeline.md`](architecture/trading-pipeline.md). Stage 1
+is now `universe-scanner`, Stage 2 is `intra-finder`, and agent runs are
+event-driven.
