@@ -1,0 +1,89 @@
+# Trading Pipeline Operations Runbook
+
+## First-time configuration
+
+1. Configure the five scanner secret values described in
+   `docs/dhan-authentication.md`.
+2. Keep `INTRA_FINDER_SHADOW_MODE=1`.
+3. Validate Compose:
+
+   ```powershell
+   docker compose config --quiet
+   ```
+
+4. Build and start:
+
+   ```powershell
+   docker compose up --build -d
+   ```
+
+5. Check:
+
+   ```powershell
+   docker compose ps
+   docker compose logs dhan-auth-manager
+   docker compose logs universe-scanner
+   docker compose logs intra-finder
+   ```
+
+## Expected daily order
+
+- Auth manager becomes healthy.
+- Gateway becomes healthy.
+- Universe Scanner runs at or after 08:40 IST.
+- Intra-Finder starts after today's successful universe exists.
+- Opening range completes at 09:30.
+- Setup events appear in `results/stage2/YYYY-MM-DD/setup-events.jsonl`.
+
+Check the Stage 2 readiness endpoint:
+
+```powershell
+docker exec trader-intra-finder-1 python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8040/health').read().decode())"
+```
+
+## Common states
+
+`auth_unavailable` means renewal and recovery cannot currently establish a valid
+scanner session. Inspect the sanitized auth health file and protected secret
+configuration. Do not paste tokens into logs.
+
+`degraded` Stage 1 means its diagnostics were saved but `latest.json` was not
+replaced. Check master age/schema and historical failure counts.
+
+`DATA_STALE` means Intra-Finder has not received a trustworthy recent packet for
+that stock. It cannot trigger until live data recovers.
+
+`quiet_instruments` does not automatically mean the WebSocket is broken. Dhan
+is event-driven, so an inactive stock may legitimately have no recent packet.
+Use `global_packet_age_seconds` and `connection_state` to diagnose the whole
+feed.
+
+`RVOL_BASELINE_UNAVAILABLE` means Stage 1 did not publish a current
+Asia/Kolkata baseline. Intra-Finder intentionally refuses to trigger that stock.
+
+`CONNECTION_WARMING_UP` protects the first thirty seconds after a real
+reconnection.
+
+`global_packet_idle` means no instrument produced a packet within the aggregate
+idle deadline. This causes a controlled reconnect and resubscription.
+
+## Shadow-to-live checklist
+
+Before changing shadow mode to `0`:
+
+- Replay several complete sessions.
+- Review false ORB and VWAP events.
+- Confirm NSE and BSE venue propagation in every event.
+- Confirm duplicate events remain suppressed after restart.
+- Check observed disk growth.
+- Keep `EXECUTIONER_ALLOW_LIVE_ORDERS=0` for the first event-dispatch test.
+
+Only after agent-event behavior is satisfactory should live order permission be
+considered separately.
+
+## Safe cleanup
+
+Intra-Finder automatically removes raw-depth directories older than seven days
+and one-second directories older than ninety days. Setup events and Stage 1
+results are retained. Cleanup validates that the target is specifically the
+Stage 2 results directory before deleting anything.
