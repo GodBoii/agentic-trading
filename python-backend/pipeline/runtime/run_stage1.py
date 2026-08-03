@@ -1,5 +1,5 @@
-from pipeline.stages.stage1_sanitation import Stage1Sanitation
+from pipeline.stages.universe_scanner import UniverseScanner
 
 
 if __name__ == "__main__":
-    Stage1Sanitation().run()
+    UniverseScanner().run()
