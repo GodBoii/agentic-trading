@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -162,6 +163,80 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         print(f"Saved stock agent batch snapshot for {len(results)} stock(s).")
         return payload
 
+    def run_event(
+        self,
+        event: Dict[str, Any],
+        *,
+        event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """Run exactly one Intra-Finder-qualified stock through the agent."""
+        if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
+            raise RuntimeError("ai_trading_disabled")
+        market_date = self.market_time.market_date_str()
+        if str(event.get("market_date") or "") != market_date:
+            raise RuntimeError("stale_intra_finder_event")
+        if str(event.get("exchange_segment") or "").upper() not in {"NSE_EQ", "BSE_EQ"}:
+            raise RuntimeError("event_missing_valid_exchange_segment")
+
+        account_context = self._build_account_context()
+        trade_config = self._with_effective_trade_amount(
+            {
+                "trade_mode": "auto",
+                "trade_amount": event.get("trade_amount") or os.getenv("INTRA_FINDER_TRADE_AMOUNT"),
+                "regime_analysis_enabled": True,
+            },
+            account_context,
+        )
+        regime_payload = self.storage.load_snapshot(self.config.regime_latest_path)
+        synthetic_stage2 = {
+            "stage": "intra_finder",
+            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "summary": {
+                "status": "completed",
+                "market_date": market_date,
+                "universe_version": event.get("universe_version"),
+            },
+            "stocks": [event],
+        }
+        packet = self._build_candidate_packet(
+            market_date=market_date,
+            candidate_record=event,
+            candidate_source="intra_finder_event",
+            stage2_payload=synthetic_stage2,
+            monitor_payload=None,
+            regime_payload=regime_payload,
+            regime_enabled=True,
+            account_context=account_context,
+        )
+        packet.update(event)
+        self._strip_monitor_context(packet)
+        run_context = {
+            "trade_session_id": f"intra-{event['event_id']}",
+            "request_id": str(event["event_id"]),
+        }
+        results = self._run_stock_agents(
+            [packet],
+            trade_config or {},
+            event_callback,
+            run_context,
+        )
+        payload = {
+            "stage": "stock_agent",
+            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "summary": {
+                "status": "completed",
+                "market_date": market_date,
+                "candidate_source": "intra_finder_event",
+                "event_id": event["event_id"],
+                "selected_count": 1,
+                "evaluated_count": len(results),
+                "executed_count": sum(1 for item in results if self._is_placed_result(item)),
+            },
+            "results": results,
+        }
+        self._save_payload(payload)
+        return payload
+
     def _select_candidates(
         self,
         stage2_payload: Dict[str, Any],
@@ -235,7 +310,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         try:
             response = self.execution_helper.dhan.calculate_margin_requirement(
                 security_id=security_id,
-                exchange_segment="BSE_EQ",
+                exchange_segment=str(stock.get("exchange_segment") or "").upper(),
                 transaction_type=side,
                 quantity=1,
                 product_type="INTRADAY",
@@ -361,7 +436,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             security_id,
             days=25,
             interval=1,
-            exchange_segment="BSE_EQ",
+            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
             instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
         )
         if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
@@ -429,6 +504,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             instrument=candidate_packet.get("instrument"),
             intraday_frame=intraday_frame,
             intraday_frame_fetched_at=intraday_frame_fetched_at,
+            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
         )
         technical_toolkit = StockTechnicalToolkit(chart_bundle, market_time=self.market_time)
         account_toolkit = StockAccountToolkit(
@@ -440,6 +516,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             isolated_dhan,
             security_id=security_id,
             margin_budget=margin_budget,
+            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
             coordinator=execution_coordinator,
         )
         research_toolkit = self._build_research_toolkit(candidate_packet)
