@@ -31,12 +31,14 @@ class StockExecutionToolkit(Toolkit):
         dhan: DhanService,
         security_id: int,
         margin_budget: float,
-        exchange_segment: str = "BSE_EQ",
+        exchange_segment: Optional[str] = "BSE_EQ",
         coordinator: Optional[StockExecutionCoordinator] = None,
     ) -> None:
         self.security_id = int(security_id)
         self.margin_budget = max(0.0, float(margin_budget))
         self.exchange_segment = str(exchange_segment or "BSE_EQ").upper()
+        if self.exchange_segment not in {"NSE_EQ", "BSE_EQ"}:
+            raise ValueError("StockExecutionToolkit requires NSE_EQ or BSE_EQ.")
         self.coordinator = coordinator or StockExecutionCoordinator()
         self._dhan_tools = DhanExecutionToolkit(dhan, entry_only=True)
         self._dhan_tools.set_allowed_security_id(self.security_id)
