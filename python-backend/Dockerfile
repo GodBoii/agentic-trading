@@ -9,7 +9,6 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY python-backend /app/python-backend
-COPY *.csv /app/
-COPY *.json /app/
+COPY security_id_list.csv /app/security_id_list.csv
 
 CMD ["python", "-m", "pipeline.runtime.run_stage1"]
