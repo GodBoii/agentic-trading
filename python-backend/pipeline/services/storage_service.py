@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -22,7 +24,31 @@ class StorageService:
 
     @staticmethod
     def save_snapshot(path: Path, payload: Dict[str, Any]) -> None:
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        serialized = json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=str(path.parent),
+        )
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(serialized)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, path)
+        finally:
+            try:
+                Path(temporary_name).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    @staticmethod
+    def append_json_line(path: Path, payload: Dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, default=str))
+            handle.write("\n")
 
     @staticmethod
     def load_snapshot(path: Path) -> Optional[Dict[str, Any]]:
@@ -74,10 +100,28 @@ class StorageService:
             return None
 
         stage = str(payload.get("stage") or "")
-        if stage == "stage1_sanitation":
+        if stage == "universe_scanner":
+            try:
+                scanned = int(summary.get("unique_isins_scanned") or 0)
+                passed = int(summary.get("stage1_passed") or 0)
+            except (TypeError, ValueError):
+                return None
+            return 0.0 if scanned > 0 and passed >= 0 else 1.0
+        if stage == "intra_finder":
+            try:
+                expected = int(summary.get("expected_instruments") or 0)
+                subscribed = int(summary.get("subscribed_instruments") or 0)
+            except (TypeError, ValueError):
+                return None
+            return max(0.0, 1.0 - (subscribed / expected)) if expected else 1.0
+        if stage in {"stage1_sanitation", "universe_scanner"}:
             total = summary.get("historical_candidates")
-        elif stage == "stage2_momentum_ignition":
+            if total is None:
+                total = summary.get("unique_isins_scanned")
+        elif stage in {"stage2_momentum_ignition", "intra_finder"}:
             total = summary.get("input_stage1_count")
+            if total is None:
+                total = summary.get("expected_instruments")
         else:
             return None
 
@@ -114,15 +158,19 @@ class StorageService:
             return False
 
         stage = str(payload.get("stage") or "")
-        if stage == "stage1_sanitation":
+        if stage in {"stage1_sanitation", "universe_scanner"}:
             try:
-                total = int(summary.get("historical_candidates") or 0)
+                total = int(
+                    summary.get("historical_candidates")
+                    or summary.get("unique_isins_scanned")
+                    or 0
+                )
             except (TypeError, ValueError):
                 return False
             # Legacy Stage 1 snapshots had no status field. Accept them only
             # when they contain a real, sufficiently complete historical scan.
             return total > 0 or status == "completed"
-        if stage == "stage2_momentum_ignition":
+        if stage in {"stage2_momentum_ignition", "intra_finder"}:
             try:
                 total = int(summary.get("input_stage1_count") or 0)
             except (TypeError, ValueError):
