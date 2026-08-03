@@ -62,6 +62,7 @@ MANIFEST
 .env.test.local
 .env.production.local
 python-backend/.env
+secrets/
 *.pem
 *.key
 
@@ -86,6 +87,7 @@ temp/
 
 # Logs and local diagnostics
 *.log
+*.ctl
 terminal-logs.txt
 docker-logs.txt
 npm-debug.log*
@@ -116,6 +118,10 @@ python-backend/stock_analyzer_artifacts/
 python-backend/regime_inputs/
 python-backend/nifty_market_depth/
 python-backend/nifty_market_depth_charts/
+python-backend/results/
+python-backend/runtime-data/
+python-backend/dhan_quote_rate_limit_state.json
+tmp_bse*
 
 # Large/raw market data exports
 *.xlsx
