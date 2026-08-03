@@ -8,6 +8,7 @@ import re
 import socket
 import struct
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
@@ -15,7 +16,6 @@ from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
 from pipeline.config import PipelineConfig
-from pipeline.runtime.run_sorting import wait_for_current_stage2_snapshot
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.storage_service import StorageService
@@ -94,6 +94,12 @@ class AITradingOrchestrator:
         self.last_request_id: Optional[str] = None
         self._boot_time_utc = datetime.now(timezone.utc)
         self.ws = WebSocketBroadcaster()
+        self.event_executor = ThreadPoolExecutor(
+            max_workers=max(1, self.config.intra_finder_agent_concurrency)
+        )
+        self.event_state_path = self.config.agents_results_dir / "event-dispatch-state.json"
+        self.event_state = self.storage.load_snapshot(self.event_state_path) or {"events": {}}
+        self.event_lock = Lock()
 
     def run_forever(self) -> None:
         print("=" * 60)
@@ -148,6 +154,65 @@ class AITradingOrchestrator:
         }
         self.storage.save_snapshot(self.config.ai_trading_request_path, request_payload)
         return request_payload
+
+    def submit_intra_finder_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        required = {
+            "event_id",
+            "market_date",
+            "universe_version",
+            "isin",
+            "exchange_segment",
+            "security_id",
+            "symbol",
+            "direction",
+            "setup_type",
+            "setup_score",
+        }
+        missing = sorted(key for key in required if event.get(key) in (None, ""))
+        if missing:
+            raise ValueError(f"invalid_intra_finder_event_missing:{','.join(missing)}")
+        event_id = str(event["event_id"])
+        with self.event_lock:
+            existing = (self.event_state.get("events") or {}).get(event_id)
+            if existing:
+                return {"accepted": False, "duplicate": True, "event_id": event_id}
+            self.event_state.setdefault("events", {})[event_id] = {
+                "status": "accepted",
+                "accepted_at_utc": datetime.now(timezone.utc).isoformat(),
+            }
+            self.storage.save_snapshot(self.event_state_path, self.event_state)
+        self.event_executor.submit(self._run_intra_finder_event, dict(event))
+        return {"accepted": True, "duplicate": False, "event_id": event_id}
+
+    def _run_intra_finder_event(self, event: Dict[str, Any]) -> None:
+        event_id = str(event["event_id"])
+        try:
+            self._broadcast_event({"type": "intra_finder_event_accepted", "event": event})
+            result = self.stock_agent.run_event(event, event_callback=self._broadcast_event)
+            status = "completed"
+            error = None
+            decision = (result.get("results") or [{}])[0].get("decision")
+        except Exception as exc:
+            status = "failed"
+            error = f"{type(exc).__name__}: {exc}"
+            decision = None
+        with self.event_lock:
+            self.event_state.setdefault("events", {})[event_id] = {
+                "status": status,
+                "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                "decision": decision,
+                "error": error,
+            }
+            self.storage.save_snapshot(self.event_state_path, self.event_state)
+        self._broadcast_event(
+            {
+                "type": "intra_finder_event_finished",
+                "event_id": event_id,
+                "status": status,
+                "decision": decision,
+                "error": error,
+            }
+        )
 
     def load_run_status(self) -> Dict[str, Any]:
         status = self.storage.load_snapshot(self.config.ai_trading_run_status_path)
@@ -257,7 +322,12 @@ class AITradingOrchestrator:
                     if not self._authorized():
                         self._json_response({"error": "unauthorized"}, status=401)
                         return
-                    if urlparse(self.path).path != "/ai-trading/start":
+                    path = urlparse(self.path).path
+                    if path == "/ai-trading/event":
+                        result = orchestrator.submit_intra_finder_event(self._read_body())
+                        self._json_response({"ok": True, **result}, status=202 if result["accepted"] else 200)
+                        return
+                    if path != "/ai-trading/start":
                         self._json_response({"error": "not_found"}, status=404)
                         return
                     request_payload = orchestrator.submit_start_request(self._read_body())
@@ -308,53 +378,27 @@ class AITradingOrchestrator:
             self._save_status("blocked", "requested", request, "AI trading is not enabled for any user.")
             return
 
-        print(f"Starting AI trading run {self.last_request_id} for user {user_id or 'unknown'}...")
+        print(f"Arming event-driven AI trading for {user_id or 'unknown'}...")
         print(f"Trade mode: {trade_mode}, Trade amount: {trade_amount}")
         print(f"Regime analysis enabled: {regime_analysis_enabled}")
-        self._save_status(
-            "waiting",
-            "stage2",
-            request,
-            message="Waiting for Stage 2 momentum results before starting trading agents.",
-        )
-        market_date = wait_for_current_stage2_snapshot(self.config, poll_seconds=10)
         outputs: Dict[str, Any] = {
-            "stage2": self.storage.load_snapshot(self.config.stage2_daily_path(market_date))
-            or self.storage.load_snapshot(self.config.stage2_latest_path)
-            or {"generated_at_utc": None, "summary": {"status": "ready", "market_date": market_date}},
+            "stage2": self.storage.load_snapshot(self.config.stage2_latest_path)
+            or {
+                "generated_at_utc": None,
+                "summary": {
+                    "status": "waiting",
+                    "message": "Intra-Finder has not published live state yet.",
+                },
+            },
         }
-
-        trade_config = {
-            "trade_mode": trade_mode,
-            "trade_amount": float(trade_amount) if trade_amount else None,
-            "regime_analysis_enabled": regime_analysis_enabled,
-        }
-        run_context = {
-            "trade_session_id": self._slugify_session_id(self.last_request_id),
-            "request_id": self.last_request_id,
-            "user_id": user_id or None,
-        }
-
-        stages = [
-            (
-                "stock_agent",
-                lambda force: self.stock_agent.run_cycle(
-                    force=force,
-                    trade_config=trade_config,
-                    use_regime_analysis=regime_analysis_enabled,
-                    event_callback=self._broadcast_event,
-                    run_context=run_context,
-                ),
-            ),
-        ]
-
-        for stage_name, runner in stages:
-            self._save_status("running", stage_name, request, outputs=outputs)
-            print(f"Running {stage_name}...")
-            outputs[stage_name] = runner(force=True)
-
-        self._save_status("completed", "completed", request, outputs=outputs)
-        print(f"Completed AI trading run {self.last_request_id}.")
+        self._save_status(
+            "armed",
+            "intra_finder",
+            request,
+            outputs=outputs,
+            message="AI trading is armed. Agents now start only for qualified Intra-Finder events.",
+        )
+        print("AI trading armed; waiting for Intra-Finder events.")
 
     def _save_status(
         self,
