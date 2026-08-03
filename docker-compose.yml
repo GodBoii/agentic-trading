@@ -1,94 +1,152 @@
-services:
-  market-data-gateway:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
-    env_file:
-      - .env
-      - python-backend/.env
-    working_dir: /app/python-backend
-    command: python -m pipeline.runtime.run_market_data_gateway
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
+x-service: &service
+  build:
+    context: .
+    dockerfile: python-backend/Dockerfile
+  env_file:
+    - .env
+    - python-backend/.env
+  working_dir: /app/python-backend
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
 
-  sorting:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
-    env_file:
-      - .env
-      - python-backend/.env
-    working_dir: /app/python-backend
+x-common-volumes: &common-volumes
+  - ./python-backend:/app/python-backend
+  - ./:/app
+
+services:
+  dhan-auth-manager:
+    <<: *service
+    command: python -m pipeline.runtime.run_dhan_auth_manager
+    environment:
+      DHAN_AUTH_HEALTH_PORT: "8030"
+      DHAN_AUTO_RENEW_BEFORE_MINUTES: "240"
+      DHAN_AUTO_RENEW_CHECK_SECONDS: "900"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8030/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes: *common-volumes
+
+  market-data-gateway:
+    <<: *service
+    command: python -m pipeline.runtime.run_market_data_gateway
+    depends_on:
+      dhan-auth-manager:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes: *common-volumes
+
+  universe-scanner:
+    <<: *service
+    command: python -m pipeline.runtime.run_universe_scanner
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-      AI_TRADING_BACKEND_URL_INTERNAL: http://ai-trading-agents:8020
-    command: python -m pipeline.runtime.run_session_supervisor
+      UNIVERSE_SCANNER_BUILD_INTRADAY_BASELINES: "1"
     depends_on:
-      - market-data-gateway
-      - ai-trading-agents
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
+      dhan-auth-manager:
+        condition: service_healthy
+      market-data-gateway:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,sys; from datetime import datetime; from pathlib import Path; from zoneinfo import ZoneInfo; p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); ok=s.get('status')=='completed' and s.get('market_date')==datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat() and int(s.get('baseline_schema_version') or 0)>=2; sys.exit(0 if ok else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 120
+      start_period: 30s
+    volumes: *common-volumes
 
-  monitor:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
-    env_file:
-      - .env
-      - python-backend/.env
-    working_dir: /app/python-backend
+  intra-finder:
+    <<: *service
+    command: python -m pipeline.runtime.run_intra_finder
+    environment:
+      AI_TRADING_EVENT_URL: http://ai-trading-agents:8020/ai-trading/event
+      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
+      INTRA_FINDER_HEALTH_PORT: "8040"
+      INTRA_FINDER_SHADOW_MODE: "1"
+      INTRA_FINDER_PROGRESS_LOG_SECONDS: "60"
+    depends_on:
+      dhan-auth-manager:
+        condition: service_healthy
+      market-data-gateway:
+        condition: service_healthy
+      universe-scanner:
+        condition: service_healthy
+    stop_grace_period: 45s
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8040/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    volumes: *common-volumes
+
+  nifty-50-market-depth:
+    <<: *service
+    command: python -m pipeline.runtime.run_nifty_50_market_depth
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
       NIFTY_DEPTH_PERSIST_EVERY_PACKET: "1"
       NIFTY_DEPTH_RAW_WRITE_SECONDS: "0"
-    command: python -m pipeline.runtime.run_monitor_loop
+      NIFTY_DEPTH_PROGRESS_LOG_SECONDS: "60"
     depends_on:
-      - market-data-gateway
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
+      dhan-auth-manager:
+        condition: service_healthy
+      market-data-gateway:
+        condition: service_healthy
+    stop_grace_period: 45s
+    volumes: *common-volumes
 
   regime:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
-    env_file:
-      - .env
-      - python-backend/.env
-    working_dir: /app/python-backend
+    <<: *service
+    profiles: ["ai"]
+    command: python -m pipeline.runtime.run_regime_loop
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    command: python -m pipeline.runtime.run_regime_loop
     depends_on:
-      - market-data-gateway
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
+      market-data-gateway:
+        condition: service_healthy
+    volumes: *common-volumes
 
   ai-trading-agents:
-    build:
-      context: .
-      dockerfile: python-backend/Dockerfile
+    <<: *service
+    profiles: ["ai"]
     container_name: trader-ai-trading-agents
-    env_file:
-      - .env
-      - python-backend/.env
-    working_dir: /app/python-backend
+    command: python -m pipeline.runtime.run_ai_trading_orchestrator
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
       STOCK_AGENT_DEBUG: "1"
-    command: python -m pipeline.runtime.run_ai_trading_orchestrator
     depends_on:
-      - market-data-gateway
+      dhan-auth-manager:
+        condition: service_healthy
+      market-data-gateway:
+        condition: service_healthy
     ports:
       - "8020:8020"
-    volumes:
-      - ./python-backend:/app/python-backend
-      - ./:/app
-    restart: unless-stopped
+    volumes: *common-volumes
