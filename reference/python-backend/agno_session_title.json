@@ -1,0 +1,112 @@
+[
+    {
+        "schemaname": "public",
+        "tablename": "attachment",
+        "policyname": "Users can create their own attachments",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "INSERT",
+        "qual": null,
+        "with_check": "(auth.uid() = user_id)"
+    },
+    {
+        "schemaname": "public",
+        "tablename": "attachment",
+        "policyname": "Users can delete their own attachments",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "attachment",
+        "policyname": "Users can read their own attachments",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_content",
+        "policyname": "Users can delete their own session content",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_content",
+        "policyname": "Users can insert their own session content",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "INSERT",
+        "qual": null,
+        "with_check": "(auth.uid() = user_id)"
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_content",
+        "policyname": "Users can update their own session content",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_content",
+        "policyname": "Users can view their own session content",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_titles",
+        "policyname": "Users can delete their own session titles",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_titles",
+        "policyname": "Users can insert their own session titles",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "INSERT",
+        "qual": null,
+        "with_check": "(auth.uid() = user_id)"
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_titles",
+        "policyname": "Users can update their own session titles",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "schemaname": "public",
+        "tablename": "session_titles",
+        "policyname": "Users can view their own session titles",
+        "permissive": "PERMISSIVE",
+        "roles": "{public}",
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    }
+]

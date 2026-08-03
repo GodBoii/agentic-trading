@@ -1,0 +1,390 @@
+[
+    {
+        "table_name": "agno_sessions",
+        "rls_enabled": true,
+        "rls_forced": false,
+        "policyname": null,
+        "cmd": null,
+        "qual": null,
+        "with_check": null
+    },
+    {
+        "table_name": "session_titles",
+        "rls_enabled": true,
+        "rls_forced": false,
+        "policyname": "Users can delete their own session titles",
+        "cmd": "DELETE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "table_name": "session_titles",
+        "rls_enabled": true,
+        "rls_forced": false,
+        "policyname": "Users can insert their own session titles",
+        "cmd": "INSERT",
+        "qual": null,
+        "with_check": "(auth.uid() = user_id)"
+    },
+    {
+        "table_name": "session_titles",
+        "rls_enabled": true,
+        "rls_forced": false,
+        "policyname": "Users can update their own session titles",
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    },
+    {
+        "table_name": "session_titles",
+        "rls_enabled": true,
+        "rls_forced": false,
+        "policyname": "Users can view their own session titles",
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "with_check": null
+    }
+]
+
+
+
+
+
+[
+    {
+        "session_id": "e993628b-9280-45b4-8cf7-dfde2a91497b",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Hello",
+        "created_at": "2026-06-13 16:52:24.311506+00",
+        "session_created_at": 1781369541,
+        "matching_agno_session_id": "e993628b-9280-45b4-8cf7-dfde2a91497b",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "111dffb8-d2a9-4e3f-afbc-0e241e9e3d2d",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "How do I look?",
+        "created_at": "2026-06-13 15:04:13.881182+00",
+        "session_created_at": 1781363051,
+        "matching_agno_session_id": "111dffb8-d2a9-4e3f-afbc-0e241e9e3d2d",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "b8318b3b-1003-4e70-b4ff-d0ff97929509",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Describe Your Photo",
+        "created_at": "2026-06-13 15:03:15.896248+00",
+        "session_created_at": 1781362993,
+        "matching_agno_session_id": "b8318b3b-1003-4e70-b4ff-d0ff97929509",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "6edf2bde-061a-4fc3-88d1-ea1b6bc99e54",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "File Listing",
+        "created_at": "2026-06-13 14:55:34.747082+00",
+        "session_created_at": 1781362531,
+        "matching_agno_session_id": "6edf2bde-061a-4fc3-88d1-ea1b6bc99e54",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "f38001f5-00c0-4937-9099-45b269c429c6",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Hey There",
+        "created_at": "2026-06-13 14:23:57.299933+00",
+        "session_created_at": 1781360634,
+        "matching_agno_session_id": "f38001f5-00c0-4937-9099-45b269c429c6",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "dedde73c-72ab-451e-a6e9-7337f3a785a9",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "File Summaries Overview",
+        "created_at": "2026-06-13 14:19:07.278957+00",
+        "session_created_at": 1781360344,
+        "matching_agno_session_id": "dedde73c-72ab-451e-a6e9-7337f3a785a9",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "135f3849-9d79-4da1-bdae-0eef5e42c6c2",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Word Document Creation",
+        "created_at": "2026-06-13 14:14:06.678977+00",
+        "session_created_at": 1781360040,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "c9254bba-7a5a-43d2-aa9b-f4b4499ea3c0",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "What Can You See?",
+        "created_at": "2026-06-12 15:23:39.120512+00",
+        "session_created_at": 1781277815,
+        "matching_agno_session_id": "c9254bba-7a5a-43d2-aa9b-f4b4499ea3c0",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "agent",
+        "agent_id": "aetheria-computer",
+        "team_id": null
+    },
+    {
+        "session_id": "1565d1a3-2ec5-4086-ae44-5d7af627c9c9",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Friendly Greeting",
+        "created_at": "2026-06-12 15:19:54.049023+00",
+        "session_created_at": 1781277588,
+        "matching_agno_session_id": "1565d1a3-2ec5-4086-ae44-5d7af627c9c9",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "129d7bc3-7154-4375-98ae-00d9e8de4014",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "User Greeting",
+        "created_at": "2026-06-12 15:08:31.517558+00",
+        "session_created_at": 1781276905,
+        "matching_agno_session_id": "129d7bc3-7154-4375-98ae-00d9e8de4014",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "79652758-f531-43ad-b2ca-e1cb3b749410",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Greeting",
+        "created_at": "2026-06-07 06:36:48.049692+00",
+        "session_created_at": 1780814201,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "b43e6342-5bfa-4269-8f79-f329a1ab6e31",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "SOTA Car Website",
+        "created_at": "2026-06-05 05:38:38.360312+00",
+        "session_created_at": 1780637914,
+        "matching_agno_session_id": "b43e6342-5bfa-4269-8f79-f329a1ab6e31",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "agent",
+        "agent_id": "aetheria-coder",
+        "team_id": null
+    },
+    {
+        "session_id": "c6d0ff6c-d541-436a-8572-c75d7440ea82",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Sleek Car UI",
+        "created_at": "2026-06-05 05:37:10.857682+00",
+        "session_created_at": 1780637828,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "0e6c1e2f-0b46-423b-b46c-dd4d81e87c6a",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Short Greeting",
+        "created_at": "2026-06-05 05:36:28.728978+00",
+        "session_created_at": 1780637784,
+        "matching_agno_session_id": "0e6c1e2f-0b46-423b-b46c-dd4d81e87c6a",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "agent",
+        "agent_id": "aetheria-coder",
+        "team_id": null
+    },
+    {
+        "session_id": "8861cd47-c88d-4f46-aacc-9001e664a2f4",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Welcome, coder",
+        "created_at": "2026-06-05 05:13:53.932105+00",
+        "session_created_at": 1780636431,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "d9346a4e-e93f-4449-a9d8-782a5edfa987",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Greeting",
+        "created_at": "2026-06-05 05:13:30.407854+00",
+        "session_created_at": 1780636406,
+        "matching_agno_session_id": "d9346a4e-e93f-4449-a9d8-782a5edfa987",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "0656da9b-c373-4305-b6a6-ae11adfe8294",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Greeting",
+        "created_at": "2026-06-05 05:03:22.74115+00",
+        "session_created_at": 1780635800,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "5762a1fd-30d5-4608-9a73-193af27cf970",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Greeting",
+        "created_at": "2026-06-05 05:03:05.998318+00",
+        "session_created_at": 1780635782,
+        "matching_agno_session_id": "5762a1fd-30d5-4608-9a73-193af27cf970",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "95d0f009-2c12-42c7-9b38-d3a20cb815f2",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Greeting to Coder Agent",
+        "created_at": "2026-06-05 04:22:25.856301+00",
+        "session_created_at": 1780633343,
+        "matching_agno_session_id": "95d0f009-2c12-42c7-9b38-d3a20cb815f2",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "a8f9c418-3b45-4f2f-b26a-625e686404f4",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Hi Coder Agent",
+        "created_at": "2026-06-05 04:21:57.99597+00",
+        "session_created_at": 1780633314,
+        "matching_agno_session_id": "a8f9c418-3b45-4f2f-b26a-625e686404f4",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "840c3fd5-af73-41be-8622-a1462be5f9be",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Car Website Design",
+        "created_at": "2026-06-05 04:16:00.009981+00",
+        "session_created_at": 1780632956,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "bac0979e-44e1-4bc5-9308-b97779951b65",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Hey there baby",
+        "created_at": "2026-06-05 03:52:41.060774+00",
+        "session_created_at": 1780631557,
+        "matching_agno_session_id": "bac0979e-44e1-4bc5-9308-b97779951b65",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "e06b7206-9a68-49b5-8d18-e937c1162537",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "How I Can Help",
+        "created_at": "2026-06-04 16:11:57.27296+00",
+        "session_created_at": 1780589514,
+        "matching_agno_session_id": "e06b7206-9a68-49b5-8d18-e937c1162537",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "d719fa2a-1e52-4a33-be0f-1c2d99bbcd16",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "What Do I Know?",
+        "created_at": "2026-06-04 16:06:51.005883+00",
+        "session_created_at": 1780589209,
+        "matching_agno_session_id": "d719fa2a-1e52-4a33-be0f-1c2d99bbcd16",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "84bc1fa4-8efc-4fbd-84ce-68825fa1e668",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Prajwals AI Diploma",
+        "created_at": "2026-06-04 15:56:46.399145+00",
+        "session_created_at": 1780588602,
+        "matching_agno_session_id": "84bc1fa4-8efc-4fbd-84ce-68825fa1e668",
+        "matching_agno_user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "session_type": "team",
+        "agent_id": null,
+        "team_id": "aetheria-ai"
+    },
+    {
+        "session_id": "1177d06f-ed76-4fed-9a98-328e14809b09",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Supra MK4 Website",
+        "created_at": "2026-06-04 13:14:38.914495+00",
+        "session_created_at": 1780578875,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "fb0af385-c1e5-4fc9-93df-dd6ef8453bba",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Gaming Cafe Startup Guide",
+        "created_at": "2026-06-04 13:04:49.202294+00",
+        "session_created_at": 1780578287,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    },
+    {
+        "session_id": "a52c0626-430c-4b2a-b206-6d0ab9a4e321",
+        "user_id": "6802b41a-de49-44e1-8579-c698ecf86268",
+        "tittle": "Hello There",
+        "created_at": "2026-06-04 13:01:21.775975+00",
+        "session_created_at": 1780578078,
+        "matching_agno_session_id": null,
+        "matching_agno_user_id": null,
+        "session_type": null,
+        "agent_id": null,
+        "team_id": null
+    }
+]

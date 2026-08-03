@@ -1,0 +1,148 @@
+agno_sessions table :-
+
+[
+    {
+        "column_name": "session_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "session_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "agent_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "team_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "workflow_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "session_data",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "agent_data",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "team_data",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "workflow_data",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "metadata",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "runs",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "summary",
+        "data_type": "json",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "created_at",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "updated_at",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": null
+    }
+]
+
+
+session_content :-
+
+[
+    {
+        "column_name": "id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": "uuid_generate_v4()"
+    },
+    {
+        "column_name": "session_id",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "user_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "content_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "reference_id",
+        "data_type": "uuid",
+        "is_nullable": "NO",
+        "column_default": null
+    },
+    {
+        "column_name": "message_id",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+    },
+    {
+        "column_name": "metadata",
+        "data_type": "jsonb",
+        "is_nullable": "NO",
+        "column_default": "'{}'::jsonb"
+    },
+    {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "now()"
+    }
+]
