@@ -8,26 +8,37 @@ from typing import Optional
 class PipelineConfig:
     backend_dir: Path = Path(__file__).resolve().parent.parent
     root_dir: Path = backend_dir.parent
+    results_dir: Path = backend_dir / "results"
+    runtime_dir: Path = backend_dir / "runtime-data"
+    runtime_secrets_dir: Path = runtime_dir / "secrets"
+    dhan_credentials_path: Path = runtime_secrets_dir / "dhan-scanner-credentials.json"
+    dhan_auth_health_path: Path = results_dir / "auth" / "sanitized-health" / "latest.json"
 
     bse_list_path: Path = backend_dir / "BSE_LIST.json"
     security_master_path: Path = root_dir / "security_id_list.csv"
-    stage1_latest_path: Path = backend_dir / "stage1_universe_latest.json"
-    stage2_latest_path: Path = backend_dir / "stage2_momentum_latest.json"
+    security_master_reference_dir: Path = results_dir / "reference" / "security-master"
+    stage1_results_dir: Path = results_dir / "stage1"
+    stage2_results_dir: Path = results_dir / "stage2"
+    nifty_results_dir: Path = results_dir / "nifty-50-market-depth"
+    regime_results_dir: Path = results_dir / "regime"
+    agents_results_dir: Path = results_dir / "agents"
+    stage1_latest_path: Path = results_dir / "stage1" / "latest.json"
+    stage2_latest_path: Path = results_dir / "stage2" / "latest-state.json"
     monitor_latest_path: Path = backend_dir / "monitor_liquidity_latest.json"
-    regime_latest_path: Path = backend_dir / "regime_latest.json"
-    market_calendar_cache_path: Path = backend_dir / "market_calendar_cache.json"
-    market_holidays_path: Path = backend_dir / "market_holidays.json"
+    regime_latest_path: Path = results_dir / "regime" / "latest.json"
+    market_calendar_cache_path: Path = results_dir / "reference" / "market-calendar" / "cache.json"
+    market_holidays_path: Path = results_dir / "reference" / "market-calendar" / "holidays.json"
     session_supervisor_state_path: Path = backend_dir / "session_supervisor_state.json"
     session_supervisor_status_path: Path = backend_dir / "session_supervisor_status.json"
     ai_trading_state_path: Path = backend_dir / "ai_trading_state.json"
-    ai_trading_request_path: Path = backend_dir / "ai_trading_request.json"
-    ai_trading_run_status_path: Path = backend_dir / "ai_trading_run_status.json"
-    ai_trading_sessions_dir: Path = backend_dir / "ai_trading_sessions"
-    stock_analyzer_latest_path: Path = backend_dir / "stock_analyzer_latest.json"
-    stock_agent_latest_path: Path = backend_dir / "stock_agent_latest.json"
-    risk_analyzer_latest_path: Path = backend_dir / "risk_analyzer_latest.json"
-    executioner_latest_path: Path = backend_dir / "executioner_latest.json"
-    stock_analyzer_artifacts_dir: Path = backend_dir / "stock_analyzer_artifacts"
+    ai_trading_request_path: Path = results_dir / "agents" / "request.json"
+    ai_trading_run_status_path: Path = results_dir / "agents" / "run-status.json"
+    ai_trading_sessions_dir: Path = results_dir / "agents" / "sessions"
+    stock_analyzer_latest_path: Path = results_dir / "agents" / "stock-analyzer-latest.json"
+    stock_agent_latest_path: Path = results_dir / "agents" / "stock-agent-latest.json"
+    risk_analyzer_latest_path: Path = results_dir / "agents" / "risk-analyzer-latest.json"
+    executioner_latest_path: Path = results_dir / "agents" / "executioner-latest.json"
+    stock_analyzer_artifacts_dir: Path = results_dir / "agents" / "artifacts"
     regime_source_catalog_path: Path = backend_dir / "pipeline" / "regime" / "market_sources.json"
     regime_inputs_dir: Path = backend_dir / "regime_inputs"
     regime_market_news_path: Path = backend_dir / "regime_inputs" / "market_news.json"
@@ -35,15 +46,20 @@ class PipelineConfig:
     tick_stats_history_latest_path: Path = backend_dir / "stage2_tick_stats_history_latest.json"
     dhan_rate_limit_state_path: Path = backend_dir / "dhan_rate_limit_state.json"
     dhan_quote_rate_limit_state_path: Path = backend_dir / "dhan_quote_rate_limit_state.json"
-    nifty_depth_latest_path: Path = backend_dir / "nifty_market_depth_latest.json"
-    nifty_depth_data_dir: Path = backend_dir / "nifty_market_depth"
-    nifty_depth_charts_latest_path: Path = backend_dir / "nifty_market_depth_charts_latest.json"
-    nifty_depth_charts_dir: Path = backend_dir / "nifty_market_depth_charts"
+    nifty_depth_latest_path: Path = results_dir / "nifty-50-market-depth" / "latest.json"
+    nifty_depth_data_dir: Path = results_dir / "nifty-50-market-depth"
+    nifty_depth_charts_latest_path: Path = results_dir / "nifty-50-market-depth" / "charts-latest.json"
+    nifty_depth_charts_dir: Path = results_dir / "nifty-50-market-depth" / "charts"
 
     stage1_min_price: float = 100.0
     stage1_max_price: float = 3000.0
     stage1_min_adv_cr: float = 10.0
     stage1_min_atr_percent: float = 1.5
+    stage1_min_valid_sessions: int = 21
+    stage1_history_days: int = 60
+    stage1_min_active_session_ratio: float = 0.90
+    stage1_venue_switch_ratio: float = 1.20
+    stage1_master_max_age_hours: int = 30
 
     stage2_history_days: int = 15
     stage2_min_rvol: float = 1.3
@@ -60,6 +76,35 @@ class PipelineConfig:
     stage2_good_spread_percent: float = 0.08
     stage2_acceptable_spread_percent: float = 0.20
     stage2_min_intraday_value_cr: float = 1.0
+    intra_finder_trigger_score: float = 75.0
+    intra_finder_max_spread_percent: float = 0.20
+    intra_finder_min_rvol: float = 1.30
+    intra_finder_min_volume_acceleration: float = 1.10
+    intra_finder_data_stale_seconds: int = 30
+    intra_finder_global_idle_seconds: int = 60
+    intra_finder_preopen_idle_seconds: int = 180
+    intra_finder_start_time: str = "09:10"
+    intra_finder_confirmation_bucket_seconds: int = 5
+    intra_finder_confirmation_buckets: int = 2
+    intra_finder_min_confirmation_seconds: int = 8
+    intra_finder_reconnect_warmup_seconds: int = 30
+    intra_finder_subscription_verify_seconds: int = 30
+    intra_finder_volume_warmup_seconds: int = 180
+    intra_finder_volume_acceleration_cap: float = 8.0
+    intra_finder_orb_break_buffer_percent: float = 0.05
+    intra_finder_min_rvol_floor: float = 0.80
+    intra_finder_vwap_extension_percent: float = 0.15
+    intra_finder_vwap_pullback_tolerance_percent: float = 0.08
+    intra_finder_vwap_continuation_percent: float = 0.08
+    intra_finder_vwap_pullback_hold_seconds: int = 5
+    intra_finder_vwap_max_sequence_seconds: int = 600
+    intra_finder_setup_cooldown_seconds: int = 1200
+    intra_finder_agent_concurrency: int = 3
+    intra_finder_raw_retention_days: int = 7
+    intra_finder_derived_retention_days: int = 90
+    intra_finder_flush_seconds: int = 30
+    intra_finder_status_seconds: int = 30
+    intra_finder_shadow_mode: bool = True
     regime_history_days: int = 5
     regime_opening_range_minutes: int = 15
     regime_min_minutes_after_open: int = 30
@@ -84,7 +129,7 @@ class PipelineConfig:
     stage1_workers: int = 8
     stage2_workers: int = 8
     regime_workers: int = 8
-    multimodal_model_id: str = "minimax/minimax-m3"
+    multimodal_model_id: str = "openai/gpt-5.6-luna-pro"
     regime_model_id: str = "xiaomi/mimo-v2.5-pro"
     alpha_vantage_api_key_env: str = "ALPHA_VANTAGE_API_KEY"
     regime_global_context_enabled: bool = True
@@ -95,7 +140,7 @@ class PipelineConfig:
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
     regime_schedule_times: tuple[str, ...] = ("09:15", "09:45", "12:30")
-    stage1_schedule_time: str = "08:45"
+    stage1_schedule_time: str = "08:40"
     stage2_first_run_time: str = "09:32"
     new_entry_cutoff_time: str = "15:00"
     protect_positions_time: str = "15:20"
@@ -138,34 +183,55 @@ class PipelineConfig:
     market_close_minute: int = 30
 
     def stage1_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"stage1-{market_date}.json"
+        return self.stage1_results_dir / market_date / "universe.json"
 
     def stage1_degraded_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"stage1-degraded-{market_date}.json"
+        return self.stage1_results_dir / market_date / "degraded-universe.json"
 
     def stage2_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"stage2-{market_date}.json"
+        return self.stage2_results_dir / market_date / "latest-state.json"
 
     def stage2_degraded_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"stage2-degraded-{market_date}.json"
+        return self.stage2_results_dir / market_date / "degraded-state.json"
 
     def monitor_daily_path(self, market_date: str) -> Path:
         return self.backend_dir / f"monitor-{market_date}.json"
 
     def regime_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"regime-{market_date}.json"
+        return self.regime_results_dir / market_date / "regime.json"
+
+    def stage1_exclusions_path(self, market_date: str) -> Path:
+        return self.stage1_results_dir / market_date / "exclusions.json"
+
+    def stage1_run_report_path(self, market_date: str) -> Path:
+        return self.stage1_results_dir / market_date / "run-report.json"
+
+    def stage1_universe_parquet_path(self, market_date: str) -> Path:
+        return self.stage1_results_dir / market_date / "universe.parquet"
+
+    def stage1_venue_comparison_path(self, market_date: str) -> Path:
+        return self.stage1_results_dir / market_date / "venue-comparison.parquet"
+
+    def stage2_events_path(self, market_date: str) -> Path:
+        return self.stage2_results_dir / market_date / "setup-events.jsonl"
+
+    def stage2_event_state_path(self, market_date: str) -> Path:
+        return self.stage2_results_dir / market_date / "event-state.json"
+
+    def stage2_runtime_state_path(self, market_date: str) -> Path:
+        return self.stage2_results_dir / market_date / "runtime-state.json"
 
     def stock_analyzer_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"stock-analyzer-{market_date}.json"
+        return self.agents_results_dir / market_date / "stock-analyzer.json"
 
     def stock_agent_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"stock-agent-{market_date}.json"
+        return self.agents_results_dir / market_date / "stock-agent.json"
 
     def risk_analyzer_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"risk-analyzer-{market_date}.json"
+        return self.agents_results_dir / market_date / "risk-analyzer.json"
 
     def executioner_daily_path(self, market_date: str) -> Path:
-        return self.backend_dir / f"executioner-{market_date}.json"
+        return self.agents_results_dir / market_date / "executioner.json"
 
     def tick_stats_daily_path(self, market_date: Optional[str] = None) -> Path:
         if market_date:
