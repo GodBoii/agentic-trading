@@ -1,0 +1,125 @@
+{
+  "market_date": "2026-07-28",
+  "data_as_of_ist": "2026-07-28T15:29:00+05:30",
+  "charts_built_at_ist": "2026-07-29T06:55:56.630966+05:30",
+  "previous_market_date": "2026-07-27",
+  "chart_count": 4,
+  "charts": {
+    "current_1m": {
+      "timeframe_minutes": 1,
+      "label": "1m",
+      "role": "execution",
+      "day_type": "current",
+      "date": "2026-07-28",
+      "path": "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-28-current-1m.png",
+      "candles": 375,
+      "data_as_of_ist": "2026-07-28T15:29:00+05:30",
+      "last_candle_start_ist": "2026-07-28T15:29:00+05:30",
+      "last_candle_complete": true
+    },
+    "current_5m": {
+      "timeframe_minutes": 5,
+      "label": "5m",
+      "role": "setup",
+      "day_type": "current",
+      "date": "2026-07-28",
+      "path": "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-28-current-5m.png",
+      "candles": 75,
+      "data_as_of_ist": "2026-07-28T15:29:00+05:30",
+      "last_candle_start_ist": "2026-07-28T15:25:00+05:30",
+      "last_candle_complete": true
+    },
+    "current_15m": {
+      "timeframe_minutes": 15,
+      "label": "15m",
+      "role": "structure",
+      "day_type": "current",
+      "date": "2026-07-28",
+      "path": "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-28-current-15m.png",
+      "candles": 25,
+      "data_as_of_ist": "2026-07-28T15:29:00+05:30",
+      "last_candle_start_ist": "2026-07-28T15:15:00+05:30",
+      "last_candle_complete": true
+    },
+    "previous_15m": {
+      "timeframe_minutes": 15,
+      "label": "15m",
+      "day_type": "previous",
+      "date": "2026-07-27",
+      "path": "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-27-previous-15m.png",
+      "candles": 25
+    }
+  },
+  "chart_paths_ordered": [
+    "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-28-current-1m.png",
+    "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-28-current-5m.png",
+    "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-28-current-15m.png",
+    "/app/artifacts/chart-preview-2026-07-29/swiggy/swiggy-2026-07-27-previous-15m.png"
+  ],
+  "chart_contract_version": "price-dossier-v3",
+  "technical_metadata": {
+    "latest_price": 269.75,
+    "vwap": 263.44,
+    "ema9": 268.35,
+    "ema21": 268.05,
+    "rsi": 66.1,
+    "bb_upper": 269.12,
+    "bb_lower": 266.64,
+    "atr": 0.79,
+    "ema_state": "bullish_cross",
+    "price_vs_vwap": "above",
+    "support_levels": [
+      253.0,
+      257.5,
+      260.0
+    ],
+    "resistance_levels": [
+      265.65,
+      268.85,
+      270.35
+    ],
+    "demand_zones": [],
+    "supply_zones": [
+      {
+        "high": 272.95,
+        "low": 272.0,
+        "strength": "strong"
+      }
+    ],
+    "prev_day": {
+      "prev_high": 264.45,
+      "prev_low": 253.0,
+      "prev_close": 257.5
+    },
+    "patterns_detected": [
+      {
+        "pattern": "Doji",
+        "bias": "neutral",
+        "at_price": 268.15
+      },
+      {
+        "pattern": "Bear Engulf",
+        "bias": "bearish",
+        "at_price": 267.95
+      },
+      {
+        "pattern": "Bull Engulf",
+        "bias": "bullish",
+        "at_price": 267.55
+      },
+      {
+        "pattern": "Doji",
+        "bias": "neutral",
+        "at_price": 267.65
+      },
+      {
+        "pattern": "Shooting Star",
+        "bias": "bearish",
+        "at_price": 268.1
+      }
+    ],
+    "data_as_of_ist": "2026-07-28T15:29:00+05:30",
+    "last_candle_start_ist": "2026-07-28T15:25:00+05:30",
+    "last_candle_complete": true
+  }
+}
