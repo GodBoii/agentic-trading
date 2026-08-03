@@ -107,6 +107,40 @@ class NiftyDepthMonitor:
             "chart_generations": 0,
             "chart_errors": 0,
         }
+        self.last_progress_log = 0.0
+        self.progress_log_seconds = max(
+            10.0, self._env_float("NIFTY_DEPTH_PROGRESS_LOG_SECONDS", 60.0)
+        )
+
+    def _log(self, message: str) -> None:
+        print(
+            f"[{self.market_time.now().strftime('%Y-%m-%d %H:%M:%S %Z')}] "
+            f"[NIFTY 50 Depth] {message}",
+            flush=True,
+        )
+
+    def _log_progress(self, *, force: bool = False) -> None:
+        now = time.time()
+        if not force and now - self.last_progress_log < self.progress_log_seconds:
+            return
+        with self.lock:
+            metrics = dict(self.metrics)
+            states = {
+                name: str((details or {}).get("status") or "unknown")
+                for name, details in self.stream_states.items()
+            }
+        state_text = ", ".join(f"{name}={status}" for name, status in sorted(states.items())) or "starting"
+        self._log(
+            f"LIVE STATUS | market_open={self.market_time.is_market_hours()} "
+            f"full_packets={metrics['full_market_packets']:,} "
+            f"depth200_packets={metrics['depth_200_packets']:,} "
+            f"options_packets={metrics['options_packets_written']:,} "
+            f"trade_ticks={metrics['trade_ticks_written']:,} "
+            f"large_order_events={metrics['large_order_events_written']:,} "
+            f"reconnects={metrics['reconnects']:,} timeouts={metrics['no_packet_timeouts']:,} "
+            f"| streams: {state_text}"
+        )
+        self.last_progress_log = now
 
     def _env_bool(self, key: str, default: bool) -> bool:
         value = os.getenv(key)
@@ -1240,6 +1274,12 @@ class NiftyDepthMonitor:
         if self.started_threads:
             return
         self._ensure_targets()
+        primary = self.targets.get("primary_depth_instrument") or {}
+        self._log(
+            f"Resolved front-month instrument: {primary.get('display_name')} "
+            f"security_id={primary.get('security_id')} segment={primary.get('exchange_segment')}; "
+            f"depth_levels={self.depth_level}; options_enabled={self.options_feed_enabled}."
+        )
         for name, target in (
             ("nifty-full-market", self._full_market_worker),
             ("nifty-depth-200", self._depth_200_worker),
@@ -1248,8 +1288,10 @@ class NiftyDepthMonitor:
         ):
             thread = threading.Thread(target=target, name=name, daemon=True)
             thread.start()
+            self._log(f"Started worker {name}.")
         self.started_threads = True
         self._save_latest(status="started", force=True)
+        self._log_progress(force=True)
 
     def _chart_worker(self) -> None:
         stream_name = "chart_generator"
@@ -1298,11 +1340,17 @@ class NiftyDepthMonitor:
             self._save_latest(status="disabled", force=True)
             return
 
+        self._log(
+            "Recorder starting. It stores NIFTY futures Full Packet, 200-level depth, "
+            "nearby options, trade ticks, CVD, volume profile and derived diagnostics."
+        )
+
         while not self.stop_event.is_set():
             try:
                 self._start_workers()
                 status = "recording" if self.market_time.is_market_hours() else "waiting_for_market_open"
                 self._save_latest(status=status, force=True)
+                self._log_progress()
                 time.sleep(self.latest_save_interval_seconds)
             except Exception as exc:
                 self._record_error("supervisor", exc)
