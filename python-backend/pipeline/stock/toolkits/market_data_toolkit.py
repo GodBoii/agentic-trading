@@ -25,7 +25,7 @@ class StockMarketDataToolkit(Toolkit):
         instrument: Optional[str] = None,
         intraday_frame: Optional[pd.DataFrame] = None,
         intraday_frame_fetched_at: Optional[datetime] = None,
-        exchange_segment: str = "BSE_EQ",
+        exchange_segment: Optional[str] = "BSE_EQ",
         history_cache_max_age_seconds: float = 20.0,
     ) -> None:
         self.dhan = dhan
@@ -36,6 +36,8 @@ class StockMarketDataToolkit(Toolkit):
         self.stock_context = stock_context if isinstance(stock_context, dict) else {}
         self.instrument = str(instrument or "EQUITY")
         self.exchange_segment = str(exchange_segment or "BSE_EQ").upper()
+        if self.exchange_segment not in {"NSE_EQ", "BSE_EQ"}:
+            raise ValueError("StockMarketDataToolkit requires NSE_EQ or BSE_EQ.")
         self._intraday_frame = self._prepare_frame(intraday_frame)
         self._intraday_frame_fetched_at = (
             intraday_frame_fetched_at
