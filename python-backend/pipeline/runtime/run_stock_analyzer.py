@@ -384,7 +384,7 @@ class MultiStockAnalyzerRunner:
             int(candidate_packet["security_id"]),
             days=5,
             interval=1,
-            exchange_segment="BSE_EQ",
+            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
             instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
         )
         if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
@@ -461,6 +461,8 @@ class MultiStockAnalyzerRunner:
             "candidate_source": candidate_source,
             "regime_analysis_enabled": regime_enabled,
             "security_id": security_id,
+            "isin": candidate_record.get("isin"),
+            "exchange_segment": candidate_record.get("exchange_segment"),
             "symbol": candidate_record.get("symbol"),
             "display_name": candidate_record.get("display_name"),
             "instrument": candidate_record.get("instrument"),
@@ -472,6 +474,7 @@ class MultiStockAnalyzerRunner:
                 "previous_session": stage2_record.get("previous_session") if stage2_record else candidate_record.get("previous_session"),
                 "static_tradability": stage2_record.get("static_tradability") if stage2_record else candidate_record.get("static_tradability"),
                 "derivatives": stage2_record.get("derivatives") if stage2_record else candidate_record.get("derivatives"),
+                "exchange_segment": candidate_record.get("exchange_segment"),
             },
             "stage2": {
                 "score": stage2_record.get("stage2_score") if stage2_record else candidate_record.get("stage2_score"),
