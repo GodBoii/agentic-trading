@@ -189,86 +189,114 @@ class ExecutionerRunner:
         return report
 
     def _build_fresh_market_snapshots(self, stock_reports: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
-        ids = [self._extract_report_security_id(report) for report in stock_reports]
-        ids = [security_id for security_id in ids if security_id > 0]
-        if not ids or not self.config.executioner_fresh_snapshot_enabled:
+        identities = [
+            (self._extract_report_security_id(report), self._extract_report_exchange_segment(report))
+            for report in stock_reports
+        ]
+        identities = [
+            (security_id, segment)
+            for security_id, segment in identities
+            if security_id > 0 and segment in {"NSE_EQ", "BSE_EQ"}
+        ]
+        ids = [security_id for security_id, _ in identities]
+        if not identities or not self.config.executioner_fresh_snapshot_enabled:
             return {
                 security_id: self._empty_fresh_market_snapshot(security_id, "fresh_snapshot_disabled")
                 for security_id in ids
             }
-        unique_ids = list(dict.fromkeys(ids))
         fetched_at = datetime.now(timezone.utc)
-        try:
-            quotes = self.dhan.fetch_quote_batch(unique_ids, exchange_segment="BSE_EQ")
-        except Exception as exc:
-            quotes = {}
-            quote_error = f"{type(exc).__name__}: {exc}"
-        else:
-            quote_error = None
-        try:
-            ohlc = self.dhan.fetch_ohlc_batch(unique_ids, exchange_segment="BSE_EQ")
-        except Exception as exc:
-            ohlc = {}
-            ohlc_error = f"{type(exc).__name__}: {exc}"
-        else:
-            ohlc_error = None
-
         snapshots: Dict[int, Dict[str, Any]] = {}
-        for security_id in unique_ids:
-            quote_payload = quotes.get(security_id) or {}
-            ohlc_payload = ohlc.get(security_id) or {}
-            latest_price = self._extract_first_number(
-                quote_payload,
-                ("last_price", "lastPrice", "ltp", "LTP", "close", "price"),
+        for segment in ("NSE_EQ", "BSE_EQ"):
+            segment_ids = list(
+                dict.fromkeys(security_id for security_id, item_segment in identities if item_segment == segment)
             )
-            bid_price = self._extract_best_depth_price(quote_payload, "buy")
-            ask_price = self._extract_best_depth_price(quote_payload, "sell")
-            spread_percent = None
-            if bid_price and ask_price and latest_price:
-                spread_percent = round(((ask_price - bid_price) / latest_price) * 100.0, 4)
-            latest_timestamp = self._extract_first_value(
-                quote_payload,
-                (
-                    "last_trade_time",
-                    "last_traded_time",
-                    "lastTradedTime",
-                    "lastTradeTime",
-                    "timestamp",
-                    "exchangeTime",
-                    "time",
-                ),
-            )
-            staleness_seconds = self._age_seconds(latest_timestamp, fetched_at)
-            snapshots[security_id] = {
-                "security_id": security_id,
-                "exchange_segment": "BSE_EQ",
-                "fetched_at_utc": fetched_at.isoformat(),
-                "fetched_at_ist": fetched_at.astimezone(self.market_time.tz).isoformat(),
-                "fetch_status": "success" if quote_payload or ohlc_payload else "failure",
-                "fetch_errors": {
-                    "quote": quote_error,
-                    "ohlc": ohlc_error,
-                },
-                "latest_price": latest_price,
-                "bid_price": bid_price,
-                "ask_price": ask_price,
-                "spread_percent": spread_percent,
-                "latest_market_timestamp": latest_timestamp,
-                "latest_market_timestamp_ist": self._to_market_iso(latest_timestamp),
-                "staleness_seconds": staleness_seconds,
-                "is_stale": bool(
-                    staleness_seconds is not None
-                    and staleness_seconds > self.config.executioner_max_market_snapshot_staleness_seconds
-                ),
-                "quote": quote_payload,
-                "ohlc": ohlc_payload,
-            }
+            if not segment_ids:
+                continue
+            try:
+                quotes = self.dhan.fetch_quote_batch(segment_ids, exchange_segment=segment)
+                quote_error = None
+            except Exception as exc:
+                quotes = {}
+                quote_error = f"{type(exc).__name__}: {exc}"
+            try:
+                ohlc = self.dhan.fetch_ohlc_batch(segment_ids, exchange_segment=segment)
+                ohlc_error = None
+            except Exception as exc:
+                ohlc = {}
+                ohlc_error = f"{type(exc).__name__}: {exc}"
+            for security_id in segment_ids:
+                snapshots[security_id] = self._build_fresh_snapshot_record(
+                    security_id,
+                    segment,
+                    quotes.get(security_id) or {},
+                    ohlc.get(security_id) or {},
+                    fetched_at,
+                    quote_error,
+                    ohlc_error,
+                )
         return snapshots
+
+    def _build_fresh_snapshot_record(
+        self,
+        security_id: int,
+        exchange_segment: str,
+        quote_payload: Dict[str, Any],
+        ohlc_payload: Dict[str, Any],
+        fetched_at: datetime,
+        quote_error: Optional[str],
+        ohlc_error: Optional[str],
+    ) -> Dict[str, Any]:
+        latest_price = self._extract_first_number(
+            quote_payload,
+            ("last_price", "lastPrice", "ltp", "LTP", "close", "price"),
+        )
+        bid_price = self._extract_best_depth_price(quote_payload, "buy")
+        ask_price = self._extract_best_depth_price(quote_payload, "sell")
+        spread_percent = None
+        if bid_price and ask_price and latest_price:
+            spread_percent = round(((ask_price - bid_price) / latest_price) * 100.0, 4)
+        latest_timestamp = self._extract_first_value(
+            quote_payload,
+            (
+                "last_trade_time",
+                "last_traded_time",
+                "lastTradedTime",
+                "lastTradeTime",
+                "timestamp",
+                "exchangeTime",
+                "time",
+            ),
+        )
+        staleness_seconds = self._age_seconds(latest_timestamp, fetched_at)
+        return {
+            "security_id": security_id,
+            "exchange_segment": exchange_segment,
+            "fetched_at_utc": fetched_at.isoformat(),
+            "fetched_at_ist": fetched_at.astimezone(self.market_time.tz).isoformat(),
+            "fetch_status": "success" if quote_payload or ohlc_payload else "failure",
+            "fetch_errors": {
+                "quote": quote_error,
+                "ohlc": ohlc_error,
+            },
+            "latest_price": latest_price,
+            "bid_price": bid_price,
+            "ask_price": ask_price,
+            "spread_percent": spread_percent,
+            "latest_market_timestamp": latest_timestamp,
+            "latest_market_timestamp_ist": self._to_market_iso(latest_timestamp),
+            "staleness_seconds": staleness_seconds,
+            "is_stale": bool(
+                staleness_seconds is not None
+                and staleness_seconds > self.config.executioner_max_market_snapshot_staleness_seconds
+            ),
+            "quote": quote_payload,
+            "ohlc": ohlc_payload,
+        }
 
     def _empty_fresh_market_snapshot(self, security_id: int, reason: str) -> Dict[str, Any]:
         return {
             "security_id": security_id,
-            "exchange_segment": "BSE_EQ",
+            "exchange_segment": None,
             "fetched_at_utc": datetime.now(timezone.utc).isoformat(),
             "fetched_at_ist": self.market_time.now().isoformat(),
             "fetch_status": "unavailable",
@@ -291,6 +319,14 @@ class ExecutionerRunner:
             return int(candidate.get("security_id") or selected_report.get("security_id") or 0)
         except Exception:
             return 0
+
+    def _extract_report_exchange_segment(self, selected_report: Dict[str, Any]) -> str:
+        candidate = selected_report.get("candidate") or {}
+        return str(
+            candidate.get("exchange_segment")
+            or selected_report.get("exchange_segment")
+            or ""
+        ).strip().upper()
 
     def _extract_first_number(self, payload: Dict[str, Any], keys: tuple[str, ...]) -> Optional[float]:
         for key in keys:
@@ -433,6 +469,12 @@ class ExecutionerRunner:
         return {
             "rank": selected_report.get("rank"),
             "security_id": int(base.get("security_id") or selected_report.get("security_id") or 0),
+            "isin": base.get("isin") or selected_report.get("isin"),
+            "exchange_segment": str(
+                base.get("exchange_segment")
+                or selected_report.get("exchange_segment")
+                or ""
+            ).upper(),
             "symbol": base.get("symbol") or selected_report.get("symbol"),
             "display_name": base.get("display_name") or selected_report.get("display_name"),
             "candidate_source": base.get("candidate_source") or selected_report.get("candidate_source"),
