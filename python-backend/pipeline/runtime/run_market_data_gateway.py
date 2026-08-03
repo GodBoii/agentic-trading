@@ -33,14 +33,32 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
 
     def _dispatch(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         path = self.path.rstrip("/")
+        def required_segment(body: Dict[str, Any]) -> str:
+            value = str(body.get("exchange_segment") or "").strip().upper()
+            if value not in {
+                "NSE_EQ",
+                "NSE_FNO",
+                "NSE_CURRENCY",
+                "BSE_EQ",
+                "BSE_FNO",
+                "BSE_CURRENCY",
+                "MCX_COMM",
+                "IDX_I",
+            }:
+                raise ValueError("A valid exchange_segment must be supplied explicitly.")
+            return value
+
         routes: Dict[str, Callable[[Dict[str, Any]], Any]] = {
-            "/health": lambda _: {"status": "ok"},
+            "/health": lambda _: {
+                "status": "ok",
+                "credential_version": self.dhan.credential_version,
+            },
             "/v1/user-profile": lambda _: self.dhan.fetch_user_profile(),
             "/v1/daily-history": lambda body: self.dhan.fetch_daily_history(
                 int(body["security_id"]),
                 days=int(body.get("days", 30)),
                 retries=int(body.get("retries", 3)),
-                exchange_segment=str(body.get("exchange_segment", "BSE_EQ")),
+                exchange_segment=required_segment(body),
                 instrument_candidates=body.get("instrument_candidates"),
             ),
             "/v1/intraday-history": lambda body: self.dhan.fetch_intraday_history(
@@ -48,16 +66,16 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
                 days=int(body.get("days", 5)),
                 interval=int(body.get("interval", 1)),
                 retries=int(body.get("retries", 3)),
-                exchange_segment=str(body.get("exchange_segment", "BSE_EQ")),
+                exchange_segment=required_segment(body),
                 instrument_candidates=body.get("instrument_candidates"),
             ),
             "/v1/quote-batch": lambda body: self.dhan.fetch_quote_batch(
                 [int(item) for item in body.get("security_ids", [])],
-                exchange_segment=str(body.get("exchange_segment", "BSE_EQ")),
+                exchange_segment=required_segment(body),
             ),
             "/v1/ohlc-batch": lambda body: self.dhan.fetch_ohlc_batch(
                 [int(item) for item in body.get("security_ids", [])],
-                exchange_segment=str(body.get("exchange_segment", "BSE_EQ")),
+                exchange_segment=required_segment(body),
             ),
             "/v1/option-chain/expiry-list": lambda body: self.dhan.fetch_option_chain_expiry_list(
                 int(body["under_security_id"]),
@@ -78,7 +96,23 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
         if self.path.rstrip("/") != "/health":
             self._write_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
             return
-        self._write_json(HTTPStatus.OK, {"ok": True, "data": {"status": "ok"}})
+        try:
+            self.dhan.reload_credentials_if_changed()
+            self._write_json(
+                HTTPStatus.OK,
+                {
+                    "ok": True,
+                    "data": {
+                        "status": "ok",
+                        "credential_version": self.dhan.credential_version,
+                    },
+                },
+            )
+        except Exception as exc:
+            self._write_json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"ok": False, "error": f"auth_unavailable:{type(exc).__name__}"},
+            )
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib signature
         try:
@@ -87,6 +121,8 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
             self._write_json(HTTPStatus.OK, response)
         except KeyError as exc:
             self._write_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": str(exc)})
+        except ValueError as exc:
+            self._write_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})
         except Exception as exc:  # pragma: no cover - runtime safety
             self._write_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
