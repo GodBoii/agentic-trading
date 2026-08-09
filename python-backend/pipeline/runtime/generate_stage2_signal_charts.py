@@ -226,6 +226,13 @@ def _path_review(
     threshold_percent: float = 0.20,
 ) -> dict[str, Any]:
     """Measure excursion and which symmetric scalp boundary was touched first."""
+    if direction not in {"LONG", "SHORT"}:
+        return {
+            "mfe": None,
+            "mae": None,
+            "first_touch": "NOT_DIRECTIONAL",
+            "first_touch_at": None,
+        }
     end = timestamp + timedelta(minutes=minutes)
     path = frame[(frame["received_at"] >= timestamp) & (frame["received_at"] <= end)]
     if path.empty or entry_price <= 0:
@@ -287,7 +294,8 @@ def _review_event(event: dict[str, Any], tape: pd.DataFrame) -> dict[str, Any]:
     timestamp = event["_event_time"]
     nearest = _nearest_row(tape, timestamp)
     valid, failures = _mechanical_checks(event, nearest)
-    direction_multiplier = 1 if event["direction"] == "LONG" else -1
+    direction = str(event["direction"])
+    direction_multiplier = 1 if direction == "LONG" else -1 if direction == "SHORT" else None
     price = float(event["price"])
     outcomes: dict[int, float | None] = {}
     for minutes in (1, 5, 15, 30):
@@ -295,6 +303,8 @@ def _review_event(event: dict[str, Any], tape: pd.DataFrame) -> dict[str, Any]:
         outcomes[minutes] = (
             None
             if later is None or price <= 0
+            else None
+            if direction_multiplier is None
             else round(direction_multiplier * (later / price - 1) * 100, 4)
         )
     path_5m = _path_review(tape, timestamp, price, event["direction"], 5)
@@ -367,28 +377,32 @@ def _make_chart(
         grouped_at_time[key] += 1
         offset = grouped_at_time[key] - 1
         price = float(event["price"])
-        is_long = event["direction"] == "LONG"
+        direction = str(event["direction"])
+        is_long = direction == "LONG"
+        is_short = direction == "SHORT"
         is_orb = event["setup_type"] == "ORB"
-        marker = "^" if is_long else "v"
-        color = "#087f5b" if is_long else "#c92a2a"
+        is_indicator = event["setup_type"] == "INDICATOR_EVENT"
+        marker = "D" if is_indicator else "^" if is_long else "v"
+        color = "#087f5b" if is_long else "#c92a2a" if is_short else "#9c36b5"
         price_axis.scatter(
             [timestamp],
             [price],
             marker=marker,
-            s=64 if is_orb else 52,
-            facecolors=color if is_orb else "none",
+            s=64 if is_orb or is_indicator else 52,
+            facecolors=color if is_orb or is_indicator else "none",
             edgecolors=color,
             linewidths=1.1,
             zorder=6,
         )
-        y_offset = (10 + offset * 11) * (1 if is_long else -1)
+        annotation_above = is_long or not is_short
+        y_offset = (10 + offset * 11) * (1 if annotation_above else -1)
         price_axis.annotate(
             str(index),
             (timestamp, price),
             xytext=(0, y_offset),
             textcoords="offset points",
             ha="center",
-            va="bottom" if is_long else "top",
+            va="bottom" if annotation_above else "top",
             fontsize=7,
             color=color,
             fontweight="bold",
@@ -407,7 +421,7 @@ def _make_chart(
     fig.text(
         0.995,
         0.01,
-        "Filled marker = ORB · Hollow marker = VWAP reclaim/pullback · ▲ Long · ▼ Short · Number = event table row",
+        "Diamond = indicator-event aggregate · Filled triangle = legacy ORB · Hollow triangle = legacy VWAP · Green = long · Red = short · Purple = mixed/neutral · Number = event table row",
         ha="right",
         fontsize=8,
         color="#4d5966",
@@ -483,7 +497,7 @@ def _index_page(rows: list[dict[str, Any]], summary: dict[str, Any], output: Pat
 <style>
 body{{font-family:system-ui,sans-serif;margin:24px;color:#17212b;background:#f7f8fa}}a{{color:#315b9c}}input{{padding:9px;width:min(430px,90%);margin:8px 0 16px}}table{{width:100%;border-collapse:collapse;background:#fff;font-size:13px}}th,td{{padding:8px;border-bottom:1px solid #e4e7eb;text-align:right}}th{{position:sticky;top:0;background:#eef1f4}}th:first-child,td:first-child,th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){{text-align:left}}.scroll{{overflow:auto}}.note{{max-width:1000px}}code{{background:#e9edf2;padding:2px 5px}}</style></head>
 <body><h1>{html.escape(summary['report_title'])} — {html.escape(summary['market_date'])}</h1>
-<p class="note">{summary['event_count']} {html.escape(summary['report_label'])} across {summary['stock_count']} stocks. Rule checks confirm whether the saved event matches its basic ORB/VWAP definition and nearby tape price; they do not prove profitability. Open a stock to inspect every numbered entry on its replay chart.</p>
+<p class="note">{summary['event_count']} {html.escape(summary['report_label'])} across {summary['stock_count']} stocks. Rule checks confirm nearby tape consistency and, for legacy events, the saved ORB/VWAP definition; they do not prove profitability. Open a stock to inspect every numbered entry on its replay chart.</p>
 <p><a href="review-summary.json">Machine-readable summary</a> · <a href="signals.csv">All signal measurements</a></p>
 <label for="filter">Find a stock, setup, or direction</label><br><input id="filter" type="search" placeholder="Example: MARICO, ORB, SHORT">
 <div class="scroll"><table><thead><tr><th>Stock</th><th>Security ID</th><th>Signals</th><th>Setups</th><th>Sides</th><th>Mean score</th><th>Rule pass</th><th>Median 5m</th><th>Median 15m</th><th>Median 30m</th></tr></thead><tbody id="stocks">{''.join(table_rows)}</tbody></table></div>

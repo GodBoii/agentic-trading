@@ -113,6 +113,13 @@ class Stage2SignalChartTests(unittest.TestCase):
         self.assertEqual(result["mfe"], 0.25)
         self.assertEqual(result["mae"], -0.3)
 
+    def test_path_review_does_not_invent_direction_for_mixed_event(self) -> None:
+        start = pd.Timestamp("2026-08-03T10:00:00+05:30")
+        frame = pd.DataFrame({"received_at": [start], "last_price": [100.0]})
+        result = _path_review(frame, start, 100.0, "MIXED", 5)
+        self.assertEqual(result["first_touch"], "NOT_DIRECTIONAL")
+        self.assertIsNone(result["mfe"])
+
 
 if __name__ == "__main__":
     unittest.main()
