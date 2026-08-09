@@ -122,6 +122,9 @@ class StockAnalyzerAgent:
         live_quote = stage2.get("live_quote") or {}
         live_liquidity = stage2.get("live_liquidity") or {}
         data_quality = stage2.get("data_quality") or {}
+        indicator_events = candidate_packet.get("indicator_events") or []
+        indicator_snapshot = candidate_packet.get("indicator_snapshot") or {}
+        recent_closed_bars = candidate_packet.get("recent_closed_bars") or []
 
         lines = [
             "Analyze the supplied intraday stock candidate.",
@@ -129,6 +132,8 @@ class StockAnalyzerAgent:
             "Chart images are provided in order: Current day 1m EXECUTION, 5m SETUP, 15m STRUCTURE.",
             "Each image is price-only; use technical_metadata for RSI, ATR, volume, patterns, and exact levels.",
             "Cross-reference the technical snapshot with what you see on charts.",
+            "An indicator event is an attention flag, not a recommendation or proof of a trade.",
+            "Independently decide whether the evidence is continuation, reversal, noise, or contradictory.",
             "Use timing_context.current_market_time_ist and the Indian market session fields for all time-sensitive conclusions.",
             "",
             "## Stock",
@@ -163,6 +168,22 @@ class StockAnalyzerAgent:
                 ]
             )
 
+        if indicator_events:
+            lines.extend(
+                [
+                    "",
+                    "## Why Intra-Finder Requested Analysis",
+                    f"Event setup type: {candidate_packet.get('setup_type')}",
+                    f"Directional hint (may be MIXED or NEUTRAL): {candidate_packet.get('direction')}",
+                    f"Attention priority (not trade probability): {candidate_packet.get('setup_score')}",
+                    f"Trigger rule: {candidate_packet.get('event_trigger_rule')}",
+                    f"New completed-candle events: {json.dumps(indicator_events, ensure_ascii=False)}",
+                    f"Latest indicator snapshot: {json.dumps(indicator_snapshot, ensure_ascii=False)}",
+                    f"Recent completed 1-minute bars: {json.dumps(recent_closed_bars, ensure_ascii=False)}",
+                    "Validate these events against the 1m, 5m and 15m charts, market structure, volume, liquidity, invalidation and reward/risk. Reject weak or conflicting evidence.",
+                ]
+            )
+
         lines.extend(
             [
                 "",
@@ -174,7 +195,7 @@ class StockAnalyzerAgent:
                 f"Previous session: {json.dumps(stock.get('previous_session'), ensure_ascii=False)}",
                 f"Static tradability: {json.dumps(stock.get('static_tradability'), ensure_ascii=False)}",
                 f"Derivatives reference: {json.dumps(stock.get('derivatives'), ensure_ascii=False)}",
-                f"Stage 2 score: {stage2.get('score')}",
+                f"Legacy Stage 2 score: {stage2.get('score')}",
                 f"Stage 2 selection score: {stage2.get('selection_score')}",
                 f"Time-of-day RVOL: {stage2.get('time_of_day_rvol')}",
                 f"Price vs VWAP percent: {stage2.get('price_vs_vwap_percent')}",
