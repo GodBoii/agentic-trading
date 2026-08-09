@@ -99,7 +99,17 @@ class PipelineConfig:
     intra_finder_vwap_pullback_hold_seconds: int = 5
     intra_finder_vwap_max_sequence_seconds: int = 600
     intra_finder_setup_cooldown_seconds: int = 1200
+    intra_finder_detector_mode: str = "indicator_events"
+    intra_finder_indicator_aggregation_seconds: int = 60
+    intra_finder_indicator_event_cooldown_seconds: int = 600
+    intra_finder_stock_agent_cooldown_seconds: int = 1200
+    intra_finder_indicator_max_evidence: int = 20
+    intra_finder_indicator_volume_surge_ratio: float = 1.80
+    intra_finder_indicator_max_event_lag_seconds: int = 60
+    intra_finder_max_slippage_percent: float = 0.20
     intra_finder_agent_concurrency: int = 3
+    intra_finder_agent_queue_max: int = 50
+    intra_finder_agent_queue_max_age_seconds: int = 120
     intra_finder_raw_retention_days: int = 7
     intra_finder_derived_retention_days: int = 90
     intra_finder_flush_seconds: int = 30

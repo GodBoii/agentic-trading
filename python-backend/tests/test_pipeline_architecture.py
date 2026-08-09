@@ -20,6 +20,7 @@ from pipeline.services.dhan_credentials import DhanCredentialStore, generate_tot
 from pipeline.services.dhan_service import DhanService
 from pipeline.runtime.run_dhan_auth_manager import DhanAuthManager
 from pipeline.stages.intra_finder import IntraFinder, subscription_batches
+from pipeline.stages.indicator_event_engine import IndicatorEventEngine
 from pipeline.stages.universe_scanner import UniverseScanner
 
 
@@ -328,7 +329,7 @@ class IntraFinderTests(unittest.TestCase):
         finder.market_time = FakeMarketTime()
         finder.market_calendar = None
         finder.universe_version = "2026-07-31-test"
-        finder.event_state = {"events": {}, "active_setups": {}}
+        finder.event_state = {"events": {}, "active_setups": {}, "last_stock_event_at": {}}
         finder.raw_buffer = []
         finder.derived_buffer = []
         finder.last_flush = time.time()
@@ -340,6 +341,15 @@ class IntraFinderTests(unittest.TestCase):
         finder.reconnect_count = 0
         finder.universe_wait_count = 0
         finder.shadow_mode = True
+        finder.detector_mode = "indicator_events"
+        finder.indicator_engine = IndicatorEventEngine(event_cooldown_seconds=600)
+        finder.indicator_aggregation_seconds = 1
+        finder.stock_agent_cooldown_seconds = 1200
+        finder.pending_indicator_deadlines = []
+        finder.indicator_events_detected = 0
+        finder.indicator_aggregates_formed = 0
+        finder.candidates_seen = 0
+        finder.gate_failure_counts = Counter()
         finder.agent_futures = set()
         finder.received_security_ids = set()
         finder.full_packet_security_ids = set()
@@ -397,7 +407,7 @@ class IntraFinderTests(unittest.TestCase):
         self.assertEqual(websocket.ping_interval, 20)
         self.assertIsNone(websocket.ping_timeout)
 
-    def test_confirmed_orb_creates_one_idempotent_event(self) -> None:
+    def test_completed_candle_orb_event_is_aggregated_once(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             finder = self._finder(Path(directory))
             stock = self._stock()
@@ -411,27 +421,33 @@ class IntraFinderTests(unittest.TestCase):
                     "state": "WATCHING",
                 }
             )
-            packet = self._packet(price=100.0)
+            packet = self._packet(price=99.0)
             now = finder.market_time.now()
             self.assertIsNone(finder.process_packet(packet, received_at=now))
             packet = self._packet(volume=2050, price=101.0)
             self.assertIsNone(
-                finder.process_packet(packet, received_at=now + timedelta(seconds=1))
+                finder.process_packet(packet, received_at=now + timedelta(minutes=1))
             )
             packet["volume"] = 2100
             self.assertIsNone(
-                finder.process_packet(packet, received_at=now + timedelta(seconds=6))
+                finder.process_packet(packet, received_at=now + timedelta(minutes=2))
             )
             packet["volume"] = 2200
-            event = finder.process_packet(packet, received_at=now + timedelta(seconds=11))
+            event = finder.process_packet(
+                packet, received_at=now + timedelta(minutes=2, seconds=2)
+            )
             self.assertIsNotNone(event)
-            self.assertEqual(event["setup_type"], "ORB")
+            self.assertEqual(event["setup_type"], "INDICATOR_EVENT")
             self.assertEqual(event["direction"], "LONG")
+            self.assertIn(
+                "ORB_BULLISH_CLOSE_BREAK",
+                [item["event_type"] for item in event["indicator_events"]],
+            )
             self.assertIsNone(
-                finder.process_packet(packet, received_at=now + timedelta(seconds=16))
+                finder.process_packet(packet, received_at=now + timedelta(minutes=3))
             )
 
-    def test_packet_bursts_cannot_confirm_setup(self) -> None:
+    def test_packet_bursts_cannot_create_completed_candle_event(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             finder = self._finder(Path(directory))
             stock = self._stock()
@@ -457,7 +473,8 @@ class IntraFinderTests(unittest.TestCase):
                         received_at=now + timedelta(seconds=1, milliseconds=milliseconds),
                     )
                 )
-            self.assertEqual(finder.states[10]["state"], "FORMING")
+            self.assertEqual(finder.events_formed, 0)
+            self.assertEqual(len(finder.states[10]["minute_bars"]), 0)
 
     def test_late_start_above_opening_range_is_not_a_new_breakout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -483,7 +500,7 @@ class IntraFinderTests(unittest.TestCase):
                 )
             self.assertEqual(finder.events_formed, 0)
 
-    def test_missing_rvol_baseline_fails_closed(self) -> None:
+    def test_indicator_event_path_does_not_require_rvol_baseline(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             finder = self._finder(Path(directory))
             stock = self._stock()
@@ -503,41 +520,41 @@ class IntraFinderTests(unittest.TestCase):
                 finder.process_packet(self._packet(price=100.0), received_at=now)
             )
             packet = self._packet(price=101.0)
-            for seconds in (1, 6, 11, 16):
-                self.assertIsNone(
-                    finder.process_packet(packet, received_at=now + timedelta(seconds=seconds))
-                )
-            self.assertEqual(finder.events_formed, 0)
+            finder.process_packet(packet, received_at=now + timedelta(minutes=1))
+            finder.process_packet(packet, received_at=now + timedelta(minutes=2))
+            event = finder.process_packet(
+                packet, received_at=now + timedelta(minutes=2, seconds=2)
+            )
+            self.assertIsNotNone(event)
+            self.assertNotIn("RVOL_BASELINE_UNAVAILABLE", finder.gate_failure_counts)
 
-    def test_vwap_reclaim_requires_extension_pullback_and_continuation(self) -> None:
+    def test_vwap_cross_is_detected_only_on_completed_candles(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             finder = self._finder(Path(directory))
             stock = self._stock()
             finder.stocks_by_security_id = {10: stock}
             finder.states = {10: finder._new_state(stock)}
             now = finder.market_time.now()
-            sequence = [
-                (0, 99.0),
-                (1, 100.1),
-                (2, 100.2),
-                (4, 100.05),
-                (9, 100.14),
-                (14, 100.15),
-            ]
-            for seconds, price in sequence:
-                self.assertIsNone(
-                    finder.process_packet(
-                        self._packet(volume=2000 + seconds * 10, price=price, vwap=100.0),
-                        received_at=now + timedelta(seconds=seconds),
-                    )
-                )
+            finder.process_packet(self._packet(price=99.0, vwap=100.0), received_at=now)
+            finder.process_packet(
+                self._packet(volume=2100, price=101.0, vwap=100.0),
+                received_at=now + timedelta(minutes=1),
+            )
+            finder.process_packet(
+                self._packet(volume=2200, price=101.0, vwap=100.0),
+                received_at=now + timedelta(minutes=2),
+            )
             event = finder.process_packet(
-                self._packet(volume=2200, price=100.16, vwap=100.0),
-                received_at=now + timedelta(seconds=19),
+                self._packet(volume=2300, price=101.0, vwap=100.0),
+                received_at=now + timedelta(minutes=2, seconds=2),
             )
             self.assertIsNotNone(event)
-            self.assertEqual(event["setup_type"], "VWAP_RECLAIM_PULLBACK")
+            self.assertEqual(event["setup_type"], "INDICATOR_EVENT")
             self.assertEqual(event["direction"], "LONG")
+            self.assertIn(
+                "VWAP_BULLISH_CROSS",
+                [item["event_type"] for item in event["indicator_events"]],
+            )
 
 
 if __name__ == "__main__":
