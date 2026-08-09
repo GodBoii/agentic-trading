@@ -21,7 +21,7 @@ from typing import Any, Iterable
 import matplotlib
 import numpy as np
 import pandas as pd
-import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 
 matplotlib.use("Agg")
 import matplotlib.dates as mdates  # noqa: E402
@@ -36,6 +36,7 @@ IST = "Asia/Kolkata"
 class ReviewPaths:
     stage2_day: Path
     output: Path
+    quality_events: Path | None = None
 
     @property
     def events(self) -> Path:
@@ -75,6 +76,59 @@ def _load_events(path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def _selected_quality_rows(path: Path, market_date: str) -> dict[str, dict[str, Any]]:
+    frame = pd.read_csv(path)
+    required = {"market_date", "event_id", "selected", "entry_time", "entry_price", "quality_score"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"Quality-event file is missing columns: {sorted(missing)}")
+    selected = frame[
+        frame["market_date"].astype(str).eq(market_date)
+        & frame["selected"].astype(str).str.lower().isin({"true", "1", "yes"})
+    ]
+    return {str(row["event_id"]): row.to_dict() for _, row in selected.iterrows()}
+
+
+def _apply_quality_selection(
+    events: list[dict[str, Any]], quality_rows: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    used_event_ids: set[str] = set()
+    for event in events:
+        event_id = str(event.get("event_id"))
+        row = quality_rows.get(event_id)
+        if row is None or event_id in used_event_ids:
+            continue
+        event = dict(event)
+        timestamp = pd.Timestamp(row["entry_time"])
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.tz_localize(IST)
+        event["_event_time"] = timestamp.tz_convert(IST)
+        event["_raw_setup_score"] = event.get("setup_score")
+        event["setup_score"] = float(row["quality_score"])
+        event["price"] = float(row["entry_price"])
+        for event_key, row_key in (
+            ("vwap", "vwap"),
+            ("relative_volume", "relative_volume"),
+            ("volume_acceleration", "volume_acceleration"),
+            ("spread", "spread_percent"),
+            ("estimated_slippage", "estimated_slippage_percent"),
+        ):
+            value = row.get(row_key)
+            if value is not None and not pd.isna(value):
+                event[event_key] = float(value)
+        depth = dict(event.get("five_level_depth_summary") or {})
+        if not pd.isna(row.get("depth_imbalance")):
+            depth["imbalance"] = float(row["depth_imbalance"])
+        if not pd.isna(row.get("order_count_imbalance")):
+            depth["order_count_imbalance"] = float(row["order_count_imbalance"])
+        event["five_level_depth_summary"] = depth
+        event["_quality_row"] = row
+        selected.append(event)
+        used_event_ids.add(event_id)
+    return selected
+
+
 def _load_snapshots(path: Path, security_ids: set[int]) -> pd.DataFrame:
     columns = [
         "received_at",
@@ -90,12 +144,24 @@ def _load_snapshots(path: Path, security_ids: set[int]) -> pd.DataFrame:
         "spread_percent",
         "depth_imbalance",
     ]
-    dataset = ds.dataset(path, format="parquet", partitioning="hive")
-    table = dataset.to_table(
-        columns=columns,
-        filter=ds.field("security_id").isin(sorted(security_ids)),
-    )
-    frame = table.to_pandas()
+    fragments: list[pd.DataFrame] = []
+    for parquet_path in sorted(path.rglob("*.parquet")):
+        names = set(pq.read_schema(parquet_path).names)
+        available = [column for column in columns if column in names]
+        fragment = pq.read_table(parquet_path, columns=available).to_pandas()
+        if "security_id" not in fragment:
+            continue
+        fragment["security_id"] = pd.to_numeric(fragment["security_id"], errors="coerce")
+        fragment = fragment[fragment["security_id"].isin(security_ids)]
+        if fragment.empty:
+            continue
+        for column in columns:
+            if column not in fragment:
+                fragment[column] = np.nan
+        fragments.append(fragment[columns])
+    if not fragments:
+        raise RuntimeError(f"No snapshots matched {len(security_ids)} selected securities")
+    frame = pd.concat(fragments, ignore_index=True, sort=False)
     # Persisted snapshots can contain ISO timestamps both with and without
     # fractional seconds, so pandas must not infer one rigid format from row 1.
     frame["received_at"] = pd.to_datetime(
@@ -272,6 +338,7 @@ def _make_chart(
     events: list[dict[str, Any]],
     symbol: str,
     output: Path,
+    report_label: str = "every Intra-Finder signal",
 ) -> None:
     fig, (price_axis, volume_axis) = plt.subplots(
         2,
@@ -334,7 +401,7 @@ def _make_chart(
     volume_axis.xaxis.set_major_locator(mdates.HourLocator())
     volume_axis.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=bars.index.tz))
     price_axis.set_ylabel("Price (INR)")
-    price_axis.set_title(f"{symbol} — one-minute replay with every Intra-Finder signal", loc="left", fontsize=14)
+    price_axis.set_title(f"{symbol} — one-minute replay with {report_label}", loc="left", fontsize=14)
     price_axis.legend(loc="upper left", ncol=3, frameon=False, fontsize=8)
     volume_axis.set_xlabel("Market time (IST)")
     fig.text(
@@ -362,6 +429,7 @@ def _stock_page(
     chart_name: str,
     reviewed: list[dict[str, Any]],
     output: Path,
+    report_label: str = "saved Stage 2 signals",
 ) -> None:
     rows = []
     for index, item in enumerate(reviewed, 1):
@@ -389,7 +457,7 @@ def _stock_page(
 <style>
 body{{font-family:system-ui,sans-serif;margin:24px;color:#17212b;background:#f7f8fa}}a{{color:#315b9c}}img{{width:100%;height:auto;background:#fff;border:1px solid #dce1e7}}table{{width:100%;border-collapse:collapse;background:#fff;font-size:12px}}th,td{{padding:7px;border-bottom:1px solid #e4e7eb;text-align:right}}th{{position:sticky;top:0;background:#eef1f4}}th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4),th:last-child,td:last-child{{text-align:left}}.scroll{{overflow:auto}}code{{background:#e9edf2;padding:2px 5px}}</style></head>
 <body><p><a href="../index.html">← All stocks</a></p><h1>{html.escape(symbol)}</h1>
-<p>Security ID <code>{security_id}</code> · {len(reviewed)} signals. Direction-adjusted returns: positive means the signal moved correctly.</p>
+<p>Security ID <code>{security_id}</code> · {len(reviewed)} {html.escape(report_label)}. Direction-adjusted returns: positive means the signal moved correctly.</p>
 <img src="../charts/{html.escape(chart_name)}" alt="One-minute candlestick chart with Stage 2 signals">
 <div class="scroll"><table><thead><tr><th>#</th><th>Time</th><th>Setup</th><th>Side</th><th>Score</th><th>Price</th><th>VWAP</th><th>RVOL</th><th>Spread %</th><th>Depth</th><th>1m</th><th>5m</th><th>15m</th><th>30m</th><th>5m MFE</th><th>5m MAE</th><th>First +/-0.20%</th><th>Rule check</th><th>Reason</th></tr></thead>
 <tbody>{''.join(rows)}</tbody></table></div></body></html>"""
@@ -411,11 +479,11 @@ def _index_page(rows: list[dict[str, Any]], summary: dict[str, Any], output: Pat
         )
     document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Stage 2 signal review {html.escape(summary['market_date'])}</title>
+<title>{html.escape(summary['report_title'])} {html.escape(summary['market_date'])}</title>
 <style>
 body{{font-family:system-ui,sans-serif;margin:24px;color:#17212b;background:#f7f8fa}}a{{color:#315b9c}}input{{padding:9px;width:min(430px,90%);margin:8px 0 16px}}table{{width:100%;border-collapse:collapse;background:#fff;font-size:13px}}th,td{{padding:8px;border-bottom:1px solid #e4e7eb;text-align:right}}th{{position:sticky;top:0;background:#eef1f4}}th:first-child,td:first-child,th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){{text-align:left}}.scroll{{overflow:auto}}.note{{max-width:1000px}}code{{background:#e9edf2;padding:2px 5px}}</style></head>
-<body><h1>Stage 2 signal review — {html.escape(summary['market_date'])}</h1>
-<p class="note">{summary['event_count']} signals across {summary['stock_count']} stocks. Rule checks confirm whether the saved event matches its basic ORB/VWAP definition and nearby tape price; they do not prove profitability. Open a stock to inspect every numbered signal on its replay chart.</p>
+<body><h1>{html.escape(summary['report_title'])} — {html.escape(summary['market_date'])}</h1>
+<p class="note">{summary['event_count']} {html.escape(summary['report_label'])} across {summary['stock_count']} stocks. Rule checks confirm whether the saved event matches its basic ORB/VWAP definition and nearby tape price; they do not prove profitability. Open a stock to inspect every numbered entry on its replay chart.</p>
 <p><a href="review-summary.json">Machine-readable summary</a> · <a href="signals.csv">All signal measurements</a></p>
 <label for="filter">Find a stock, setup, or direction</label><br><input id="filter" type="search" placeholder="Example: MARICO, ORB, SHORT">
 <div class="scroll"><table><thead><tr><th>Stock</th><th>Security ID</th><th>Signals</th><th>Setups</th><th>Sides</th><th>Mean score</th><th>Rule pass</th><th>Median 5m</th><th>Median 15m</th><th>Median 30m</th></tr></thead><tbody id="stocks">{''.join(table_rows)}</tbody></table></div>
@@ -435,8 +503,14 @@ def generate(
     reuse_charts: bool = False,
 ) -> dict[str, Any]:
     events = _load_events(paths.events)
+    quality_mode = paths.quality_events is not None
+    if quality_mode:
+        quality_rows = _selected_quality_rows(paths.quality_events, paths.stage2_day.name)
+        events = _apply_quality_selection(events, quality_rows)
     if not events:
-        raise RuntimeError("No setup events were found")
+        raise RuntimeError("No matching setup events were found")
+    report_label = "quality-v3 selected entries" if quality_mode else "saved Stage 2 signals"
+    chart_label = "quality-v3 selected entries" if quality_mode else "every Intra-Finder signal"
     by_security: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for event in events:
         by_security[int(event["security_id"])].append(event)
@@ -467,8 +541,15 @@ def generate(
         page_name = f"{slug}.html"
         chart_path = chart_dir / chart_name
         if not reuse_charts or not chart_path.exists():
-            _make_chart(bars, stock_events, symbol, chart_path)
-        _stock_page(symbol, security_id, chart_name, reviewed, stock_dir / page_name)
+            _make_chart(bars, stock_events, symbol, chart_path, chart_label)
+        _stock_page(
+            symbol,
+            security_id,
+            chart_name,
+            reviewed,
+            stock_dir / page_name,
+            report_label,
+        )
         for item in reviewed:
             signal_rows.append(
                 {
@@ -479,6 +560,14 @@ def generate(
                     "setup": item["setup"],
                     "direction": item["direction"],
                     "score": item["score"],
+                    "raw_stage2_score": next(
+                        (
+                            event.get("_raw_setup_score")
+                            for event in stock_events
+                            if event.get("event_id") == item["event_id"]
+                        ),
+                        item["score"],
+                    ),
                     "price": item["price"],
                     "vwap": item["vwap"],
                     "rvol": item["rvol"],
@@ -532,6 +621,9 @@ def generate(
     first_touch_15m = Counter(row["first_touch_15m_0_20_percent"] for row in signal_rows)
     summary = {
         "market_date": str(events[0]["market_date"]),
+        "report_title": "Stage 2 quality-entry review" if quality_mode else "Stage 2 signal review",
+        "report_label": report_label,
+        "selection_source": str(paths.quality_events.resolve()) if paths.quality_events else None,
         "generated_at": datetime.now().astimezone().isoformat(),
         "event_count": len(signal_rows),
         "stock_count": len(stock_rows),
@@ -568,6 +660,11 @@ def main() -> None:
         help="Pipeline results directory",
     )
     parser.add_argument("--output", type=Path, help="Optional report output directory")
+    parser.add_argument(
+        "--quality-events",
+        type=Path,
+        help="Optional all-evaluated-events.csv; render only rows selected by the quality policy",
+    )
     parser.add_argument("--limit", type=int, help="Render only the busiest N stocks (for testing)")
     parser.add_argument(
         "--reuse-charts",
@@ -576,9 +673,15 @@ def main() -> None:
     )
     args = parser.parse_args()
     stage2_day = args.results_dir / "stage2" / args.date
-    output = args.output or stage2_day / "signal-review"
+    output = args.output or stage2_day / (
+        "quality-entry-review" if args.quality_events else "signal-review"
+    )
     summary = generate(
-        ReviewPaths(stage2_day=stage2_day, output=output),
+        ReviewPaths(
+            stage2_day=stage2_day,
+            output=output,
+            quality_events=args.quality_events,
+        ),
         limit=args.limit,
         reuse_charts=args.reuse_charts,
     )
