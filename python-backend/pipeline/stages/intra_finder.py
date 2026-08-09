@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import heapq
 import hashlib
 import json
 import os
@@ -26,6 +27,7 @@ from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.market_calendar_service import MarketCalendarService
 from pipeline.services.storage_service import StorageService
+from pipeline.stages.indicator_event_engine import IndicatorEventEngine
 
 
 def subscription_batches(instruments: List[tuple], size: int = 100) -> List[List[tuple]]:
@@ -43,8 +45,8 @@ class SessionEnded(RuntimeError):
 
 
 class IntraFinder:
-    EVENT_STATE_SCHEMA_VERSION = 4
-    RUNTIME_STATE_SCHEMA_VERSION = 3
+    EVENT_STATE_SCHEMA_VERSION = 5
+    RUNTIME_STATE_SCHEMA_VERSION = 4
 
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
@@ -94,6 +96,8 @@ class IntraFinder:
         self.pending_agent_events: List[Dict[str, Any]] = []
         self.agent_dispatch_successes = 0
         self.agent_dispatch_failures = 0
+        self.agent_queue_expired = 0
+        self.agent_queue_overflow_dropped = 0
         self.event_state: Dict[str, Any] = {}
         self.shadow_mode = os.getenv(
             "INTRA_FINDER_SHADOW_MODE",
@@ -106,6 +110,72 @@ class IntraFinder:
             10, int(os.getenv("INTRA_FINDER_PROGRESS_LOG_SECONDS", "60"))
         )
         self.coverage_milestones_logged: set[int] = set()
+        self.detector_mode = "indicator_events"
+        self.indicator_aggregation_seconds = max(
+            1,
+            int(
+                os.getenv(
+                    "INTRA_FINDER_INDICATOR_AGGREGATION_SECONDS",
+                    str(self.config.intra_finder_indicator_aggregation_seconds),
+                )
+            ),
+        )
+        self.stock_agent_cooldown_seconds = max(
+            0,
+            int(
+                os.getenv(
+                    "INTRA_FINDER_STOCK_AGENT_COOLDOWN_SECONDS",
+                    str(self.config.intra_finder_stock_agent_cooldown_seconds),
+                )
+            ),
+        )
+        self.agent_queue_max = max(
+            1,
+            int(
+                os.getenv(
+                    "INTRA_FINDER_AGENT_QUEUE_MAX",
+                    str(self.config.intra_finder_agent_queue_max),
+                )
+            ),
+        )
+        self.agent_queue_max_age_seconds = max(
+            1,
+            int(
+                os.getenv(
+                    "INTRA_FINDER_AGENT_QUEUE_MAX_AGE_SECONDS",
+                    str(self.config.intra_finder_agent_queue_max_age_seconds),
+                )
+            ),
+        )
+        self.indicator_engine = IndicatorEventEngine(
+            volume_surge_ratio=float(
+                os.getenv(
+                    "INTRA_FINDER_INDICATOR_VOLUME_SURGE_RATIO",
+                    str(self.config.intra_finder_indicator_volume_surge_ratio),
+                )
+            ),
+            event_cooldown_seconds=max(
+                0,
+                int(
+                    os.getenv(
+                        "INTRA_FINDER_INDICATOR_EVENT_COOLDOWN_SECONDS",
+                        str(self.config.intra_finder_indicator_event_cooldown_seconds),
+                    )
+                ),
+            ),
+            max_event_lag_seconds=max(
+                0,
+                int(
+                    os.getenv(
+                        "INTRA_FINDER_INDICATOR_MAX_EVENT_LAG_SECONDS",
+                        str(self.config.intra_finder_indicator_max_event_lag_seconds),
+                    )
+                ),
+            ),
+        )
+        self.pending_indicator_deadlines: List[Tuple[float, int, int]] = []
+        self.indicator_events_detected = 0
+        self.indicator_aggregates_formed = 0
 
     def _log(self, message: str) -> None:
         print(
@@ -134,7 +204,11 @@ class IntraFinder:
             f"{summary['expected_instruments']:,} full={summary['full_packet_instruments']:,} "
             f"active={summary['active_instruments']:,} stale={summary['stale_instruments']:,} "
             f"OR_ready={summary['opening_range_complete']:,} RVOL_ready={summary['rvol_available']:,} "
-            f"candidates={int(getattr(self, 'candidates_seen', 0)):,} events={summary['events_formed']:,} "
+            f"indicator_events={summary['indicator_events_detected']:,} "
+            f"aggregates={summary['indicator_aggregates_formed']:,} "
+            f"pending={summary['pending_indicator_stocks']:,} events={summary['events_formed']:,} "
+            f"agent_active={summary['agent_dispatch_active']:,} agent_queue={summary['agent_dispatch_queued']:,} "
+            f"queue_expired={summary['agent_queue_expired']:,} queue_dropped={summary['agent_queue_overflow_dropped']:,} "
             f"suppressed={summary['events_suppressed']:,} reconnects={summary['reconnect_count']:,} "
             f"shadow={summary['shadow_mode']} | states: {most_common_states} | gates: {common_gates}"
         )
@@ -188,12 +262,16 @@ class IntraFinder:
                 self.opening_range_recovery_requested = 0
                 self.opening_range_recovery_completed = 0
                 self.opening_range_recovery_failed = 0
+                self.indicator_events_detected = 0
+                self.indicator_aggregates_formed = 0
+                self.pending_indicator_deadlines.clear()
             existing_states = self.states if identity_compatible else {}
             self.states = {
                 security_id: existing_states.get(security_id) or self._new_state(stock)
                 for security_id, stock in self.stocks_by_security_id.items()
             }
             self._restore_runtime_state(market_date)
+            self._rebuild_indicator_deadlines()
             loaded_event_state = StorageService.load_snapshot(
                 self.config.stage2_event_state_path(market_date)
             ) or {}
@@ -207,6 +285,7 @@ class IntraFinder:
                     "universe_version": self.universe_version,
                     "events": {},
                     "active_setups": {},
+                    "last_stock_event_at": {},
                     "superseded_event_count": len(loaded_event_state.get("events") or {}),
                 }
                 StorageService.save_snapshot(
@@ -261,6 +340,7 @@ class IntraFinder:
             "last_second": None,
             "last_suppressed_key": None,
             "latest_features": {},
+            **IndicatorEventEngine.state_fields(),
         }
 
     @staticmethod
@@ -289,6 +369,14 @@ class IntraFinder:
             "last_second",
             "last_suppressed_key",
             "latest_features",
+            "minute_builder",
+            "minute_bars",
+            "last_closed_cumulative_volume",
+            "indicator_snapshot",
+            "indicator_event_last_at",
+            "pending_indicator_events",
+            "pending_indicator_deadline",
+            "pending_indicator_generation",
         )
 
     def _runtime_state_payload(self) -> Dict[str, Any]:
@@ -321,7 +409,20 @@ class IntraFinder:
         detector_compatible = (
             int(payload.get("schema_version") or 0) == self.RUNTIME_STATE_SCHEMA_VERSION
         )
-        detector_fields = {"orb_break", "vwap_reclaim", "confirmations", "last_suppressed_key"}
+        detector_fields = {
+            "orb_break",
+            "vwap_reclaim",
+            "confirmations",
+            "last_suppressed_key",
+            "minute_builder",
+            "minute_bars",
+            "last_closed_cumulative_volume",
+            "indicator_snapshot",
+            "indicator_event_last_at",
+            "pending_indicator_events",
+            "pending_indicator_deadline",
+            "pending_indicator_generation",
+        }
         restored = 0
         for raw_security_id, saved in (payload.get("states") or {}).items():
             try:
@@ -346,11 +447,35 @@ class IntraFinder:
                         ),
                         maxlen=420,
                     )
+                if key == "minute_bars":
+                    value = deque(
+                        (item for item in (value or []) if isinstance(item, dict)),
+                        maxlen=IndicatorEventEngine.BAR_LIMIT,
+                    )
                 state[key] = value
             restored += 1
         if restored:
             mode = "full" if detector_compatible else "market-data-only"
             print(f"Intra-Finder restored {mode} state for {restored} stocks.")
+
+    def _rebuild_indicator_deadlines(self) -> None:
+        self.pending_indicator_deadlines.clear()
+        for security_id, state in self.states.items():
+            if not state.get("pending_indicator_events"):
+                continue
+            deadline = state.get("pending_indicator_deadline")
+            try:
+                deadline_timestamp = datetime.fromisoformat(str(deadline)).timestamp()
+            except (TypeError, ValueError):
+                continue
+            heapq.heappush(
+                self.pending_indicator_deadlines,
+                (
+                    deadline_timestamp,
+                    security_id,
+                    int(state.get("pending_indicator_generation") or 0),
+                ),
+            )
 
     @staticmethod
     def _feed_exchange(stock: Dict[str, Any]) -> Any:
@@ -982,6 +1107,312 @@ class IntraFinder:
             failures.append("ENTRY_CUTOFF")
         return failures
 
+    @staticmethod
+    def _indicator_direction(events: List[Dict[str, Any]]) -> str:
+        directions = {
+            str(event.get("direction") or "NEUTRAL")
+            for event in events
+            if str(event.get("direction") or "NEUTRAL") in {"LONG", "SHORT"}
+        }
+        if directions == {"LONG"}:
+            return "LONG"
+        if directions == {"SHORT"}:
+            return "SHORT"
+        if directions == {"LONG", "SHORT"}:
+            return "MIXED"
+        return "NEUTRAL"
+
+    @staticmethod
+    def _indicator_attention_score(events: List[Dict[str, Any]]) -> float:
+        weights = {
+            "DOJI": 1,
+            "HAMMER": 2,
+            "SHOOTING_STAR": 2,
+            "BULLISH_ENGULFING": 3,
+            "BEARISH_ENGULFING": 3,
+            "EMA_BULLISH_CROSS": 3,
+            "EMA_BEARISH_CROSS": 3,
+            "RSI_ENTERED_OVERSOLD": 2,
+            "RSI_ENTERED_OVERBOUGHT": 2,
+            "RSI_EXITED_OVERSOLD": 3,
+            "RSI_EXITED_OVERBOUGHT": 3,
+            "VWAP_BULLISH_CROSS": 2,
+            "VWAP_BEARISH_CROSS": 2,
+            "ORB_BULLISH_CLOSE_BREAK": 3,
+            "ORB_BEARISH_CLOSE_BREAK": 3,
+            "VOLUME_SURGE": 2,
+        }
+        evidence_weight = sum(
+            weights.get(str(event.get("event_type") or ""), 1) for event in events
+        )
+        # This is queue priority, not a probability of profit or a trade score.
+        return float(min(100, 40 + evidence_weight * 8))
+
+    def _queue_indicator_evidence(
+        self,
+        security_id: int,
+        state: Dict[str, Any],
+        events: List[Dict[str, Any]],
+        detected_at: datetime,
+    ) -> None:
+        if not events:
+            return
+        pending = state.setdefault("pending_indicator_events", [])
+        existing = {
+            (str(item.get("event_type")), str(item.get("bar_start"))) for item in pending
+        }
+        evidence_limit = max(1, int(self.config.intra_finder_indicator_max_evidence))
+        for event in events:
+            key = (str(event.get("event_type")), str(event.get("bar_start")))
+            if key not in existing and len(pending) < evidence_limit:
+                pending.append(event)
+                existing.add(key)
+                self.indicator_events_detected += 1
+        if not pending:
+            return
+        if not state.get("pending_indicator_deadline"):
+            deadline = detected_at + timedelta(seconds=self.indicator_aggregation_seconds)
+            generation = int(state.get("pending_indicator_generation") or 0) + 1
+            state["pending_indicator_generation"] = generation
+            state["pending_indicator_deadline"] = deadline.isoformat()
+            heapq.heappush(
+                self.pending_indicator_deadlines,
+                (deadline.timestamp(), security_id, generation),
+            )
+        state["state"] = "EVENT_PENDING"
+
+    def _indicator_safety_gates(
+        self,
+        state: Dict[str, Any],
+        features: Dict[str, Any],
+        direction: str,
+        now: datetime,
+    ) -> Tuple[List[str], Optional[float]]:
+        failures: List[str] = []
+        try:
+            received_at = datetime.fromisoformat(str(features.get("received_at")))
+        except (TypeError, ValueError):
+            received_at = None
+        if (
+            received_at is None
+            or (now - received_at).total_seconds() > self.config.intra_finder_data_stale_seconds
+        ):
+            failures.append("DATA_STALE")
+        depth = features.get("depth") or []
+        if len(depth) < 5:
+            failures.append("DEPTH_INCOMPLETE")
+        spread = features.get("spread_percent")
+        if spread is None or float(spread) > self.config.intra_finder_max_spread_percent:
+            failures.append("SPREAD_TOO_WIDE")
+        price = float(features.get("last_price") or 0.0)
+        slippage: Optional[float] = None
+        if price <= 0:
+            failures.append("INVALID_PRICE")
+        elif depth:
+            trade_amount = float(os.getenv("INTRA_FINDER_TRADE_AMOUNT", "100000"))
+            sides = [direction] if direction in {"LONG", "SHORT"} else ["LONG", "SHORT"]
+            estimates = [
+                self._estimated_slippage(
+                    depth,
+                    direction=side,
+                    reference_price=price,
+                    trade_amount=trade_amount,
+                )
+                for side in sides
+            ]
+            valid_estimates = [float(value) for value in estimates if value is not None]
+            slippage = max(valid_estimates) if valid_estimates else None
+        if slippage is None or slippage > self.config.intra_finder_max_slippage_percent:
+            failures.append("INSUFFICIENT_DEPTH_CAPACITY")
+        if not features.get("connection_warm"):
+            failures.append("CONNECTION_WARMING_UP")
+        if now.time() >= dt_time(15, 0):
+            failures.append("ENTRY_CUTOFF")
+        upper = float(features.get("upper_circuit") or 0.0)
+        lower = float(features.get("lower_circuit") or 0.0)
+        if direction in {"LONG", "MIXED", "NEUTRAL"} and upper > 0 and price >= upper * 0.998:
+            failures.append("UPPER_CIRCUIT_PROXIMITY")
+        if direction in {"SHORT", "MIXED", "NEUTRAL"} and lower > 0 and price <= lower * 1.002:
+            failures.append("LOWER_CIRCUIT_PROXIMITY")
+        last_event = (self.event_state.get("last_stock_event_at") or {}).get(
+            str(state["security_id"])
+        )
+        if last_event:
+            try:
+                elapsed = (now - datetime.fromisoformat(str(last_event))).total_seconds()
+                if elapsed < self.stock_agent_cooldown_seconds:
+                    failures.append("STOCK_AGENT_COOLDOWN")
+            except ValueError:
+                pass
+        return failures, slippage
+
+    def _create_indicator_event(
+        self,
+        stock: Dict[str, Any],
+        state: Dict[str, Any],
+        features: Dict[str, Any],
+        indicator_events: List[Dict[str, Any]],
+        direction: str,
+        attention_score: float,
+        now: datetime,
+    ) -> Optional[Dict[str, Any]]:
+        event_types = sorted({str(item.get("event_type")) for item in indicator_events})
+        evidence_timestamps = sorted(
+            {
+                str(item.get("detected_at"))
+                for item in indicator_events
+                if item.get("detected_at")
+            }
+        )
+        first_evidence = evidence_timestamps[0] if evidence_timestamps else now.isoformat()
+        identity = "|".join(
+            [
+                self.market_time.market_date_str(),
+                str(stock["isin"]),
+                str(stock["exchange_segment"]),
+                first_evidence,
+                ",".join(event_types),
+            ]
+        )
+        event_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+        if event_id in (self.event_state.get("events") or {}):
+            self.events_suppressed += 1
+            return None
+        price = float(features["last_price"])
+        event = SetupEvent(
+            event_id=event_id,
+            market_date=self.market_time.market_date_str(),
+            universe_version=self.universe_version,
+            isin=str(stock["isin"]),
+            exchange_segment=str(stock["exchange_segment"]),
+            security_id=int(stock["security_id"]),
+            symbol=str(stock.get("symbol") or ""),
+            direction=direction,
+            setup_type="INDICATOR_EVENT",
+            setup_state="TRIGGERED",
+            setup_score=attention_score,
+            payload={
+                "display_name": stock.get("display_name"),
+                "created_at": now.isoformat(),
+                "instrument": stock.get("instrument", "EQUITY"),
+                "price": price,
+                "adv_20_cr": (stock.get("historical") or {}).get("adv_20_cr"),
+                "atr_percent": (stock.get("historical") or {}).get("atr_percent"),
+                "avg_volume_20": (stock.get("historical") or {}).get("avg_volume_20"),
+                "historical": stock.get("historical"),
+                "static_tradability": stock.get("tradability"),
+                "selected_venue": {
+                    "exchange": stock.get("exchange"),
+                    "exchange_segment": stock.get("exchange_segment"),
+                    "security_id": stock.get("security_id"),
+                    "selected_venue_reason": stock.get("selected_venue_reason"),
+                },
+                "entry_zone": [round(price * 0.9995, 4), round(price * 1.0005, 4)],
+                "invalidation_level": None,
+                "opening_range": {
+                    "high": state.get("opening_range_high"),
+                    "low": state.get("opening_range_low"),
+                },
+                "vwap": features.get("vwap"),
+                "relative_volume": features.get("relative_volume"),
+                "volume_acceleration": features.get("volume_acceleration"),
+                "spread": features.get("spread_percent"),
+                "five_level_depth_summary": {
+                    "best_bid": features.get("best_bid"),
+                    "best_ask": features.get("best_ask"),
+                    "bid_quantity": features.get("bid_quantity_5"),
+                    "ask_quantity": features.get("ask_quantity_5"),
+                    "imbalance": features.get("depth_imbalance"),
+                    "order_count_imbalance": features.get("order_count_imbalance"),
+                },
+                "estimated_slippage": features.get("estimated_slippage_percent"),
+                "trade_amount": float(os.getenv("INTRA_FINDER_TRADE_AMOUNT", "100000")),
+                "data_quality": {"fresh": True, "depth_levels": len(features.get("depth") or [])},
+                "score_components": {
+                    "attention_priority": attention_score,
+                    "indicator_event_count": len(indicator_events),
+                },
+                "indicator_events": indicator_events,
+                "indicator_snapshot": state.get("indicator_snapshot") or {},
+                "recent_closed_bars": list(state.get("minute_bars") or [])[-10:],
+                "event_trigger_rule": "one_or_more_new_indicator_events",
+                "evidence_timestamps": evidence_timestamps,
+                "detector_schema_version": self.EVENT_STATE_SCHEMA_VERSION,
+                "detector_mode": self.detector_mode,
+                "latest_regime_context": self._load_context(self.config.regime_latest_path),
+                "latest_nifty_context": self._load_context(self.config.nifty_depth_latest_path),
+                "shadow_mode": self.shadow_mode,
+            },
+        ).as_dict()
+        self.event_state.setdefault("events", {})[event_id] = {
+            "event_id": event_id,
+            "created_at": now.isoformat(),
+            "indicator_events": event_types,
+        }
+        self.event_state.setdefault("last_stock_event_at", {})[
+            str(stock["security_id"])
+        ] = now.isoformat()
+        StorageService.save_snapshot(
+            self.config.stage2_event_state_path(self.market_time.market_date_str()),
+            self.event_state,
+        )
+        StorageService.append_json_line(
+            self.config.stage2_events_path(self.market_time.market_date_str()),
+            event,
+        )
+        self.events_formed += 1
+        self.indicator_aggregates_formed += 1
+        state["state"] = "TRIGGERED"
+        if not self.shadow_mode:
+            self._dispatch_event(event)
+        return event
+
+    def _flush_due_indicator_events(self, now: datetime) -> List[Dict[str, Any]]:
+        emitted: List[Dict[str, Any]] = []
+        while self.pending_indicator_deadlines and self.pending_indicator_deadlines[0][0] <= now.timestamp():
+            _, security_id, generation = heapq.heappop(self.pending_indicator_deadlines)
+            state = self.states.get(security_id)
+            stock = self.stocks_by_security_id.get(security_id)
+            if not state or not stock:
+                continue
+            if generation != int(state.get("pending_indicator_generation") or 0):
+                continue
+            indicator_events = list(state.get("pending_indicator_events") or [])
+            state["pending_indicator_events"] = []
+            state["pending_indicator_deadline"] = None
+            if not indicator_events:
+                continue
+            direction = self._indicator_direction(indicator_events)
+            features = dict(state.get("latest_features") or {})
+            failures, slippage = self._indicator_safety_gates(
+                state, features, direction, now
+            )
+            self.gate_failure_counts.update(failures)
+            if failures:
+                state["state"] = "COOLDOWN" if "STOCK_AGENT_COOLDOWN" in failures else "WATCHING"
+                self.events_suppressed += 1
+                continue
+            features["estimated_slippage_percent"] = slippage
+            attention_score = self._indicator_attention_score(indicator_events)
+            event = self._create_indicator_event(
+                stock,
+                state,
+                features,
+                indicator_events,
+                direction,
+                attention_score,
+                now,
+            )
+            if event:
+                self._log(
+                    f"INDICATOR EVENT | {stock.get('symbol')} direction={direction} "
+                    f"evidence={','.join(item['event_type'] for item in indicator_events)} "
+                    f"priority={attention_score:.0f} price={float(features.get('last_price') or 0):.2f} "
+                    f"shadow={self.shadow_mode}."
+                )
+                emitted.append(event)
+        return emitted
+
     def process_packet(
         self,
         packet: Dict[str, Any],
@@ -1080,7 +1511,6 @@ class IntraFinder:
             **depth_features,
         }
         state["latest_features"] = features
-        self._update_active_setup_invalidations(stock, state, features)
         second_key = received_at.replace(microsecond=0).isoformat()
         if state["last_second"] != second_key:
             state["last_second"] = second_key
@@ -1093,38 +1523,36 @@ class IntraFinder:
                     **{key: value for key, value in features.items() if key != "depth"},
                 }
             )
-
-        candidate = self._setup_candidate(state, features, received_at)
-        event = None
-        if candidate:
-            self.candidates_seen = int(getattr(self, "candidates_seen", 0)) + 1
-            setup, direction = candidate
-            directional_slippage = self._estimated_slippage(
-                depth,
-                direction=direction,
-                reference_price=price,
-                trade_amount=trade_amount,
+        indicator_events = self.indicator_engine.on_tick(
+            state,
+            timestamp=received_at,
+            price=price,
+            cumulative_volume=volume,
+            vwap=float(state["vwap"]) if state.get("vwap") else None,
+            opening_range_high=(
+                float(state["opening_range_high"])
+                if state.get("opening_range_high") is not None
+                else None
+            ),
+            opening_range_low=(
+                float(state["opening_range_low"])
+                if state.get("opening_range_low") is not None
+                else None
+            ),
+            opening_range_complete=bool(state.get("opening_range_complete")),
+        )
+        if indicator_events:
+            self.candidates_seen += len(indicator_events)
+            self._queue_indicator_evidence(
+                security_id,
+                state,
+                indicator_events,
+                received_at,
             )
-            features["estimated_slippage_percent"] = directional_slippage
-            score, components = self._score(setup, direction, state, features)
-            gate_failures = self._hard_gates(features, direction)
-            gate_counts = getattr(self, "gate_failure_counts", Counter())
-            gate_counts.update(gate_failures)
-            self.gate_failure_counts = gate_counts
-            if state["state"] == "ARMED" and score >= self.config.intra_finder_trigger_score and not gate_failures:
-                event = self._create_event(stock, state, features, setup, direction, score, components, received_at)
-                if event:
-                    self._log(
-                        f"SHADOW EVENT | {stock.get('symbol')} {direction} {setup} "
-                        f"score={score:.2f} price={price:.2f} "
-                        f"RVOL={float(features.get('relative_volume') or 0):.2f} "
-                        f"spread={float(features.get('spread_percent') or 0):.4f}% "
-                        f"depth_imbalance={float(features.get('depth_imbalance') or 0):+.3f} "
-                        f"dispatched={not self.shadow_mode}."
-                    )
+        emitted = self._flush_due_indicator_events(received_at)
         self._flush_if_due()
         self._save_status_if_due()
-        return event
+        return emitted[-1] if emitted else None
 
     def _event_key(self, stock: Dict[str, Any], setup: str, direction: str, now: datetime) -> str:
         occurrence = int(now.timestamp()) // self.config.intra_finder_setup_cooldown_seconds
@@ -1389,11 +1817,34 @@ class IntraFinder:
             if len(self.agent_futures) >= self.config.intra_finder_agent_concurrency:
                 self.pending_agent_events.append(event)
                 self.pending_agent_events.sort(
-                    key=lambda item: float(item.get("setup_score") or 0),
+                    key=lambda item: (
+                        float(item.get("setup_score") or 0),
+                        str(item.get("created_at") or ""),
+                    ),
                     reverse=True,
                 )
+                if len(self.pending_agent_events) > self.agent_queue_max:
+                    self.pending_agent_events.pop()
+                    self.agent_queue_overflow_dropped += 1
                 return
             self._submit_agent_event_locked(event)
+
+    def _event_dispatch_age_seconds(self, event: Dict[str, Any], now: datetime) -> float:
+        timestamps = event.get("evidence_timestamps") or []
+        reference = event.get("created_at") or (timestamps[-1] if timestamps else None)
+        try:
+            return max(0.0, (now - datetime.fromisoformat(str(reference))).total_seconds())
+        except (TypeError, ValueError):
+            return float("inf")
+
+    def _next_fresh_agent_event_locked(self) -> Optional[Dict[str, Any]]:
+        now = self.market_time.now()
+        while self.pending_agent_events:
+            event = self.pending_agent_events.pop(0)
+            if self._event_dispatch_age_seconds(event, now) <= self.agent_queue_max_age_seconds:
+                return event
+            self.agent_queue_expired += 1
+        return None
 
     def _submit_agent_event_locked(self, event: Dict[str, Any]) -> None:
         future = self.executor.submit(self._post_agent_event, event)
@@ -1410,8 +1861,9 @@ class IntraFinder:
             except Exception as exc:
                 self.agent_dispatch_failures += 1
                 print(f"Intra-Finder agent dispatch failed: {type(exc).__name__}.")
-            if self.pending_agent_events:
-                self._submit_agent_event_locked(self.pending_agent_events.pop(0))
+            next_event = self._next_fresh_agent_event_locked()
+            if next_event is not None:
+                self._submit_agent_event_locked(next_event)
 
     def _post_agent_event(self, event: Dict[str, Any]) -> None:
         endpoint = os.getenv(
@@ -1517,6 +1969,11 @@ class IntraFinder:
                         for key, value in state["latest_features"].items()
                         if key != "depth"
                     },
+                    "indicator_snapshot": state.get("indicator_snapshot") or {},
+                    "pending_indicator_events": [
+                        item.get("event_type")
+                        for item in (state.get("pending_indicator_events") or [])
+                    ],
                 }
             )
         global_packet_age = (
@@ -1577,10 +2034,18 @@ class IntraFinder:
             "events_formed": self.events_formed,
             "events_triggered": self.events_triggered,
             "events_suppressed": self.events_suppressed,
+            "detector_mode": self.detector_mode,
+            "indicator_events_detected": self.indicator_events_detected,
+            "indicator_aggregates_formed": self.indicator_aggregates_formed,
+            "pending_indicator_stocks": sum(
+                bool(state.get("pending_indicator_events")) for state in self.states.values()
+            ),
             "agent_dispatch_active": len(self.agent_futures),
             "agent_dispatch_queued": len(self.pending_agent_events),
             "agent_dispatch_successes": self.agent_dispatch_successes,
             "agent_dispatch_failures": self.agent_dispatch_failures,
+            "agent_queue_expired": self.agent_queue_expired,
+            "agent_queue_overflow_dropped": self.agent_queue_overflow_dropped,
             "shadow_mode": self.shadow_mode,
         }
         self._log_progress(summary, force=force)
@@ -1643,6 +2108,13 @@ class IntraFinder:
             "global_packet_age_seconds": round(age, 3) if age is not None else None,
             "reconnect_count": self.reconnect_count,
             "shadow_mode": self.shadow_mode,
+            "detector_mode": self.detector_mode,
+            "indicator_events_detected": self.indicator_events_detected,
+            "indicator_aggregates_formed": self.indicator_aggregates_formed,
+            "agent_dispatch_active": len(self.agent_futures),
+            "agent_dispatch_queued": len(self.pending_agent_events),
+            "agent_queue_expired": self.agent_queue_expired,
+            "agent_queue_overflow_dropped": self.agent_queue_overflow_dropped,
         }
 
     def enforce_retention(self) -> None:
@@ -1743,7 +2215,8 @@ class IntraFinder:
                 )
                 self._log(
                     f"Starting Full Packet feed for universe={self.universe_version}; "
-                    f"instruments={len(instruments):,}; shadow_mode={self.shadow_mode}."
+                    f"instruments={len(instruments):,}; detector={self.detector_mode}; "
+                    f"aggregation={self.indicator_aggregation_seconds}s; shadow_mode={self.shadow_mode}."
                 )
                 # DhanHQ's v2 MarketFeed accepts the full list and performs the
                 # protocol-level subscription batching on one socket.
