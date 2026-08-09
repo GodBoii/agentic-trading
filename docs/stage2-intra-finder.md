@@ -10,6 +10,15 @@ Intra-Finder watches every Stage 1 survivor and asks:
 It does not choose a fixed top 30. Every stock must independently pass the live
 evidence threshold.
 
+## Current validation status
+
+Keep Intra-Finder in shadow mode. The available July 31, August 3, and August 4
+recordings do not support automatic scalp or agent triggering yet. A leakage-safe
+indicator/order-flow research layer and its failed holdout result are documented
+in [Stage 2 setup-quality research](stage2-quality-research.md). The production
+score below describes the existing event collector; it is not a proven trading
+edge.
+
 ## WebSocket limits
 
 One WebSocket connection can hold thousands of instruments. Dhan limits a
