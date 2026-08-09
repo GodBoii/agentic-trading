@@ -32,8 +32,9 @@
 - Gateway becomes healthy.
 - Universe Scanner runs at or after 08:40 IST.
 - Intra-Finder starts after today's successful universe exists.
-- Opening range completes at 09:30.
-- Setup events appear in `results/stage2/YYYY-MM-DD/setup-events.jsonl`.
+- One-minute indicator calculations begin after the first completed candle.
+- EMA and RSI need enough completed candles before their first event can appear.
+- Aggregated indicator events appear in `results/stage2/YYYY-MM-DD/setup-events.jsonl`.
 
 Check the Stage 2 readiness endpoint:
 
@@ -58,9 +59,6 @@ is event-driven, so an inactive stock may legitimately have no recent packet.
 Use `global_packet_age_seconds` and `connection_state` to diagnose the whole
 feed.
 
-`RVOL_BASELINE_UNAVAILABLE` means Stage 1 did not publish a current
-Asia/Kolkata baseline. Intra-Finder intentionally refuses to trigger that stock.
-
 `CONNECTION_WARMING_UP` protects the first thirty seconds after a real
 reconnection.
 
@@ -72,7 +70,10 @@ idle deadline. This causes a controlled reconnect and resubscription.
 Before changing shadow mode to `0`:
 
 - Replay several complete sessions.
-- Review false ORB and VWAP events.
+- Review indicator and candlestick events against their completed one-minute candles.
+- Confirm repeated states do not create repeated events.
+- Confirm multiple events within sixty seconds become one agent request.
+- Confirm queue-expired and overflow-dropped counters are visible and bounded; a stale event must never wait for hours.
 - Confirm NSE and BSE venue propagation in every event.
 - Confirm duplicate events remain suppressed after restart.
 - Check observed disk growth.

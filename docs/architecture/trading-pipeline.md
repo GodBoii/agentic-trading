@@ -6,7 +6,7 @@ The pipeline is separated by the kind of information each job uses:
 
 1. **Universe Scanner** uses Dhan reference data and completed historical candles.
 2. **Intra-Finder** watches the resulting stocks continuously with live Full Packet data.
-3. **AI trading agents** start only after Intra-Finder confirms a setup.
+3. **AI trading agents** start only after Intra-Finder observes and aggregates a new technical event.
 
 The old `sorting` process mixed historical scanning, live scanning, scheduling and
 agent triggering. A failure in one responsibility could therefore affect all of
@@ -32,7 +32,7 @@ remove a stock-specific setup.
 | `dhan-auth-manager` | Scanner-token validation, renewal and TOTP recovery | Website-user OAuth tokens |
 | `market-data-gateway` | REST rate limits, historical data and recovery quotes | Live WebSocket sorting |
 | `universe-scanner` | Master validation, ASM/GSM exclusion, historical filters and venue selection | Live prices |
-| `intra-finder` | Full Packet capture, five-level depth, ORB/VWAP detection and event dispatch | Final trade decision |
+| `intra-finder` | Full Packet capture, causal one-minute indicator/candle events, aggregation and event dispatch | Final trade decision or prediction of profitability |
 | `nifty-50-market-depth` | NIFTY futures, options and deep-market context | Individual-stock qualification |
 | `regime` | General market context | Blocking Intra-Finder events |
 | `ai-trading-agents` | Final evidence/risk analysis and possible execution | Broad top-N scanning |
@@ -50,7 +50,7 @@ snapshot, never half-written JSON.
 
 ## Rollout safety
 
-Intra-Finder defaults to `INTRA_FINDER_SHADOW_MODE=1`. It records setup events
+Intra-Finder defaults to `INTRA_FINDER_SHADOW_MODE=1`. It records indicator-event packets
 without calling an agent. Replay the captured data and review events before
 setting the value to `0`. Live order placement remains separately protected by
 `EXECUTIONER_ALLOW_LIVE_ORDERS`.
