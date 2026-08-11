@@ -32,12 +32,12 @@ class ExecutionerAgent:
         trade_mode = str((trade_config or {}).get("trade_mode") or "auto").lower()
         trade_amount = (trade_config or {}).get("trade_amount")
 
-        if trade_mode == "manual" and trade_amount:
+        if trade_amount:
             capital_instruction = (
-                f"Treat Rs {trade_amount} as this stock's intraday margin budget, not as a notional cap. "
-                "Size quantity from Dhan margin requirement, then verify margin before order placement."
+                f"Treat Rs {trade_amount} as this stock's strict cash/notional cap. "
+                "Do not assume leverage; use whole shares and verify current LTP before placement."
             )
-            trade_range_instruction = f"Use no more than Rs {trade_amount} margin for this stock."
+            trade_range_instruction = f"Use no more than Rs {trade_amount} notional for this stock."
         elif trade_mode == "auto":
             capital_instruction = "Size trades from available balance, Dhan margin validation, and supplied account context."
             trade_range_instruction = "Size trades based on the user's available account balance and margin response."

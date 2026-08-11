@@ -174,11 +174,10 @@ class DhanExecutionToolkit(Toolkit):
         exchange_segment: str = "BSE_EQ",
         trigger_price: float = 0.0,
     ) -> str:
-        """Size an intraday equity order from Dhan's margin for one share.
+        """Size a whole-share equity order from a strict cash/notional cap.
 
-        Manual trade amount is treated as an intraday margin budget, not as a
-        notional cap. The final order still needs a margin check for the chosen
-        quantity immediately before placement.
+        Dhan margin is evidence only and never expands the user's buying power.
+        The final order is rechecked with current LTP immediately before placement.
         """
         normalized_side = str(side).strip().upper()
         budget = max(0.0, float(margin_budget))
@@ -224,14 +223,14 @@ class DhanExecutionToolkit(Toolkit):
                 ensure_ascii=True,
             )
 
-        qty_by_margin = int(budget // margin_per_share)
+        qty_by_cash = int(budget // entry)
         qty_by_risk: Optional[int] = None
         per_share_risk: Optional[float] = None
         if stop is not None and max_risk_rupees is not None and float(max_risk_rupees) > 0:
             per_share_risk = abs(entry - stop)
-            qty_by_risk = int(float(max_risk_rupees) // per_share_risk) if per_share_risk > 0 else qty_by_margin
+            qty_by_risk = int(float(max_risk_rupees) // per_share_risk) if per_share_risk > 0 else qty_by_cash
 
-        caps = [qty_by_margin]
+        caps = [qty_by_cash]
         if qty_by_risk is not None:
             caps.append(qty_by_risk)
         if max_quantity is not None and int(max_quantity) > 0:
@@ -249,7 +248,7 @@ class DhanExecutionToolkit(Toolkit):
                 "stop_loss_price": stop,
                 "margin_budget": budget,
                 "margin_per_share": margin_per_share,
-                "max_qty_by_margin": qty_by_margin,
+                "max_qty_by_cash": qty_by_cash,
                 "max_risk_rupees": float(max_risk_rupees) if max_risk_rupees is not None else None,
                 "per_share_risk": per_share_risk,
                 "max_qty_by_risk": qty_by_risk,
