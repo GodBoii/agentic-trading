@@ -54,3 +54,13 @@ Intra-Finder defaults to `INTRA_FINDER_SHADOW_MODE=1`. It records indicator-even
 without calling an agent. Replay the captured data and review events before
 setting the value to `0`. Live order placement remains separately protected by
 `EXECUTIONER_ALLOW_LIVE_ORDERS`.
+
+# Per-user trading amount (dynamic Stage 2 routing)
+
+The Universe Scanner and Intra-Finder are continuous backend services. A website user does not start a scan. Stage 1 stays global and uses only historical/reference data. Intra-Finder also remains one global live detector.
+
+After a global indicator/candlestick event passes the common safety gates, the agent gateway evaluates it separately for every configured user. The amount field is optional. When it is blank, the gateway fetches current available broker balance and uses that as the effective amount. When a user supplies an amount, that fresh positive value becomes the effective amount. The route uses `floor(effective_amount / current_price)` whole shares; if the result is zero, that user is skipped while other users and global monitoring continue. Five-level depth and slippage are then estimated for that user's requested quantity. One user's rejection never removes the stock globally.
+
+The effective amount is a strict cash/notional cap. Intraday margin data may be shown as evidence, but it cannot increase buying power. The mode, amount source, effective amount and requested quantity travel in the agent evidence packet. Current LTP is fetched again immediately before placement. Automatic mode also refreshes available balance; if either check no longer covers the requested notional, placement fails closed.
+
+The current runtime represents multiple web-user configurations but uses one configured Dhan backend credential set. Per-user eligibility and evidence are isolated, but true per-user broker execution requires a credential resolver that creates a Dhan client for the routed `user_id`. Keep live orders disabled until that account isolation exists and is tested.

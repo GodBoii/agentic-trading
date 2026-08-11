@@ -88,3 +88,11 @@ Intra-Finder automatically removes raw-depth directories older than seven days
 and one-second directories older than ninety days. Setup events and Stage 1
 results are retained. Cleanup validates that the target is specifically the
 Stage 2 results directory before deleting anything.
+
+# Trading-amount diagnostics
+
+Market monitoring must remain healthy even when a user cannot be routed. Check `python-backend/ai_trading_state.json` under `user_states.<user_id>` for `trade_mode`, `trade_amount` and `amount_updated_at_utc`. `trade_mode=auto` intentionally stores no amount and resolves current available balance for every event. `trade_mode=manual` requires a positive finite amount; its default freshness window is 30 days (`TRADING_AMOUNT_MAX_AGE_SECONDS=2592000`). Invalid or stale manual values, or unavailable/zero automatic balance, pause only that user's agent/execution path.
+
+The browser endpoint `GET /api/ai-trading/config` returns a plain status such as `automatic_balance`, `manual_amount`, `amount_missing_or_invalid`, `amount_timestamp_unavailable`, or `amount_stale`. Event dispatch diagnostics additionally use `available_balance_unavailable`, `price_above_trading_amount`, `price_unavailable`, `user_depth_unavailable`, and `user_slippage_too_high`.
+
+Saving with `POST /api/ai-trading/config` persists either automatic mode (blank field) or a manual amount and arms continuous event routing for that user; it does not launch a batch. Intra-Finder shadow mode remains the Compose default (`INTRA_FINDER_SHADOW_MODE=1`), and `EXECUTIONER_ALLOW_LIVE_ORDERS=0` must remain unchanged during validation.
