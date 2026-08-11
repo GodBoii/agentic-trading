@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
+from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.trading_amount_service import TradingAmountService
+
+
+DEPTH = [
+    {"ask_price": 500.0 + index * 0.01, "ask_quantity": 10, "bid_price": 499.99 - index * 0.01, "bid_quantity": 10}
+    for index in range(5)
+]
+
+
+class TradingAmountContractTests(unittest.TestCase):
+    def test_missing_amount_selects_auto_while_invalid_manual_and_stale_fail_closed(self):
+        now = datetime.now(timezone.utc)
+        automatic = TradingAmountService.status({}, max_age_seconds=60, now=now)
+        self.assertTrue(automatic["eligible"])
+        self.assertEqual(automatic["code"], "automatic_balance")
+        for value in (0, -1, "bad", float("nan")):
+            status = TradingAmountService.status(
+                {"trade_mode": "manual", "trade_amount": value, "amount_updated_at_utc": now.isoformat()},
+                max_age_seconds=60,
+                now=now,
+            )
+            self.assertFalse(status["eligible"])
+        stale = TradingAmountService.status(
+            {"trade_mode": "manual", "trade_amount": 500, "amount_updated_at_utc": (now - timedelta(seconds=61)).isoformat()},
+            max_age_seconds=60,
+            now=now,
+        )
+        self.assertEqual(stale["code"], "amount_stale")
+
+    def test_price_above_amount_is_rejected_and_equal_or_below_is_eligible(self):
+        runner = object.__new__(MultiStockAgentRunner)
+        runner.config = SimpleNamespace(intra_finder_max_slippage_percent=1.0)
+        base = {"price": 500.0, "direction": "LONG", "five_level_depth": DEPTH}
+        rejected = runner.prepare_user_event(base, {"user_id": "small", "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": 499.99})
+        equal = runner.prepare_user_event(base, {"user_id": "equal", "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": 500.0})
+        below = runner.prepare_user_event(base, {"user_id": "larger", "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": 1000.0})
+        self.assertEqual(rejected["status_code"], "price_above_trading_amount")
+        self.assertTrue(equal["eligible"])
+        self.assertEqual(equal["requested_quantity"], 1)
+        self.assertTrue(below["eligible"])
+        self.assertEqual(below["requested_quantity"], 2)
+
+    def test_multi_user_amounts_are_isolated(self):
+        now = datetime.now(timezone.utc).isoformat()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            AITradingStateService.set_user_state(path, "small", True, {"trade_amount": 100, "amount_updated_at_utc": now})
+            AITradingStateService.set_user_state(path, "large", True, {"trade_amount": 1000, "amount_updated_at_utc": now})
+            AITradingStateService.set_user_state(path, "auto", True, {"trade_mode": "auto", "trade_amount": None, "amount_updated_at_utc": now})
+            users = AITradingStateService.configured_users(path, max_age_seconds=60)
+        self.assertEqual({row["user_id"]: row["trade_amount"] for row in users}, {"small": 100.0, "large": 1000.0, "auto": None})
+
+    def test_auto_mode_resolves_current_available_balance(self):
+        runner = object.__new__(MultiStockAgentRunner)
+        runner._build_account_context = lambda: {"funds": {"data": {"availabelBalance": 1250.0}}}
+        resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
+        self.assertTrue(resolved["eligible"])
+        self.assertEqual(resolved["trade_amount"], 1250.0)
+        self.assertEqual(resolved["amount_source"], "available_balance")
+
+    def test_auto_mode_fails_closed_when_balance_is_unavailable(self):
+        runner = object.__new__(MultiStockAgentRunner)
+        runner._build_account_context = lambda: {"funds": {"data": {}}}
+        resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
+        self.assertFalse(resolved["eligible"])
+        self.assertEqual(resolved["status_code"], "available_balance_unavailable")
+
+    def test_quantity_is_cash_based_without_leverage(self):
+        self.assertEqual(TradingAmountService.quantity(499.99, 500), 0)
+        self.assertEqual(TradingAmountService.quantity(500, 500), 1)
+        self.assertEqual(TradingAmountService.quantity(1099, 500), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
