@@ -32,11 +32,16 @@ except ImportError:
 
 
 class FakeStockDhan:
-    def __init__(self, margin_required=20.0, include_selected_position=True, order_status="TRANSIT"):
+    def __init__(self, margin_required=20.0, include_selected_position=True, order_status="TRANSIT", current_ltp=100.0, fund_balance=1000.0):
         self.margin_required = margin_required
         self.include_selected_position = include_selected_position
         self.order_status = order_status
         self.super_order_calls = 0
+        self.current_ltp = current_ltp
+        self.fund_balance = fund_balance
+
+    def fetch_quote_batch(self, security_ids, **_kwargs):
+        return {int(security_id): {"last_price": self.current_ltp} for security_id in security_ids}
 
     def calculate_margin_requirement(self, **_kwargs):
         return {"status": "success", "data": {"totalMargin": self.margin_required}}
@@ -100,7 +105,7 @@ class FakeStockDhan:
             "status": "success",
             "data": {
                 "dhanClientId": "private-client-id",
-                "availabelBalance": 1000.0,
+                "availabelBalance": self.fund_balance,
                 "utilizedAmount": 100.0,
             },
         }
@@ -653,6 +658,34 @@ class StockToolkitTests(unittest.TestCase):
 
         self.assertEqual(response["status"], "blocked")
         self.assertEqual(decision["execution_status"], "blocked")
+        self.assertEqual(dhan.super_order_calls, 0)
+
+    def test_execution_revalidates_current_ltp_against_cash_amount(self):
+        dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False, current_ltp=501.0)
+        toolkit = StockExecutionToolkit(dhan, 111, 500)
+        toolkit._dhan_tools.allow_live_orders = True
+
+        response = json.loads(toolkit.place_protected_intraday_order(
+            side="BUY", quantity=1, entry_price=490.0, target_price=510.0, stop_loss_price=480.0,
+        ))
+
+        self.assertEqual(response["status"], "blocked")
+        self.assertEqual(response["remarks"], "current_price_exceeds_trading_amount")
+        self.assertEqual(response["current_ltp"], 501.0)
+        self.assertEqual(dhan.super_order_calls, 0)
+
+    def test_auto_execution_revalidates_current_available_balance(self):
+        dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False, current_ltp=100.0, fund_balance=90.0)
+        toolkit = StockExecutionToolkit(dhan, 111, 500, amount_source="available_balance")
+        toolkit._dhan_tools.allow_live_orders = True
+
+        response = json.loads(toolkit.place_protected_intraday_order(
+            side="BUY", quantity=1, entry_price=100.0, target_price=105.0, stop_loss_price=98.0,
+        ))
+
+        self.assertEqual(response["status"], "blocked")
+        self.assertEqual(response["effective_current_cap"], 90.0)
+        self.assertEqual(response["amount_source"], "available_balance")
         self.assertEqual(dhan.super_order_calls, 0)
 
     def test_shared_execution_coordinator_serializes_final_checks_and_placements(self):

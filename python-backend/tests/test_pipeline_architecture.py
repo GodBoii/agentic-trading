@@ -348,6 +348,18 @@ class IntraFinderTests(unittest.TestCase):
         finder.pending_indicator_deadlines = []
         finder.indicator_events_detected = 0
         finder.indicator_aggregates_formed = 0
+        finder.readiness_evaluations = 0
+        finder.readiness_passed = 0
+        finder.readiness_rechecks = 0
+        finder.readiness_threshold = 75.0
+        finder.readiness_direction_margin = 10.0
+        finder.readiness_min_completed_bars = 45
+        finder.readiness_min_room_atr = 0.55
+        finder.readiness_max_last_trade_age_seconds = 90
+        finder.readiness_observation_seconds = 600
+        finder.readiness_reevaluation_seconds = 60
+        finder.readiness_min_confirmation_seconds = 300
+        finder.readiness_max_entry_drift_atr = 0.80
         finder.candidates_seen = 0
         finder.gate_failure_counts = Counter()
         finder.agent_futures = set()
@@ -433,9 +445,19 @@ class IntraFinderTests(unittest.TestCase):
                 finder.process_packet(packet, received_at=now + timedelta(minutes=2))
             )
             packet["volume"] = 2200
-            event = finder.process_packet(
-                packet, received_at=now + timedelta(minutes=2, seconds=2)
-            )
+            with patch(
+                "pipeline.stages.intra_finder.evaluate_trade_readiness",
+                return_value={
+                    "ready": True,
+                    "direction": "LONG",
+                    "score": 84.0,
+                    "components": {},
+                    "failures": [],
+                },
+            ):
+                event = finder.process_packet(
+                    packet, received_at=now + timedelta(minutes=2, seconds=2)
+                )
             self.assertIsNotNone(event)
             self.assertEqual(event["setup_type"], "INDICATOR_EVENT")
             self.assertEqual(event["direction"], "LONG")
@@ -500,7 +522,7 @@ class IntraFinderTests(unittest.TestCase):
                 )
             self.assertEqual(finder.events_formed, 0)
 
-    def test_indicator_event_path_does_not_require_rvol_baseline(self) -> None:
+    def test_indicator_observation_waits_for_readiness_when_history_is_too_short(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             finder = self._finder(Path(directory))
             stock = self._stock()
@@ -525,8 +547,9 @@ class IntraFinderTests(unittest.TestCase):
             event = finder.process_packet(
                 packet, received_at=now + timedelta(minutes=2, seconds=2)
             )
-            self.assertIsNotNone(event)
-            self.assertNotIn("RVOL_BASELINE_UNAVAILABLE", finder.gate_failure_counts)
+            self.assertIsNone(event)
+            self.assertGreater(finder.readiness_rechecks, 0)
+            self.assertIn("INSUFFICIENT_COMPLETED_BARS", finder.gate_failure_counts)
 
     def test_vwap_cross_is_detected_only_on_completed_candles(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -544,10 +567,20 @@ class IntraFinderTests(unittest.TestCase):
                 self._packet(volume=2200, price=101.0, vwap=100.0),
                 received_at=now + timedelta(minutes=2),
             )
-            event = finder.process_packet(
-                self._packet(volume=2300, price=101.0, vwap=100.0),
-                received_at=now + timedelta(minutes=2, seconds=2),
-            )
+            with patch(
+                "pipeline.stages.intra_finder.evaluate_trade_readiness",
+                return_value={
+                    "ready": True,
+                    "direction": "LONG",
+                    "score": 82.0,
+                    "components": {},
+                    "failures": [],
+                },
+            ):
+                event = finder.process_packet(
+                    self._packet(volume=2300, price=101.0, vwap=100.0),
+                    received_at=now + timedelta(minutes=2, seconds=2),
+                )
             self.assertIsNotNone(event)
             self.assertEqual(event["setup_type"], "INDICATOR_EVENT")
             self.assertEqual(event["direction"], "LONG")
