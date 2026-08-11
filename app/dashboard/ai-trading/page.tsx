@@ -876,7 +876,7 @@ function TradeHistoryView({
                             No saved agent runs yet
                         </p>
                         <Link href="/dashboard/ai-trading" className="mt-4 inline-flex text-[13px] text-accent hover:underline">
-                            Start your first run
+                            Waiting for the first eligible live event
                         </Link>
                     </div>
                 </div>
@@ -1201,7 +1201,7 @@ function AITradingChatContent() {
                             </Link>
                             <div className="border-l border-white/10 pl-3 sm:pl-4 min-w-0">
                                 <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
-                                    {viewMode === 'agent' ? 'Agent launcher' : viewMode === 'trades' ? 'Trade history' : 'Live run'}
+                                    {viewMode === 'agent' ? 'Trading settings' : viewMode === 'trades' ? 'Trade history' : 'Live events'}
                                 </p>
                                 <h1 className="font-display text-[18px] sm:text-[20px] text-white tracking-[-0.02em] leading-[1.1] mt-0.5">
                                     AI Trading <span className="font-serif-italic text-ink-secondary">{viewMode === 'agent' ? 'Control' : viewMode === 'trades' ? 'Archive' : 'Workspace'}</span>
@@ -1214,7 +1214,7 @@ function AITradingChatContent() {
                                 onClick={showAgentLauncher}
                                 className={`flex-shrink-0 rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${viewMode === 'agent' ? 'border-accent/40 bg-accent/[0.09] text-white' : 'border-line bg-white/[0.03] text-ink-secondary hover:text-white'}`}
                             >
-                                Agent
+                                Amount
                             </button>
                             <button
                                 type="button"
@@ -1296,13 +1296,13 @@ function AITradingChatContent() {
                     <section className="mx-auto max-w-3xl">
                         <div className="mb-7 text-center">
                             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-                                Configure one run
+                                Trading amount
                             </p>
                             <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.045em] text-white sm:text-[46px]">
-                                Put your agents to work.
+                                Choose fixed or automatic sizing.
                             </h2>
                             <p className="mx-auto mt-3 max-w-xl text-[13px] leading-relaxed text-ink-secondary">
-                                Choose automatic sizing or a fixed trade amount, decide whether regime analysis should run, then launch.
+                                Leave the amount blank to use available balance automatically, or enter a fixed amount. The scanner and Intra-Finder monitor continuously; no manual start is required.
                             </p>
                         </div>
                         <TradingStatus />
