@@ -8,7 +8,7 @@ create table public.user_trading_keys (
   dhan_access_token text not null, -- Storing as plain text per your request (Relying on RLS)
   
   -- Logic Control
-  is_trading_enabled boolean default false, -- The "Start/Stop" switch
+  is_trading_enabled boolean default false, -- Set when a valid amount is saved; not a manual scanner switch
   token_expiry timestamptz,
   
   -- Audit Timestamps
