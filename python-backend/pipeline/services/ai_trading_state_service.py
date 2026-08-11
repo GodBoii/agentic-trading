@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pipeline.services.storage_service import StorageService
+from pipeline.services.trading_amount_service import TradingAmountService
 
 
 class AITradingStateService:
@@ -59,3 +60,15 @@ class AITradingStateService:
         payload = AITradingStateService.load_state(path)
         enabled_user_ids = payload.get("enabled_user_ids")
         return isinstance(enabled_user_ids, list) and len(enabled_user_ids) > 0
+
+    @staticmethod
+    def configured_users(path: Path, *, max_age_seconds: float) -> list[Dict[str, Any]]:
+        payload = AITradingStateService.load_state(path)
+        results = []
+        for user_id, raw_entry in (payload.get("user_states") or {}).items():
+            entry = raw_entry if isinstance(raw_entry, dict) else {}
+            status = TradingAmountService.status(entry, max_age_seconds=max_age_seconds)
+            if not entry.get("enabled") or not status["eligible"]:
+                continue
+            results.append({"user_id": str(user_id), **entry, **status})
+        return results
