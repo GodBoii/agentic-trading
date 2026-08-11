@@ -14,7 +14,9 @@ from typing import Any, Deque, Dict, Iterable, List
 
 
 class IndicatorEventEngine:
-    BAR_LIMIT = 120
+    # Preserve one complete cash-market session so the readiness layer can use
+    # slower five- and fifteen-minute structure.
+    BAR_LIMIT = 420
 
     def __init__(
         self,
@@ -263,9 +265,9 @@ class IndicatorEventEngine:
 
         if previous_rsi is not None and rsi is not None:
             if float(previous_rsi) >= self.rsi_oversold > rsi:
-                add("RSI_ENTERED_OVERSOLD", "LONG", rsi=rsi, threshold=self.rsi_oversold)
+                add("RSI_ENTERED_OVERSOLD", "NEUTRAL", rsi=rsi, threshold=self.rsi_oversold)
             if float(previous_rsi) <= self.rsi_overbought < rsi:
-                add("RSI_ENTERED_OVERBOUGHT", "SHORT", rsi=rsi, threshold=self.rsi_overbought)
+                add("RSI_ENTERED_OVERBOUGHT", "NEUTRAL", rsi=rsi, threshold=self.rsi_overbought)
             if float(previous_rsi) <= self.rsi_oversold < rsi:
                 add("RSI_EXITED_OVERSOLD", "LONG", rsi=rsi, threshold=self.rsi_oversold)
             if float(previous_rsi) >= self.rsi_overbought > rsi:
@@ -297,14 +299,27 @@ class IndicatorEventEngine:
                     add("ORB_BEARISH_CLOSE_BREAK", "SHORT", level=opening_range_low)
 
         if volume_ratio is not None and volume_ratio >= self.volume_surge_ratio:
-            candle_direction = (
-                "LONG"
-                if float(bar["close"]) > float(bar["open"])
-                else "SHORT"
-                if float(bar["close"]) < float(bar["open"])
-                else "NEUTRAL"
+            candle_range = max(1e-9, float(bar["high"]) - float(bar["low"]))
+            signed_body = float(bar["close"]) - float(bar["open"])
+            body_to_range = abs(signed_body) / candle_range
+            close_location = (float(bar["close"]) - float(bar["low"])) / candle_range
+            # Volume is participation, not direction.  It becomes directional
+            # only when a completed candle also closes decisively near one end.
+            candle_direction = "NEUTRAL"
+            if body_to_range >= 0.35 and close_location >= 0.70:
+                candle_direction = "LONG"
+            elif body_to_range >= 0.35 and close_location <= 0.30:
+                candle_direction = "SHORT"
+            add(
+                "VOLUME_SURGE",
+                candle_direction,
+                volume_ratio=volume_ratio,
+                median_prior_volume=normal_volume,
+                current_volume=float(bar.get("volume") or 0.0),
+                body_to_range=body_to_range,
+                close_location=close_location,
+                baseline_samples=len(prior_volumes),
             )
-            add("VOLUME_SURGE", candle_direction, volume_ratio=volume_ratio)
 
         state["indicator_snapshot"] = {
             "as_of": detected_at.isoformat(),
