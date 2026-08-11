@@ -99,6 +99,34 @@ Keep Intra-Finder in shadow mode and collect at least 20 complete, stable tradin
 
 Automatic agent triggering should be considered only after multiple untouched days show positive conservative net expectancy, stable results across market conditions, acceptable drawdown, and enough signals for the estimate to be credible.
 
+## Trade-readiness v1 audit after the August 10 agent review
+
+The August 10 agent reports showed that most skips came from poor entry location, insufficient room, missing confirmation, stale trading and conflicting structure. Stage 2 now treats raw indicators as observations and applies a separate trade-readiness layer before agent dispatch. The implementation includes:
+
+- Five- and fifteen-minute structure instead of one-minute direction alone.
+- ATR-normalized support/resistance location and target room.
+- Five-minute confirmation and a minimum five-minute observation window.
+- Time-of-day RVOL, volume acceleration and recent five-minute participation.
+- Exchange last-trade freshness and persistent 30-second depth measurements.
+- Low candle-pattern weights and no dispatch for doji/volume-only observations.
+- Rejection of conflicting transitions, recent two-sided price action and excessive signal churn.
+- A bounded downstream AI queue and worker-start expiration.
+
+The scoring and gates were frozen before replaying the older dates below. Source Parquet files were read without modification. The recorded windows were measured from the data rather than inferred from folder names.
+
+| Date | Recorded IST window | Readiness events | 15m median directional return | 30m median | 60m median |
+|---|---|---:|---:|---:|---:|
+| 2026-07-31 | 10:13-15:30 | 59 | 0.0000% | -0.0326% | -0.0745% (49 eligible) |
+| 2026-08-03 | 09:20-15:02 | 112 | -0.0402% (111 eligible) | -0.0403% (105) | -0.1062% (101) |
+| 2026-08-04 | 09:29-13:24 | 89 | -0.0172% (83) | -0.0432% (76) | +0.0560% (64) |
+| 2026-08-10 | 12:50-14:01 | 17 | +0.0600% (only 6 eligible) | insufficient follow-up | insufficient follow-up |
+
+Across July 31, August 3 and August 4, the weighted mean directional return was approximately -0.017% at 15 minutes, -0.027% at 30 minutes and -0.015% at 60 minutes before costs. Approximately 45%, 42% and 44% of eligible events were positive at those horizons. These results do not demonstrate predictive edge.
+
+The wider symmetric target/stop audit was also inconsistent. At 1.0% over the available next hour, July 31 produced 14 target-first versus 6 stop-first outcomes, August 3 produced 10 versus 17, and August 4 produced 8 versus 8. This variation across days is exactly why one favourable session cannot be used to approve live routing.
+
+The readiness layer is therefore approved only as a **shadow-mode traffic and explanation layer**. It materially reduces agent demand, records explicit reasons for suppression, and prevents stale backlogs, but it is not approved as evidence that the remaining setups are profitable. `INTRA_FINDER_SHADOW_MODE=1` and `EXECUTIONER_ALLOW_LIVE_ORDERS=0` remain the required settings.
+
 ## Commands
 
 From `python-backend`:
@@ -108,4 +136,3 @@ python -m unittest tests.test_stage2_quality_replay -v
 python -m pipeline.runtime.run_stage2_quality_backtest --dates 2026-07-31 2026-08-03 --output results/research/stage2-quality-v3-devval --rebuild-features
 python -m pipeline.runtime.run_stage2_quality_backtest --dates 2026-08-04 --output results/research/stage2-quality-v3-holdout --rebuild-features
 ```
-
