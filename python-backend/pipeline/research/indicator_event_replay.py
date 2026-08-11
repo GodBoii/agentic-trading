@@ -16,6 +16,7 @@ import pyarrow as pa
 import pyarrow.dataset as pads
 
 from pipeline.stages.indicator_event_engine import IndicatorEventEngine
+from pipeline.stages.trade_readiness import evaluate_trade_readiness
 
 
 REPLAY_COLUMNS = [
@@ -35,6 +36,10 @@ REPLAY_COLUMNS = [
     "best_ask",
     "bid_quantity_5",
     "ask_quantity_5",
+    "relative_volume",
+    "volume_acceleration",
+    "depth_imbalance",
+    "order_count_imbalance",
 ]
 
 
@@ -72,6 +77,10 @@ def _partial_frame(frame: pd.DataFrame) -> pd.DataFrame:
         best_ask=("best_ask", "last"),
         bid_quantity_5=("bid_quantity_5", "last"),
         ask_quantity_5=("ask_quantity_5", "last"),
+        relative_volume=("relative_volume", "last"),
+        volume_acceleration=("volume_acceleration", "last"),
+        depth_imbalance=("depth_imbalance", "median"),
+        order_count_imbalance=("order_count_imbalance", "median"),
     )
     return result.reset_index()
 
@@ -98,6 +107,10 @@ def load_recorded_minutes(one_second_root: Path) -> pd.DataFrame:
                     "opening_range_low",
                     "spread_percent",
                     "estimated_slippage_percent",
+                    "relative_volume",
+                    "volume_acceleration",
+                    "depth_imbalance",
+                    "order_count_imbalance",
                 )
             ],
             pa.field("connection_warm", pa.bool_()),
@@ -140,6 +153,10 @@ def load_recorded_minutes(one_second_root: Path) -> pd.DataFrame:
         best_ask=("best_ask", "last"),
         bid_quantity_5=("bid_quantity_5", "last"),
         ask_quantity_5=("ask_quantity_5", "last"),
+        relative_volume=("relative_volume", "last"),
+        volume_acceleration=("volume_acceleration", "last"),
+        depth_imbalance=("depth_imbalance", "median"),
+        order_count_imbalance=("order_count_imbalance", "median"),
     ).reset_index()
     combined = combined.sort_values(["security_id", "minute"])
     combined["volume"] = (
@@ -180,12 +197,17 @@ def replay_indicator_events(
     event_cooldown_seconds: int = 600,
     stock_agent_cooldown_seconds: int = 1200,
     volume_surge_ratio: float = 1.8,
+    readiness_score_threshold: float = 75.0,
+    readiness_direction_margin: float = 10.0,
+    readiness_min_completed_bars: int = 45,
 ) -> Dict[str, Any]:
     event_counts: Counter[str] = Counter()
     direction_counts: Counter[str] = Counter()
     gate_counts: Counter[str] = Counter()
     aggregates: List[Dict[str, Any]] = []
     detected_event_total = 0
+    readiness_passed = 0
+    readiness_failure_counts: Counter[str] = Counter()
 
     for security_id, stock_rows in minutes.groupby("security_id", sort=False, observed=True):
         engine = IndicatorEventEngine(
@@ -198,7 +220,7 @@ def replay_indicator_events(
         last_agent_at: pd.Timestamp | None = None
 
         def flush(row: pd.Series, at: pd.Timestamp) -> None:
-            nonlocal pending, deadline, last_agent_at
+            nonlocal pending, deadline, last_agent_at, readiness_passed
             if not pending:
                 return
             directions = {item["direction"] for item in pending if item["direction"] in {"LONG", "SHORT"}}
@@ -212,9 +234,37 @@ def replay_indicator_events(
             if last_agent_at is not None and (at - last_agent_at).total_seconds() < stock_agent_cooldown_seconds:
                 failures.append("STOCK_AGENT_COOLDOWN")
             gate_counts.update(failures)
-            accepted = not failures
+            features = {
+                "received_at": at.isoformat(),
+                "last_price": float(row["close"]),
+                "vwap": None if pd.isna(row.get("vwap")) else float(row["vwap"]),
+                "opening_range_high": None if pd.isna(row.get("opening_range_high")) else float(row["opening_range_high"]),
+                "opening_range_low": None if pd.isna(row.get("opening_range_low")) else float(row["opening_range_low"]),
+                "relative_volume": None if pd.isna(row.get("relative_volume")) else float(row["relative_volume"]),
+                "volume_acceleration": None if pd.isna(row.get("volume_acceleration")) else float(row["volume_acceleration"]),
+                "spread_percent": None if pd.isna(row.get("spread_percent")) else float(row["spread_percent"]),
+                "estimated_slippage_percent": None if pd.isna(row.get("estimated_slippage_percent")) else float(row["estimated_slippage_percent"]),
+                "depth_imbalance_median_30s": None if pd.isna(row.get("depth_imbalance")) else float(row["depth_imbalance"]),
+                "order_count_imbalance_median_30s": None if pd.isna(row.get("order_count_imbalance")) else float(row["order_count_imbalance"]),
+                "depth_sample_count_30s": 0,
+                # LTT was not persisted in older sessions.  Keep it unknown so
+                # replay cannot invent trade freshness.
+                "last_trade_age_seconds": None,
+            }
+            readiness = evaluate_trade_readiness(
+                bars=list(state.get("minute_bars") or []),
+                events=pending,
+                features=features,
+                threshold=readiness_score_threshold,
+                direction_margin=readiness_direction_margin,
+                min_completed_bars=readiness_min_completed_bars,
+            )
+            readiness_failure_counts.update(readiness.get("failures") or [])
+            safety_accepted = not failures
+            accepted = safety_accepted and bool(readiness.get("ready"))
             if accepted:
                 last_agent_at = at
+                readiness_passed += 1
             aggregates.append(
                 {
                     "security_id": int(security_id),
@@ -222,13 +272,41 @@ def replay_indicator_events(
                     "at": at.isoformat(),
                     "direction": direction,
                     "event_types": [item["event_type"] for item in pending],
-                    "accepted_by_approximate_safety_gates": accepted,
+                    "accepted_by_approximate_safety_gates": safety_accepted,
+                    "accepted_by_trade_readiness": accepted,
                     "failures": failures,
+                    "readiness": readiness,
                 }
             )
             direction_counts[direction] += 1
-            pending = []
-            deadline = None
+            weak_types = {
+                "DOJI",
+                "VOLUME_SURGE",
+                "RSI_ENTERED_OVERSOLD",
+                "RSI_ENTERED_OVERBOUGHT",
+            }
+            event_types = {str(item.get("event_type") or "") for item in pending}
+            weak_only = bool(event_types) and event_types.issubset(weak_types)
+            evidence_ages = []
+            for item in pending:
+                try:
+                    evidence_ages.append(
+                        max(
+                            0.0,
+                            (
+                                at
+                                - pd.Timestamp(item.get("detected_at"))
+                            ).total_seconds(),
+                        )
+                    )
+                except (TypeError, ValueError):
+                    evidence_ages.append(601.0)
+            expired = bool(evidence_ages) and max(evidence_ages) >= 600.0
+            if accepted or failures or weak_only or expired:
+                pending = []
+                deadline = None
+            else:
+                deadline = at + timedelta(seconds=60)
 
         previous_row: pd.Series | None = None
         for _, row in stock_rows.sort_values("minute").iterrows():
@@ -274,18 +352,24 @@ def replay_indicator_events(
         "event_type_counts": dict(event_counts.most_common()),
         "aggregates_formed": len(aggregates),
         "aggregates_passing_approximate_safety_gates": accepted,
+        "aggregates_passing_trade_readiness": readiness_passed,
         "direction_counts": dict(direction_counts.most_common()),
         "gate_failure_counts": dict(gate_counts.most_common()),
+        "readiness_failure_counts": dict(readiness_failure_counts.most_common()),
         "parameters": {
             "aggregation_seconds": aggregation_seconds,
             "event_cooldown_seconds": event_cooldown_seconds,
             "stock_agent_cooldown_seconds": stock_agent_cooldown_seconds,
             "volume_surge_ratio": volume_surge_ratio,
+            "readiness_score_threshold": readiness_score_threshold,
+            "readiness_direction_margin": readiness_direction_margin,
+            "readiness_min_completed_bars": readiness_min_completed_bars,
         },
         "limitations": [
             "One-second snapshots preserve top-five summaries, not full depth arrays; depth completeness is approximated.",
             "This report measures detector volume and operational gating, not profitability.",
             "Missing portions of a recorded session remain missing and are not synthesized.",
+            "Historical recordings before this change do not contain exchange last-trade time or persistent depth sample counts.",
         ],
         "aggregates": aggregates,
     }
