@@ -22,7 +22,7 @@ class StockExecutionCoordinator:
 
 
 class StockExecutionToolkit(Toolkit):
-    """New-entry execution tools bound to one stock and one margin budget."""
+    """New-entry execution tools bound to one stock and a cash/notional cap."""
 
     ALLOWED_ORDER_TYPES = {"LIMIT", "MARKET", "STOP_LOSS", "STOP_LOSS_MARKET"}
 
@@ -33,9 +33,12 @@ class StockExecutionToolkit(Toolkit):
         margin_budget: float,
         exchange_segment: Optional[str] = "BSE_EQ",
         coordinator: Optional[StockExecutionCoordinator] = None,
+        amount_source: str = "user_amount",
     ) -> None:
         self.security_id = int(security_id)
         self.margin_budget = max(0.0, float(margin_budget))
+        self.trade_amount = self.margin_budget
+        self.amount_source = str(amount_source or "user_amount")
         self.exchange_segment = str(exchange_segment or "BSE_EQ").upper()
         if self.exchange_segment not in {"NSE_EQ", "BSE_EQ"}:
             raise ValueError("StockExecutionToolkit requires NSE_EQ or BSE_EQ.")
@@ -63,7 +66,7 @@ class StockExecutionToolkit(Toolkit):
         stop_loss_price: Optional[float] = None,
         max_risk_rupees: Optional[float] = None,
     ) -> str:
-        """Calculate quantity from the assigned run's Dhan intraday margin budget.
+        """Calculate whole-share quantity from the assigned cash/notional cap.
 
         Args:
             side: BUY or SELL.
@@ -100,7 +103,7 @@ class StockExecutionToolkit(Toolkit):
     ) -> str:
         """Place one protected intraday entry for the assigned stock.
 
-        Quantity is checked against the bound margin budget immediately before
+        Quantity is checked against the bound cash amount and current LTP immediately before
         placement. This tool cannot modify or exit any existing trade.
 
         Args:
@@ -318,11 +321,60 @@ class StockExecutionToolkit(Toolkit):
         reference_price: float,
         trigger_price: float = 0.0,
     ) -> Optional[str]:
+        try:
+            quotes = self._dhan_tools.dhan.fetch_quote_batch(
+                [self.security_id], exchange_segment=self.exchange_segment
+            )
+            quote = quotes.get(self.security_id) or quotes.get(str(self.security_id)) or {}
+            current_ltp = float(
+                quote.get("last_price")
+                or quote.get("LTP")
+                or quote.get("ltp")
+                or quote.get("last_traded_price")
+                or 0
+            )
+        except Exception as exc:
+            return self._failure(f"current_ltp_unavailable:{type(exc).__name__}")
+        if current_ltp <= 0:
+            return self._failure("current_ltp_unavailable")
+        effective_cap = self.trade_amount
+        if self.amount_source == "available_balance":
+            try:
+                funds = self._dhan_tools.dhan.fetch_fund_limits()
+                data = funds.get("data") if isinstance(funds, dict) else {}
+                if isinstance(data, dict) and isinstance(data.get("data"), dict):
+                    data = data["data"]
+                current_balance = float(
+                    (data or {}).get("availabelBalance")
+                    or (data or {}).get("availableBalance")
+                    or (data or {}).get("sodLimit")
+                    or 0
+                )
+            except Exception as exc:
+                return self._failure(f"available_balance_unavailable:{type(exc).__name__}")
+            if current_balance <= 0:
+                return self._failure("available_balance_unavailable")
+            effective_cap = min(effective_cap, current_balance)
+        requested_notional = current_ltp * int(quantity)
+        if requested_notional > effective_cap + 1e-9:
+            return json.dumps(
+                {
+                    "status": "blocked",
+                    "remarks": "current_price_exceeds_trading_amount",
+                    "trade_amount": self.trade_amount,
+                    "amount_source": self.amount_source,
+                    "effective_current_cap": effective_cap,
+                    "current_ltp": current_ltp,
+                    "requested_quantity": int(quantity),
+                    "requested_notional": requested_notional,
+                },
+                ensure_ascii=True,
+            )
         response = self._dhan_tools.calculate_margin_requirement(
             security_id=self.security_id,
             side=side,
             quantity=int(quantity),
-            reference_price=float(reference_price),
+            reference_price=current_ltp,
             exchange_segment=self.exchange_segment,
             trigger_price=float(trigger_price),
         )

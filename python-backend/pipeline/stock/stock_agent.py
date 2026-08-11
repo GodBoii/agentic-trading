@@ -309,6 +309,15 @@ class StockAgent:
         ]
         if selected_stock.get("symbol"):
             lines.append(f"- Symbol: {selected_stock.get('symbol')}")
+        if selected_stock.get("trade_amount") is not None:
+            lines.extend([
+                f"- Strict cash/notional cap: Rs {selected_stock.get('trade_amount')}",
+                f"- Sizing mode: {selected_stock.get('trade_mode')} ({selected_stock.get('amount_source')})",
+                f"- Requested whole-share quantity: {selected_stock.get('requested_quantity')}",
+                f"- Estimated notional: Rs {selected_stock.get('estimated_notional')}",
+                f"- User-sized depth slippage estimate: {selected_stock.get('estimated_slippage_percent')}%",
+                "- Do not assume leverage. Current LTP and affordability are revalidated immediately before placement.",
+            ])
         if current_time:
             lines.append(f"- Indian date and time: {current_time}")
         lines.append(f"- Regular market session: {market_session.get('regular_session') or '09:15-15:30 IST'}")
