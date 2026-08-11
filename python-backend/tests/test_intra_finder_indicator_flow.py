@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 import sys
 import types
 
@@ -34,6 +35,18 @@ class IntraFinderIndicatorFlowTests(unittest.TestCase):
         finder.agent_queue_expired = 0
         finder.indicator_events_detected = 0
         finder.indicator_aggregates_formed = 0
+        finder.readiness_evaluations = 0
+        finder.readiness_passed = 0
+        finder.readiness_rechecks = 0
+        finder.readiness_threshold = 75.0
+        finder.readiness_direction_margin = 10.0
+        finder.readiness_min_completed_bars = 45
+        finder.readiness_min_room_atr = 0.55
+        finder.readiness_max_last_trade_age_seconds = 90
+        finder.readiness_observation_seconds = 600
+        finder.readiness_reevaluation_seconds = 60
+        finder.readiness_min_confirmation_seconds = 300
+        finder.readiness_max_entry_drift_atr = 0.80
         finder.shadow_mode = True
         finder.events_suppressed = 0
         finder.gate_failure_counts = __import__("collections").Counter()
@@ -70,16 +83,27 @@ class IntraFinderIndicatorFlowTests(unittest.TestCase):
         captured = []
         finder._indicator_safety_gates = lambda *args: ([], 0.01)
 
-        def create_event(stock, local_state, features, events, direction, score, emitted_at):
-            captured.append((events, direction, score))
+        def create_event(stock, local_state, features, events, direction, readiness, score, emitted_at):
+            captured.append((events, direction, readiness["score"], score))
             return {"event_id": "one-event"}
 
         finder._create_indicator_event = create_event
         self.assertEqual(finder._flush_due_indicator_events(now + timedelta(seconds=30)), [])
-        emitted = finder._flush_due_indicator_events(now + timedelta(seconds=61))
+        with patch(
+            "pipeline.stages.intra_finder.evaluate_trade_readiness",
+            return_value={
+                "ready": True,
+                "direction": "LONG",
+                "score": 82.0,
+                "components": {},
+                "failures": [],
+            },
+        ):
+            emitted = finder._flush_due_indicator_events(now + timedelta(seconds=61))
         self.assertEqual(len(emitted), 1)
         self.assertEqual(len(captured[0][0]), 2)
         self.assertEqual(captured[0][1], "LONG")
+        self.assertEqual(captured[0][2], 82.0)
 
     def test_mixed_indicator_directions_are_preserved_for_agent_reasoning(self) -> None:
         now = datetime.fromisoformat("2026-08-03T10:00:01+05:30")
@@ -109,6 +133,25 @@ class IntraFinderIndicatorFlowTests(unittest.TestCase):
         )
         self.assertEqual(failures, [])
         self.assertEqual(slippage, 0.01)
+
+    def test_weak_evidence_is_rejected_before_agent_readiness(self) -> None:
+        finder = self.finder()
+        self.assertTrue(
+            finder._weak_indicator_evidence_only(
+                [
+                    {"event_type": "DOJI"},
+                    {"event_type": "VOLUME_SURGE"},
+                ]
+            )
+        )
+        self.assertFalse(
+            finder._weak_indicator_evidence_only(
+                [
+                    {"event_type": "DOJI"},
+                    {"event_type": "EMA_BULLISH_CROSS"},
+                ]
+            )
+        )
 
     def test_agent_queue_discards_stale_evidence_before_dispatch(self) -> None:
         finder = self.finder()

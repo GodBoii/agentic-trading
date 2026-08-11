@@ -101,6 +101,48 @@ class IndicatorEventEngineTests(unittest.TestCase):
         self.assertEqual(events, [])
         self.assertEqual(len(state["minute_bars"]), 2)
 
+    def test_volume_surge_without_decisive_candle_is_neutral(self) -> None:
+        engine = IndicatorEventEngine(event_cooldown_seconds=0, volume_surge_ratio=1.8)
+        state = engine.state_fields()
+        for index in range(10):
+            minute = self.start + timedelta(minutes=index)
+            engine.on_closed_bar(
+                state,
+                bar={
+                    "minute_start": minute.isoformat(),
+                    "open": 100.0,
+                    "high": 100.1,
+                    "low": 99.9,
+                    "close": 100.02,
+                    "volume": 100.0,
+                    "vwap": 100.0,
+                },
+                detected_at=minute + timedelta(minutes=1),
+                opening_range_high=None,
+                opening_range_low=None,
+                opening_range_complete=False,
+            )
+        minute = self.start + timedelta(minutes=10)
+        events = engine.on_closed_bar(
+            state,
+            bar={
+                "minute_start": minute.isoformat(),
+                "open": 100.0,
+                "high": 100.2,
+                "low": 99.8,
+                "close": 100.02,
+                "volume": 500.0,
+                "vwap": 100.0,
+            },
+            detected_at=minute + timedelta(minutes=1),
+            opening_range_high=None,
+            opening_range_low=None,
+            opening_range_complete=False,
+        )
+        surge = next(item for item in events if item["event_type"] == "VOLUME_SURGE")
+        self.assertEqual(surge["direction"], "NEUTRAL")
+        self.assertLess(surge["details"]["body_to_range"], 0.35)
+
 
 if __name__ == "__main__":
     unittest.main()
