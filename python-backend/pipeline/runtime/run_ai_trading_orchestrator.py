@@ -11,13 +11,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Lock, Thread
+from threading import BoundedSemaphore, Lock, Thread
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.trading_amount_service import TradingAmountService
 from pipeline.services.storage_service import StorageService
 
 
@@ -94,9 +95,22 @@ class AITradingOrchestrator:
         self.last_request_id: Optional[str] = None
         self._boot_time_utc = datetime.now(timezone.utc)
         self.ws = WebSocketBroadcaster()
-        self.event_executor = ThreadPoolExecutor(
-            max_workers=max(1, self.config.intra_finder_agent_concurrency)
+        self.event_workers = max(1, self.config.intra_finder_agent_concurrency)
+        self.event_queue_max = max(
+            1,
+            int(os.getenv("AI_TRADING_EVENT_QUEUE_MAX", str(self.config.ai_trading_event_queue_max))),
         )
+        self.event_max_age_seconds = max(
+            1,
+            int(
+                os.getenv(
+                    "AI_TRADING_EVENT_MAX_AGE_SECONDS",
+                    str(self.config.ai_trading_event_max_age_seconds),
+                )
+            ),
+        )
+        self.event_executor = ThreadPoolExecutor(max_workers=self.event_workers)
+        self.event_capacity = BoundedSemaphore(self.event_workers + self.event_queue_max)
         self.event_state_path = self.config.agents_results_dir / "event-dispatch-state.json"
         self.event_state = self.storage.load_snapshot(self.event_state_path) or {"events": {}}
         self.event_lock = Lock()
@@ -105,16 +119,12 @@ class AITradingOrchestrator:
         print("=" * 60)
         print("AI TRADING ORCHESTRATOR")
         print("=" * 60)
-        print("Waiting for user start requests...")
+        print("Continuous detector routing is active; no manual start request is required.")
         self._start_http_gateway()
 
         while True:
             try:
-                request = self._load_pending_request()
-                if request:
-                    self._run_request(request)
-                else:
-                    time.sleep(2)
+                time.sleep(2)
             except Exception as exc:  # pragma: no cover - runtime safety
                 print(f"AI trading orchestrator error: {type(exc).__name__}: {exc}")
                 self._save_status("failed", "orchestrator", error=str(exc))
@@ -176,33 +186,146 @@ class AITradingOrchestrator:
             existing = (self.event_state.get("events") or {}).get(event_id)
             if existing:
                 return {"accepted": False, "duplicate": True, "event_id": event_id}
+            if not self.event_capacity.acquire(blocking=False):
+                return {
+                    "accepted": False,
+                    "duplicate": False,
+                    "queue_full": True,
+                    "event_id": event_id,
+                }
             self.event_state.setdefault("events", {})[event_id] = {
-                "status": "accepted",
+                "status": "queued",
                 "accepted_at_utc": datetime.now(timezone.utc).isoformat(),
             }
-            self.storage.save_snapshot(self.event_state_path, self.event_state)
-        self.event_executor.submit(self._run_intra_finder_event, dict(event))
-        return {"accepted": True, "duplicate": False, "event_id": event_id}
+            try:
+                self.storage.save_snapshot(self.event_state_path, self.event_state)
+            except Exception:
+                self.event_state.setdefault("events", {}).pop(event_id, None)
+                self.event_capacity.release()
+                raise
+        try:
+            future = self.event_executor.submit(self._run_intra_finder_event, dict(event))
+        except Exception as exc:
+            with self.event_lock:
+                existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
+                existing.update(
+                    {
+                        "status": "failed",
+                        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                        "error": f"executor_submit_failed:{type(exc).__name__}",
+                    }
+                )
+                self.event_state.setdefault("events", {})[event_id] = existing
+                self.storage.save_snapshot(self.event_state_path, self.event_state)
+            self.event_capacity.release()
+            raise
+        future.add_done_callback(lambda _future: self.event_capacity.release())
+        return {
+            "accepted": True,
+            "duplicate": False,
+            "queue_full": False,
+            "event_id": event_id,
+        }
+
+    def save_user_config(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        user_id = str(request.get("user_id") or "").strip()
+        raw_amount = request.get("trade_amount")
+        amount = TradingAmountService.parse(raw_amount)
+        trade_mode = "auto" if raw_amount in (None, "") else "manual"
+        if not user_id:
+            raise ValueError("user_id_required")
+        if trade_mode == "manual" and amount is None:
+            raise ValueError("trade_amount_must_be_a_positive_finite_number")
+        now = datetime.now(timezone.utc).isoformat()
+        state = AITradingStateService.set_user_state(
+            self.config.ai_trading_state_path,
+            user_id,
+            True,
+            {
+                "email": request.get("email"),
+                "trade_mode": trade_mode,
+                "trade_amount": amount,
+                "amount_updated_at_utc": now,
+                "status_code": "automatic_balance" if trade_mode == "auto" else "manual_amount",
+            },
+        )
+        return {"user_id": user_id, "trade_mode": trade_mode, "trade_amount": amount, "amount_updated_at_utc": now, "enabled": True, "generated_at_utc": state.get("generated_at_utc")}
+
+    def load_user_config(self, user_id: str) -> Dict[str, Any]:
+        entry = (AITradingStateService.load_state(self.config.ai_trading_state_path).get("user_states") or {}).get(user_id) or {}
+        max_age = float(os.getenv("TRADING_AMOUNT_MAX_AGE_SECONDS", str(30 * 24 * 60 * 60)))
+        status = TradingAmountService.status(entry, max_age_seconds=max_age)
+        return {"user_id": user_id, "trade_mode": status.get("trade_mode"), "trade_amount": entry.get("trade_amount"), "amount_updated_at_utc": entry.get("amount_updated_at_utc"), "enabled": bool(entry.get("enabled")), **status}
 
     def _run_intra_finder_event(self, event: Dict[str, Any]) -> None:
         event_id = str(event["event_id"])
+        started_at = datetime.now(timezone.utc)
+        with self.event_lock:
+            existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
+            existing.update(
+                {
+                    "status": "started",
+                    "started_at_utc": started_at.isoformat(),
+                }
+            )
+            self.event_state.setdefault("events", {})[event_id] = existing
+            self.storage.save_snapshot(self.event_state_path, self.event_state)
         try:
+            created_at_raw = event.get("created_at")
+            if created_at_raw:
+                created_at = datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                event_age = max(
+                    0.0,
+                    (started_at - created_at.astimezone(timezone.utc)).total_seconds(),
+                )
+                if event_age > self.event_max_age_seconds:
+                    raise TimeoutError(
+                        f"event_expired_before_agent_start:age={event_age:.1f}s:"
+                        f"limit={self.event_max_age_seconds}s"
+                    )
             self._broadcast_event({"type": "intra_finder_event_accepted", "event": event})
-            result = self.stock_agent.run_event(event, event_callback=self._broadcast_event)
+            max_age = float(os.getenv("TRADING_AMOUNT_MAX_AGE_SECONDS", str(30 * 24 * 60 * 60)))
+            users = AITradingStateService.configured_users(self.config.ai_trading_state_path, max_age_seconds=max_age)
+            user_results = []
+            for user in users:
+                resolved = self.stock_agent.resolve_user_trade_config(user)
+                if not resolved.get("eligible"):
+                    user_results.append(resolved)
+                    continue
+                routed = self.stock_agent.prepare_user_event(event, resolved)
+                if not routed.get("eligible"):
+                    user_results.append(routed)
+                    continue
+                result = self.stock_agent.run_event(
+                    routed["event"],
+                    user_id=user["user_id"],
+                    trade_config={
+                        "trade_mode": resolved["trade_mode"],
+                        "trade_amount": resolved["trade_amount"],
+                        "amount_source": resolved["amount_source"],
+                        "regime_analysis_enabled": True,
+                    },
+                    event_callback=self._broadcast_event,
+                )
+                user_results.append({"user_id": user["user_id"], "eligible": True, "result": result})
             status = "completed"
             error = None
-            decision = (result.get("results") or [{}])[0].get("decision")
+            decision = {"user_results": user_results, "configured_user_count": len(users)}
         except Exception as exc:
-            status = "failed"
+            status = "expired" if isinstance(exc, TimeoutError) else "failed"
             error = f"{type(exc).__name__}: {exc}"
             decision = None
         with self.event_lock:
-            self.event_state.setdefault("events", {})[event_id] = {
+            existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
+            existing.update({
                 "status": status,
                 "finished_at_utc": datetime.now(timezone.utc).isoformat(),
                 "decision": decision,
                 "error": error,
-            }
+            })
+            self.event_state.setdefault("events", {})[event_id] = existing
             self.storage.save_snapshot(self.event_state_path, self.event_state)
         self._broadcast_event(
             {
@@ -310,6 +433,13 @@ class AITradingOrchestrator:
                     if parsed.path == "/ai-trading/stream":
                         self._websocket_stream()
                         return
+                    if parsed.path == "/ai-trading/config":
+                        user_id = (parse_qs(parsed.query).get("user_id") or [""])[0]
+                        if not user_id:
+                            self._json_response({"error": "user_id_required"}, status=400)
+                            return
+                        self._json_response(orchestrator.load_user_config(user_id))
+                        return
                     if parsed.path != "/ai-trading/status":
                         self._json_response({"error": "not_found"}, status=404)
                         return
@@ -325,7 +455,21 @@ class AITradingOrchestrator:
                     path = urlparse(self.path).path
                     if path == "/ai-trading/event":
                         result = orchestrator.submit_intra_finder_event(self._read_body())
-                        self._json_response({"ok": True, **result}, status=202 if result["accepted"] else 200)
+                        response_status = (
+                            202
+                            if result["accepted"]
+                            else 429
+                            if result.get("queue_full")
+                            else 200
+                        )
+                        self._json_response(
+                            {"ok": bool(result["accepted"]), **result},
+                            status=response_status,
+                        )
+                        return
+                    if path == "/ai-trading/config":
+                        result = orchestrator.save_user_config(self._read_body())
+                        self._json_response({"ok": True, "config": result})
                         return
                     if path != "/ai-trading/start":
                         self._json_response({"error": "not_found"}, status=404)

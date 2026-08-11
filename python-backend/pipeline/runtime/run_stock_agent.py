@@ -13,6 +13,7 @@ from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.trading_amount_service import TradingAmountService
 from pipeline.stock import StockAgent
 from pipeline.stock.toolkits import (
     StockAccountToolkit,
@@ -90,14 +91,14 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 event_callback,
                 {
                     "type": "stock_agent_no_trade",
-                    "reason": "No Stage 2 top-30 stocks met the manual intraday margin budget.",
+                    "reason": "No Stage 2 candidates were affordable within the saved trading amount.",
                 },
             )
             return self._save_no_trade_payload(
                 market_date,
                 candidate_source,
                 regime_enabled,
-                "No Stage 2 top-30 stocks met the manual intraday margin budget.",
+                "No Stage 2 candidates were affordable within the saved trading amount.",
             )
 
         candidate_packets = [
@@ -167,6 +168,8 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         self,
         event: Dict[str, Any],
         *,
+        user_id: Optional[str] = None,
+        trade_config: Optional[Dict[str, Any]] = None,
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Run exactly one Intra-Finder-qualified stock through the agent."""
@@ -179,14 +182,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             raise RuntimeError("event_missing_valid_exchange_segment")
 
         account_context = self._build_account_context()
-        trade_config = self._with_effective_trade_amount(
-            {
-                "trade_mode": "auto",
-                "trade_amount": event.get("trade_amount") or os.getenv("INTRA_FINDER_TRADE_AMOUNT"),
-                "regime_analysis_enabled": True,
-            },
-            account_context,
-        )
+        trade_config = dict(trade_config or {})
+        trade_config["trade_mode"] = str(trade_config.get("trade_mode") or "auto").lower()
+        trade_config["trade_amount"] = TradingAmountService.parse(trade_config.get("trade_amount"))
+        trade_config["user_id"] = user_id
+        if trade_config["trade_amount"] is None:
+            raise RuntimeError("trading_amount_missing_or_invalid")
         regime_payload = self.storage.load_snapshot(self.config.regime_latest_path)
         synthetic_stage2 = {
             "stage": "intra_finder",
@@ -237,6 +238,80 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         self._save_payload(payload)
         return payload
 
+    def resolve_user_trade_config(self, user: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve a manual amount or fetch current balance for automatic mode."""
+        user_id = str(user.get("user_id") or "")
+        mode = str(user.get("trade_mode") or ("manual" if user.get("trade_amount") not in (None, "") else "auto")).lower()
+        if mode == "manual":
+            amount = TradingAmountService.parse(user.get("trade_amount"))
+            if amount is None:
+                return {
+                    "user_id": user_id,
+                    "eligible": False,
+                    "status_code": "manual_amount_invalid",
+                    "message": "This account's manual amount is invalid. Save a positive amount or leave it blank for automatic sizing.",
+                }
+            return {"user_id": user_id, "eligible": True, "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": amount}
+        try:
+            account_context = self._build_account_context()
+            effective = self._with_effective_trade_amount({"trade_mode": "auto"}, account_context) or {}
+            amount = TradingAmountService.parse(effective.get("trade_amount"))
+        except Exception as exc:
+            return {
+                "user_id": user_id,
+                "eligible": False,
+                "status_code": "available_balance_unavailable",
+                "message": "Automatic sizing is paused for this account because available broker balance could not be loaded.",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        if amount is None:
+            return {
+                "user_id": user_id,
+                "eligible": False,
+                "status_code": "available_balance_unavailable",
+                "message": "Automatic sizing is paused for this account because available broker balance is missing or zero.",
+            }
+        return {"user_id": user_id, "eligible": True, "trade_mode": "auto", "amount_source": "available_balance", "trade_amount": amount}
+
+    def prepare_user_event(self, event: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply dynamic, user-specific Stage 2 eligibility without changing Stage 1."""
+        user_id = str(user.get("user_id") or "")
+        amount = TradingAmountService.parse(user.get("trade_amount"))
+        price = self._reference_price(event)
+        quantity = TradingAmountService.quantity(amount, price)
+        base = {
+            "user_id": user_id,
+            "trade_mode": user.get("trade_mode"),
+            "amount_source": user.get("amount_source"),
+            "trade_amount": amount,
+            "current_price": price,
+        }
+        if amount is None:
+            return {**base, "eligible": False, "status_code": "amount_missing_or_invalid", "message": "Agent dispatch paused for this user because the trading amount is missing or invalid."}
+        if price <= 0:
+            return {**base, "eligible": False, "status_code": "price_unavailable", "message": "Agent dispatch paused for this user because the current stock price is unavailable."}
+        if quantity < 1:
+            return {**base, "eligible": False, "status_code": "price_above_trading_amount", "message": "This stock costs more than the user's trading amount, so no agent was started."}
+        depth = event.get("five_level_depth") or []
+        direction = str(event.get("direction") or "LONG").upper()
+        slippage = TradingAmountService.estimated_slippage(depth, direction=direction if direction in {"LONG", "SHORT"} else "LONG", price=price, quantity=quantity)
+        if slippage is None:
+            return {**base, "requested_quantity": quantity, "eligible": False, "status_code": "user_depth_unavailable", "message": "Agent dispatch paused for this user because five-level depth cannot fill the requested quantity."}
+        if slippage > self.config.intra_finder_max_slippage_percent:
+            return {**base, "requested_quantity": quantity, "estimated_slippage_percent": slippage, "eligible": False, "status_code": "user_slippage_too_high", "message": "Agent dispatch paused for this user because estimated slippage is too high."}
+        routed = dict(event)
+        routed.update({
+            "user_id": user_id,
+            "trade_amount": amount,
+            "trade_mode": user.get("trade_mode"),
+            "amount_source": user.get("amount_source"),
+            "requested_quantity": quantity,
+            "user_estimated_notional": round(quantity * price, 2),
+            "user_estimated_slippage_percent": slippage,
+            "affordability": {"eligible": True, "price": price, "trade_amount": amount, "trade_mode": user.get("trade_mode"), "amount_source": user.get("amount_source"), "requested_quantity": quantity},
+        })
+        return {**base, "requested_quantity": quantity, "estimated_slippage_percent": slippage, "eligible": True, "status_code": "eligible", "event": routed}
+
     def _select_candidates(
         self,
         stage2_payload: Dict[str, Any],
@@ -285,23 +360,15 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             reference_price = self._reference_price(stock)
             if reference_price <= 0:
                 continue
-            margin_results = [
-                self._calculate_one_share_margin(stock, side, reference_price)
-                for side in ("BUY", "SELL")
-            ]
-            valid_results = [item for item in margin_results if item.get("status") == "success"]
-            if not valid_results:
-                continue
-            best_margin = min(float(item["total_margin"]) for item in valid_results)
+            quantity = TradingAmountService.quantity(margin_budget, reference_price)
             enriched = dict(stock)
             enriched["manual_margin_filter"] = {
-                "margin_budget": margin_budget,
+                "trade_amount": margin_budget,
                 "reference_price": reference_price,
-                "best_one_share_margin": best_margin,
-                "included": best_margin <= margin_budget,
-                "sides": margin_results,
+                "requested_quantity": quantity,
+                "included": quantity >= 1,
             }
-            if best_margin <= margin_budget:
+            if quantity >= 1:
                 filtered.append(enriched)
         return filtered
 
@@ -518,6 +585,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             margin_budget=margin_budget,
             exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
             coordinator=execution_coordinator,
+            amount_source=str(trade_config.get("amount_source") or "user_amount"),
         )
         research_toolkit = self._build_research_toolkit(candidate_packet)
         stock_toolkits = [
@@ -536,6 +604,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "security_id": selected_stock.get("security_id"),
                 "symbol": selected_stock.get("symbol"),
                 "display_name": selected_stock.get("display_name"),
+                "trade_amount": trade_config.get("trade_amount"),
+                "trade_mode": trade_config.get("trade_mode"),
+                "amount_source": trade_config.get("amount_source"),
+                "requested_quantity": candidate_packet.get("requested_quantity"),
+                "estimated_notional": candidate_packet.get("user_estimated_notional"),
+                "estimated_slippage_percent": candidate_packet.get("user_estimated_slippage_percent"),
             },
         }
 
@@ -763,6 +837,15 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         ]
         if selected_stock.get("symbol"):
             lines.append(f"- Symbol: {selected_stock.get('symbol')}")
+        if selected_stock.get("trade_amount") is not None:
+            lines.extend([
+                f"- Strict cash/notional cap: Rs {selected_stock.get('trade_amount')}",
+                f"- Sizing mode: {selected_stock.get('trade_mode')} ({selected_stock.get('amount_source')})",
+                f"- Requested whole-share quantity: {selected_stock.get('requested_quantity')}",
+                f"- Estimated notional: Rs {selected_stock.get('estimated_notional')}",
+                f"- User-sized depth slippage estimate: {selected_stock.get('estimated_slippage_percent')}%",
+                "- Do not assume leverage. Current LTP and affordability are revalidated immediately before placement.",
+            ])
         return "\n".join(lines)
 
     def _build_data_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
