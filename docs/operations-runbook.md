@@ -73,7 +73,7 @@ Before changing shadow mode to `0`:
 - Review indicator and candlestick events against their completed one-minute candles.
 - Confirm repeated states do not create repeated events.
 - Confirm multiple events within sixty seconds become one agent request.
-- Confirm queue-expired and overflow-dropped counters are visible and bounded; a stale event must never wait for hours.
+- Confirm every `ENTRY_READY` event starts its agent immediately, with no waiting queue or concurrency cap.
 - Confirm NSE and BSE venue propagation in every event.
 - Confirm duplicate events remain suppressed after restart.
 - Check observed disk growth.

@@ -84,7 +84,9 @@ A bearish stock reaching support is not automatically shorted or bought. It rema
 
 Event IDs are deterministic from the market date, stock venue, first evidence time and event types. Repeated packets and restarts therefore cannot create the same job twice.
 
-At most three new stock analyses run concurrently. The Intra-Finder dispatch queue is capped at 50 packets and expires queued work after 120 seconds. The AI gateway has a second bounded safety limit of 20 waiting events; it returns HTTP 429 instead of creating an unbounded backlog. Before a worker starts expensive analysis it expires an event older than 300 seconds. A stock-specific 20-minute cooldown prevents repeated agent spending on the same stock.
+Every confirmed signal is dispatched immediately. Intra-Finder starts an independent dispatch thread for it, and the AI gateway immediately starts a dedicated stock-agent thread after accepting it. There is no configured worker limit, waiting queue, queue capacity or queue expiry. A deterministic event ID prevents duplicate runs, and a stock-specific 20-minute cooldown prevents repeated agent spending on an equivalent setup.
+
+This deliberately permits simultaneous agent runs when several stocks qualify at once. The admission controls are therefore the Stage 2 evidence score, hard safety gates, duplicate suppression and cooldown—not delayed scheduling.
 
 ## Shadow mode
 
@@ -113,10 +115,6 @@ INTRA_FINDER_READINESS_OBSERVATION_SECONDS=600
 INTRA_FINDER_READINESS_REEVALUATION_SECONDS=60
 INTRA_FINDER_READINESS_MIN_CONFIRMATION_SECONDS=300
 INTRA_FINDER_READINESS_MAX_ENTRY_DRIFT_ATR=0.80
-INTRA_FINDER_AGENT_QUEUE_MAX=50
-INTRA_FINDER_AGENT_QUEUE_MAX_AGE_SECONDS=120
-AI_TRADING_EVENT_QUEUE_MAX=20
-AI_TRADING_EVENT_MAX_AGE_SECONDS=300
 ```
 
 ## WebSocket and recovery behavior
