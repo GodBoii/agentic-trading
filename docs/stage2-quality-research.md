@@ -110,7 +110,7 @@ The August 10 agent reports showed that most skips came from poor entry location
 - Exchange last-trade freshness and persistent 30-second depth measurements.
 - Low candle-pattern weights and no dispatch for doji/volume-only observations.
 - Rejection of conflicting transitions, recent two-sided price action and excessive signal churn.
-- A bounded downstream AI queue and worker-start expiration.
+- Immediate per-signal agent dispatch without a waiting queue, while duplicate and cooldown safeguards remain active.
 
 The scoring and gates were frozen before replaying the older dates below. Source Parquet files were read without modification. The recorded windows were measured from the data rather than inferred from folder names.
 
