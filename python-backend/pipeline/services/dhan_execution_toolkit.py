@@ -398,14 +398,17 @@ class DhanExecutionToolkit(Toolkit):
             return json.dumps({"status": "failure", "remarks": "invalid_product_type"}, ensure_ascii=True)
 
         tag = self._normalize_correlation_id(correlation_id, prefix="exec-so")
+        normalized_order_type = self._normalize_order_type(order_type, allowed={"LIMIT", "MARKET"})
         response = self.dhan.place_super_order(
             security_id=int(security_id),
             exchange_segment=normalized_exchange_segment,
             transaction_type=normalized_side,
             quantity=int(quantity),
-            order_type=self._normalize_order_type(order_type, allowed={"LIMIT", "MARKET"}),
+            order_type=normalized_order_type,
             product_type=normalized_product_type,
-            price=entry,
+            # Dhan rejects a non-zero price for MARKET super orders. Keep the
+            # observed entry/LTP for risk geometry, but omit it from execution.
+            price=0.0 if normalized_order_type == "MARKET" else entry,
             target_price=target,
             stop_loss_price=stop,
             trailing_jump=float(trailing_jump),
@@ -535,7 +538,7 @@ class DhanExecutionToolkit(Toolkit):
         price: float,
         trigger_price: float,
         order_flag: str = "SINGLE",
-        leg_name: str = "TARGET_LEG",
+        leg_name: str = "STOP_LOSS_LEG",
         order_type: str = "LIMIT",
         validity: str = "DAY",
         disclosed_quantity: int = 0,

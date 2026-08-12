@@ -1,3 +1,4 @@
+import base64
 import json
 import math
 import os
@@ -94,8 +95,11 @@ class DhanService:
             runtime_credentials = self.credential_store.load(required=False)
         except CredentialUnavailable:
             runtime_credentials = None
-        self.client_id = runtime_credentials.client_id if runtime_credentials else env_client_id
-        self.access_token = runtime_credentials.access_token if runtime_credentials else env_access_token
+        self.client_id, self.access_token, self.credential_source = self._select_credentials(
+            runtime_credentials,
+            env_client_id,
+            env_access_token,
+        )
         if runtime_credentials:
             self.credential_version = runtime_credentials.version
             self.credential_mtime_ns = self.credential_store.mtime_ns()
@@ -113,6 +117,58 @@ class DhanService:
         self.gateway_session = requests.Session() if self.gateway_url else None
         self.base_url = "https://api.dhan.co/v2"
 
+    @staticmethod
+    def _jwt_epoch_claim(token: Optional[str], claim: str) -> Optional[float]:
+        """Read a numeric JWT timestamp without verifying or exposing the token."""
+        try:
+            encoded = str(token or "").split(".")[1]
+            encoded += "=" * ((4 - len(encoded) % 4) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(encoded).decode("utf-8"))
+            value = payload.get(claim)
+            return float(value) if value is not None else None
+        except Exception:
+            return None
+
+    @classmethod
+    def _select_credentials(
+        cls,
+        runtime_credentials: Any,
+        env_client_id: Optional[str],
+        env_access_token: Optional[str],
+    ) -> tuple[Optional[str], Optional[str], str]:
+        """Prefer the newest unexpired token across runtime and environment sources.
+
+        A manually generated Dhan token can be newer than the encrypted runtime copy.
+        Blindly preferring the runtime file leaves every service stuck on DH-901 until
+        TOTP recovery is configured, even when a valid replacement token is present.
+        """
+        if runtime_credentials is None:
+            return env_client_id, env_access_token, "environment"
+        if not env_client_id or not env_access_token:
+            return runtime_credentials.client_id, runtime_credentials.access_token, "runtime"
+
+        now = time.time()
+        runtime_expiry = cls._jwt_epoch_claim(runtime_credentials.access_token, "exp")
+        env_expiry = cls._jwt_epoch_claim(env_access_token, "exp")
+        runtime_expired = runtime_expiry is not None and runtime_expiry <= now + 30
+        env_expired = env_expiry is not None and env_expiry <= now + 30
+
+        if runtime_expired and not env_expired:
+            return env_client_id, env_access_token, "environment"
+        if env_expired and not runtime_expired:
+            return runtime_credentials.client_id, runtime_credentials.access_token, "runtime"
+
+        runtime_issued = cls._jwt_epoch_claim(runtime_credentials.access_token, "iat")
+        env_issued = cls._jwt_epoch_claim(env_access_token, "iat")
+        if (
+            not env_expired
+            and env_issued is not None
+            and runtime_issued is not None
+            and env_issued > runtime_issued
+        ):
+            return env_client_id, env_access_token, "environment"
+        return runtime_credentials.client_id, runtime_credentials.access_token, "runtime"
+
     def _rebuild_clients(self) -> None:
         self.dhan_context = DhanContext(self.client_id, self.access_token)
         self.market_api = dhanhq(self.dhan_context)
@@ -129,12 +185,29 @@ class DhanService:
         current_mtime = self.credential_store.mtime_ns()
         if not force and (current_mtime == 0 or current_mtime == self.credential_mtime_ns):
             return False
-        credentials = self.credential_store.load(required=False)
+        try:
+            credentials = self.credential_store.load(required=False)
+        except CredentialUnavailable:
+            # Startup may legitimately fall back to DHAN_* environment credentials
+            # when a stale/encrypted runtime file cannot be decrypted in this process.
+            # Keep those working credentials instead of breaking the first API call.
+            self.credential_mtime_ns = current_mtime
+            return False
         if not credentials or credentials.version == self.credential_version:
             self.credential_mtime_ns = current_mtime
             return False
-        self.client_id = credentials.client_id
-        self.access_token = credentials.access_token
+        client_id, access_token, source = self._select_credentials(
+            credentials,
+            self.client_id,
+            self.access_token,
+        )
+        if client_id == self.client_id and access_token == self.access_token:
+            self.credential_version = credentials.version
+            self.credential_mtime_ns = current_mtime
+            return False
+        self.client_id = client_id
+        self.access_token = access_token
+        self.credential_source = "runtime" if source == "runtime" else self.credential_source
         self.credential_version = credentials.version
         self.credential_mtime_ns = current_mtime
         self._rebuild_clients()
@@ -296,6 +369,7 @@ class DhanService:
             "has_data_access_token": bool(self.access_token),
             "has_app_id": bool(self.app_id),
             "has_app_secret": bool(self.app_secret),
+            "credential_source": self.credential_source,
         }
 
     def fetch_user_profile(self) -> Dict[str, Any]:
@@ -537,12 +611,14 @@ class DhanService:
         product_types: Optional[List[str]] = None,
         enable_kill_switch: bool = False,
     ) -> Dict[str, Any]:
-        payload = {
-            "profitValue": float(profit_value),
-            "lossValue": float(loss_value),
-            "productType": [str(item).strip().upper() for item in (product_types or ["INTRADAY"])],
-            "enableKillSwitch": bool(enable_kill_switch),
-        }
+        payload = self._with_client_id(
+            {
+                "profitValue": float(profit_value),
+                "lossValue": float(loss_value),
+                "productType": [str(item).strip().upper() for item in (product_types or ["INTRADAY"])],
+                "enableKillSwitch": bool(enable_kill_switch),
+            }
+        )
         return self._request("POST", "/pnlExit", payload=payload)
 
     def disable_pnl_exit(self) -> Dict[str, Any]:
@@ -758,20 +834,27 @@ class DhanService:
         validity: str = "DAY",
         leg_name: str = "",
     ) -> Dict[str, Any]:
-        try:
-            response = self.market_api.modify_order(
-                order_id=order_id,
-                order_type=order_type,
-                leg_name=leg_name,
-                quantity=int(quantity),
-                price=float(price),
-                trigger_price=float(trigger_price),
-                disclosed_quantity=int(disclosed_quantity),
-                validity=validity,
-            )
-            return self._normalize_sdk_response(response)
-        except Exception as exc:
-            return {"status": "failure", "remarks": str(exc), "data": None}
+        # dhanhq-py currently omits dhanClientId from this request even though
+        # Dhan's v2 modify-order contract requires it. Use the documented REST
+        # payload so pending normal orders can actually be modified.
+        payload = self._with_client_id(
+            {
+                "orderId": str(order_id),
+                "orderType": str(order_type),
+                "quantity": int(quantity),
+                "price": float(price),
+                "validity": str(validity),
+            }
+        )
+        # Dhan treats empty/non-applicable optional fields as bad values on a
+        # normal LIMIT modification. Only send them when the order needs them.
+        if leg_name:
+            payload["legName"] = str(leg_name)
+        if int(disclosed_quantity) > 0:
+            payload["disclosedQuantity"] = int(disclosed_quantity)
+        if float(trigger_price) > 0:
+            payload["triggerPrice"] = float(trigger_price)
+        return self._request("PUT", f"/orders/{order_id}", payload=payload)
 
     def cancel_order(self, order_id: str) -> Dict[str, Any]:
         try:
@@ -1225,6 +1308,16 @@ class DhanService:
                 return parsed
 
             if self._is_rate_limited(resp) and attempt < self.config.quote_request_retries - 1:
+                time.sleep(self._compute_rate_limit_delay(attempt))
+                continue
+            code, error_type, message = self._response_error_details(resp)
+            if (
+                not any((code, error_type, message))
+                and attempt < self.config.quote_request_retries - 1
+            ):
+                # The Dhan SDK occasionally returns a completely blank failure for
+                # an otherwise valid quote/OHLC request. These reads are idempotent,
+                # so retry the same bounded way as an explicit rate-limit response.
                 time.sleep(self._compute_rate_limit_delay(attempt))
                 continue
             break
