@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import time
+import asyncio
 from contextlib import redirect_stdout
 from datetime import date, timedelta
 from io import StringIO
@@ -68,6 +69,15 @@ def extract_historical_points(resp_data: Any) -> int:
             value = resp_data.get(key)
             if isinstance(value, list):
                 return len(value)
+        for value in resp_data.values():
+            points = extract_historical_points(value)
+            if points:
+                return points
+    elif isinstance(resp_data, list):
+        for value in resp_data:
+            points = extract_historical_points(value)
+            if points:
+                return points
     return 0
 
 
@@ -133,46 +143,48 @@ def run_full_depth_check(
         if depth_level == 200:
             feed.ws_url = "wss://full-depth-api.dhan.co/twohundreddepth"
 
+        bid_data = None
+        ask_data = None
         sink = StringIO()
         with redirect_stdout(sink):
             feed.run_forever()
-            raw = feed.loop.run_until_complete(feed.ws.recv())
-        remaining_data = raw
-        bid_data = None
-        ask_data = None
+        deadline = time.monotonic() + 15.0
 
-        while remaining_data:
-            update = feed.process_data(remaining_data)
-            if not update:
-                break
-            remaining_data = update.pop("remaining_data", None)
-            if update.get("type") == "Bid":
-                bid_data = update
-            elif update.get("type") == "Ask":
-                ask_data = update
-            if bid_data and ask_data and bid_data.get("security_id") == ask_data.get("security_id"):
-                combined = {
-                    "exchange_segment": bid_data["exchange_segment"],
-                    "security_id": bid_data["security_id"],
-                    "bid_depth": bid_data["depth"],
-                    "ask_depth": ask_data["depth"],
-                }
-                try:
-                    with redirect_stdout(sink):
-                        feed.close_connection()
-                except Exception:
-                    pass
-                levels = min(len(bid_data["depth"]), len(ask_data["depth"]))
-                return True, f"Received dedicated FullDepth packet with {levels} bid and {levels} ask levels.", combined
+        # Bid and ask packets may be stacked in one frame or delivered in
+        # separate frames, especially on the 200-level endpoint.
+        while time.monotonic() < deadline and not (bid_data and ask_data):
+            timeout = max(0.1, deadline - time.monotonic())
+            raw = feed.loop.run_until_complete(asyncio.wait_for(feed.ws.recv(), timeout))
+            remaining_data = raw
+            while remaining_data:
+                update = feed.process_data(remaining_data)
+                if not update:
+                    break
+                remaining_data = update.pop("remaining_data", None)
+                if update.get("type") == "Bid":
+                    bid_data = update
+                elif update.get("type") == "Ask":
+                    ask_data = update
 
-        try:
-            with redirect_stdout(sink):
-                feed.close_connection()
-        except Exception:
-            pass
+        if bid_data and ask_data and bid_data.get("security_id") == ask_data.get("security_id"):
+            combined = {
+                "exchange_segment": bid_data["exchange_segment"],
+                "security_id": bid_data["security_id"],
+                "bid_depth": bid_data["depth"],
+                "ask_depth": ask_data["depth"],
+            }
+            levels = min(len(bid_data["depth"]), len(ask_data["depth"]))
+            return True, f"Received dedicated FullDepth packet with {levels} bid and {levels} ask levels.", combined
+
         return False, "Connected to FullDepth feed but could not assemble bid/ask packet.", None
     except Exception as exc:
         return False, f"FullDepth websocket failed: {exc}", None
+    finally:
+        try:
+            if feed.ws is not None:
+                feed.loop.run_until_complete(feed.ws.close())
+        except Exception:
+            pass
 
 
 def main() -> int:
@@ -197,9 +209,12 @@ def main() -> int:
     under_security_id = int(cfg.get("DHAN_OPTION_UNDER_SECURITY_ID", "13"))  # NIFTY by docs
     under_exchange_segment = cfg.get("DHAN_OPTION_UNDER_EXCHANGE_SEGMENT", "IDX_I")
 
-    expired_option_security_id = cfg.get("DHAN_EXPIRED_OPTION_SECURITY_ID")
+    # The rolling-options endpoint takes the underlying ID, not an expired
+    # contract ID. NIFTY (13) is the documented safe default.
+    expired_option_security_id = cfg.get("DHAN_EXPIRED_OPTION_SECURITY_ID", "13")
     expired_option_exchange_segment = cfg.get("DHAN_EXPIRED_OPTION_EXCHANGE_SEGMENT", dhan.NSE_FNO)
-    expired_option_instrument_type = cfg.get("DHAN_EXPIRED_OPTION_INSTRUMENT_TYPE", dhan.FNO)
+    expired_option_instrument_type = cfg.get("DHAN_EXPIRED_OPTION_INSTRUMENT_TYPE", "OPTIDX")
+    expired_option_expiry_flag = cfg.get("DHAN_EXPIRED_OPTION_EXPIRY_FLAG", "MONTH")
     expired_option_expiry_code = int(cfg.get("DHAN_EXPIRED_OPTION_EXPIRY_CODE", "1"))
 
     masked_client = f"{client_id[:2]}***{client_id[-2:]}" if len(client_id) >= 4 else "***"
@@ -301,42 +316,44 @@ def main() -> int:
 
     # 6) Expired Options Data
     print_step("Expired Options Data")
-    if not expired_option_security_id:
-        details = (
-            "Skipped: set DHAN_EXPIRED_OPTION_SECURITY_ID (and optional "
-            "DHAN_EXPIRED_OPTION_EXCHANGE_SEGMENT, DHAN_EXPIRED_OPTION_EXPIRY_CODE) in .env."
+    try:
+        # Dhan permits at most 30 days per request. Use an already completed
+        # historical window so the rolling expired series is stable.
+        from_date = (today - timedelta(days=60)).isoformat()
+        to_date = (today - timedelta(days=31)).isoformat()
+        required_data = [
+            field.strip()
+            for field in cfg.get(
+                "DHAN_EXPIRED_OPTION_REQUIRED_DATA",
+                "open,high,low,close,volume",
+            ).split(",")
+            if field.strip()
+        ]
+        resp = historical_api.expired_options_data(
+            security_id=expired_option_security_id,
+            exchange_segment=expired_option_exchange_segment,
+            instrument_type=expired_option_instrument_type,
+            expiry_flag=expired_option_expiry_flag,
+            expiry_code=expired_option_expiry_code,
+            strike=cfg.get("DHAN_EXPIRED_OPTION_STRIKE", "ATM"),
+            drv_option_type=cfg.get("DHAN_EXPIRED_OPTION_TYPE", "CALL"),
+            required_data=required_data,
+            from_date=from_date,
+            to_date=to_date,
+            interval=int(cfg.get("DHAN_EXPIRED_OPTION_INTERVAL", "5")),
         )
+        points = extract_historical_points(resp.get("data") if isinstance(resp, dict) else {})
+        passed = status_ok(resp) and points > 0
+        details = (
+            f"Received {points} data points for underlying security_id={expired_option_security_id}, "
+            f"expiry_flag={expired_option_expiry_flag}, expiry_code={expired_option_expiry_code}."
+        )
+        print_result("Expired Options Data", passed, details, resp if not passed else None)
+        results.append(("Expired Options Data", passed, details))
+    except Exception as exc:
+        details = f"Exception: {exc}"
         print_result("Expired Options Data", False, details)
         results.append(("Expired Options Data", False, details))
-    else:
-        try:
-            from_date = (today - timedelta(days=90)).isoformat()
-            to_date = today.isoformat()
-            resp = historical_api.expired_options_data(
-                security_id=expired_option_security_id,
-                exchange_segment=expired_option_exchange_segment,
-                instrument_type=expired_option_instrument_type,
-                expiry_flag=True,
-                expiry_code=expired_option_expiry_code,
-                strike=cfg.get("DHAN_EXPIRED_OPTION_STRIKE", ""),
-                drv_option_type=cfg.get("DHAN_EXPIRED_OPTION_TYPE", "PUT"),
-                required_data=cfg.get("DHAN_EXPIRED_OPTION_REQUIRED_DATA", "days"),
-                from_date=from_date,
-                to_date=to_date,
-                interval=1,
-            )
-            points = extract_historical_points(resp.get("data") if isinstance(resp, dict) else {})
-            passed = status_ok(resp) and points > 0
-            details = (
-                f"Received {points} candles for expired option security_id={expired_option_security_id}, "
-                f"expiry_code={expired_option_expiry_code}."
-            )
-            print_result("Expired Options Data", passed, details, resp if not passed else None)
-            results.append(("Expired Options Data", passed, details))
-        except Exception as exc:
-            details = f"Exception: {exc}"
-            print_result("Expired Options Data", False, details)
-            results.append(("Expired Options Data", False, details))
 
     print("\nSummary")
     for name, passed, details in results:

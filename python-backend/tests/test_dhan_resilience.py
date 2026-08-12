@@ -1,10 +1,13 @@
+import base64
 import json
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.dhan_credentials import CredentialUnavailable
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.storage_service import StorageService
 from pipeline.runtime.run_executioner import ExecutionerRunner
@@ -62,8 +65,74 @@ class FakeExecutionService:
         self.super_order_payload = payload
         return {"status": "success", "data": {"orderId": "test-order"}}
 
+    def modify_forever_order(self, **payload):
+        self.forever_modify_payload = payload
+        return {"status": "success", "data": {"orderId": "forever-order"}}
+
 
 class DhanResilienceTests(unittest.TestCase):
+    @staticmethod
+    def _jwt(*, issued_at: int, expires_at: int) -> str:
+        def encoded(value):
+            raw = json.dumps(value, separators=(",", ":")).encode("utf-8")
+            return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+        return f"{encoded({'alg': 'none'})}.{encoded({'iat': issued_at, 'exp': expires_at})}.x"
+
+    def test_newer_unexpired_environment_token_beats_expired_runtime_token(self):
+        now = int(time.time())
+        runtime = SimpleNamespace(
+            client_id="runtime-client",
+            access_token=self._jwt(issued_at=now - 86400, expires_at=now - 60),
+        )
+        env_token = self._jwt(issued_at=now, expires_at=now + 86400)
+
+        client_id, token, source = DhanService._select_credentials(
+            runtime,
+            "environment-client",
+            env_token,
+        )
+
+        self.assertEqual(client_id, "environment-client")
+        self.assertEqual(token, env_token)
+        self.assertEqual(source, "environment")
+
+    def test_newer_unexpired_runtime_token_remains_preferred(self):
+        now = int(time.time())
+        runtime_token = self._jwt(issued_at=now, expires_at=now + 86400)
+        runtime = SimpleNamespace(client_id="runtime-client", access_token=runtime_token)
+        env_token = self._jwt(issued_at=now - 60, expires_at=now + 3600)
+
+        client_id, token, source = DhanService._select_credentials(
+            runtime,
+            "environment-client",
+            env_token,
+        )
+
+        self.assertEqual(client_id, "runtime-client")
+        self.assertEqual(token, runtime_token)
+        self.assertEqual(source, "runtime")
+
+    def test_credential_reload_keeps_environment_fallback_when_runtime_file_is_unreadable(self):
+        service = object.__new__(DhanService)
+        service.credential_store = SimpleNamespace(
+            mtime_ns=lambda: 42,
+            load=lambda required=False: (_ for _ in ()).throw(
+                CredentialUnavailable("missing decryption secret")
+            ),
+        )
+        service.credential_mtime_ns = 0
+        service.credential_version = 0
+        service.client_id = "env-client"
+        service.access_token = "env-token"
+
+        changed = service.reload_credentials_if_changed()
+
+        self.assertFalse(changed)
+        self.assertEqual(service.credential_mtime_ns, 42)
+        self.assertEqual(service.client_id, "env-client")
+        self.assertEqual(service.access_token, "env-token")
+
     def test_sdk_failure_is_not_wrapped_as_success(self):
         service = object.__new__(DhanService)
         response = {
@@ -133,6 +202,53 @@ class DhanResilienceTests(unittest.TestCase):
         self.assertNotIn("scripts", captured["payload"])
         self.assertNotIn("includeOrders", captured["payload"])
 
+    def test_modify_order_uses_documented_client_id_payload(self):
+        service = object.__new__(DhanService)
+        service.client_id = "1100000001"
+        captured = {}
+
+        def fake_request(method, path, *, payload=None, **_kwargs):
+            captured.update(method=method, path=path, payload=payload)
+            return {"status": "success", "data": {"orderStatus": "TRANSIT"}}
+
+        service._request = fake_request
+
+        result = service.modify_order(
+            order_id="12345",
+            order_type="LIMIT",
+            quantity=1,
+            price=13.20,
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(captured["method"], "PUT")
+        self.assertEqual(captured["path"], "/orders/12345")
+        self.assertEqual(captured["payload"]["dhanClientId"], "1100000001")
+        self.assertEqual(captured["payload"]["orderId"], "12345")
+        self.assertNotIn("legName", captured["payload"])
+        self.assertNotIn("disclosedQuantity", captured["payload"])
+        self.assertNotIn("triggerPrice", captured["payload"])
+
+    def test_pnl_exit_includes_required_client_id(self):
+        service = object.__new__(DhanService)
+        service.client_id = "1100000001"
+        captured = {}
+
+        def fake_request(method, path, *, payload=None, **_kwargs):
+            captured.update(method=method, path=path, payload=payload)
+            return {"status": "success", "data": {"pnlExitStatus": "ACTIVE"}}
+
+        service._request = fake_request
+
+        result = service.configure_pnl_exit(
+            profit_value=1000,
+            loss_value=500,
+            product_types=["INTRADAY"],
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(captured["payload"]["dhanClientId"], "1100000001")
+
     def test_agent_correlation_id_is_sanitized_and_limited_for_dhan(self):
         raw = "PW/544609/BUY/20260728/093429/01"
 
@@ -173,6 +289,49 @@ class DhanResilienceTests(unittest.TestCase):
         self.assertEqual(payload["status"], "success")
         self.assertEqual(len(service.super_order_payload["correlation_id"]), 30)
         self.assertEqual(payload["correlation_id"], service.super_order_payload["correlation_id"])
+
+    def test_market_super_order_sends_zero_price_to_dhan(self):
+        service = FakeExecutionService()
+        toolkit = DhanExecutionToolkit(service, entry_only=True)
+        toolkit.allow_live_orders = True
+        toolkit.set_allowed_security_id(14366)
+
+        payload = json.loads(
+            toolkit.place_protected_intraday_super_order(
+                security_id=14366,
+                side="BUY",
+                quantity=1,
+                entry_price=13.19,
+                target_price=13.89,
+                stop_loss_price=12.49,
+                order_type="MARKET",
+                exchange_segment="NSE_EQ",
+            )
+        )
+
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(service.super_order_payload["order_type"], "MARKET")
+        self.assertEqual(service.super_order_payload["price"], 0.0)
+        self.assertEqual(service.super_order_payload["target_price"], 13.89)
+        self.assertEqual(service.super_order_payload["stop_loss_price"], 12.49)
+
+    def test_single_forever_order_modify_defaults_to_live_stop_loss_leg(self):
+        service = FakeExecutionService()
+        toolkit = DhanExecutionToolkit(service)
+        toolkit.allow_live_orders = True
+
+        payload = json.loads(
+            toolkit.modify_forever_order(
+                order_id="forever-order",
+                quantity=1,
+                price=11.62,
+                trigger_price=11.61,
+            )
+        )
+
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(service.forever_modify_payload["order_flag"], "SINGLE")
+        self.assertEqual(service.forever_modify_payload["leg_name"], "STOP_LOSS_LEG")
 
     def test_dhan_quote_depth_and_timestamp_are_parsed_for_agents(self):
         runner = object.__new__(ExecutionerRunner)
@@ -259,6 +418,29 @@ class DhanResilienceTests(unittest.TestCase):
 
         self.assertEqual(market_client.calls, 2)
         self.assertEqual(result[500180]["last_price"], 100.0)
+
+    def test_quote_retries_blank_sdk_failure_and_parses_success(self):
+        service = object.__new__(DhanService)
+        service.config = SimpleNamespace(quote_request_retries=2)
+        service.acquire_quote_slot = lambda: None
+        service._compute_rate_limit_delay = lambda _attempt: 0.0
+        responses = iter(
+            [
+                {"status": "failure", "remarks": "", "data": ""},
+                {
+                    "status": "success",
+                    "data": {
+                        "data": {"NSE_EQ": {"2885": {"last_price": 100.0}}}
+                    },
+                },
+            ]
+        )
+        market_client = SimpleNamespace(ohlc_data=lambda _payload: next(responses))
+        service._market_client = lambda: market_client
+
+        result = service._fetch_market_batch("ohlc_data", [2885], "NSE_EQ")
+
+        self.assertEqual(result[2885]["last_price"], 100.0)
 
     def test_repeated_905_opens_local_historical_circuit(self):
         service = object.__new__(DhanService)
