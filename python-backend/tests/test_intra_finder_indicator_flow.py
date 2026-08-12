@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta
+from threading import Event, RLock
 from unittest.mock import patch
 import sys
 import types
@@ -30,9 +31,11 @@ class IntraFinderIndicatorFlowTests(unittest.TestCase):
         finder.indicator_aggregation_seconds = 60
         finder.stock_agent_cooldown_seconds = 1200
         finder.pending_indicator_deadlines = []
-        finder.pending_agent_events = []
-        finder.agent_queue_max_age_seconds = 120
-        finder.agent_queue_expired = 0
+        finder.agent_threads = set()
+        finder.dispatch_lock = RLock()
+        finder.events_triggered = 0
+        finder.agent_dispatch_successes = 0
+        finder.agent_dispatch_failures = 0
         finder.indicator_events_detected = 0
         finder.indicator_aggregates_formed = 0
         finder.readiness_evaluations = 0
@@ -153,25 +156,35 @@ class IntraFinderIndicatorFlowTests(unittest.TestCase):
             )
         )
 
-    def test_agent_queue_discards_stale_evidence_before_dispatch(self) -> None:
+    def test_each_agent_event_starts_immediately_without_a_waiting_queue(self) -> None:
         finder = self.finder()
-        now = datetime.fromisoformat("2026-08-03T10:10:00+05:30")
-        finder.market_time = type("Clock", (), {"now": lambda self: now})()
-        finder.pending_agent_events = [
-            {
-                "event_id": "stale",
-                "created_at": (now - timedelta(minutes=5)).isoformat(),
-                "setup_score": 100,
-            },
-            {
-                "event_id": "fresh",
-                "created_at": (now - timedelta(seconds=30)).isoformat(),
-                "setup_score": 50,
-            },
-        ]
-        event = finder._next_fresh_agent_event_locked()
-        self.assertEqual(event["event_id"], "fresh")
-        self.assertEqual(finder.agent_queue_expired, 1)
+        both_started = Event()
+        release = Event()
+        started: list[str] = []
+
+        def post(event):
+            started.append(event["event_id"])
+            if len(started) == 2:
+                both_started.set()
+            release.wait(2)
+
+        finder._post_agent_event = post
+        finder._dispatch_event({"event_id": "first"})
+        finder._dispatch_event({"event_id": "second"})
+
+        self.assertTrue(both_started.wait(2))
+        self.assertCountEqual(started, ["first", "second"])
+        self.assertEqual(finder.events_triggered, 2)
+        self.assertEqual(len(finder.agent_threads), 2)
+        self.assertFalse(hasattr(finder, "pending_agent_events"))
+
+        threads = list(finder.agent_threads)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=2)
+        self.assertEqual(finder.agent_dispatch_successes, 2)
+        self.assertEqual(finder.agent_dispatch_failures, 0)
+        self.assertEqual(finder.agent_threads, set())
 
 
 if __name__ == "__main__":
