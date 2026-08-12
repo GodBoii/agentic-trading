@@ -116,11 +116,6 @@ class PipelineConfig:
     intra_finder_readiness_min_confirmation_seconds: int = 300
     intra_finder_readiness_max_entry_drift_atr: float = 0.80
     intra_finder_max_slippage_percent: float = 0.20
-    intra_finder_agent_concurrency: int = 3
-    intra_finder_agent_queue_max: int = 50
-    intra_finder_agent_queue_max_age_seconds: int = 120
-    ai_trading_event_queue_max: int = 20
-    ai_trading_event_max_age_seconds: int = 300
     intra_finder_raw_retention_days: int = 7
     intra_finder_derived_retention_days: int = 90
     intra_finder_flush_seconds: int = 30
