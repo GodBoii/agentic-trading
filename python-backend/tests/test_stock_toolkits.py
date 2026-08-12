@@ -617,6 +617,66 @@ class StockToolkitTests(unittest.TestCase):
         self.assertEqual(second_response["remarks"], "entry_order_already_placed")
         self.assertEqual(toolkit.decision_snapshot("Test Limited")["execution_status"], "pending")
 
+    def test_nse_protected_order_preserves_selected_exchange_segment(self):
+        dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False)
+        toolkit = StockExecutionToolkit(
+            dhan,
+            111,
+            500,
+            exchange_segment="NSE_EQ",
+        )
+        toolkit._dhan_tools.allow_live_orders = True
+
+        response = json.loads(
+            toolkit.place_protected_intraday_order(
+                side="BUY",
+                quantity=2,
+                entry_price=100.0,
+                target_price=105.0,
+                stop_loss_price=98.0,
+            )
+        )
+
+        self.assertEqual(response["status"], "success")
+        self.assertEqual(response["received"]["exchange_segment"], "NSE_EQ")
+
+    def test_invalid_ip_broker_failure_is_never_reported_as_an_order(self):
+        dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False)
+        dhan.place_super_order = lambda **_kwargs: {
+            "status": "failure",
+            "remarks": {
+                "error_code": "DH-905",
+                "error_type": "Input_Exception",
+                "error_message": "Invalid IP",
+            },
+            "data": "",
+        }
+        toolkit = StockExecutionToolkit(
+            dhan,
+            111,
+            500,
+            exchange_segment="NSE_EQ",
+        )
+        toolkit._dhan_tools.allow_live_orders = True
+
+        response = json.loads(
+            toolkit.place_protected_intraday_order(
+                side="BUY",
+                quantity=1,
+                entry_price=100.0,
+                target_price=105.0,
+                stop_loss_price=98.0,
+            )
+        )
+        decision = toolkit.decision_snapshot("Test Limited")
+
+        self.assertEqual(response["status"], "failure")
+        self.assertEqual(response["remarks"]["error_code"], "DH-905")
+        self.assertEqual(decision["action"], "avoid")
+        self.assertEqual(decision["execution_status"], "failed")
+        self.assertEqual(decision["order_id"], "NONE")
+        self.assertEqual(toolkit.coordinator.successful_orders, [])
+
     def test_only_traded_order_is_reported_as_executed(self):
         dhan = FakeStockDhan(
             margin_required=20.0,

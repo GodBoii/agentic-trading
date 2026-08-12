@@ -362,7 +362,10 @@ class IntraFinderTests(unittest.TestCase):
         finder.readiness_max_entry_drift_atr = 0.80
         finder.candidates_seen = 0
         finder.gate_failure_counts = Counter()
-        finder.agent_futures = set()
+        finder.agent_threads = set()
+        finder.dispatch_lock = RLock()
+        finder.agent_dispatch_successes = 0
+        finder.agent_dispatch_failures = 0
         finder.received_security_ids = set()
         finder.full_packet_security_ids = set()
         finder.last_global_packet_at = None
