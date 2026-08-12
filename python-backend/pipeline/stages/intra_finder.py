@@ -15,7 +15,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
 from statistics import median
-from threading import RLock
+from threading import RLock, Thread, current_thread
 from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
@@ -83,9 +83,6 @@ class IntraFinder:
         self.state_lock = RLock()
         self.dispatch_lock = RLock()
         self.current_feed: Any = None
-        self.executor = ThreadPoolExecutor(
-            max_workers=max(1, self.config.intra_finder_agent_concurrency)
-        )
         self.io_executor = ThreadPoolExecutor(max_workers=1)
         self.io_futures: set[Future] = set()
         self.recovery_executor = ThreadPoolExecutor(max_workers=4)
@@ -94,12 +91,9 @@ class IntraFinder:
         self.opening_range_recovery_requested = 0
         self.opening_range_recovery_completed = 0
         self.opening_range_recovery_failed = 0
-        self.agent_futures: set[Future] = set()
-        self.pending_agent_events: List[Dict[str, Any]] = []
+        self.agent_threads: set[Thread] = set()
         self.agent_dispatch_successes = 0
         self.agent_dispatch_failures = 0
-        self.agent_queue_expired = 0
-        self.agent_queue_overflow_dropped = 0
         self.event_state: Dict[str, Any] = {}
         self.shadow_mode = os.getenv(
             "INTRA_FINDER_SHADOW_MODE",
@@ -128,24 +122,6 @@ class IntraFinder:
                 os.getenv(
                     "INTRA_FINDER_STOCK_AGENT_COOLDOWN_SECONDS",
                     str(self.config.intra_finder_stock_agent_cooldown_seconds),
-                )
-            ),
-        )
-        self.agent_queue_max = max(
-            1,
-            int(
-                os.getenv(
-                    "INTRA_FINDER_AGENT_QUEUE_MAX",
-                    str(self.config.intra_finder_agent_queue_max),
-                )
-            ),
-        )
-        self.agent_queue_max_age_seconds = max(
-            1,
-            int(
-                os.getenv(
-                    "INTRA_FINDER_AGENT_QUEUE_MAX_AGE_SECONDS",
-                    str(self.config.intra_finder_agent_queue_max_age_seconds),
                 )
             ),
         )
@@ -289,8 +265,8 @@ class IntraFinder:
             f"readiness={summary['readiness_passed']:,}/{summary['readiness_evaluations']:,} "
             f"rechecks={summary['readiness_rechecks']:,} "
             f"pending={summary['pending_indicator_stocks']:,} events={summary['events_formed']:,} "
-            f"agent_active={summary['agent_dispatch_active']:,} agent_queue={summary['agent_dispatch_queued']:,} "
-            f"queue_expired={summary['agent_queue_expired']:,} queue_dropped={summary['agent_queue_overflow_dropped']:,} "
+            f"agent_active={summary['agent_dispatch_active']:,} "
+            f"dispatch_ok={summary['agent_dispatch_successes']:,} dispatch_failed={summary['agent_dispatch_failures']:,} "
             f"suppressed={summary['events_suppressed']:,} reconnects={summary['reconnect_count']:,} "
             f"shadow={summary['shadow_mode']} | states: {most_common_states} | gates: {common_gates}"
         )
@@ -1310,7 +1286,7 @@ class IntraFinder:
         evidence_weight = sum(
             weights.get(str(event.get("event_type") or ""), 1) for event in events
         )
-        # This is queue priority, not a probability of profit or a trade score.
+        # This is evidence strength for the readiness model, not a probability of profit.
         return float(min(100, 40 + evidence_weight * 8))
 
     def _queue_indicator_evidence(
@@ -2086,58 +2062,37 @@ class IntraFinder:
         return event
 
     def _dispatch_event(self, event: Dict[str, Any]) -> None:
+        """Start one independent dispatch thread immediately for every signal."""
+        event_id = str(event.get("event_id") or uuid.uuid4().hex[:12])
+        thread = Thread(
+            target=self._post_agent_event_immediately,
+            args=(event,),
+            name=f"intra-agent-dispatch-{event_id[:12]}",
+            daemon=True,
+        )
         with self.dispatch_lock:
-            self.agent_futures = {future for future in self.agent_futures if not future.done()}
-            if len(self.agent_futures) >= self.config.intra_finder_agent_concurrency:
-                self.pending_agent_events.append(event)
-                self.pending_agent_events.sort(
-                    key=lambda item: (
-                        float(item.get("setup_score") or 0),
-                        str(item.get("created_at") or ""),
-                    ),
-                    reverse=True,
-                )
-                if len(self.pending_agent_events) > self.agent_queue_max:
-                    self.pending_agent_events.pop()
-                    self.agent_queue_overflow_dropped += 1
-                return
-            self._submit_agent_event_locked(event)
-
-    def _event_dispatch_age_seconds(self, event: Dict[str, Any], now: datetime) -> float:
-        timestamps = event.get("evidence_timestamps") or []
-        reference = event.get("created_at") or (timestamps[-1] if timestamps else None)
+            self.agent_threads.add(thread)
+            self.events_triggered += 1
         try:
-            return max(0.0, (now - datetime.fromisoformat(str(reference))).total_seconds())
-        except (TypeError, ValueError):
-            return float("inf")
-
-    def _next_fresh_agent_event_locked(self) -> Optional[Dict[str, Any]]:
-        now = self.market_time.now()
-        while self.pending_agent_events:
-            event = self.pending_agent_events.pop(0)
-            if self._event_dispatch_age_seconds(event, now) <= self.agent_queue_max_age_seconds:
-                return event
-            self.agent_queue_expired += 1
-        return None
-
-    def _submit_agent_event_locked(self, event: Dict[str, Any]) -> None:
-        future = self.executor.submit(self._post_agent_event, event)
-        self.agent_futures.add(future)
-        self.events_triggered += 1
-        future.add_done_callback(self._agent_event_done)
-
-    def _agent_event_done(self, future: Future) -> None:
-        with self.dispatch_lock:
-            self.agent_futures.discard(future)
-            try:
-                future.result()
-                self.agent_dispatch_successes += 1
-            except Exception as exc:
+            thread.start()
+        except Exception:
+            with self.dispatch_lock:
+                self.agent_threads.discard(thread)
                 self.agent_dispatch_failures += 1
-                print(f"Intra-Finder agent dispatch failed: {type(exc).__name__}.")
-            next_event = self._next_fresh_agent_event_locked()
-            if next_event is not None:
-                self._submit_agent_event_locked(next_event)
+            raise
+
+    def _post_agent_event_immediately(self, event: Dict[str, Any]) -> None:
+        try:
+            self._post_agent_event(event)
+            with self.dispatch_lock:
+                self.agent_dispatch_successes += 1
+        except Exception as exc:
+            with self.dispatch_lock:
+                self.agent_dispatch_failures += 1
+            print(f"Intra-Finder agent dispatch failed: {type(exc).__name__}.")
+        finally:
+            with self.dispatch_lock:
+                self.agent_threads.discard(current_thread())
 
     def _post_agent_event(self, event: Dict[str, Any]) -> None:
         endpoint = os.getenv(
@@ -2318,12 +2273,9 @@ class IntraFinder:
             "pending_indicator_stocks": sum(
                 bool(state.get("pending_indicator_events")) for state in self.states.values()
             ),
-            "agent_dispatch_active": len(self.agent_futures),
-            "agent_dispatch_queued": len(self.pending_agent_events),
+            "agent_dispatch_active": len(self.agent_threads),
             "agent_dispatch_successes": self.agent_dispatch_successes,
             "agent_dispatch_failures": self.agent_dispatch_failures,
-            "agent_queue_expired": self.agent_queue_expired,
-            "agent_queue_overflow_dropped": self.agent_queue_overflow_dropped,
             "shadow_mode": self.shadow_mode,
         }
         self._log_progress(summary, force=force)
@@ -2389,10 +2341,9 @@ class IntraFinder:
             "detector_mode": self.detector_mode,
             "indicator_events_detected": self.indicator_events_detected,
             "indicator_aggregates_formed": self.indicator_aggregates_formed,
-            "agent_dispatch_active": len(self.agent_futures),
-            "agent_dispatch_queued": len(self.pending_agent_events),
-            "agent_queue_expired": self.agent_queue_expired,
-            "agent_queue_overflow_dropped": self.agent_queue_overflow_dropped,
+            "agent_dispatch_active": len(self.agent_threads),
+            "agent_dispatch_successes": self.agent_dispatch_successes,
+            "agent_dispatch_failures": self.agent_dispatch_failures,
         }
 
     def enforce_retention(self) -> None:
@@ -2570,6 +2521,5 @@ class IntraFinder:
         self._close_feed(getattr(self, "current_feed", None))
         self.flush()
         self._save_status_if_due(force=True)
-        self.executor.shutdown(wait=False, cancel_futures=False)
         self.recovery_executor.shutdown(wait=False, cancel_futures=True)
         self.io_executor.shutdown(wait=True, cancel_futures=False)
