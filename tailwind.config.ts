@@ -1,5 +1,18 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Colour policy
+ * -------------
+ * Every tonal colour resolves to a channel triplet declared once in
+ * `app/globals.css` (`--*-rgb`). Declaring them here with `<alpha-value>`
+ * means Tailwind's opacity modifiers work off the same source of truth,
+ * so `border-danger/30` and `var(--dash-negative)` can never drift apart.
+ *
+ * `success`/`danger` are the semantic aliases used for run and order state.
+ * `positive`/`negative` are the financial aliases used for P&L direction.
+ * They intentionally share a value: a losing position and a failed run
+ * should read as the same red.
+ */
 const config: Config = {
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,15 +23,32 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Text scale — shared by the marketing surface and the product shell.
         ink: {
-          primary: "#F8F8F8",
-          secondary: "rgba(255,255,255,0.55)",
-          tertiary: "rgba(255,255,255,0.30)",
+          primary: "var(--dash-text)",
+          secondary: "var(--dash-text-secondary)",
+          tertiary: "var(--dash-text-muted)",
         },
+        // Structure.
+        canvas: "var(--dash-canvas)",
+        panel: {
+          DEFAULT: "var(--dash-panel)",
+          inset: "var(--dash-panel-inset)",
+        },
+        line: {
+          DEFAULT: "var(--dash-border)",
+          strong: "var(--dash-border-strong)",
+        },
+        // Tone.
         accent: {
-          DEFAULT: "#00E5FF",
-          glow: "rgba(0,229,255,0.45)",
+          DEFAULT: "rgb(var(--accent-rgb) / <alpha-value>)",
+          glow: "rgb(var(--accent-rgb) / 0.45)",
         },
+        success: "rgb(var(--dash-positive-rgb) / <alpha-value>)",
+        danger: "rgb(var(--dash-negative-rgb) / <alpha-value>)",
+        warning: "rgb(var(--dash-warning-rgb) / <alpha-value>)",
+        positive: "rgb(var(--dash-positive-rgb) / <alpha-value>)",
+        negative: "rgb(var(--dash-negative-rgb) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
