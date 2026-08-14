@@ -321,14 +321,10 @@ class SessionSupervisor:
             trade_amount = float(trade_amount) if trade_amount not in (None, "") else None
         except Exception:
             trade_amount = None
-        regime_enabled = self._env_bool(
-            "SUPERVISOR_REGIME_ANALYSIS_ENABLED",
-            self._as_bool(last_request.get("regime_analysis_enabled"), True),
-        )
         return {
             "trade_mode": str(trade_mode).strip().lower(),
             "trade_amount": trade_amount,
-            "regime_analysis_enabled": regime_enabled,
+            "regime_analysis_enabled": False,
         }
 
     def _backend_is_busy(self) -> bool:
