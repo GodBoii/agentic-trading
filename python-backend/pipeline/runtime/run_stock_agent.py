@@ -188,7 +188,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         trade_config["user_id"] = user_id
         if trade_config["trade_amount"] is None:
             raise RuntimeError("trading_amount_missing_or_invalid")
-        regime_payload = self.storage.load_snapshot(self.config.regime_latest_path)
+        regime_payload = None
         synthetic_stage2 = {
             "stage": "intra_finder",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -206,7 +206,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             stage2_payload=synthetic_stage2,
             monitor_payload=None,
             regime_payload=regime_payload,
-            regime_enabled=True,
+            regime_enabled=False,
             account_context=account_context,
         )
         packet.update(event)
@@ -328,19 +328,28 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
 
     def _strip_monitor_context(self, packet: Dict[str, Any]) -> None:
         packet.pop("monitor", None)
+        packet.pop("regime_report", None)
+        packet.pop("latest_regime_context", None)
+        packet["regime_analysis_enabled"] = False
         snapshots = packet.get("source_snapshots")
         if isinstance(snapshots, dict):
             snapshots.pop("monitor_generated_at_utc", None)
             snapshots.pop("monitor_generated_at_ist", None)
+            snapshots.pop("regime_generated_at_utc", None)
+            snapshots.pop("regime_generated_at_ist", None)
+            snapshots["regime_analysis_enabled"] = False
         timing = packet.get("timing_context")
         if isinstance(timing, dict):
             source_times = timing.get("source_snapshot_times")
             if isinstance(source_times, dict):
                 source_times.pop("monitor_generated_at_utc", None)
                 source_times.pop("monitor_generated_at_ist", None)
+                source_times.pop("regime_generated_at_utc", None)
+                source_times.pop("regime_generated_at_ist", None)
             source_ages = timing.get("source_snapshot_ages_seconds")
             if isinstance(source_ages, dict):
                 source_ages.pop("monitor", None)
+                source_ages.pop("regime", None)
 
     def _filter_by_manual_margin_budget(
         self,
