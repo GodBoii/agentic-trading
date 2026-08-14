@@ -137,11 +137,9 @@ class MultiStockAnalyzerRunner:
         trade_config: Optional[Dict[str, Any]],
         explicit_value: Optional[bool],
     ) -> bool:
-        if explicit_value is not None:
-            return bool(explicit_value)
-        if trade_config and "regime_analysis_enabled" in trade_config:
-            return self._as_bool(trade_config.get("regime_analysis_enabled"), default=True)
-        return True
+        # Deprecated. Ignore legacy request/config values so stale clients
+        # cannot put regime output back into a stock-agent packet.
+        return False
 
     def _as_bool(self, value: Any, default: bool = True) -> bool:
         if value is None:
