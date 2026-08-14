@@ -11,6 +11,7 @@ from agno.tools import Toolkit
 
 from pipeline.llm import create_multimodal_trading_model
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
+from pipeline.stock.toolkits.markdown_result import tool_result_markdown
 
 
 class StockAgent:
@@ -57,21 +58,22 @@ class StockAgent:
                 "Analyze one assigned Indian equity for an intraday entry and act when a sound setup exists."
             ),
             tools=self.toolkits,
-            tool_call_limit=12,
+            tool_call_limit=3,
             instructions=[
                 "You are an expert intraday Indian equity trader.",
-                "Study the assigned stock using the attached charts and any available tools that are useful.",
+                "Study the assigned stock using the attached charts and the complete initial decision snapshot in the user message.",
                 "The attached image order is: current-day 1m, current-day 5m, current-day 15m, previous-session 5m, previous-session 15m, volume and participation, momentum and volatility, OHLCV-derived price-structure liquidity, then current/previous TPO market profile.",
-                "Use get_technical_data and get_security_overview for exact numeric values that complement the charts.",
+                "The initial snapshot is the single source for identity, time, market state, technical readings, account state, and risk budget. Do not look for read-only tools.",
                 "Do not assume stock CVD, footprint, historical DOM, or trade aggressor data exists. Dhan historical candles do not contain those fields.",
                 "The price-structure liquidity image is derived from OHLCV and the TPO image is time at price, not order-book liquidity or exact volume at price.",
-                "Before making the trade decision, call get_security_overview and get_technical_data once so the chart reading is checked against exact numeric data.",
                 "Understand how price is moving and evaluate price action, volume, momentum, liquidity, liquidity pools or sweeps, market structure, and risk-reward wherever relevant.",
                 "Decide whether a sound intraday entry exists and place it when appropriate. Any trade opened by you is for the current trading day only.",
                 "Focus only on the stock assigned to you.",
                 "Any live position or order in another stock belongs to another agent or workflow. Never modify, cancel, exit, hedge, convert, or otherwise touch it.",
-                "If the assigned stock already has a live position or active order, do not create another entry.",
-                "After completing your analysis and before your final decision or order, call get_current_stock_state once, use its newly fetched quote and OHLC data to update your view, and then proceed.",
+                "If account data is unavailable, or the assigned stock already has a live position or active order, do not create another entry.",
+                "Exactly two tools are available: estimate_intraday_quantity and place_protected_intraday_order.",
+                "Before any order, call estimate_intraday_quantity with the intended entry and stop, then use its recommended quantity.",
+                "Only place a protected order with an explicit entry, target, and stop-loss. There is no unprotected-order fallback.",
                 "Give your final analysis and outcome naturally and concisely. Do not use a fixed response template.",
             ],
             markdown=True,
@@ -240,7 +242,36 @@ class StockAgent:
                 ):
                     if parsed.get(key) is not None:
                         payload[key] = parsed.get(key)
+            else:
+                markdown_fields = self._markdown_result_fields(result_text)
+                status = str(markdown_fields.get("status") or "success").lower()
+                payload["result_status"] = status
+                payload["result_partial"] = status == "partial" or str(
+                    markdown_fields.get("partial") or ""
+                ).lower() == "true"
+                for key in (
+                    "as_of_ist",
+                    "snapshot_fetched_at_ist",
+                    "candle_data_as_of_ist",
+                    "market_data_age_seconds",
+                    "candle_data_age_seconds",
+                ):
+                    if markdown_fields.get(key) is not None:
+                        payload[key] = markdown_fields[key]
         return payload
+
+    @staticmethod
+    def _markdown_result_fields(result_text: str) -> Dict[str, str]:
+        fields: Dict[str, str] = {}
+        for line in str(result_text or "").splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("- ") or ":" not in stripped:
+                continue
+            key, value = stripped[2:].split(":", 1)
+            key = key.strip()
+            if key and key not in fields:
+                fields[key] = value.strip()
+        return fields
 
     @staticmethod
     def _build_tool_summary(timeline: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -291,40 +322,20 @@ class StockAgent:
         }
 
     def _build_prompt(self, stock_packet: Dict[str, Any]) -> str:
-        selected_stock = stock_packet.get("selected_stock") or {}
-        timing_context = stock_packet.get("timing_context") or {}
-        market_session = timing_context.get("market_session") or {}
-        current_time = (
-            timing_context.get("current_market_time_ist")
-            or timing_context.get("stock_agent_started_at_ist")
-            or ""
-        )
+        decision_context = stock_packet.get("decision_context") or {}
         lines = [
-            "Analyze the assigned stock for an intraday trade using the attached charts and available tools.",
+            "Analyze the assigned stock for an intraday trade using the attached charts and the initial decision snapshot below.",
             "Attached charts in order: current 1m, current 5m, current 15m, previous-session 5m, previous-session 15m, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO market profile.",
             "",
-            "## Assignment",
-            f"- Security ID: {selected_stock.get('security_id')}",
-            f"- Stock: {selected_stock.get('display_name') or selected_stock.get('symbol')}",
+            "All read-only evidence is already included exactly once. The only available tools size a trade and place a protected order.",
+            "",
         ]
-        if selected_stock.get("symbol"):
-            lines.append(f"- Symbol: {selected_stock.get('symbol')}")
-        if selected_stock.get("trade_amount") is not None:
-            lines.extend([
-                f"- Strict cash/notional cap: Rs {selected_stock.get('trade_amount')}",
-                f"- Sizing mode: {selected_stock.get('trade_mode')} ({selected_stock.get('amount_source')})",
-                f"- Requested whole-share quantity: {selected_stock.get('requested_quantity')}",
-                f"- Estimated notional: Rs {selected_stock.get('estimated_notional')}",
-                f"- User-sized depth slippage estimate: {selected_stock.get('estimated_slippage_percent')}%",
-                "- Do not assume leverage. Current LTP and affordability are revalidated immediately before placement.",
-            ])
-        if current_time:
-            lines.append(f"- Indian date and time: {current_time}")
-        lines.append(f"- Regular market session: {market_session.get('regular_session') or '09:15-15:30 IST'}")
-        if market_session.get("is_open_now") is not None:
-            lines.append(f"- Market open now: {bool(market_session.get('is_open_now'))}")
-        if market_session.get("minutes_to_close") is not None:
-            lines.append(f"- Minutes to close: {market_session.get('minutes_to_close')}")
+        rendered = tool_result_markdown(decision_context).replace(
+            "## Tool result",
+            "## Initial decision snapshot",
+            1,
+        )
+        lines.append(rendered)
         return "\n".join(lines)
 
     def _extract_metadata(self, response: Any) -> Dict[str, Any]:
