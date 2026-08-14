@@ -6,7 +6,6 @@ import {
   Inter_Tight,
   JetBrains_Mono,
   Manrope,
-  Playfair_Display,
   Space_Grotesk,
 } from "next/font/google";
 import "./globals.css";
@@ -42,13 +41,6 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-const playfairDisplay = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-  weight: ["400", "500", "600", "700", "800", "900"],
-  style: ["normal", "italic"],
-});
-
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-manrope",
@@ -62,9 +54,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Polycognitive — Autonomous Intelligence for Global Markets",
+  title: "PolyCognition — AI Trading Agents for Indian Markets",
   description:
-    "The first autonomous operating system for market research, execution, and portfolio intelligence.",
+    "Connect your Dhan broker and let AI agents scan the NSE universe, surface intraday opportunities, and execute within your risk limits.",
   icons: {
     icon: "/icon.png",
     apple: "/icon.png",
@@ -82,7 +74,7 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" />
       </head>
       <body
-        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} ${manrope.variable} ${ibmPlexMono.variable} font-sans antialiased bg-black text-white`}
+        className={`${inter.variable} ${neue.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${manrope.variable} ${ibmPlexMono.variable} font-sans antialiased bg-black text-white`}
       >
         {children}
       </body>
