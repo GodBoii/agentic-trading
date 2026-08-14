@@ -15,14 +15,30 @@
   --hairline: rgba(255, 255, 255, 0.07);
   --hairline-strong: rgba(255, 255, 255, 0.14);
 
+  /* ── Tonal channels ──
+     Single source of truth. Every tonal colour is declared once as an
+     "R G B" channel triplet so it can be consumed three ways:
+       CSS solid      → var(--dash-positive)
+       CSS w/ alpha   → rgb(var(--dash-positive-rgb) / 0.25)
+       Tailwind       → text-positive, border-positive/25  (see tailwind.config.ts)
+     Never hard-code these values again. */
+  --accent-rgb: 0 229 255;
+  --dash-positive-rgb: 52 211 153;
+  --dash-negative-rgb: 248 113 113;
+  --dash-warning-rgb: 251 191 36;
+
   /* Accent + status (auth/dashboard pages) */
-  --accent: #00E5FF;
-  --accent-glow: rgba(0, 229, 255, 0.45);
+  --accent: rgb(var(--accent-rgb));
+  --accent-glow: rgb(var(--accent-rgb) / 0.45);
   --profit: #00FF9D;
   --loss: #FF5B5B;
 
   /* Dashboard minimalist tokens */
   --dash-canvas: #09090B;
+  /* Elevated panel — the default reading surface for data. */
+  --dash-panel: #0D0F12;
+  /* Inset surface, one step back from the panel: nested cells, code, wells. */
+  --dash-panel-inset: #0A0B0E;
   --dash-surface: rgba(255, 255, 255, 0.025);
   --dash-surface-hover: rgba(255, 255, 255, 0.04);
   --dash-border: rgba(255, 255, 255, 0.06);
@@ -30,9 +46,9 @@
   --dash-text: #FAFAFA;
   --dash-text-secondary: rgba(255, 255, 255, 0.50);
   --dash-text-muted: rgba(255, 255, 255, 0.25);
-  --dash-positive: #34D399;
-  --dash-negative: #F87171;
-  --dash-warning: #FBBF24;
+  --dash-positive: rgb(var(--dash-positive-rgb));
+  --dash-negative: rgb(var(--dash-negative-rgb));
+  --dash-warning: rgb(var(--dash-warning-rgb));
 
   /* Typography */
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
@@ -180,7 +196,7 @@ body {
   overscroll-behavior-inline: contain;
   scroll-snap-type: inline proximity;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 229, 255, 0.38) rgba(255, 255, 255, 0.04);
+  scrollbar-color: var(--dash-border-strong) rgba(255, 255, 255, 0.04);
 }
 
 .attachment-rail > * > * {
@@ -197,7 +213,7 @@ body {
 }
 
 .attachment-rail::-webkit-scrollbar-thumb {
-  background: rgba(0, 229, 255, 0.38);
+  background: var(--dash-border-strong);
   border-radius: 999px;
 }
 
@@ -246,7 +262,7 @@ body {
 }
 
 .agent-markdown blockquote {
-  border-left: 2px solid rgba(0, 229, 255, 0.45);
+  border-left: 2px solid rgb(var(--accent-rgb) / 0.45);
   padding-left: 1rem;
   color: var(--dash-text-secondary);
 }
@@ -265,7 +281,7 @@ body {
   overflow-x: auto;
   border: 1px solid var(--dash-border);
   border-radius: 12px;
-  background: #050506;
+  background: var(--dash-panel-inset);
   padding: 1rem;
 }
 
@@ -397,7 +413,7 @@ body {
     transition: all 0.3s var(--ease-out-expo);
   }
   .dash-btn-accent:hover {
-    box-shadow: 0 0 0 1px var(--accent), 0 8px 30px -8px rgba(0,229,255,0.25);
+    box-shadow: 0 0 0 1px var(--accent), 0 8px 30px -8px rgb(var(--accent-rgb) / 0.25);
   }
 
   /* ── Dashboard inputs ── */
@@ -418,11 +434,17 @@ body {
   .dash-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.08);
   }
   .dash-input:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+  /* Leaves room for a currency glyph rendered inside the field. Declared here
+     rather than overriding .dash-input's padding with `!important` at the
+     call site. */
+  .dash-input-currency {
+    padding-left: 2rem;
   }
 
   /* ── Dashboard badges ── */
@@ -442,23 +464,23 @@ body {
   }
   .dash-badge-positive {
     color: var(--dash-positive);
-    border-color: rgba(52, 211, 153, 0.25);
-    background: rgba(52, 211, 153, 0.06);
+    border-color: rgb(var(--dash-positive-rgb) / 0.25);
+    background: rgb(var(--dash-positive-rgb) / 0.06);
   }
   .dash-badge-negative {
     color: var(--dash-negative);
-    border-color: rgba(248, 113, 113, 0.25);
-    background: rgba(248, 113, 113, 0.06);
+    border-color: rgb(var(--dash-negative-rgb) / 0.25);
+    background: rgb(var(--dash-negative-rgb) / 0.06);
   }
   .dash-badge-warning {
     color: var(--dash-warning);
-    border-color: rgba(251, 191, 36, 0.25);
-    background: rgba(251, 191, 36, 0.06);
+    border-color: rgb(var(--dash-warning-rgb) / 0.25);
+    background: rgb(var(--dash-warning-rgb) / 0.06);
   }
   .dash-badge-accent {
     color: var(--accent);
-    border-color: rgba(0, 229, 255, 0.25);
-    background: rgba(0, 229, 255, 0.06);
+    border-color: rgb(var(--accent-rgb) / 0.25);
+    background: rgb(var(--accent-rgb) / 0.06);
   }
 
   /* ── Dashboard section label ── */
@@ -496,8 +518,8 @@ body {
   }
   .dash-dot-positive { background: var(--dash-positive); }
   .dash-dot-negative { background: var(--dash-negative); }
-  .dash-dot-warning { background: var(--dash-warning); box-shadow: 0 0 8px rgba(251,191,36,0.4); }
-  .dash-dot-accent { background: var(--accent); box-shadow: 0 0 8px rgba(0,229,255,0.4); }
+  .dash-dot-warning { background: var(--dash-warning); box-shadow: 0 0 8px rgb(var(--dash-warning-rgb) / 0.4); }
+  .dash-dot-accent { background: var(--accent); box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.4); }
   .dash-dot-muted { background: var(--dash-text-muted); }
   .dash-dot-pulse {
     animation: dash-pulse 2s var(--ease-in-out) infinite;
@@ -520,8 +542,8 @@ body {
     flex-shrink: 0;
   }
   .dash-toggle[aria-pressed="true"] {
-    background: rgba(52, 211, 153, 0.2);
-    border-color: rgba(52, 211, 153, 0.3);
+    background: rgb(var(--dash-positive-rgb) / 0.2);
+    border-color: rgb(var(--dash-positive-rgb) / 0.3);
   }
   .dash-toggle::after {
     content: "";
@@ -553,37 +575,265 @@ body {
   }
 }
 
-/* Trade archive: restrained motion on stateful elements only. */
-.trade-date-card {
-  transition:
-    border-color var(--duration-fast) var(--ease-smooth-out),
-    background-color var(--duration-fast) var(--ease-smooth-out);
+/* =====================================================================
+   PRODUCT SURFACES — shared enterprise chrome
+   Dashboard, Agent workspace, and Trade history share these primitives.
+   ===================================================================== */
+
+/* ── Segmented view switcher (Agent section) ── */
+.product-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--dash-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
 }
+.product-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--duration-quick) ease-out,
+    background-color var(--duration-quick) ease-out,
+    border-color var(--duration-quick) ease-out;
+}
+.product-tab:hover { color: var(--dash-text-secondary); }
+.product-tab[data-active="true"] {
+  color: var(--dash-text);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--dash-border-strong);
+}
+
+/* ── Status chip with tone dot ── */
+.product-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--dash-border);
+  background: rgba(255, 255, 255, 0.02);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Panel: the standard framed reading surface for data ──
+   Header/body/footer are optional slots. Radius stays on the panel so
+   nested tables and grids clip correctly. */
+.panel {
+  background: var(--dash-panel);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--dash-border);
+}
+.panel-body { padding: 1.25rem; }
+.panel-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--dash-border);
+}
+
+/* ── Hairline cell grid ──
+   Replaces the `gap-px bg-line + per-cell background` idiom that was
+   repeated in a dozen places. Column count still comes from Tailwind
+   (`grid-cols-2 sm:grid-cols-4`); this class deliberately sets no
+   grid-template so it never fights those utilities. */
+.cell-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--dash-border);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cell-grid > * {
+  background: var(--dash-panel);
+  min-width: 0;
+}
+/* Flush variant: sits inside an existing .panel, so it drops its own frame. */
+.cell-grid-flush {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ── Data table ──
+   Sticky header, tabular figures, right-alignable columns. Keeps ~6
+   utility classes off every single <th>/<td>. */
+.table-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.6875rem 1.25rem;
+  background: var(--dash-panel);
+  border-bottom: 1px solid var(--dash-border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--dash-text-muted);
+}
+.data-table tbody td {
+  padding: 0.8125rem 1.25rem;
+  border-top: 1px solid var(--dash-border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--dash-text-secondary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.data-table tbody tr:first-child td { border-top: 0; }
+.data-table tbody tr { transition: background-color var(--duration-quick) ease-out; }
+.data-table tbody tr:hover td { background: rgba(255, 255, 255, 0.016); }
+.data-table [data-align="right"] { text-align: right; }
+.data-table [data-align="center"] { text-align: center; }
+/* Emphasized figure inside a cell. */
+.data-table td strong {
+  display: block;
+  font-weight: 500;
+  color: var(--dash-text);
+}
+/* Secondary annotation inside a cell. */
+.data-table td small {
+  display: block;
+  margin-top: 0.1875rem;
+  font-size: 0.5625rem;
+  color: var(--dash-text-muted);
+}
+
+/* ── Meter: proportion of a known total ── */
+.meter {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--duration-slow) var(--ease-smooth-out);
+}
+
+/* ── Interactive card ──
+   Buttons that wrap a whole block of content. Inset focus ring so the
+   outline never gets clipped by the parent's overflow:hidden. */
+.card-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  transition:
+    background-color var(--duration-quick) ease-out,
+    border-color var(--duration-quick) ease-out;
+}
+.card-button:hover { background: var(--dash-surface-hover); }
+.card-button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.card-button:disabled { cursor: not-allowed; }
+/* While one card is loading, the others dim — but the busy one stays legible
+   so the spinner reads as progress rather than as a disabled control. */
+.card-button:disabled:not([aria-busy="true"]) { opacity: 0.45; }
+
+/* ── Agent event timeline rail ── */
+.event-timeline { position: relative; }
+.event-timeline::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--dash-border);
+}
+.event-timeline-item { position: relative; padding-left: 1.75rem; }
+.event-timeline-item + .event-timeline-item { margin-top: 1rem; }
+.event-timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  /* Ring in the panel colour so the dot reads as sitting on the rail. */
+  border: 2px solid var(--dash-panel);
+  /* No `background` here on purpose: the tone utility class supplies it.
+     This block is plain CSS emitted after `@tailwind utilities`, so any colour
+     declared here would beat `bg-positive` / `bg-negative` on the element. */
+}
+
+/* ── Collapsible long-form agent output ── */
+.clamp-region { position: relative; }
+.clamp-region[data-clamped="true"] > .clamp-content {
+  max-height: 220px;
+  overflow: hidden;
+}
+.clamp-region[data-clamped="true"] > .clamp-content::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 64px;
+  background: linear-gradient(transparent, var(--dash-panel));
+  pointer-events: none;
+}
+.clamp-region > .clamp-content { position: relative; }
+.clamp-toggle {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: color var(--duration-quick) ease-out;
+}
+.clamp-toggle:hover { color: var(--dash-text); }
+
+/* ── Trade history disclosure mechanics ── */
 .trade-date-trigger {
   transition: background-color var(--duration-fast) var(--ease-smooth-out);
 }
 .trade-date-trigger:hover,
 .trade-date-trigger:focus-visible {
-  background: rgba(255, 255, 255, 0.03);
-}
-.trade-date-toggle {
-  transition:
-    color var(--duration-fast) var(--ease-smooth-out),
-    border-color var(--duration-fast) var(--ease-smooth-out),
-    background-color var(--duration-fast) var(--ease-smooth-out);
-}
-.trade-date-toggle-icon {
-  display: block;
-  line-height: 1;
-  transition: transform var(--duration-fast) var(--ease-smooth-out);
-}
-.trade-date-trigger[aria-expanded="true"] .trade-date-toggle {
-  border-color: rgba(0, 229, 255, 0.35);
-  background: rgba(0, 229, 255, 0.07);
-  color: var(--accent);
-}
-.trade-date-trigger[aria-expanded="true"] .trade-date-toggle-icon {
-  transform: rotate(45deg);
+  background: rgba(255, 255, 255, 0.022);
 }
 .trade-date-panel {
   display: grid;
@@ -603,50 +853,12 @@ body {
   pointer-events: auto;
   transition-delay: 0s;
 }
-.trade-date-panel-inner { min-height: 0; }
-.archive-run {
-  background: rgba(255, 255, 255, 0.002);
-  transition:
-    background-color var(--duration-fast) var(--ease-smooth-out),
-    opacity var(--duration-quick) ease-out;
-}
-.archive-run:hover,
-.archive-run:focus-visible {
-  background: rgba(0, 229, 255, 0.028);
-}
-.archive-run:disabled:not([aria-busy="true"]) { opacity: 0.48; }
-.archive-run-accent,
-.archive-run-title,
-.archive-arrow {
-  transition: transform var(--duration-fast) var(--ease-smooth-out);
-}
-.archive-run:hover .archive-run-title,
-.archive-run:focus-visible .archive-run-title { transform: translateX(4px); }
-.archive-run:hover .archive-arrow,
-.archive-run:focus-visible .archive-arrow { transform: translateX(4px); }
-.archive-back-button,
-.archive-retry-button {
-  transition:
-    color var(--duration-quick) ease-out,
-    border-color var(--duration-quick) ease-out,
-    background-color var(--duration-quick) ease-out,
-    transform var(--duration-fast) var(--ease-smooth-out);
-}
-.archive-back-button:hover,
-.archive-retry-button:hover { transform: translateY(-1px); }
-.archive-loading-label {
-  background: linear-gradient(90deg, currentColor 25%, rgba(255,255,255,0.35) 50%, currentColor 75%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: archive-shimmer 1s linear infinite;
-}
+.trade-date-panel-inner { min-height: 0; overflow: hidden; }
 .archive-spinner {
   width: 12px;
   height: 12px;
-  border: 1px solid rgba(0, 229, 255, 0.25);
-  border-top-color: var(--accent);
+  border: 1px solid var(--dash-border-strong);
+  border-top-color: var(--dash-text);
   border-radius: 999px;
   animation: archive-spin 650ms linear infinite;
 }
@@ -662,23 +874,16 @@ body {
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.045), transparent);
   animation: archive-skeleton 1.15s ease-in-out infinite;
 }
-@keyframes archive-shimmer { to { background-position: -200% 0; } }
 @keyframes archive-spin { to { transform: rotate(360deg); } }
 @keyframes archive-skeleton { to { transform: translateX(100%); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .archive-run,
-  .trade-date-card,
+  .card-button,
   .trade-date-trigger,
-  .trade-date-toggle,
-  .trade-date-toggle-icon,
   .trade-date-panel,
-  .archive-run-accent,
-  .archive-run-title,
-  .archive-arrow,
-  .archive-back-button,
-  .archive-retry-button { transition: none !important; }
-  .archive-loading-label,
+  .data-table tbody tr,
+  .meter-fill,
+  .product-tab { transition: none !important; }
   .archive-spinner,
   .archive-skeleton::after { animation: none !important; }
 }
