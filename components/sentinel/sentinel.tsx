@@ -8,7 +8,7 @@ import FinalCta from "./final-cta";
 import Footer from "./footer";
 
 /**
- * Polycognitive — landing page.
+ * PolyCognition — landing page.
  *
  * A single, professional page:
  *   Nav           — brand, section links, auth actions
