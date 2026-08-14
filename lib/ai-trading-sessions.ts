@@ -196,23 +196,19 @@ function fallbackFiles(item: JsonRecord) {
   const stock = item.selected_stock || {}
   const candidate = item.candidate || {}
   const stockPacket = item.stock_packet || {}
+  const decisionContext = stockPacket.decision_context || {}
+  const instrument = decisionContext.instrument || stock
   return [
     {
       id: 'instructions',
       title: 'Instructions',
       filename: 'instructions.md',
       content: [
-        `# ${stock.display_name || candidate.display_name || 'Stock'} Agent Instructions`,
+        `# ${instrument.display_name || candidate.display_name || 'Stock'} Agent Instructions`,
         '',
-        '- Analyze the assigned intraday stock candidate.',
-        '- Use chart images and technical metadata as primary evidence.',
-        '- Check Dhan margin and execution context before placement.',
-        '- Return parseable Decision and Execution Status headers.',
-        '',
-        '## Selected Stock',
-        '```json',
-        JSON.stringify(stock, null, 2),
-        '```',
+        '- Analyze the attached charts and the initial decision snapshot.',
+        '- Use only estimate_intraday_quantity and place_protected_intraday_order.',
+        '- Never place an unprotected intraday order.',
       ].join('\n'),
     },
     {
@@ -220,20 +216,32 @@ function fallbackFiles(item: JsonRecord) {
       title: 'Data',
       filename: 'data.md',
       content: [
-        `# ${stock.display_name || candidate.display_name || 'Stock'} Agent Data`,
+        `# ${instrument.display_name || candidate.display_name || 'Stock'} Initial Decision Snapshot`,
         '',
-        '```json',
-        JSON.stringify({
-          timing_context: stockPacket.timing_context,
-          selected_stock: stock,
-          stage2: candidate.stage2,
-          technical_metadata: candidate.chart_artifacts?.technical_metadata,
-          trade_config: stockPacket.trade_config,
-        }, null, 2),
-        '```',
+        ...markdownValue(decisionContext),
       ].join('\n'),
     },
   ]
+}
+
+function markdownValue(value: any, depth = 0): string[] {
+  const indent = '  '.repeat(depth)
+  if (Array.isArray(value)) {
+    if (!value.length) return [`${indent}- none`]
+    return value.flatMap((item) => {
+      if (item === null || typeof item !== 'object') return [`${indent}- ${String(item)}`]
+      return [`${indent}- item:`, ...markdownValue(item, depth + 1)]
+    })
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value)
+    if (!entries.length) return [`${indent}- none`]
+    return entries.flatMap(([key, item]) => {
+      if (item === null || typeof item !== 'object') return [`${indent}- ${key}: ${String(item)}`]
+      return [`${indent}- ${key}:`, ...markdownValue(item, depth + 1)]
+    })
+  }
+  return [`${indent}- ${String(value)}`]
 }
 
 async function syncSessionImagesToSupabase(session: JsonRecord) {
@@ -277,9 +285,13 @@ async function queryAgnoTradeSessions(userId: string, tradeSessionId?: string) {
   const client = serviceSupabase()
   if (!client) throw new Error('Supabase service credentials are not configured')
 
+  const columns = tradeSessionId
+    ? 'session_id,user_id,metadata,runs,created_at,updated_at'
+    : 'session_id,user_id,metadata,created_at,updated_at'
   let query = client
     .from(agnoSessionTable)
-    .select('session_id,user_id,metadata,runs,created_at,updated_at')
+    .select(columns)
+    .eq('user_id', userId)
     .eq('metadata->>stage', 'stock_agent')
     .order('updated_at', { ascending: false })
     .limit(1000)
@@ -290,9 +302,7 @@ async function queryAgnoTradeSessions(userId: string, tradeSessionId?: string) {
 
   const { data, error } = await query
   if (error) throw error
-  return Array.isArray(data)
-    ? (data as JsonRecord[]).filter((row) => agnoRowBelongsToUser(row, userId))
-    : []
+  return Array.isArray(data) ? data as JsonRecord[] : []
 }
 
 function agnoTradeSessionId(row: JsonRecord) {
@@ -300,20 +310,6 @@ function agnoTradeSessionId(row: JsonRecord) {
   if (metadataId) return safeSegment(metadataId)
   const sessionId = String(row.session_id || '')
   return safeSegment(sessionId.split('--stock-')[0] || '')
-}
-
-function agnoRowBelongsToUser(row: JsonRecord, userId: string) {
-  const normalizedUserId = String(userId || '').trim()
-  if (!normalizedUserId) return false
-
-  const persistedUserIds = [row.user_id, row.metadata?.user_id]
-    .map((value) => String(value || '').trim())
-    .filter((value) => value && value !== 'null' && value !== 'anonymous')
-  if (persistedUserIds.includes(normalizedUserId)) return true
-
-  const tradeSessionId = agnoTradeSessionId(row)
-  const requestId = String(row.metadata?.request_id || '').trim()
-  return tradeSessionId.endsWith(`-${normalizedUserId}`) || requestId.endsWith(`-${normalizedUserId}`)
 }
 
 function agnoSessionSummary(rows: JsonRecord[], sessionId: string) {
