@@ -5,6 +5,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
@@ -80,7 +81,33 @@ class TradingAmountContractTests(unittest.TestCase):
         self.assertEqual(TradingAmountService.quantity(500, 500), 1)
         self.assertEqual(TradingAmountService.quantity(1099, 500), 2)
 
+    def test_event_agent_session_carries_and_requires_user_id(self):
+        runner = object.__new__(MultiStockAgentRunner)
+        runner.config = SimpleNamespace(ai_trading_state_path=Path("unused-state.json"))
+        runner.market_time = SimpleNamespace(market_date_str=lambda: "2026-08-12")
+        runner._build_account_context = lambda: {}
+        runner._build_candidate_packet = lambda **kwargs: {"security_id": 1}
+        runner._strip_monitor_context = lambda packet: None
+        runner._is_placed_result = lambda result: False
+        runner._save_payload = lambda payload: None
+        captured = {}
+
+        def run_agents(packets, trade_config, event_callback, run_context):
+            captured.update(run_context)
+            return [{"decision": {"status": "no_trade"}}]
+
+        runner._run_stock_agents = run_agents
+        event = {
+            "event_id": "event-123",
+            "market_date": "2026-08-12",
+            "exchange_segment": "NSE_EQ",
+        }
+        with patch.object(AITradingStateService, "is_any_user_enabled", return_value=True):
+            runner.run_event(event, user_id="user-123", trade_config={"trade_amount": 500})
+            self.assertEqual(captured["user_id"], "user-123")
+            with self.assertRaisesRegex(RuntimeError, "user_id_required_for_agent_session"):
+                runner.run_event(event, user_id=None, trade_config={"trade_amount": 500})
+
 
 if __name__ == "__main__":
     unittest.main()
-
