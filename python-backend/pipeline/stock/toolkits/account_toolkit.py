@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, List
 
 from agno.tools import Toolkit
 
 from pipeline.services.dhan_service import DhanService
+from pipeline.stock.toolkits.markdown_result import tool_result_markdown
 
 
 class StockAccountToolkit(Toolkit):
@@ -35,10 +35,26 @@ class StockAccountToolkit(Toolkit):
         Other live positions and orders are returned only as aggregate counts.
         This tool is read-only and cannot modify, cancel, convert, or exit them.
         """
+        return tool_result_markdown(self.account_overview_payload())
+
+    def account_overview_payload(self) -> Dict[str, Any]:
+        """Fetch account and overlap state for the initial decision snapshot."""
         funds_response = self.dhan.fetch_fund_limits()
         positions_response = self.dhan.fetch_positions()
         orders_response = self.dhan.fetch_order_book()
         super_orders_response = self.dhan.fetch_super_orders()
+
+        responses = {
+            "funds": funds_response,
+            "positions": positions_response,
+            "orders": orders_response,
+            "super_orders": super_orders_response,
+        }
+        errors = [
+            f"{name}:{self._response_error(response)}"
+            for name, response in responses.items()
+            if not self._response_succeeded(response)
+        ]
 
         funds = self._extract_dict(funds_response)
         positions = self._extract_list(positions_response)
@@ -69,7 +85,7 @@ class StockAccountToolkit(Toolkit):
 
         selected_orders: List[Dict[str, Any]] = []
         other_active_orders = 0
-        for row in [*orders, *super_orders]:
+        for row in self._unique_orders([*orders, *super_orders]):
             if not self._is_active_order(row):
                 continue
             if self._matches_selected(row):
@@ -86,6 +102,7 @@ class StockAccountToolkit(Toolkit):
                 other_active_orders += 1
 
         payload = {
+            "status": "partial" if errors else "success",
             "assigned_security_id": self.security_id,
             "intraday_margin_budget": self.margin_budget,
             "available_balance": self._first_number(
@@ -107,8 +124,9 @@ class StockAccountToolkit(Toolkit):
                 "active_order_count": other_active_orders,
                 "read_only": True,
             },
+            "errors": errors,
         }
-        return json.dumps(self._without_empty(payload), ensure_ascii=True)
+        return self._without_empty(payload)
 
     def _matches_selected(self, row: Dict[str, Any]) -> bool:
         value = row.get("securityId") or row.get("security_id")
@@ -126,6 +144,30 @@ class StockAccountToolkit(Toolkit):
         )
 
     @staticmethod
+    def _unique_orders(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        unique: List[Dict[str, Any]] = []
+        seen = set()
+        for index, row in enumerate(rows):
+            order_id = row.get("orderId") or row.get("order_id")
+            key = (
+                "order_id",
+                str(order_id),
+            ) if order_id not in (None, "") else (
+                "row",
+                str(row.get("securityId") or row.get("security_id") or ""),
+                str(row.get("orderStatus") or ""),
+                str(row.get("transactionType") or ""),
+                str(row.get("quantity") or ""),
+                str(row.get("price") or ""),
+                index,
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(row)
+        return unique
+
+    @staticmethod
     def _extract_list(response: Dict[str, Any]) -> List[Dict[str, Any]]:
         data: Any = response.get("data") if isinstance(response, dict) else None
         if isinstance(data, dict):
@@ -138,6 +180,17 @@ class StockAccountToolkit(Toolkit):
         if isinstance(data, dict) and isinstance(data.get("data"), dict):
             data = data["data"]
         return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _response_succeeded(response: Any) -> bool:
+        return isinstance(response, dict) and str(response.get("status") or "").lower() == "success"
+
+    @staticmethod
+    def _response_error(response: Any) -> str:
+        if not isinstance(response, dict):
+            return "invalid_response"
+        remarks = response.get("remarks") or response.get("message") or "request_failed"
+        return str(remarks)
 
     @staticmethod
     def _first_number(data: Dict[str, Any], *keys: str) -> Any:
