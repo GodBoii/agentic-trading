@@ -52,6 +52,14 @@
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-celestial: cubic-bezier(0.7, 0, 0.2, 1);
+
+  /* Archive interaction motion */
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-slow: 400ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --blur-small: 2px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1773,6 +1781,136 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Trade archive: restrained motion on stateful elements only. */
+.trade-date-card {
+  transition:
+    border-color var(--duration-fast) var(--ease-smooth-out),
+    background-color var(--duration-fast) var(--ease-smooth-out);
+}
+.trade-date-trigger {
+  transition: background-color var(--duration-fast) var(--ease-smooth-out);
+}
+.trade-date-trigger:hover,
+.trade-date-trigger:focus-visible {
+  background: rgba(255, 255, 255, 0.03);
+}
+.trade-date-toggle {
+  transition:
+    color var(--duration-fast) var(--ease-smooth-out),
+    border-color var(--duration-fast) var(--ease-smooth-out),
+    background-color var(--duration-fast) var(--ease-smooth-out);
+}
+.trade-date-toggle-icon {
+  display: block;
+  line-height: 1;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.trade-date-trigger[aria-expanded="true"] .trade-date-toggle {
+  border-color: rgba(0, 229, 255, 0.35);
+  background: rgba(0, 229, 255, 0.07);
+  color: var(--accent);
+}
+.trade-date-trigger[aria-expanded="true"] .trade-date-toggle-icon {
+  transform: rotate(45deg);
+}
+.trade-date-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    grid-template-rows var(--duration-fast) var(--ease-smooth-out),
+    opacity var(--duration-quick) ease-out,
+    visibility 0s linear var(--duration-fast);
+}
+.trade-date-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+.trade-date-panel-inner { min-height: 0; }
+.archive-run {
+  background: rgba(255, 255, 255, 0.002);
+  transition:
+    background-color var(--duration-fast) var(--ease-smooth-out),
+    opacity var(--duration-quick) ease-out;
+}
+.archive-run:hover,
+.archive-run:focus-visible {
+  background: rgba(0, 229, 255, 0.028);
+}
+.archive-run:disabled:not([aria-busy="true"]) { opacity: 0.48; }
+.archive-run-accent,
+.archive-run-title,
+.archive-arrow {
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.archive-run:hover .archive-run-title,
+.archive-run:focus-visible .archive-run-title { transform: translateX(4px); }
+.archive-run:hover .archive-arrow,
+.archive-run:focus-visible .archive-arrow { transform: translateX(4px); }
+.archive-back-button,
+.archive-retry-button {
+  transition:
+    color var(--duration-quick) ease-out,
+    border-color var(--duration-quick) ease-out,
+    background-color var(--duration-quick) ease-out,
+    transform var(--duration-fast) var(--ease-smooth-out);
+}
+.archive-back-button:hover,
+.archive-retry-button:hover { transform: translateY(-1px); }
+.archive-loading-label {
+  background: linear-gradient(90deg, currentColor 25%, rgba(255,255,255,0.35) 50%, currentColor 75%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: archive-shimmer 1s linear infinite;
+}
+.archive-spinner {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: archive-spin 650ms linear infinite;
+}
+.archive-skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.archive-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.045), transparent);
+  animation: archive-skeleton 1.15s ease-in-out infinite;
+}
+@keyframes archive-shimmer { to { background-position: -200% 0; } }
+@keyframes archive-spin { to { transform: rotate(360deg); } }
+@keyframes archive-skeleton { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .archive-run,
+  .trade-date-card,
+  .trade-date-trigger,
+  .trade-date-toggle,
+  .trade-date-toggle-icon,
+  .trade-date-panel,
+  .archive-run-accent,
+  .archive-run-title,
+  .archive-arrow,
+  .archive-back-button,
+  .archive-retry-button { transition: none !important; }
+  .archive-loading-label,
+  .archive-spinner,
+  .archive-skeleton::after { animation: none !important; }
 }
 
 /* =====================================================================
