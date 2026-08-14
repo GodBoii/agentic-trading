@@ -1,11 +1,12 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import AgentMarkdown from '@/components/agent-markdown'
 import TradingStatus from '@/components/trading-status'
+import { TradeHistoryArchive, type TradeSessionSummary } from '@/components/trade-history-archive'
 
 interface AgentStage {
     status: string
@@ -98,19 +99,6 @@ interface AgentResult {
     report_text?: string
 }
 
-interface TradeSessionSummary {
-    session_id: string
-    request_id: string
-    title: string
-    status: string
-    created_at_utc?: string | null
-    updated_at_utc?: string | null
-    agent_count?: number
-    executed_count?: number
-    cloud_synced_at_utc?: string | null
-    loaded_from_cloud?: boolean
-}
-
 interface TradeSession {
     session_id: string
     request_id?: string
@@ -143,18 +131,6 @@ function formatTime(value?: string | null) {
         }).format(new Date(value))
     } catch {
         return ''
-    }
-}
-
-function formatDateTime(value?: string | null) {
-    if (!value) return 'Unknown time'
-    try {
-        return new Intl.DateTimeFormat('en-IN', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-        }).format(new Date(value))
-    } catch {
-        return 'Unknown time'
     }
 }
 
@@ -786,26 +762,41 @@ function TradeHistoryView({
     tradeSessions,
     selectedSession,
     openTradeSession,
+    prefetchTradeSession,
     closeTradeSession,
     activeAgent,
     setActiveAgent,
+    sessionsLoading,
+    openingSessionId,
+    sessionsError,
+    retryTradeSessions,
 }: {
     tradeSessions: TradeSessionSummary[]
     selectedSession: TradeSession | null
     openTradeSession: (sessionId: string) => void
+    prefetchTradeSession: (sessionId: string) => void
     closeTradeSession: () => void
     activeAgent: number
     setActiveAgent: (rank: number) => void
+    sessionsLoading: boolean
+    openingSessionId: string | null
+    sessionsError: string | null
+    retryTradeSessions: () => void
 }) {
     if (selectedSession) {
         const sessionAgents = selectedSession.agents || []
         const selectedUpdatedAt = selectedSession.updated_at_utc || selectedSession.created_at_utc
         return (
-            <section className="space-y-5">
+            <motion.section
+                initial={{ opacity: 0, x: 8, filter: 'blur(3px)' }}
+                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.25, ease }}
+                className="space-y-5"
+            >
                 <button
                     type="button"
                     onClick={closeTradeSession}
-                    className="flex items-center gap-2 rounded-full border border-line px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-secondary transition-colors hover:border-line-strong hover:text-white"
+                    className="archive-back-button flex items-center gap-2 rounded-full border border-line px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-secondary hover:border-line-strong hover:text-white"
                 >
                     <span aria-hidden>←</span>
                     Trade history
@@ -848,72 +839,20 @@ function TradeHistoryView({
                     setActiveAgent={setActiveAgent}
                     connectionState={selectedSession.loaded_from_cloud ? 'cloud archive' : 'saved archive'}
                 />
-            </section>
+            </motion.section>
         )
     }
 
     return (
-        <section>
-            <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-success">Past runs</p>
-                    <h2 className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-white sm:text-[38px]">
-                        Trade history
-                    </h2>
-                    <p className="mt-2 text-[13px] text-ink-secondary">
-                        Open any completed run to review its agents, charts, artifacts, and responses.
-                    </p>
-                </div>
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-tertiary">
-                    {pluralize(tradeSessions.length, 'session')}
-                </span>
-            </div>
-
-            {tradeSessions.length === 0 ? (
-                <div className="surface grid min-h-[420px] place-items-center rounded-3xl border border-dashed border-line">
-                    <div className="text-center">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-tertiary">
-                            No saved agent runs yet
-                        </p>
-                        <Link href="/dashboard/ai-trading" className="mt-4 inline-flex text-[13px] text-accent hover:underline">
-                            Waiting for the first eligible live event
-                        </Link>
-                    </div>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {tradeSessions.map((session) => (
-                        <button
-                            key={session.session_id}
-                            type="button"
-                            onClick={() => openTradeSession(session.session_id)}
-                            className="group min-h-[190px] rounded-2xl border border-line bg-[#0a0a0d] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-success/45 hover:bg-success/[0.025]"
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                                <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-tertiary">
-                                    {formatDateTime(session.updated_at_utc || session.created_at_utc)}
-                                </p>
-                                <span className={`mt-0.5 h-2 w-2 flex-shrink-0 rounded-full ${session.status === 'completed' ? 'bg-success' : session.status === 'failed' ? 'bg-danger' : 'bg-warning'}`} />
-                            </div>
-                            <h3 className="mt-5 line-clamp-2 text-[17px] font-medium leading-snug text-white">{session.title}</h3>
-                            <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
-                                <div className="flex gap-2">
-                                    <span className="rounded-full border border-line px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-secondary">
-                                        {session.agent_count || 0} agents
-                                    </span>
-                                    {session.loaded_from_cloud && (
-                                        <span className="rounded-full border border-accent/25 bg-accent/[0.06] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
-                                            cloud
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="text-accent transition-transform group-hover:translate-x-1">→</span>
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            )}
-        </section>
+        <TradeHistoryArchive
+            sessions={tradeSessions}
+            loading={sessionsLoading}
+            error={sessionsError}
+            openingSessionId={openingSessionId}
+            onOpenSession={openTradeSession}
+            onPrefetchSession={prefetchTradeSession}
+            onRetry={retryTradeSessions}
+        />
     )
 }
 
@@ -921,8 +860,9 @@ function AITradingChatContent() {
     const searchParams = useSearchParams()
     const expectedRun = searchParams.get('run')
     const requestedView = searchParams.get('view')
+    const requestedSession = searchParams.get('session')
     const initialView: 'agent' | 'live' | 'trades' =
-        requestedView === 'trades' ? 'trades' : requestedView === 'live' || expectedRun ? 'live' : 'agent'
+        requestedView === 'trades' || requestedSession ? 'trades' : requestedView === 'live' || expectedRun ? 'live' : 'agent'
     const [runStatus, setRunStatus] = useState<AgentRunStatus | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [liveEvents, setLiveEvents] = useState<Record<number, LiveAgentEvent[]>>({})
@@ -931,26 +871,37 @@ function AITradingChatContent() {
     const [viewMode, setViewMode] = useState<'agent' | 'live' | 'trades'>(initialView)
     const [tradeSessions, setTradeSessions] = useState<TradeSessionSummary[]>([])
     const [selectedSession, setSelectedSession] = useState<TradeSession | null>(null)
+    const [sessionsLoading, setSessionsLoading] = useState(initialView === 'trades')
+    const [sessionsError, setSessionsError] = useState<string | null>(null)
+    const [openingSessionId, setOpeningSessionId] = useState<string | null>(null)
     const bottomRef = useRef<HTMLDivElement | null>(null)
     const selectedSessionRef = useRef<TradeSession | null>(null)
+    const sessionCacheRef = useRef(new Map<string, TradeSession>())
+    const sessionRequestRef = useRef(new Map<string, Promise<TradeSession>>())
+    const sessionsRequestRef = useRef<Promise<void> | null>(null)
+    const sessionsFetchedAtRef = useRef(0)
+    const statusRequestRef = useRef<Promise<void> | null>(null)
+    const deepLinkedSessionRef = useRef<string | null>(null)
     const shouldAutoScrollRef = useRef(true)
     const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const fetchStatus = async () => {
         if (selectedSessionRef.current) return
-        try {
+        if (statusRequestRef.current) return statusRequestRef.current
+        const request = (async () => { try {
             const response = await fetch('/api/ai-trading/toggle', { method: 'GET' })
             if (!response.ok) throw new Error('Failed to load AI trading status')
             const status = await response.json()
             setRunStatus(status)
-            if (!selectedSession) {
-                fetchTradeSessions()
-            }
             setError(null)
         } catch (statusError) {
             console.error('Error loading AI trading status:', statusError)
             setError('Could not load the latest agent run.')
-        }
+        } finally {
+            statusRequestRef.current = null
+        } })()
+        statusRequestRef.current = request
+        return request
     }
 
     useEffect(() => {
@@ -961,80 +912,139 @@ function AITradingChatContent() {
         if (requestedView === 'live' || expectedRun) {
             setSelectedSession(null)
             setViewMode('live')
-        } else if (requestedView === 'trades') {
+        } else if (requestedView === 'trades' || requestedSession) {
             setViewMode('trades')
         }
-    }, [requestedView, expectedRun])
+    }, [requestedView, expectedRun, requestedSession])
 
-    const fetchTradeSessions = async () => {
-        try {
-            const response = await fetch('/api/ai-trading/sessions', { method: 'GET', cache: 'no-store' })
-            if (!response.ok) return
+    const fetchTradeSessions = useCallback(async (force = false) => {
+        if (!force && sessionsFetchedAtRef.current && Date.now() - sessionsFetchedAtRef.current < 30_000) return
+        if (sessionsRequestRef.current) return sessionsRequestRef.current
+        const request = (async () => { try {
+            setSessionsLoading(true)
+            setSessionsError(null)
+            const response = await fetch('/api/ai-trading/sessions', { method: 'GET' })
+            if (!response.ok) throw new Error(`Trade history request failed (${response.status})`)
             const payload = await response.json()
             setTradeSessions(Array.isArray(payload.sessions) ? payload.sessions : [])
+            sessionsFetchedAtRef.current = Date.now()
         } catch (sessionError) {
             console.error('Error loading trade sessions:', sessionError)
-        }
-    }
+            setSessionsError('Trade history is temporarily unavailable. Your current screen remains usable.')
+        } finally {
+            setSessionsLoading(false)
+            sessionsRequestRef.current = null
+        } })()
+        sessionsRequestRef.current = request
+        return request
+    }, [])
 
-    const openTradeSession = async (sessionId: string) => {
-        try {
-            const response = await fetch(`/api/ai-trading/sessions/${encodeURIComponent(sessionId)}`, {
-                method: 'GET',
-                cache: 'no-store',
-            })
-            if (!response.ok) throw new Error('Failed to load trade session')
+    const loadTradeSession = useCallback((sessionId: string) => {
+        const cached = sessionCacheRef.current.get(sessionId)
+        if (cached) return Promise.resolve(cached)
+        const pending = sessionRequestRef.current.get(sessionId)
+        if (pending) return pending
+        const request = (async () => {
+            const response = await fetch(`/api/ai-trading/sessions/${encodeURIComponent(sessionId)}`, { method: 'GET' })
+            if (!response.ok) throw new Error(`Trade session request failed (${response.status})`)
             const session: TradeSession = await response.json()
+            sessionCacheRef.current.set(sessionId, session)
+            return session
+        })().finally(() => sessionRequestRef.current.delete(sessionId))
+        sessionRequestRef.current.set(sessionId, request)
+        return request
+    }, [])
+
+    const prefetchTradeSession = useCallback((sessionId: string) => {
+        void loadTradeSession(sessionId).catch(() => undefined)
+    }, [loadTradeSession])
+
+    const updateArchiveUrl = useCallback((view: 'agent' | 'live' | 'trades', sessionId?: string) => {
+        const url = new URL(window.location.href)
+        url.searchParams.set('view', view)
+        if (sessionId) url.searchParams.set('session', sessionId)
+        else url.searchParams.delete('session')
+        if (view !== 'live') url.searchParams.delete('run')
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    }, [])
+
+    const openTradeSession = useCallback(async (sessionId: string) => {
+        if (openingSessionId) return
+        setOpeningSessionId(sessionId)
+        setSessionsError(null)
+        try {
+            const session = await loadTradeSession(sessionId)
             setSelectedSession(session)
             setRunStatus(session.status_snapshot || null)
             setLiveEvents({})
             const firstRank = Number(session.agents?.[0]?.rank || 1)
             setActiveAgent(firstRank)
             setViewMode('trades')
+            deepLinkedSessionRef.current = sessionId
+            updateArchiveUrl('trades', sessionId)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
         } catch (sessionError) {
             console.error('Error opening trade session:', sessionError)
-            setError('Could not open that trade session.')
+            setSessionsError('That run could not be opened. It may still be syncing; please try again.')
+        } finally {
+            setOpeningSessionId(null)
         }
-    }
+    }, [loadTradeSession, openingSessionId, updateArchiveUrl])
 
     const resumeLiveRun = () => {
         setSelectedSession(null)
         setLiveEvents({})
         setViewMode('live')
+        updateArchiveUrl('live')
         fetchStatus()
     }
 
     const showAgentLauncher = () => {
         setSelectedSession(null)
         setViewMode('agent')
+        updateArchiveUrl('agent')
     }
 
     const showTradeHistory = () => {
         setSelectedSession(null)
         setViewMode('trades')
-        fetchTradeSessions()
+        updateArchiveUrl('trades')
+        void fetchTradeSessions()
     }
 
     const closeTradeSession = () => {
         setSelectedSession(null)
         setLiveEvents({})
         setViewMode('trades')
+        updateArchiveUrl('trades')
     }
 
     useEffect(() => {
-        fetchStatus()
-        fetchTradeSessions()
-        const timer = setInterval(fetchStatus, 2500)
+        if (viewMode === 'trades') return
+        void fetchStatus()
+        const timer = setInterval(() => {
+            if (document.visibilityState === 'visible') void fetchStatus()
+        }, 8_000)
         return () => clearInterval(timer)
-    }, [])
-
-    useEffect(() => {
-        if (viewMode === 'trades') {
-            fetchTradeSessions()
-        }
     }, [viewMode])
 
     useEffect(() => {
+        if (viewMode === 'trades') {
+            void fetchTradeSessions()
+        }
+    }, [fetchTradeSessions, viewMode])
+
+    useEffect(() => {
+        if (!requestedSession || deepLinkedSessionRef.current === requestedSession) return
+        deepLinkedSessionRef.current = requestedSession
+        void openTradeSession(requestedSession)
+    }, [openTradeSession, requestedSession])
+
+    useEffect(() => {
+        if (viewMode !== 'live') {
+            setConnectionState('paused')
+            return
+        }
         let socket: WebSocket | null = null
         let closedByEffect = false
 
@@ -1148,7 +1158,7 @@ function AITradingChatContent() {
             }
             socket?.close()
         }
-    }, [])
+    }, [viewMode])
 
     useEffect(() => {
         const handleScroll = () => {
@@ -1312,9 +1322,14 @@ function AITradingChatContent() {
                         tradeSessions={tradeSessions}
                         selectedSession={selectedSession}
                         openTradeSession={openTradeSession}
+                        prefetchTradeSession={prefetchTradeSession}
                         closeTradeSession={closeTradeSession}
                         activeAgent={activeAgent}
                         setActiveAgent={setActiveAgent}
+                        sessionsLoading={sessionsLoading}
+                        openingSessionId={openingSessionId}
+                        sessionsError={sessionsError}
+                        retryTradeSessions={() => void fetchTradeSessions(true)}
                     />
                 ) : (
                     <div className="space-y-5 pb-8">
