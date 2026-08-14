@@ -15,6 +15,7 @@ import pandas as pd
 from pipeline.services.charting_service import CandlestickChartService
 from pipeline.services.nifty_depth_charting import NiftyDepthChartGenerator
 from pipeline.services.nifty_depth_monitor import NiftyDepthMonitor
+from pipeline.stock.decision_context import StockDecisionContextBuilder
 from pipeline.stock.stock_agent import StockAgent
 from pipeline.stock.toolkits import (
     StockAccountToolkit,
@@ -23,20 +24,13 @@ from pipeline.stock.toolkits import (
     StockMarketDataToolkit,
     StockTechnicalToolkit,
 )
-try:
-    from pipeline.stock.toolkits.research_toolkit import StockResearchToolkit
-    from agno.tools.websearch import WebSearchTools
-except ImportError:
-    StockResearchToolkit = None
-    WebSearchTools = None
-
-
 class FakeStockDhan:
     def __init__(self, margin_required=20.0, include_selected_position=True, order_status="TRANSIT", current_ltp=100.0, fund_balance=1000.0):
         self.margin_required = margin_required
         self.include_selected_position = include_selected_position
         self.order_status = order_status
         self.super_order_calls = 0
+        self.last_super_order_kwargs = None
         self.current_ltp = current_ltp
         self.fund_balance = fund_balance
 
@@ -112,6 +106,7 @@ class FakeStockDhan:
 
     def place_super_order(self, **kwargs):
         self.super_order_calls += 1
+        self.last_super_order_kwargs = dict(kwargs)
         return {
             "status": "success",
             "data": {"orderId": "order-123"},
@@ -329,21 +324,20 @@ class StockToolkitTests(unittest.TestCase):
         self.assertGreaterEqual(synced_trades["timestamp"].min(), common_start)
         self.assertGreaterEqual(synced_quotes.index.min(), common_start)
 
-    def test_agent_prompt_is_small_and_does_not_expose_pipeline_sections(self):
+    def test_agent_prompt_contains_one_initial_decision_snapshot(self):
         execution = StockExecutionToolkit(FakeStockDhan(), 111, 500)
         agent = StockAgent([execution])
         prompt = agent._build_prompt(
             {
-                "selected_stock": {
-                    "security_id": 111,
-                    "symbol": "TEST",
-                    "display_name": "Test Limited",
-                },
-                "timing_context": {
-                    "current_market_time_ist": "2026-07-28T10:05:00+05:30",
-                    "market_session": {
-                        "regular_session": "09:15-15:30 IST",
-                        "is_open_now": True,
+                "decision_context": {
+                    "instrument": {
+                        "security_id": 111,
+                        "symbol": "TEST",
+                        "display_name": "Test Limited",
+                    },
+                    "timestamps_and_session": {
+                        "context_generated_at_ist": "2026-07-28T10:05:00+05:30",
+                        "market_open_now": True,
                         "minutes_to_close": 325,
                     },
                 },
@@ -351,12 +345,76 @@ class StockToolkitTests(unittest.TestCase):
         )
 
         self.assertIn("Test Limited", prompt)
-        self.assertNotIn("Stage 2", prompt)
+        self.assertEqual(prompt.count("## Initial decision snapshot"), 1)
         self.assertNotIn("rank", prompt.lower())
-        self.assertNotIn("Technical Metadata", prompt)
-        self.assertNotIn("Output Requirements", prompt)
-        self.assertNotIn("execution", prompt.lower())
-        self.assertNotIn("setup", prompt.lower())
+        self.assertNotIn("selected_stock", prompt)
+        self.assertNotIn("timing_context", prompt)
+
+    def test_execution_toolkit_exposes_only_sizing_and_protected_order(self):
+        toolkit = StockExecutionToolkit(FakeStockDhan(), 111, 500)
+
+        self.assertEqual(
+            set(toolkit.functions),
+            {"estimate_intraday_quantity", "place_protected_intraday_order"},
+        )
+        self.assertFalse(hasattr(toolkit, "place_intraday_order"))
+
+    def test_decision_context_removes_duplicate_identity_price_vwap_and_budget(self):
+        context = StockDecisionContextBuilder.build(
+            selected_stock={
+                "security_id": 111,
+                "symbol": "TEST",
+                "display_name": "Test Limited",
+                "trade_amount": 500,
+            },
+            timing_context={
+                "current_market_time_ist": "2026-07-28 10:05:00 IST",
+                "market_session": {"is_open_now": True, "minutes_to_close": 325},
+            },
+            security_overview={
+                "security_id": 111,
+                "symbol": "TEST",
+                "display_name": "Test Limited",
+                "exchange_segment": "NSE_EQ",
+                "stage2_momentum_snapshot": {"price_vs_vwap_percent": 1.0, "score": 7},
+                "tradability": {"tick_size_rupees": 0.05, "upper_circuit": 120},
+            },
+            current_state={
+                "status": "success",
+                "source": "dhan_quote_and_intraday",
+                "as_of_ist": "2026-07-28T10:05:01+05:30",
+                "quote": {
+                    "as_of_ist": "2026-07-28T10:05:01+05:30",
+                    "last_price": 101,
+                    "upper_circuit": 121,
+                },
+            },
+            technical_data={
+                "basis": "current 5-minute chart",
+                "readings": {
+                    "latest_price": 100,
+                    "vwap": 99,
+                    "price_vs_vwap": "above",
+                },
+            },
+            account_overview={
+                "status": "success",
+                "assigned_security_id": 111,
+                "intraday_margin_budget": 500,
+                "available_balance": 1000,
+            },
+        )
+
+        self.assertNotIn("price_vs_vwap_percent", context["scanner_signal"])
+        self.assertNotIn("latest_price", context["technical"]["readings"])
+        self.assertAlmostEqual(
+            context["technical"]["readings"]["price_vs_vwap_percent"],
+            1.0101,
+        )
+        self.assertNotIn("upper_circuit", context["instrument"]["tradability"])
+        self.assertEqual(context["live_market"]["quote"]["upper_circuit"], 121)
+        self.assertNotIn("intraday_margin_budget", context["account"])
+        self.assertNotIn("assigned_security_id", context["account"])
 
     def test_stream_tool_events_capture_result_size_status_and_summary(self):
         agent = StockAgent([])
@@ -409,19 +467,18 @@ class StockToolkitTests(unittest.TestCase):
         self.assertEqual(profile["initial_balance_high"], 101.0)
 
     def test_account_overview_hides_other_trade_details_and_client_id(self):
-        payload = json.loads(StockAccountToolkit(FakeStockDhan(), 111, 500).get_account_overview())
+        result = StockAccountToolkit(FakeStockDhan(), 111, 500).get_account_overview()
 
-        self.assertTrue(payload["assigned_stock_overlap"]["has_open_intraday_position"])
-        self.assertEqual(payload["other_live_activity"]["open_intraday_position_count"], 1)
-        self.assertEqual(payload["other_live_activity"]["active_order_count"], 1)
-        serialized = json.dumps(payload)
-        self.assertNotIn("other-order-secret", serialized)
-        self.assertNotIn("private-client-id", serialized)
-        self.assertNotIn('"999"', serialized)
+        self.assertTrue(result.startswith("## Tool result\n"))
+        self.assertIn("- has_open_intraday_position: true", result)
+        self.assertIn("- open_intraday_position_count: 1", result)
+        self.assertIn("- active_order_count: 1", result)
+        self.assertNotIn("other-order-secret", result)
+        self.assertNotIn("private-client-id", result)
+        self.assertNotIn("999", result)
 
     def test_technical_tool_omits_indicators_without_enough_candles(self):
-        payload = json.loads(
-            StockTechnicalToolkit(
+        result = StockTechnicalToolkit(
                 {
                     "market_date": "2026-07-28",
                     "charts": {"current_5m": {"candles": 10}},
@@ -433,11 +490,10 @@ class StockToolkitTests(unittest.TestCase):
                     },
                 }
             ).get_technical_data()
-        )
 
-        self.assertEqual(payload["readings"]["latest_price"], 100.0)
-        self.assertNotIn("rsi", payload["readings"])
-        self.assertNotIn("bb_upper", payload["readings"])
+        self.assertIn("- latest_price: 100", result)
+        self.assertNotIn("- rsi:", result)
+        self.assertNotIn("- bb_upper:", result)
 
     def test_security_overview_normalizes_bse_tick_size_from_paise(self):
         market_time = SimpleNamespace()
@@ -460,13 +516,10 @@ class StockToolkitTests(unittest.TestCase):
             },
         )
 
-        payload = json.loads(toolkit.get_security_overview())
-        self.assertEqual(payload["tradability"]["tick_size_rupees"], 0.05)
-        self.assertEqual(payload["stage2_momentum_snapshot"]["time_of_day_rvol"], 1.8)
-        self.assertEqual(
-            payload["stage2_momentum_snapshot"]["opening_range_breakout_percent"],
-            0.7,
-        )
+        result = toolkit.get_security_overview()
+        self.assertIn("- tick_size_rupees: 0.05", result)
+        self.assertIn("- time_of_day_rvol: 1.8", result)
+        self.assertIn("- opening_range_breakout_percent: 0.7", result)
 
     def test_duplicative_live_and_ohlc_tools_are_not_exposed(self):
         market_tz = ZoneInfo("Asia/Kolkata")
@@ -548,58 +601,31 @@ class StockToolkitTests(unittest.TestCase):
             intraday_frame=stale_frame,
         )
 
-        payload = json.loads(toolkit.get_current_stock_state())
+        result = toolkit.get_current_stock_state()
 
-        self.assertEqual(payload["status"], "success")
+        self.assertIn("- status: success", result)
         self.assertEqual(dhan.history_calls, 1)
-        self.assertEqual(payload["quote"]["last_price"], 101.25)
-        self.assertIn("12:59:00", payload["candle_data_as_of_ist"])
-        self.assertEqual(payload["one_minute"]["latest_completed"]["close"], 101.25)
-        self.assertNotIn("recent_1m_candles", payload)
-        self.assertNotIn("recent_5m_candles", payload)
-
-    @unittest.skipIf(StockResearchToolkit is None, "optional ddgs dependency is not installed")
-    def test_news_tool_removes_future_dated_results(self):
-        market_time = SimpleNamespace(
-            now=lambda: datetime(
-                2026,
-                7,
-                28,
-                13,
-                0,
-                tzinfo=ZoneInfo("Asia/Kolkata"),
-            )
-        )
-        toolkit = StockResearchToolkit("Test Limited", "TEST", market_time=market_time)
-        source = json.dumps(
-            [
-                {"date": "2026-07-28T05:00:00+00:00", "title": "Current"},
-                {"date": "2026-10-03T00:00:00+00:00", "title": "Future"},
-            ]
-        )
-
-        with patch.object(WebSearchTools, "search_news", return_value=source):
-            results = json.loads(toolkit.search_news("latest"))
-
-        self.assertEqual([item["title"] for item in results], ["Current"])
+        self.assertIn("- last_price: 101.25", result)
+        self.assertIn("12:59:00", result)
+        self.assertIn("- close: 101.25", result)
+        self.assertNotIn("recent_1m_candles", result)
+        self.assertNotIn("recent_5m_candles", result)
 
     def test_execution_state_comes_from_tool_result_not_agent_prose(self):
         dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False)
         toolkit = StockExecutionToolkit(dhan, 111, 500)
         toolkit._dhan_tools.allow_live_orders = True
 
-        response = json.loads(
-            toolkit.place_protected_intraday_order(
+        response = toolkit.place_protected_intraday_order(
                 side="BUY",
                 quantity=2,
                 entry_price=100.0,
                 target_price=105.0,
                 stop_loss_price=98.0,
             )
-        )
         decision = toolkit.decision_snapshot("Test Limited")
 
-        self.assertEqual(response["status"], "success")
+        self.assertIn("- status: success", response)
         self.assertEqual(decision["action"], "pending")
         self.assertEqual(decision["execution_status"], "pending")
         self.assertEqual(decision["broker_order_status"], "TRANSIT")
@@ -607,14 +633,7 @@ class StockToolkitTests(unittest.TestCase):
         self.assertEqual(decision["order_id"], "order-123")
         self.assertEqual(dhan.super_order_calls, 1)
 
-        second_response = json.loads(
-            toolkit.place_intraday_order(
-                side="BUY",
-                quantity=1,
-                reference_price=100.0,
-            )
-        )
-        self.assertEqual(second_response["remarks"], "entry_order_already_placed")
+        self.assertNotIn("place_intraday_order", toolkit.functions)
         self.assertEqual(toolkit.decision_snapshot("Test Limited")["execution_status"], "pending")
 
     def test_nse_protected_order_preserves_selected_exchange_segment(self):
@@ -627,18 +646,17 @@ class StockToolkitTests(unittest.TestCase):
         )
         toolkit._dhan_tools.allow_live_orders = True
 
-        response = json.loads(
-            toolkit.place_protected_intraday_order(
+        response = toolkit.place_protected_intraday_order(
                 side="BUY",
                 quantity=2,
                 entry_price=100.0,
                 target_price=105.0,
                 stop_loss_price=98.0,
             )
-        )
 
-        self.assertEqual(response["status"], "success")
-        self.assertEqual(response["received"]["exchange_segment"], "NSE_EQ")
+        self.assertIn("- status: success", response)
+        self.assertNotIn("exchange_segment", response)
+        self.assertEqual(dhan.last_super_order_kwargs["exchange_segment"], "NSE_EQ")
 
     def test_invalid_ip_broker_failure_is_never_reported_as_an_order(self):
         dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False)
@@ -659,19 +677,17 @@ class StockToolkitTests(unittest.TestCase):
         )
         toolkit._dhan_tools.allow_live_orders = True
 
-        response = json.loads(
-            toolkit.place_protected_intraday_order(
+        response = toolkit.place_protected_intraday_order(
                 side="BUY",
                 quantity=1,
                 entry_price=100.0,
                 target_price=105.0,
                 stop_loss_price=98.0,
             )
-        )
         decision = toolkit.decision_snapshot("Test Limited")
 
-        self.assertEqual(response["status"], "failure")
-        self.assertEqual(response["remarks"]["error_code"], "DH-905")
+        self.assertIn("- status: failure", response)
+        self.assertIn("- error_code: DH-905", response)
         self.assertEqual(decision["action"], "avoid")
         self.assertEqual(decision["execution_status"], "failed")
         self.assertEqual(decision["order_id"], "NONE")
@@ -705,18 +721,16 @@ class StockToolkitTests(unittest.TestCase):
         toolkit = StockExecutionToolkit(dhan, 111, 500)
         toolkit._dhan_tools.allow_live_orders = True
 
-        response = json.loads(
-            toolkit.place_protected_intraday_order(
+        response = toolkit.place_protected_intraday_order(
                 side="BUY",
                 quantity=1,
                 entry_price=100.0,
                 target_price=105.0,
                 stop_loss_price=98.0,
             )
-        )
         decision = toolkit.decision_snapshot("Test Limited")
 
-        self.assertEqual(response["status"], "blocked")
+        self.assertIn("- status: blocked", response)
         self.assertEqual(decision["execution_status"], "blocked")
         self.assertEqual(dhan.super_order_calls, 0)
 
@@ -725,13 +739,13 @@ class StockToolkitTests(unittest.TestCase):
         toolkit = StockExecutionToolkit(dhan, 111, 500)
         toolkit._dhan_tools.allow_live_orders = True
 
-        response = json.loads(toolkit.place_protected_intraday_order(
+        response = toolkit.place_protected_intraday_order(
             side="BUY", quantity=1, entry_price=490.0, target_price=510.0, stop_loss_price=480.0,
-        ))
+        )
 
-        self.assertEqual(response["status"], "blocked")
-        self.assertEqual(response["remarks"], "current_price_exceeds_trading_amount")
-        self.assertEqual(response["current_ltp"], 501.0)
+        self.assertIn("- status: blocked", response)
+        self.assertIn("- remarks: current_price_exceeds_trading_amount", response)
+        self.assertIn("- current_ltp: 501", response)
         self.assertEqual(dhan.super_order_calls, 0)
 
     def test_auto_execution_revalidates_current_available_balance(self):
@@ -739,13 +753,13 @@ class StockToolkitTests(unittest.TestCase):
         toolkit = StockExecutionToolkit(dhan, 111, 500, amount_source="available_balance")
         toolkit._dhan_tools.allow_live_orders = True
 
-        response = json.loads(toolkit.place_protected_intraday_order(
+        response = toolkit.place_protected_intraday_order(
             side="BUY", quantity=1, entry_price=100.0, target_price=105.0, stop_loss_price=98.0,
-        ))
+        )
 
-        self.assertEqual(response["status"], "blocked")
-        self.assertEqual(response["effective_current_cap"], 90.0)
-        self.assertEqual(response["amount_source"], "available_balance")
+        self.assertIn("- status: blocked", response)
+        self.assertIn("- effective_current_cap: 90", response)
+        self.assertIn("- amount_source: available_balance", response)
         self.assertEqual(dhan.super_order_calls, 0)
 
     def test_shared_execution_coordinator_serializes_final_checks_and_placements(self):
