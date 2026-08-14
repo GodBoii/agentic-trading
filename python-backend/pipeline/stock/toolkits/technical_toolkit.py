@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any, Dict
 
 from agno.tools import Toolkit
+
+from pipeline.stock.toolkits.markdown_result import tool_result_markdown
 
 
 class StockTechnicalToolkit(Toolkit):
@@ -24,6 +25,10 @@ class StockTechnicalToolkit(Toolkit):
         Only computed values are returned. Indicators that do not have enough
         candles are omitted instead of being represented as neutral values.
         """
+        return tool_result_markdown(self.technical_data_payload())
+
+    def technical_data_payload(self) -> Dict[str, Any]:
+        """Build exact chart-derived readings for the initial decision snapshot."""
         metadata = dict(self.chart_bundle.get("technical_metadata") or {})
         charts = self.chart_bundle.get("charts") or {}
         primary = charts.get("current_5m") if isinstance(charts, dict) else {}
@@ -50,7 +55,7 @@ class StockTechnicalToolkit(Toolkit):
             "last_candle_complete": last_candle_complete,
             "readings": metadata,
         }
-        return json.dumps(self._without_empty(payload), ensure_ascii=True)
+        return self._without_empty(payload)
 
     def _age_seconds(self, value: Any) -> Any:
         if value in (None, ""):
