@@ -10,6 +10,7 @@ const sessionsDir = path.join(backendDir, 'ai_trading_sessions')
 const statusPath = path.join(backendDir, 'ai_trading_run_status.json')
 const stockAgentLatestPath = path.join(backendDir, 'stock_agent_latest.json')
 const defaultBucket = process.env.SUPABASE_TRADE_SESSIONS_BUCKET || 'trade-sessions'
+const agnoSessionTable = process.env.AGNO_SESSION_TABLE || 'agno_sessions'
 
 export function resolveTradingArtifactPath(input: string) {
   const normalized = decodeURIComponent(input).replaceAll('\\', '/')
@@ -29,41 +30,26 @@ export function resolveTradingArtifactPath(input: string) {
   return resolved
 }
 
-export async function loadTradeSession(sessionId: string) {
+export async function loadTradeSession(sessionId: string, userId: string) {
   const safeId = safeSegment(sessionId)
   if (!safeId) return null
-  const localSession = await readJson(path.join(sessionsDir, safeId, 'session.json'))
-  return localSession || loadTradeSessionFromSupabase(safeId)
+  const rows = await queryAgnoTradeSessions(userId, safeId)
+  return rows.length ? tradeSessionFromAgnoRows(rows, safeId) : null
 }
 
-export async function listTradeSessions() {
-  await syncLatestTradeSession({ uploadToCloud: false })
+export async function listTradeSessions(userId: string) {
+  const rows = await queryAgnoTradeSessions(userId)
+  const grouped = new Map<string, JsonRecord[]>()
 
-  let entries: string[] = []
-  try {
-    entries = await fs.readdir(sessionsDir)
-  } catch {
-    entries = []
+  for (const row of rows) {
+    const tradeSessionId = agnoTradeSessionId(row)
+    if (!tradeSessionId) continue
+    const group = grouped.get(tradeSessionId) || []
+    group.push(row)
+    grouped.set(tradeSessionId, group)
   }
 
-  const localSessions = await Promise.all(
-    entries.map(async (entry) => {
-      const payload = await readJson(path.join(sessionsDir, entry, 'session.json'))
-      if (!payload) return null
-      return sessionSummary(payload, entry)
-    }),
-  )
-
-  const cloudSessions = await listTradeSessionsFromSupabase()
-  const merged = new Map<string, JsonRecord>()
-  for (const session of cloudSessions) {
-    if (session?.session_id) merged.set(String(session.session_id), session)
-  }
-  for (const session of localSessions.filter(Boolean) as JsonRecord[]) {
-    if (session?.session_id) merged.set(String(session.session_id), session)
-  }
-
-  return Array.from(merged.values())
+  return Array.from(grouped, ([sessionId, sessionRows]) => agnoSessionSummary(sessionRows, sessionId))
     .sort((a: any, b: any) => Date.parse(b.updated_at_utc || b.created_at_utc || '') - Date.parse(a.updated_at_utc || a.created_at_utc || ''))
 }
 
@@ -287,64 +273,167 @@ async function uploadBuffer(body: Buffer, storagePath: string, contentType: stri
   return data.publicUrl
 }
 
-async function loadTradeSessionFromSupabase(sessionId: string) {
-  const payload = await downloadJsonFromSupabase(`${sessionId}/session.json`)
-  if (!payload) return null
+async function queryAgnoTradeSessions(userId: string, tradeSessionId?: string) {
+  const client = serviceSupabase()
+  if (!client) throw new Error('Supabase service credentials are not configured')
+
+  let query = client
+    .from(agnoSessionTable)
+    .select('session_id,user_id,metadata,runs,created_at,updated_at')
+    .eq('metadata->>stage', 'stock_agent')
+    .order('updated_at', { ascending: false })
+    .limit(1000)
+
+  if (tradeSessionId) {
+    query = query.eq('metadata->>trade_session_id', tradeSessionId)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return Array.isArray(data)
+    ? (data as JsonRecord[]).filter((row) => agnoRowBelongsToUser(row, userId))
+    : []
+}
+
+function agnoTradeSessionId(row: JsonRecord) {
+  const metadataId = String(row.metadata?.trade_session_id || '').trim()
+  if (metadataId) return safeSegment(metadataId)
+  const sessionId = String(row.session_id || '')
+  return safeSegment(sessionId.split('--stock-')[0] || '')
+}
+
+function agnoRowBelongsToUser(row: JsonRecord, userId: string) {
+  const normalizedUserId = String(userId || '').trim()
+  if (!normalizedUserId) return false
+
+  const persistedUserIds = [row.user_id, row.metadata?.user_id]
+    .map((value) => String(value || '').trim())
+    .filter((value) => value && value !== 'null' && value !== 'anonymous')
+  if (persistedUserIds.includes(normalizedUserId)) return true
+
+  const tradeSessionId = agnoTradeSessionId(row)
+  const requestId = String(row.metadata?.request_id || '').trim()
+  return tradeSessionId.endsWith(`-${normalizedUserId}`) || requestId.endsWith(`-${normalizedUserId}`)
+}
+
+function agnoSessionSummary(rows: JsonRecord[], sessionId: string) {
+  const ordered = orderAgnoRows(rows)
+  const createdAt = earliestTimestamp(ordered.map((row) => row.created_at))
+  const updatedAt = latestTimestamp(ordered.map((row) => row.updated_at))
+  const names = ordered
+    .slice(0, 3)
+    .map((row) => row.metadata?.display_name || row.metadata?.symbol)
+    .filter(Boolean)
+
   return {
-    ...payload,
+    session_id: sessionId,
+    request_id: ordered[0]?.metadata?.request_id || sessionId,
+    title: names.length ? names.join(', ') : 'Trade session',
+    status: aggregateAgnoStatus(ordered),
+    created_at_utc: createdAt,
+    updated_at_utc: updatedAt,
+    agent_count: ordered.length,
+    executed_count: 0,
     loaded_from_cloud: true,
   }
 }
 
-async function listTradeSessionsFromSupabase() {
-  const client = serviceSupabase()
-  if (!client) return []
-
-  const { data, error } = await client.storage
-    .from(defaultBucket)
-    .list('', { limit: 200, sortBy: { column: 'updated_at', order: 'desc' } })
-
-  if (error || !Array.isArray(data)) return []
-
-  const sessions = await Promise.all(
-    data.map(async (entry) => {
-      const sessionId = safeSegment(entry.name)
-      if (!sessionId || entry.name === 'session.json') return null
-      const payload = await downloadJsonFromSupabase(`${sessionId}/session.json`)
-      return payload ? sessionSummary(payload, sessionId, true) : null
-    }),
-  )
-
-  return sessions.filter(Boolean) as JsonRecord[]
-}
-
-async function downloadJsonFromSupabase(storagePath: string) {
-  const client = serviceSupabase()
-  if (!client) return null
-
-  const { data, error } = await client.storage.from(defaultBucket).download(storagePath)
-  if (error || !data) return null
-
-  try {
-    return JSON.parse(await data.text())
-  } catch {
-    return null
-  }
-}
-
-function sessionSummary(payload: JsonRecord, fallbackId: string, loadedFromCloud = false) {
+function tradeSessionFromAgnoRows(rows: JsonRecord[], sessionId: string) {
+  const ordered = orderAgnoRows(rows)
+  const summary = agnoSessionSummary(ordered, sessionId)
+  const agents = ordered.map(agnoRowToAgent)
   return {
-    session_id: payload.session_id || fallbackId,
-    request_id: payload.request_id || payload.request?.request_id || fallbackId,
-    title: payload.title || 'Trade session',
-    status: payload.status || payload.status_snapshot?.status || 'unknown',
-    created_at_utc: payload.created_at_utc || payload.request?.requested_at_utc || null,
-    updated_at_utc: payload.updated_at_utc || payload.status_snapshot?.updated_at_utc || null,
-    agent_count: Array.isArray(payload.agents) ? payload.agents.length : 0,
-    executed_count: payload.summary?.executed_count ?? payload.status_snapshot?.stages?.stock_agent?.summary?.executed_count ?? 0,
-    cloud_synced_at_utc: payload.cloud_synced_at_utc || null,
-    loaded_from_cloud: loadedFromCloud,
+    ...summary,
+    request: {
+      request_id: summary.request_id,
+      user_id: ordered[0]?.user_id || ordered[0]?.metadata?.user_id || null,
+    },
+    summary: {
+      agent_count: agents.length,
+      executed_count: 0,
+    },
+    status_snapshot: {
+      status: summary.status,
+      current_stage: 'stock_agent',
+      updated_at_utc: summary.updated_at_utc,
+      stages: {
+        stock_agent: {
+          status: summary.status,
+          summary: { agent_count: agents.length, executed_count: 0 },
+          details: { results: agents },
+        },
+      },
+    },
+    agents,
   }
+}
+
+function agnoRowToAgent(row: JsonRecord, index: number) {
+  const metadata = row.metadata || {}
+  const runs = Array.isArray(row.runs) ? row.runs : []
+  const latestRun = runs[runs.length - 1] || {}
+  const imageUrls = Array.isArray(metadata.image_urls) ? metadata.image_urls : []
+  const storagePaths = Array.isArray(metadata.image_storage_paths) ? metadata.image_storage_paths : []
+  const images = imageUrls.map((cloudUrl: string, imageIndex: number) => {
+    const storagePath = String(storagePaths[imageIndex] || '')
+    const filename = storagePath.split('/').pop() || `chart-${imageIndex + 1}.png`
+    return {
+      id: `chart-${imageIndex + 1}`,
+      title: chartTitle(filename, imageIndex),
+      filename,
+      storage_path: storagePath,
+      cloud_url: cloudUrl,
+    }
+  })
+
+  return {
+    rank: Number(metadata.rank || index + 1),
+    symbol: metadata.symbol || null,
+    display_name: metadata.display_name || metadata.symbol || `Agent ${index + 1}`,
+    decision: null,
+    attachments: { images, files: [] },
+    agent_metadata: {
+      session_id: row.session_id,
+      run_id: latestRun.run_id || null,
+      model: latestRun.model || null,
+      metrics: latestRun.metrics || null,
+      reasoning_content: latestRun.reasoning_content || null,
+    },
+    analysis: String(latestRun.content || ''),
+    report_text: String(latestRun.content || ''),
+  }
+}
+
+function orderAgnoRows(rows: JsonRecord[]) {
+  return [...rows].sort((a, b) => Number(a.metadata?.rank || 0) - Number(b.metadata?.rank || 0))
+}
+
+function aggregateAgnoStatus(rows: JsonRecord[]) {
+  const statuses = rows.flatMap((row) => Array.isArray(row.runs) ? row.runs.map((run: JsonRecord) => String(run.status || '').toLowerCase()) : [])
+  if (statuses.some((status) => status === 'error' || status === 'failed' || status === 'cancelled')) return 'failed'
+  if (statuses.length && statuses.every((status) => status === 'completed')) return 'completed'
+  return statuses.length ? 'running' : 'unknown'
+}
+
+function earliestTimestamp(values: any[]) {
+  const timestamps = values.map(timestampToMs).filter((value): value is number => value !== null)
+  return timestamps.length ? new Date(Math.min(...timestamps)).toISOString() : null
+}
+
+function latestTimestamp(values: any[]) {
+  const timestamps = values.map(timestampToMs).filter((value): value is number => value !== null)
+  return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null
+}
+
+function timestampToMs(value: any) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value > 1e12 ? value : value * 1000
+  const parsed = Date.parse(String(value || ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function chartTitle(filename: string, index: number) {
+  const normalized = filename.replace(/\.png$/i, '').replace(/[-_]+/g, ' ')
+  return normalized.trim() || `Chart ${index + 1}`
 }
 
 function serviceSupabase() {
