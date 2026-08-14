@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import BrandMark from '@/components/brand-mark'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import DhanConnect from '@/components/dhan-connect'
@@ -88,11 +89,9 @@ function DashboardContent() {
 
             <header className="sticky top-0 z-40 border-b border-[var(--dash-border)] bg-[#09090b]/90 backdrop-blur-xl">
                 <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-5 sm:px-8">
-                    <Link href="/" className="flex items-center gap-2.5" aria-label="Polycognitive home">
-                        <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.04]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#37d67a] shadow-[0_0_12px_rgba(55,214,122,0.7)]" />
-                        </span>
-                        <span className="text-[13px] font-medium tracking-[-0.02em]">Polycognitive</span>
+                    <Link href="/" className="flex items-center gap-2.5" aria-label="PolyCognition home">
+                        <BrandMark className="h-8 w-8" priority />
+                        <span className="text-[13px] font-medium tracking-[-0.02em]">PolyCognition</span>
                         <span className="hidden border-l border-white/10 pl-2.5 font-mono text-[8px] uppercase tracking-[0.18em] text-[var(--dash-text-muted)] sm:inline">
                             Portfolio
                         </span>
