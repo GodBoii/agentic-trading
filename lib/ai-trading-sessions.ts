@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { fetchWithTimeout } from '@/lib/supabase/fetch-with-timeout'
 
 type JsonRecord = Record<string, any>
 
@@ -11,6 +12,7 @@ const statusPath = path.join(backendDir, 'ai_trading_run_status.json')
 const stockAgentLatestPath = path.join(backendDir, 'stock_agent_latest.json')
 const defaultBucket = process.env.SUPABASE_TRADE_SESSIONS_BUCKET || 'trade-sessions'
 const agnoSessionTable = process.env.AGNO_SESSION_TABLE || 'agno_sessions'
+const sessionListCache = new Map<string, { expiresAt: number; sessions: JsonRecord[] }>()
 
 export function resolveTradingArtifactPath(input: string) {
   const normalized = decodeURIComponent(input).replaceAll('\\', '/')
@@ -38,6 +40,8 @@ export async function loadTradeSession(sessionId: string, userId: string) {
 }
 
 export async function listTradeSessions(userId: string) {
+  const cached = sessionListCache.get(userId)
+  if (cached && cached.expiresAt > Date.now()) return cached.sessions
   const rows = await queryAgnoTradeSessions(userId)
   const grouped = new Map<string, JsonRecord[]>()
 
@@ -49,8 +53,10 @@ export async function listTradeSessions(userId: string) {
     grouped.set(tradeSessionId, group)
   }
 
-  return Array.from(grouped, ([sessionId, sessionRows]) => agnoSessionSummary(sessionRows, sessionId))
+  const sessions = Array.from(grouped, ([sessionId, sessionRows]) => agnoSessionSummary(sessionRows, sessionId))
     .sort((a: any, b: any) => Date.parse(b.updated_at_utc || b.created_at_utc || '') - Date.parse(a.updated_at_utc || a.created_at_utc || ''))
+  sessionListCache.set(userId, { expiresAt: Date.now() + 15_000, sessions })
+  return sessions
 }
 
 export async function syncLatestTradeSession(options: { status?: JsonRecord | null; uploadToCloud?: boolean } = {}) {
@@ -438,6 +444,7 @@ function serviceSupabase() {
   if (!url || !serviceRoleKey) return null
   return createSupabaseClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchWithTimeout },
   })
 }
 
