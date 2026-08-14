@@ -77,7 +77,7 @@ async function saveState(state: ToggleStatePayload) {
 
 async function writeStartRequest(
   user: { id: string; email?: string | null },
-  tradeConfig?: { trade_mode?: string; trade_amount?: number | null; regime_analysis_enabled?: boolean },
+  tradeConfig?: { trade_mode?: string; trade_amount?: number | null },
 ) {
   const request = {
     request_id: `${Date.now()}-${user.id}`,
@@ -87,7 +87,7 @@ async function writeStartRequest(
     requested_at_utc: new Date().toISOString(),
     trade_mode: tradeConfig?.trade_mode || 'auto',
     trade_amount: tradeConfig?.trade_amount || null,
-    regime_analysis_enabled: tradeConfig?.regime_analysis_enabled ?? true,
+    regime_analysis_enabled: false,
   }
   try {
     await fs.mkdir(path.dirname(requestFilePath), { recursive: true })
@@ -154,11 +154,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body: { enabled?: boolean; trade_mode?: string; trade_amount?: number; regime_analysis_enabled?: boolean } = await request.json().catch(() => ({}))
+    const body: { enabled?: boolean; trade_mode?: string; trade_amount?: number } = await request.json().catch(() => ({}))
     const enabled = body?.enabled === undefined ? true : Boolean(body?.enabled)
     const tradeMode = body?.trade_mode || 'auto'
     const tradeAmount = body?.trade_amount || null
-    const regimeAnalysisEnabled = body?.regime_analysis_enabled === undefined ? true : Boolean(body?.regime_analysis_enabled)
 
     const { error: updateError } = await supabase
       .from('user_trading_keys')
@@ -190,7 +189,7 @@ export async function POST(request: NextRequest) {
       requested_at_utc: new Date().toISOString(),
       trade_mode: tradeMode,
       trade_amount: tradeAmount,
-      regime_analysis_enabled: regimeAnalysisEnabled,
+      regime_analysis_enabled: false,
     }
     let backendPayload = null
     if (enabled) {
@@ -206,7 +205,7 @@ export async function POST(request: NextRequest) {
     const startRequest = enabled
       ? backendPayload?.request || await writeStartRequest(
         { id: user.id, email: user.email },
-        { trade_mode: tradeMode, trade_amount: tradeAmount, regime_analysis_enabled: regimeAnalysisEnabled },
+        { trade_mode: tradeMode, trade_amount: tradeAmount },
       )
       : null
 
