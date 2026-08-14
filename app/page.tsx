@@ -1,9 +1,9 @@
 import Sentinel from "@/components/sentinel/sentinel";
 
 export const metadata = {
-  title: "Polycognitive — Autonomous Intelligence for Global Markets",
+  title: "PolyCognition — AI Trading Agents for Indian Markets",
   description:
-    "The first autonomous operating system for market research, execution, and portfolio intelligence.",
+    "Connect your Dhan broker and let AI agents scan the NSE universe, surface intraday opportunities, and execute within your risk limits.",
 };
 
 export default function HomePage() {
