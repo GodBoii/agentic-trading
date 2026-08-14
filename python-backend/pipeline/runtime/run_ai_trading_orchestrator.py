@@ -143,7 +143,9 @@ class AITradingOrchestrator:
             "requested_at_utc": request.get("requested_at_utc") or datetime.now(timezone.utc).isoformat(),
             "trade_mode": request.get("trade_mode") or "auto",
             "trade_amount": request.get("trade_amount"),
-            "regime_analysis_enabled": self._as_bool(request.get("regime_analysis_enabled"), default=True),
+            # Regime analysis is deprecated. Keep the response field for older
+            # clients, but never allow a request to re-enable the retired lane.
+            "regime_analysis_enabled": False,
         }
         self.storage.save_snapshot(self.config.ai_trading_request_path, request_payload)
         return request_payload
@@ -269,7 +271,7 @@ class AITradingOrchestrator:
                         "trade_mode": resolved["trade_mode"],
                         "trade_amount": resolved["trade_amount"],
                         "amount_source": resolved["amount_source"],
-                        "regime_analysis_enabled": True,
+                        "regime_analysis_enabled": False,
                     },
                     event_callback=self._broadcast_event,
                 )
@@ -473,7 +475,7 @@ class AITradingOrchestrator:
         user_id = str(request.get("user_id") or "")
         trade_mode = str(request.get("trade_mode") or "auto").strip().lower()
         trade_amount = request.get("trade_amount")
-        regime_analysis_enabled = self._as_bool(request.get("regime_analysis_enabled"), default=True)
+        regime_analysis_enabled = False
 
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             self._save_status("blocked", "requested", request, "AI trading is not enabled for any user.")
