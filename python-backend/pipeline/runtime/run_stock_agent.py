@@ -14,7 +14,7 @@ from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.trading_amount_service import TradingAmountService
-from pipeline.stock import StockAgent
+from pipeline.stock import StockAgent, StockDecisionContextBuilder
 from pipeline.stock.toolkits import (
     StockAccountToolkit,
     StockExecutionCoordinator,
@@ -182,10 +182,13 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             raise RuntimeError("event_missing_valid_exchange_segment")
 
         account_context = self._build_account_context()
+        normalized_user_id = str(user_id or "").strip()
+        if not normalized_user_id:
+            raise RuntimeError("user_id_required_for_agent_session")
         trade_config = dict(trade_config or {})
         trade_config["trade_mode"] = str(trade_config.get("trade_mode") or "auto").lower()
         trade_config["trade_amount"] = TradingAmountService.parse(trade_config.get("trade_amount"))
-        trade_config["user_id"] = user_id
+        trade_config["user_id"] = normalized_user_id
         if trade_config["trade_amount"] is None:
             raise RuntimeError("trading_amount_missing_or_invalid")
         regime_payload = None
@@ -214,6 +217,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         run_context = {
             "trade_session_id": f"intra-{event['event_id']}",
             "request_id": str(event["event_id"]),
+            "user_id": normalized_user_id,
         }
         results = self._run_stock_agents(
             [packet],
@@ -596,30 +600,43 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             coordinator=execution_coordinator,
             amount_source=str(trade_config.get("amount_source") or "user_amount"),
         )
-        research_toolkit = self._build_research_toolkit(candidate_packet)
-        stock_toolkits = [
-            market_data_toolkit,
-            technical_toolkit,
-            account_toolkit,
-            execution_toolkit,
-        ]
-        if research_toolkit is not None:
-            stock_toolkits.append(research_toolkit)
-        agent = StockAgent(stock_toolkits)
+        selected_stock_context = {
+            "security_id": selected_stock.get("security_id"),
+            "symbol": selected_stock.get("symbol"),
+            "display_name": selected_stock.get("display_name"),
+            "trade_amount": trade_config.get("trade_amount"),
+            "trade_mode": trade_config.get("trade_mode"),
+            "amount_source": trade_config.get("amount_source"),
+            "requested_quantity": candidate_packet.get("requested_quantity"),
+            "estimated_notional": candidate_packet.get("user_estimated_notional"),
+            "estimated_slippage_percent": candidate_packet.get("user_estimated_slippage_percent"),
+        }
+        timing_context = self._build_stock_agent_timing_context(candidate_packet)
+        decision_context = StockDecisionContextBuilder.build(
+            selected_stock=selected_stock_context,
+            timing_context=timing_context,
+            security_overview=self._safe_initial_context_component(
+                "security_overview",
+                market_data_toolkit.security_overview_payload,
+            ),
+            current_state=self._safe_initial_context_component(
+                "current_stock_state",
+                market_data_toolkit.current_stock_state_payload,
+            ),
+            technical_data=self._safe_initial_context_component(
+                "technical_data",
+                technical_toolkit.technical_data_payload,
+            ),
+            account_overview=self._safe_initial_context_component(
+                "account_overview",
+                account_toolkit.account_overview_payload,
+            ),
+        )
+        # The LLM receives exactly two functions. All read-only evidence is supplied once above.
+        agent = StockAgent([execution_toolkit])
         stock_packet = {
             "market_date": candidate_packet.get("market_date"),
-            "timing_context": self._build_stock_agent_timing_context(candidate_packet),
-            "selected_stock": {
-                "security_id": selected_stock.get("security_id"),
-                "symbol": selected_stock.get("symbol"),
-                "display_name": selected_stock.get("display_name"),
-                "trade_amount": trade_config.get("trade_amount"),
-                "trade_mode": trade_config.get("trade_mode"),
-                "amount_source": trade_config.get("amount_source"),
-                "requested_quantity": candidate_packet.get("requested_quantity"),
-                "estimated_notional": candidate_packet.get("user_estimated_notional"),
-                "estimated_slippage_percent": candidate_packet.get("user_estimated_slippage_percent"),
-            },
+            "decision_context": decision_context,
         }
 
         print(f"[stock agent {index + 1}] Analyzing and trading {candidate_packet['display_name']}...")
@@ -663,7 +680,8 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "type": "stock_agent_input",
                 "message": (
                     f"Analyze {candidate_packet.get('display_name') or candidate_packet.get('symbol')} "
-                    "using the nine attached evidence charts and scoped tools."
+                    "using the nine attached evidence charts, the initial decision snapshot, "
+                    "and the two protected-execution tools."
                 ),
                 "input": stock_packet,
             }
@@ -829,48 +847,38 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         }
 
     def _build_instructions_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
-        selected_stock = stock_packet.get("selected_stock") or {}
+        decision_context = stock_packet.get("decision_context") or {}
+        instrument = decision_context.get("instrument") or {}
+        risk_budget = decision_context.get("risk_budget") or {}
         lines = [
             f"# {display_name} Agent Instructions",
             "",
-            "- Analyze the assigned stock for a sound intraday entry using the attached charts and available tools.",
+            "- Analyze the assigned stock using the attached charts and the supplied initial decision snapshot.",
             "- Focus only on the assigned stock.",
             "- Never modify, cancel, exit, hedge, convert, or otherwise touch another stock's position or order.",
             "- Any trade opened is for the current trading day only.",
-            "- After the main analysis, call get_current_stock_state once and use its compact fresh quote and latest completed/partial candles before the final decision or order.",
+            "- The only tools are estimate_intraday_quantity and place_protected_intraday_order.",
+            "- Size with estimate_intraday_quantity before placing a protected order.",
             "- Return the analysis and outcome naturally and concisely.",
             "",
             "## Assignment",
-            f"- Security ID: {selected_stock.get('security_id')}",
-            f"- Stock: {selected_stock.get('display_name') or selected_stock.get('symbol')}",
+            f"- Security ID: {instrument.get('security_id')}",
+            f"- Stock: {instrument.get('display_name') or instrument.get('symbol')}",
         ]
-        if selected_stock.get("symbol"):
-            lines.append(f"- Symbol: {selected_stock.get('symbol')}")
-        if selected_stock.get("trade_amount") is not None:
+        if instrument.get("symbol"):
+            lines.append(f"- Symbol: {instrument.get('symbol')}")
+        if risk_budget.get("strict_cash_notional_cap_rupees") is not None:
             lines.extend([
-                f"- Strict cash/notional cap: Rs {selected_stock.get('trade_amount')}",
-                f"- Sizing mode: {selected_stock.get('trade_mode')} ({selected_stock.get('amount_source')})",
-                f"- Requested whole-share quantity: {selected_stock.get('requested_quantity')}",
-                f"- Estimated notional: Rs {selected_stock.get('estimated_notional')}",
-                f"- User-sized depth slippage estimate: {selected_stock.get('estimated_slippage_percent')}%",
+                f"- Strict cash/notional cap: Rs {risk_budget.get('strict_cash_notional_cap_rupees')}",
                 "- Do not assume leverage. Current LTP and affordability are revalidated immediately before placement.",
             ])
         return "\n".join(lines)
 
     def _build_data_markdown(self, display_name: str, stock_packet: Dict[str, Any]) -> str:
-        timing = stock_packet.get("timing_context") or {}
-        session = timing.get("market_session") or {}
-        lines = [
-            f"# {display_name} Agent Context",
-            "",
-            f"- Indian date and time: {timing.get('current_market_time_ist')}",
-            f"- Regular market session: {session.get('regular_session') or '09:15-15:30 IST'}",
-            f"- Market open now: {session.get('is_open_now')}",
-            f"- Minutes to close: {session.get('minutes_to_close')}",
-            "",
-            "Detailed market, technical, account, and execution information is available to the agent through scoped tools.",
-        ]
-        return "\n".join(line for line in lines if not line.endswith(": None"))
+        from pipeline.stock.toolkits.markdown_result import tool_result_markdown
+
+        rendered = tool_result_markdown(stock_packet.get("decision_context") or {})
+        return rendered.replace("## Tool result", f"# {display_name} Initial Decision Snapshot", 1)
 
     def _build_stock_agent_timing_context(self, candidate_packet: Dict[str, Any]) -> Dict[str, Any]:
         now = self.market_time.now()
@@ -912,17 +920,22 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         except Exception:
             return 0.0
 
-    def _build_research_toolkit(self, candidate_packet: Dict[str, Any]) -> Any:
+    @staticmethod
+    def _safe_initial_context_component(
+        name: str,
+        loader: Callable[[], Dict[str, Any]],
+    ) -> Dict[str, Any]:
         try:
-            from pipeline.stock.toolkits.research_toolkit import StockResearchToolkit
-
-            return StockResearchToolkit(
-                display_name=str(candidate_packet.get("display_name") or ""),
-                symbol=str(candidate_packet.get("symbol") or ""),
-                market_time=self.market_time,
-            )
-        except ImportError:
-            return None
+            payload = loader()
+            return payload if isinstance(payload, dict) else {
+                "status": "error",
+                "errors": [f"{name}:invalid_payload"],
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "errors": [f"{name}:{type(exc).__name__}:{exc}"],
+            }
 
     def _save_no_trade_payload(
         self,
