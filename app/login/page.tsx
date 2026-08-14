@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import BrandMark from "@/components/brand-mark";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -69,14 +70,9 @@ export default function LoginPage() {
       {/* Top bar with logo + back link */}
       <header className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8 py-6 flex items-center justify-between">
         <Link href="/" className="group flex items-center gap-2.5">
-          <div className="relative h-7 w-7">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent to-success opacity-80 blur-md group-hover:opacity-100 transition-opacity" />
-            <div className="absolute inset-[3px] rounded-full bg-[#0a0a0c] flex items-center justify-center">
-              <div className="h-1.5 w-1.5 rounded-full bg-white" />
-            </div>
-          </div>
+          <BrandMark className="h-8 w-8 transition-transform duration-300 group-hover:scale-105" priority />
           <span className="text-[15px] font-medium tracking-[-0.02em] text-white">
-            Aetheria
+            PolyCognition
           </span>
         </Link>
         <Link
@@ -266,7 +262,7 @@ export default function LoginPage() {
             transition={{ duration: 0.6, ease, delay: 0.5 }}
             className="text-center text-[13px] text-ink-secondary mt-8"
           >
-            New to Aetheria?{" "}
+            New to PolyCognition?{" "}
             <Link
               href="/signup"
               className="text-white hover:text-accent transition-colors underline-offset-4 hover:underline"
