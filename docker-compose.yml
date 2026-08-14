@@ -128,17 +128,6 @@ services:
     stop_grace_period: 45s
     volumes: *common-volumes
 
-  regime:
-    <<: *service
-    profiles: ["ai"]
-    command: python -m pipeline.runtime.run_regime_loop
-    environment:
-      MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
-    depends_on:
-      market-data-gateway:
-        condition: service_healthy
-    volumes: *common-volumes
-
   ai-trading-agents:
     <<: *service
     profiles: ["ai"]
