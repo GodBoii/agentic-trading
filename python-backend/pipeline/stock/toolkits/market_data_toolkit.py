@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -9,6 +8,7 @@ from agno.tools import Toolkit
 
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
+from pipeline.stock.toolkits.markdown_result import tool_result_markdown
 
 
 class StockMarketDataToolkit(Toolkit):
@@ -56,6 +56,10 @@ class StockMarketDataToolkit(Toolkit):
 
     def get_security_overview(self) -> str:
         """Get identity, historical liquidity measures, and tradability data for the assigned stock."""
+        return tool_result_markdown(self.security_overview_payload())
+
+    def security_overview_payload(self) -> Dict[str, Any]:
+        """Build security context for the initial stock-agent decision snapshot."""
         stock = self.stock_context.get("stock") or {}
         tradability = dict(stock.get("static_tradability") or {})
         tick_size = tradability.pop("tick_size", None)
@@ -88,10 +92,14 @@ class StockMarketDataToolkit(Toolkit):
             },
             "tradability": tradability,
         }
-        return json.dumps(self._without_empty(payload), ensure_ascii=True)
+        return self._without_empty(payload)
 
     def get_market_time(self) -> str:
         """Get the current Indian market time and regular-session status."""
+        return tool_result_markdown(self.market_time_payload())
+
+    def market_time_payload(self) -> Dict[str, Any]:
+        """Build the current market-session context without an LLM tool call."""
         now = self.market_time.now()
         open_at = now.replace(
             hour=self.market_time.config.market_open_hour,
@@ -112,7 +120,7 @@ class StockMarketDataToolkit(Toolkit):
             "is_open_now": bool(open_at <= now <= close_at),
             "minutes_to_close": max(0, int((close_at - now).total_seconds() // 60)),
         }
-        return json.dumps(payload, ensure_ascii=True)
+        return payload
 
     def _fetch_live_market_snapshot(self) -> tuple[Dict[str, Any], list[str]]:
         """Fetch a compact live snapshot without exposing depth to the model."""
@@ -168,6 +176,10 @@ class StockMarketDataToolkit(Toolkit):
         Call this after the main analysis, immediately before placing an order
         or giving the final no-trade conclusion.
         """
+        return tool_result_markdown(self.current_stock_state_payload())
+
+    def current_stock_state_payload(self) -> Dict[str, Any]:
+        """Fetch fresh quote/candle data for the initial stock-agent snapshot."""
         fetched_at = self._now()
         payload: Dict[str, Any] = {
             "source": "dhan_quote_and_intraday",
@@ -213,7 +225,7 @@ class StockMarketDataToolkit(Toolkit):
             payload["missing_fields"] = sorted(set(missing_fields))
         if errors:
             payload["errors"] = errors
-        return json.dumps(self._without_empty(payload), ensure_ascii=True)
+        return self._without_empty(payload)
 
     def _latest_candle_pair(
         self,
