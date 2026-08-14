@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import BrandMark from '@/components/brand-mark'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import AgentMarkdown from '@/components/agent-markdown'
@@ -1202,12 +1203,7 @@ function AITradingChatContent() {
                     <div className="glass flex flex-col justify-between gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:items-center sm:rounded-full sm:px-6">
                         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                             <Link href="/" className="flex items-center gap-2.5 flex-shrink-0" aria-label="Home">
-                                <div className="relative h-7 w-7">
-                                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent to-success opacity-80 blur-md" />
-                                    <div className="absolute inset-[3px] rounded-full bg-[#0a0a0c] flex items-center justify-center">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-white" />
-                                    </div>
-                                </div>
+                                <BrandMark className="h-8 w-8" priority />
                             </Link>
                             <div className="border-l border-white/10 pl-3 sm:pl-4 min-w-0">
                                 <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-success">
