@@ -8,6 +8,7 @@ from agno.tools import Toolkit
 
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.dhan_service import DhanService
+from pipeline.stock.toolkits.markdown_result import json_tool_result_markdown, tool_result_markdown
 
 
 class StockExecutionCoordinator:
@@ -23,8 +24,6 @@ class StockExecutionCoordinator:
 
 class StockExecutionToolkit(Toolkit):
     """New-entry execution tools bound to one stock and a cash/notional cap."""
-
-    ALLOWED_ORDER_TYPES = {"LIMIT", "MARKET", "STOP_LOSS", "STOP_LOSS_MARKET"}
 
     def __init__(
         self,
@@ -47,7 +46,6 @@ class StockExecutionToolkit(Toolkit):
         self._dhan_tools.set_allowed_security_id(self.security_id)
         self._halted = False
         self._protected_attempts = 0
-        self._normal_attempts = 0
         self.last_preview: Optional[Dict[str, Any]] = None
         self.last_execution: Optional[Dict[str, Any]] = None
         super().__init__(
@@ -55,7 +53,6 @@ class StockExecutionToolkit(Toolkit):
             tools=[
                 self.estimate_intraday_quantity,
                 self.place_protected_intraday_order,
-                self.place_intraday_order,
             ],
         )
 
@@ -75,7 +72,7 @@ class StockExecutionToolkit(Toolkit):
             max_risk_rupees: Optional maximum rupee loss for this trade.
         """
         if self._halted:
-            return self._failure("execution_halted_after_input_error")
+            return json_tool_result_markdown(self._failure("execution_halted_after_input_error"))
         response = self._dhan_tools.calculate_intraday_equity_order_quantity(
             security_id=self.security_id,
             side=side,
@@ -86,9 +83,10 @@ class StockExecutionToolkit(Toolkit):
             exchange_segment=self.exchange_segment,
         )
         parsed = self._parse(response)
+        parsed = self._compact_quantity_result(parsed)
         self.last_preview = parsed
         self._halt_if_input_error(parsed)
-        return response
+        return tool_result_markdown(parsed)
 
     def place_protected_intraday_order(
         self,
@@ -115,9 +113,9 @@ class StockExecutionToolkit(Toolkit):
             order_type: LIMIT or MARKET.
         """
         if self._has_successful_placement():
-            return self._failure("entry_order_already_placed")
+            return json_tool_result_markdown(self._failure("entry_order_already_placed"))
         if self._halted:
-            return self._failure("execution_halted_after_input_error")
+            return json_tool_result_markdown(self._failure("execution_halted_after_input_error"))
         if self._protected_attempts >= 1:
             return self._record_preflight_failure(
                 "protected",
@@ -134,6 +132,16 @@ class StockExecutionToolkit(Toolkit):
                 reference_price=entry_price,
             )
         with self.coordinator.placement_lock:
+            overlap_error = self._validate_no_existing_trade()
+            if overlap_error:
+                return self._record_preflight_failure(
+                    "protected",
+                    overlap_error,
+                    side=side,
+                    quantity=quantity,
+                    order_type=normalized_type,
+                    reference_price=entry_price,
+                )
             margin_error = self._validate_final_margin(side, quantity, entry_price)
             if margin_error:
                 return self._record_preflight_failure(
@@ -166,82 +174,9 @@ class StockExecutionToolkit(Toolkit):
                     "quantity": int(quantity),
                     "order_type": normalized_type,
                     "reference_price": float(entry_price),
-                },
-            )
-
-    def place_intraday_order(
-        self,
-        side: str,
-        quantity: int,
-        reference_price: float,
-        order_type: str = "MARKET",
-        price: float = 0.0,
-        trigger_price: float = 0.0,
-        correlation_id: Optional[str] = None,
-    ) -> str:
-        """Place one normal intraday entry for the assigned stock.
-
-        This is an entry-only fallback. It cannot modify, cancel, convert, or
-        exit any position or order.
-
-        Args:
-            side: BUY or SELL.
-            quantity: Quantity returned by estimate_intraday_quantity.
-            reference_price: Current price used for the final margin check.
-            order_type: LIMIT, MARKET, STOP_LOSS, or STOP_LOSS_MARKET.
-            price: Order price; use zero for MARKET.
-            trigger_price: Trigger for stop-loss order types; otherwise zero.
-        """
-        if self._has_successful_placement():
-            return self._failure("entry_order_already_placed")
-        if self._halted:
-            return self._failure("execution_halted_after_input_error")
-        if self._normal_attempts >= 1:
-            return self._record_preflight_failure(
-                "normal",
-                self._failure("normal_order_attempt_limit_reached"),
-            )
-        normalized_type = self._strict_order_type(order_type, self.ALLOWED_ORDER_TYPES)
-        if not normalized_type:
-            self._halted = True
-            return self._record_preflight_failure(
-                "normal",
-                self._failure("invalid_order_type"),
-                side=side,
-                quantity=quantity,
-                reference_price=reference_price,
-            )
-        with self.coordinator.placement_lock:
-            margin_error = self._validate_final_margin(side, quantity, reference_price, trigger_price)
-            if margin_error:
-                return self._record_preflight_failure(
-                    "normal",
-                    margin_error,
-                    side=side,
-                    quantity=quantity,
-                    order_type=normalized_type,
-                    reference_price=reference_price,
-                )
-
-            self._normal_attempts += 1
-            response = self._dhan_tools.place_intraday_equity_order(
-                security_id=self.security_id,
-                side=side,
-                quantity=int(quantity),
-                order_type=normalized_type,
-                price=float(price),
-                trigger_price=float(trigger_price),
-                exchange_segment=self.exchange_segment,
-                correlation_id=correlation_id,
-            )
-            return self._record_execution(
-                "normal",
-                response,
-                {
-                    "side": str(side).upper(),
-                    "quantity": int(quantity),
-                    "order_type": normalized_type,
-                    "reference_price": float(reference_price),
+                    "target_price": float(target_price),
+                    "stop_loss_price": float(stop_loss_price),
+                    "trailing_jump": float(trailing_jump),
                 },
             )
 
@@ -407,9 +342,70 @@ class StockExecutionToolkit(Toolkit):
             )
         return None
 
+    def _validate_no_existing_trade(self) -> Optional[str]:
+        """Recheck overlap at placement time because initial context can become stale."""
+        try:
+            positions_response = self._dhan_tools.dhan.fetch_positions()
+            orders_response = self._dhan_tools.dhan.fetch_order_book()
+            super_orders_response = self._dhan_tools.dhan.fetch_super_orders()
+        except Exception as exc:
+            return self._failure(f"account_overlap_recheck_failed:{type(exc).__name__}")
+
+        responses = (positions_response, orders_response, super_orders_response)
+        if not all(self._broker_request_succeeded(response) for response in responses):
+            return self._failure("account_overlap_recheck_unavailable")
+
+        for row in self._extract_rows(positions_response):
+            if not self._matches_security(row):
+                continue
+            if str(row.get("productType") or "").upper() != "INTRADAY":
+                continue
+            try:
+                if float(row.get("netQty") or 0) != 0:
+                    return self._failure("assigned_stock_open_intraday_position_exists")
+            except (TypeError, ValueError):
+                return self._failure("assigned_stock_position_state_invalid")
+
+        active_statuses = {
+            "PENDING",
+            "TRANSIT",
+            "PART_TRADED",
+            "AMO_REQ_RECEIVED",
+            "AFTER_MARKET_ORDER",
+            "TRADED_PENDING",
+        }
+        for row in [
+            *self._extract_rows(orders_response),
+            *self._extract_rows(super_orders_response),
+        ]:
+            if not self._matches_security(row):
+                continue
+            if str(row.get("orderStatus") or "").upper() in active_statuses:
+                return self._failure("assigned_stock_active_order_exists")
+            legs = row.get("legDetails")
+            if isinstance(legs, list) and any(
+                isinstance(leg, dict)
+                and str(leg.get("orderStatus") or "").upper() in active_statuses
+                for leg in legs
+            ):
+                return self._failure("assigned_stock_active_order_exists")
+        return None
+
+    @staticmethod
+    def _broker_request_succeeded(response: Any) -> bool:
+        if isinstance(response, list):
+            return True
+        return isinstance(response, dict) and str(response.get("status") or "").lower() == "success"
+
+    def _matches_security(self, row: Dict[str, Any]) -> bool:
+        value = row.get("securityId") or row.get("security_id")
+        return str(value or "") == str(self.security_id)
+
     def _record_execution(self, kind: str, response: str, request: Dict[str, Any]) -> str:
         parsed = self._parse(response)
         parsed = self._reconcile_order_status(kind, parsed)
+        if kind == "protected":
+            parsed = self._compact_protected_result(parsed, request)
         self.last_execution = {
             "kind": kind,
             **request,
@@ -425,7 +421,7 @@ class StockExecutionToolkit(Toolkit):
                     "response": parsed,
                 }
             )
-        return json.dumps(parsed, ensure_ascii=True)
+        return tool_result_markdown(parsed)
 
     def _reconcile_order_status(self, kind: str, response: Dict[str, Any]) -> Dict[str, Any]:
         """Attach the freshest observable broker state without claiming a fill."""
@@ -533,7 +529,7 @@ class StockExecutionToolkit(Toolkit):
             "response": parsed,
         }
         self._halt_if_input_error(parsed)
-        return response
+        return tool_result_markdown(parsed)
 
     def _halt_if_input_error(self, payload: Any) -> None:
         serialized = json.dumps(payload, ensure_ascii=True).lower()
@@ -564,6 +560,104 @@ class StockExecutionToolkit(Toolkit):
             return parsed if isinstance(parsed, dict) else {"data": parsed}
         except Exception:
             return {"status": "failure", "remarks": str(response)}
+
+    @classmethod
+    def _compact_quantity_result(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Return only sizing evidence that is new to the initial snapshot."""
+        keys = (
+            "status",
+            "remarks",
+            "side",
+            "reference_price",
+            "stop_loss_price",
+            "margin_per_share",
+            "max_qty_by_cash",
+            "max_risk_rupees",
+            "per_share_risk",
+            "max_qty_by_risk",
+            "max_quantity",
+            "recommended_quantity",
+            "estimated_margin_required",
+            "estimated_notional",
+        )
+        compact = {key: payload.get(key) for key in keys if payload.get(key) is not None}
+        for output_key, aliases in {
+            "error_code": ("error_code", "errorCode"),
+            "error_type": ("error_type", "errorType"),
+            "error_message": ("error_message", "errorMessage"),
+        }.items():
+            value = cls._find_value(payload, *aliases)
+            if value not in (None, ""):
+                compact[output_key] = value
+        return compact or {"status": "failure", "remarks": "empty_quantity_response"}
+
+    @classmethod
+    def _compact_protected_result(
+        cls,
+        payload: Dict[str, Any],
+        request: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Keep broker outcome and protection evidence, not repeated instrument context."""
+        compact: Dict[str, Any] = {
+            "status": payload.get("status"),
+            "correlation_id": payload.get("correlation_id"),
+            "order_id": cls._find_value(payload, "orderId", "order_id"),
+            "broker_order_status": payload.get("broker_order_status"),
+            "filled_quantity": cls._find_value(
+                payload,
+                "filledQty",
+                "filledQuantity",
+                "filled_quantity",
+                "tradedQty",
+            ),
+            "protection": {
+                "entry_price": request.get("reference_price"),
+                "target_price": request.get("target_price"),
+                "stop_loss_price": request.get("stop_loss_price"),
+                "trailing_jump": request.get("trailing_jump"),
+            },
+        }
+        remarks = payload.get("remarks")
+        if remarks not in (None, "", {}, []):
+            compact["remarks"] = remarks if not isinstance(remarks, dict) else None
+        for output_key, aliases in {
+            "error_code": ("error_code", "errorCode"),
+            "error_type": ("error_type", "errorType"),
+            "error_message": ("error_message", "errorMessage"),
+        }.items():
+            value = cls._find_value(payload, *aliases)
+            if value not in (None, ""):
+                compact[output_key] = value
+
+        legs = cls._find_value(payload, "legDetails", "leg_details")
+        if isinstance(legs, list):
+            compact["broker_legs"] = [
+                cls._without_empty(
+                    {
+                        "leg_name": cls._find_value(leg, "legName", "leg_name"),
+                        "order_id": cls._find_value(leg, "orderId", "order_id"),
+                        "status": cls._find_value(leg, "orderStatus", "order_status"),
+                        "price": cls._find_value(leg, "price", "orderPrice"),
+                        "trigger_price": cls._find_value(leg, "triggerPrice", "trigger_price"),
+                        "quantity": cls._find_value(leg, "quantity", "orderQuantity"),
+                    }
+                )
+                for leg in legs
+                if isinstance(leg, dict)
+            ]
+        return cls._without_empty(compact)
+
+    @classmethod
+    def _without_empty(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: cls._without_empty(item)
+                for key, item in value.items()
+                if item not in (None, "", [], {})
+            }
+        if isinstance(value, list):
+            return [cls._without_empty(item) for item in value if item not in (None, "", [], {})]
+        return value
 
     @classmethod
     def _find_value(cls, value: Any, *keys: str) -> Any:
