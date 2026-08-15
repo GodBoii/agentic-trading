@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import TradingStatus from '@/components/trading-status'
 import { AgentConsole } from '@/components/agent/agent-console'
 import { RunSummary } from '@/components/agent/run-summary'
-import { useAgentRun } from '@/components/agent/use-agent-run'
+import { useAgentRunContext } from '@/components/agent/agent-run-provider'
 import type { AgentView } from '@/components/ai-trading/types'
 import { Notice } from '@/components/ui/notice'
 import { CellGrid, Panel } from '@/components/ui/panel'
@@ -40,7 +40,7 @@ function AgentPageContent() {
         )
     }, [requestedView, legacySession, router])
 
-    const { status, events, stream, error } = useAgentRun(view === 'live')
+    const { status, events, stream, error } = useAgentRunContext()
 
     const changeView = useCallback((next: AgentView) => {
         setView(next)
