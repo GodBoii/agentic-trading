@@ -105,15 +105,17 @@ All were healthy or running at the latest verification.
 
 Supabase remains the only user-facing authentication system. Users sign up and log in through Supabase; no second login or user password system was added.
 
-The backend credential serves a different purpose: it authenticates trusted server-to-server and internal Docker requests after Vercel has authenticated the user. This prevents a visitor from bypassing the Vercel/Supabase layer and directly invoking trading controls through the public tunnel hostname.
+The browser's Supabase access token is now the end-to-end user credential. Vercel verifies the session and forwards that short-lived token to the Python gateway. The Python gateway independently verifies it with Supabase and derives the user ID itself before processing any user-scoped request. This prevents callers from impersonating another user by supplying a `user_id` in a query string or JSON body.
 
-Only one application secret is required:
+The backend credential is retained only for trusted internal Docker service-to-service requests, such as pipeline events. It is no longer used by the Vercel user-facing routes.
+
+One internal application secret is required on the Python/Docker host:
 
 ```text
 AI_TRADING_BACKEND_TOKEN
 ```
 
-The previously considered separate `AI_TRADING_WS_SIGNING_SECRET` is optional. When it is absent, the backend credential also signs short-lived WebSocket tickets, keeping the minimum configuration to one application secret.
+The separate `AI_TRADING_WS_SIGNING_SECRET` remains optional. When absent, the internal backend credential also signs short-lived WebSocket tickets. Neither value is exposed to browser JavaScript or required in Vercel.
 
 The Cloudflare tunnel token is separate infrastructure authentication. It authorizes the local `cloudflared` connector to attach to the managed tunnel; it is not a user credential and is not placed in Vercel.
 
@@ -123,8 +125,9 @@ The Cloudflare tunnel token is separate infrastructure authentication. It author
 Authenticated browser
   → Vercel Next.js API route
   → Supabase session verification
-  → Vercel adds the private backend bearer credential
-  → Python trading gateway
+  → Vercel forwards the Supabase access token
+  → Python gateway verifies the token with Supabase `/auth/v1/user`
+  → Python gateway derives the authenticated user ID
   → user-scoped operation
 ```
 
@@ -134,7 +137,8 @@ Authenticated browser
 Authenticated browser
   → POST /api/ai-trading/ws-ticket on Vercel
   → Supabase session verification
-  → short-lived, one-time WebSocket ticket
+  → Supabase access token forwarded to Python
+  → Python verifies the user and issues a short-lived, one-time WebSocket ticket
   → wss://api.polycognition.online/ai-trading/stream?ticket=...
   → Python gateway validates origin, signature, expiry, audience, issuer, user, and replay state
   → user-scoped live events
@@ -150,6 +154,10 @@ Implemented protections:
 
 - The gateway fails closed when the backend credential is absent, a placeholder, or too weak.
 - Protected REST endpoints require a valid bearer credential.
+- User-facing REST endpoints validate the bearer token with Supabase and derive the user identity server-side.
+- Internal pipeline endpoints accept only the separate internal service credential.
+- User-provided `user_id` and email values are ignored and replaced with the verified Supabase identity.
+- Enable and disable requests are applied by the Python gateway through `/ai-trading/toggle`; Vercel no longer maintains a separate production toggle state that can drift from the running engine.
 - `/health` remains public and returns only a minimal health response.
 - WebSocket upgrades require an allowed browser `Origin`.
 - WebSocket upgrades require a valid short-lived ticket.
@@ -162,6 +170,7 @@ Implemented protections:
 - Status responses are sanitized and scoped to the requested authenticated user.
 - Event and decision propagation retains the owning user ID.
 - Responses use `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` where appropriate.
+- Structured audit logs record request receipt, authentication success or rejection, ticket issuance, request completion, and WebSocket client connection/disconnection without logging access tokens or email addresses.
 
 ## Next.js and frontend changes
 
@@ -177,8 +186,9 @@ This server-only route:
 
 - Verifies the current Supabase user.
 - Refuses unauthenticated requests.
-- Issues a short-lived, user-scoped, one-time WebSocket JWT.
-- Never exposes the permanent backend credential to browser JavaScript.
+- Forwards the current Supabase access token to the Python gateway.
+- Returns the short-lived, user-scoped, one-time WebSocket JWT issued by Python after independent verification.
+- Never exposes the internal backend credential to browser JavaScript.
 - Uses private, no-store response caching.
 
 ### Live agent connection
@@ -189,12 +199,13 @@ Updated:
 components/agent/use-agent-run.ts
 ```
 
-The live-agent hook now:
+The live-agent hook and dashboard-level provider now:
 
 - Requests a fresh WebSocket ticket before every connection attempt.
 - Adds the ticket to the WebSocket URL.
 - Obtains a new ticket during reconnection instead of reusing an expired ticket.
 - Preserves existing status polling, visibility awareness, event de-duplication, and reconnect behavior.
+- Maintain one authenticated live connection across all `/dashboard/*` pages, so opening the authenticated dashboard produces a backend `client_connected` event without creating duplicate sockets on the AI Trading page.
 
 ### Public WebSocket configuration
 
@@ -218,11 +229,13 @@ app/api/ai-trading/config/route.ts
 These routes now:
 
 - Verify the Supabase user before backend interaction.
-- Attach the server-only backend bearer credential.
+- Forward the current Supabase access token to the Python gateway.
+- Allow the Python gateway to independently verify and derive the user identity.
 - Use a bounded backend timeout.
 - Request user-scoped status/configuration.
 - Return an upstream error when the configured production backend is unavailable instead of pretending Vercel's local filesystem is the active backend.
 - Keep the existing local file fallback only for development when no remote backend URL is configured.
+- Send both enable and disable operations to the Python gateway, with a best-effort backend rollback if the subsequent Supabase state update fails.
 
 ## Environment configuration
 
@@ -238,6 +251,10 @@ AI_TRADING_BACKEND_URL=http://127.0.0.1:8020
 AI_TRADING_ALLOWED_ORIGINS=http://localhost:3000,https://www.polycognition.online
 NEXT_PUBLIC_AI_TRADING_WS_URL=ws://localhost:8020/ai-trading/stream
 CLOUDFLARE_TUNNEL_TOKEN=<private connector token>
+SUPABASE_URL=<Supabase project URL>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase anonymous key used for token verification>
+SUPABASE_AUTH_TIMEOUT_SECONDS=5
+SUPABASE_AUTH_CACHE_SECONDS=30
 ```
 
 ### Vercel production environment
@@ -247,7 +264,6 @@ The following production configuration was added or updated by the user:
 ```env
 NEXT_PUBLIC_APP_URL=https://www.polycognition.online
 AI_TRADING_BACKEND_URL=https://api.polycognition.online
-AI_TRADING_BACKEND_TOKEN=<same private server credential as the Python gateway>
 NEXT_PUBLIC_AI_TRADING_WS_URL=wss://api.polycognition.online/ai-trading/stream
 AI_TRADING_BACKEND_TIMEOUT_MS=10000
 SUPABASE_SERVICE_ROLE_KEY=<existing private Supabase service key>
@@ -264,11 +280,13 @@ DHAN_APP_ID
 DHAN_APP_SECRET
 ```
 
-The following must not be added to Vercel:
+The following are not used by the Vercel frontend and should remain only on the Docker host:
 
 ```text
 CLOUDFLARE_TUNNEL_TOKEN
 AI_TRADING_ALLOWED_ORIGINS
+AI_TRADING_BACKEND_TOKEN
+AI_TRADING_WS_SIGNING_SECRET
 ```
 
 `AI_TRADING_WS_SIGNING_SECRET` may remain unset because the implementation falls back to the backend credential for ticket signing.
@@ -306,13 +324,19 @@ The Dhan authentication container was recreated after the change and returned to
 Tracked implementation files:
 
 - `.env.example`
+- `app/api/ai-trading/assets/route.ts`
 - `app/api/ai-trading/config/route.ts`
 - `app/api/ai-trading/toggle/route.ts`
 - `app/api/ai-trading/ws-ticket/route.ts`
+- `app/dashboard/ai-trading/page.tsx`
+- `app/dashboard/layout.tsx`
+- `components/agent/agent-run-provider.tsx`
 - `components/agent/use-agent-run.ts`
 - `components/ai-trading/utils.ts`
+- `components/trading-status.tsx`
 - `docker-compose.yml`
 - `python-backend/pipeline/runtime/run_ai_trading_orchestrator.py`
+- `python-backend/pipeline/stages/intra_finder.py`
 - `python-backend/tests/test_ai_gateway_security.py`
 
 Ignored local configuration files were also updated but must not be committed:
@@ -326,8 +350,9 @@ Ignored local configuration files were also updated but must not be committed:
 Completed checks:
 
 - `npm run build` — passed.
-- Focused gateway security tests — passed.
-- Node-issued ticket to Python-validator compatibility check — passed.
+- Complete Python test suite — `115 passed`.
+- Backend-issued ticket and Python-validator compatibility checks — passed.
+- Supabase verifier cache, invalid-token rejection, ticket scope, tamper rejection, replay prevention, and user-isolated broadcast tests — passed.
 - `docker compose --profile ai config --quiet` — passed.
 - `git diff --check` — passed, apart from informational Windows LF-to-CRLF notices.
 - Local backend `/health` — HTTP `200`.
@@ -337,15 +362,11 @@ Completed checks:
 - Tunnel route configuration — received by the connector.
 - Dhan authentication service after credential update — healthy.
 - Vercel custom-domain frontend — HTTP `200`.
+- Real tunneled WebSocket handshake — connected and received `status_snapshot`.
+- Backend audit logs — verified `request_received`, `auth_success`, `auth_denied`, `request_completed`, `client_connected`, and `client_disconnected` events.
+- Scheduled weekend idle is treated as healthy by Universe Scanner and Intra-Finder.
 
-The focused test file currently contains four passing tests covering:
-
-- Valid user-scoped, one-time WebSocket tickets.
-- Rejection of tampered tickets.
-- Isolation of broadcasts between users.
-- Refusal to start the public gateway without its server credential.
-
-The broader Python suite previously produced 108 passing tests and one unrelated pre-existing UI-contract failure concerning the trading-amount accessibility label. That unrelated UI assertion was not changed as part of the tunnel work.
+The earlier trading-amount accessibility/copy contract failure was corrected. The complete suite now passes.
 
 The Next.js build reports only non-blocking maintenance notices for outdated Browserslist/baseline metadata.
 
@@ -392,7 +413,7 @@ docker compose --profile ai up -d --force-recreate cloudflared
 1. Review the local diff one final time.
 2. Commit the tracked implementation files and this progress document.
 3. Push the commit to `origin/master` so Vercel can deploy the new application code.
-4. Confirm the Vercel production deployment uses the newly configured environment variables.
+4. Confirm the Vercel production deployment uses the listed environment variables. `AI_TRADING_BACKEND_TOKEN` may be removed from Vercel because user requests now use Supabase tokens end to end.
 5. Update Supabase Authentication URL Configuration:
    - Site URL: `https://www.polycognition.online`
    - Redirect URL: `https://www.polycognition.online/auth/callback`
@@ -419,10 +440,11 @@ After the code is pushed and Vercel finishes deploying:
 11. Start or enable AI trading.
 12. Confirm the Vercel route reaches `api.polycognition.online` without a `401`, `502`, or timeout.
 13. Confirm the live stream becomes connected through `wss://api.polycognition.online/ai-trading/stream`.
-14. Confirm status and live events belong only to the signed-in user.
-15. Open the protected API hostname directly without credentials and confirm it remains unauthorized.
-16. Place or simulate an eligible Dhan order only under the project's established safety controls, then confirm the postback route receives the status update.
-17. Review Vercel, Cloudflare Tunnel, and Docker logs for unexpected `401`, `403`, `502`, WebSocket handshake, origin, or timeout errors.
+14. In Docker logs, confirm the signed-in dashboard produces `auth_success`, `websocket_ticket_issued`, and `client_connected` for the verified user ID.
+15. Confirm status and live events belong only to the signed-in user.
+16. Open the protected API hostname directly without credentials and confirm it remains unauthorized.
+17. Place or simulate an eligible Dhan order only under the project's established safety controls, then confirm the postback route receives the status update.
+18. Review Vercel, Cloudflare Tunnel, and Docker logs for unexpected `401`, `403`, `502`, WebSocket handshake, origin, or timeout errors.
 
 ## Availability limitation
 
@@ -435,4 +457,3 @@ The backend currently runs on the local Windows computer. Production backend ava
 - The local internet connection remaining available.
 
 For reliable 24/7 operation, the same Docker services and tunnel connector should eventually move to an always-on VPS or server. The current local deployment is functional but inherits the availability of the host computer.
-
