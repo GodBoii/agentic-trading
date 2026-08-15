@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { createClient } from '@/lib/supabase/server'
@@ -24,16 +25,15 @@ const stateFilePath = path.join(process.cwd(), 'python-backend', 'ai_trading_sta
 const requestFilePath = path.join(process.cwd(), 'python-backend', 'ai_trading_request.json')
 const statusFilePath = path.join(process.cwd(), 'python-backend', 'ai_trading_run_status.json')
 const backendUrl = process.env.AI_TRADING_BACKEND_URL?.replace(/\/$/, '')
-const backendToken = process.env.AI_TRADING_BACKEND_TOKEN
 const backendTimeoutMs = Number(process.env.AI_TRADING_BACKEND_TIMEOUT_MS || 10_000)
 
-async function callTradingBackend(endpoint: string, init: RequestInit = {}) {
+async function callTradingBackend(endpoint: string, accessToken: string, init: RequestInit = {}) {
   if (!backendUrl) return null
-  if (!backendToken) throw new Error('AI_TRADING_BACKEND_TOKEN is not configured')
 
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
-  headers.set('Authorization', `Bearer ${backendToken}`)
+  headers.set('Authorization', `Bearer ${accessToken}`)
+  headers.set('X-Request-ID', randomUUID())
 
   const response = await fetch(`${backendUrl}${endpoint}`, {
     ...init,
@@ -154,11 +154,39 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const body: { enabled?: boolean; trade_mode?: string; trade_amount?: number } = await request.json().catch(() => ({}))
     const enabled = body?.enabled === undefined ? true : Boolean(body?.enabled)
     const tradeMode = body?.trade_mode || 'auto'
     const tradeAmount = body?.trade_amount || null
+
+    const toggleRequest = {
+      request_id: `${Date.now()}-${user.id}`,
+      action: 'start',
+      enabled,
+      user_id: user.id,
+      email: user.email ?? null,
+      requested_at_utc: new Date().toISOString(),
+      trade_mode: tradeMode,
+      trade_amount: tradeAmount,
+      regime_analysis_enabled: false,
+    }
+    let backendPayload: any = null
+    if (backendUrl) {
+      try {
+        backendPayload = await callTradingBackend('/ai-trading/toggle', session.access_token, {
+          method: 'POST',
+          body: JSON.stringify(toggleRequest),
+        })
+      } catch (error) {
+        console.warn('[Toggle API] AI trading backend unavailable:', error)
+        return NextResponse.json({ error: 'Trading backend unavailable' }, { status: 502 })
+      }
+    }
 
     const { error: updateError } = await supabase
       .from('user_trading_keys')
@@ -167,57 +195,49 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Failed to update AI trading status in Supabase:', updateError)
+      if (backendPayload) {
+        await callTradingBackend('/ai-trading/toggle', session.access_token, {
+          method: 'POST',
+          body: JSON.stringify({
+            ...toggleRequest,
+            enabled: Boolean(backendPayload.previous_enabled),
+          }),
+        }).catch((rollbackError) => {
+          console.error('[Toggle API] Backend rollback failed:', rollbackError)
+        })
+      }
       return NextResponse.json({ error: 'Failed to update trading status' }, { status: 500 })
     }
 
-    const state = await loadState()
-    state.user_states[user.id] = {
-      enabled,
-      updated_at_utc: new Date().toISOString(),
-      email: user.email ?? null,
-    }
-    state.enabled_user_ids = Object.entries(state.user_states)
-      .filter(([, value]) => Boolean(value?.enabled))
-      .map(([userId]) => userId)
-      .sort()
-    state.generated_at_utc = new Date().toISOString()
-    await saveState(state)
-    const localRequest = {
-      request_id: `${Date.now()}-${user.id}`,
-      action: 'start',
-      user_id: user.id,
-      email: user.email ?? null,
-      requested_at_utc: new Date().toISOString(),
-      trade_mode: tradeMode,
-      trade_amount: tradeAmount,
-      regime_analysis_enabled: false,
-    }
-    let backendPayload = null
-    if (enabled) {
-      try {
-        backendPayload = await callTradingBackend('/ai-trading/start', {
-          method: 'POST',
-          body: JSON.stringify(localRequest),
-        })
-      } catch (error) {
-        console.warn('[Toggle API] AI trading backend unavailable:', error)
-        if (backendUrl) {
-          return NextResponse.json({ error: 'Trading backend unavailable' }, { status: 502 })
-        }
+    if (!backendUrl) {
+      const state = await loadState()
+      state.user_states[user.id] = {
+        enabled,
+        updated_at_utc: new Date().toISOString(),
+        email: user.email ?? null,
+      }
+      state.enabled_user_ids = Object.entries(state.user_states)
+        .filter(([, value]) => Boolean(value?.enabled))
+        .map(([userId]) => userId)
+        .sort()
+      state.generated_at_utc = new Date().toISOString()
+      await saveState(state)
+      backendPayload = {
+        enabled_user_ids: state.enabled_user_ids,
+        request: enabled
+          ? await writeStartRequest(
+            { id: user.id, email: user.email },
+            { trade_mode: tradeMode, trade_amount: tradeAmount },
+          )
+          : null,
       }
     }
-    const startRequest = enabled
-      ? backendPayload?.request || await writeStartRequest(
-        { id: user.id, email: user.email },
-        { trade_mode: tradeMode, trade_amount: tradeAmount },
-      )
-      : null
 
     return NextResponse.json({
       ok: true,
       enabled,
-      enabled_user_ids: state.enabled_user_ids,
-      request: startRequest,
+      enabled_user_ids: backendPayload?.enabled_user_ids || [],
+      request: backendPayload?.request || null,
     })
   } catch (error) {
     console.error('AI trading toggle route error:', error)
@@ -235,9 +255,14 @@ export async function GET() {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     try {
       const backendPayload = await callTradingBackend(
-        `/ai-trading/status?user_id=${encodeURIComponent(user.id)}`,
+        '/ai-trading/status',
+        session.access_token,
         { method: 'GET' },
       )
       if (backendPayload) {
