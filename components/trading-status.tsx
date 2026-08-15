@@ -140,14 +140,16 @@ export default function TradingStatus() {
                 label="Trade sizing"
                 title="Capital per trade"
                 actions={
-                    <Badge tone={automatic ? 'accent' : 'neutral'}>{automatic ? 'Automatic' : 'Fixed'}</Badge>
+                    <Badge tone={automatic ? 'accent' : 'neutral'}>
+                        {automatic ? 'Auto: available balance' : 'Fixed'}
+                    </Badge>
                 }
             />
             <PanelBody className="space-y-5">
                 <p className="max-w-prose text-[12px] leading-relaxed text-ink-secondary">
-                    Leave this blank to size each trade from the available balance at the moment of execution. Enter an
-                    amount to cap it instead — the scanner will then only consider events your account can afford.
-                    Saving does not trigger a scan.
+                    Leave this blank to size automatically from the available balance at the moment of execution. Enter
+                    an amount to cap it instead — the scanner will then only consider events your account can afford;
+                    saving does not start a scan.
                 </p>
 
                 <div>
@@ -172,6 +174,7 @@ export default function TradingStatus() {
                                 onChange={(event) => setTradeAmount(event.target.value)}
                                 placeholder="Automatic — use available balance"
                                 disabled={tokenExpired}
+                                aria-label="Trading amount in rupees"
                                 aria-invalid={invalid}
                                 aria-describedby="trade-amount-hint"
                                 className="dash-input dash-input-currency"
