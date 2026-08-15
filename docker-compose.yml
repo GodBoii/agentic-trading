@@ -71,7 +71,7 @@ services:
         - CMD
         - python
         - -c
-        - "import json,sys; from datetime import datetime; from pathlib import Path; from zoneinfo import ZoneInfo; p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); ok=s.get('status')=='completed' and s.get('market_date')==datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat() and int(s.get('baseline_schema_version') or 0)>=2; sys.exit(0 if ok else 1)"
+        - "import json,os,sys; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; session=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); artifact_ok=s.get('status')=='completed' and s.get('market_date')==session.market_date and int(s.get('baseline_schema_version') or 0)>=2; sys.exit(0 if (not session.is_trading_day or artifact_ok) else 1)"
       interval: 30s
       timeout: 5s
       retries: 120
