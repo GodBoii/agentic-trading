@@ -2296,7 +2296,10 @@ class IntraFinder:
             if self.last_global_packet_at
             else None
         )
-        if self.connection_state == "WAITING_FOR_START" and session.is_before_open:
+        if not session.is_trading_day:
+            healthy = True
+            reason = session.reason or "non_trading_day"
+        elif self.connection_state == "WAITING_FOR_START" and session.is_before_open:
             healthy = True
             reason = "waiting_for_configured_start"
         elif not self.universe_version:
