@@ -4,6 +4,7 @@ import json
 import os
 import base64
 import hashlib
+import hmac
 import re
 import socket
 import struct
@@ -25,12 +26,12 @@ class WebSocketBroadcaster:
     MAGIC_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
     def __init__(self) -> None:
-        self.clients: list[socket.socket] = []
+        self.clients: dict[socket.socket, str] = {}
         self.lock = Lock()
 
-    def accept(self, handler: BaseHTTPRequestHandler) -> bool:
+    def accept(self, handler: BaseHTTPRequestHandler, user_id: str) -> bool:
         key = handler.headers.get("Sec-WebSocket-Key")
-        if not key:
+        if not key or not user_id:
             return False
         accept_key = base64.b64encode(
             hashlib.sha1(f"{key}{self.MAGIC_GUID}".encode("ascii")).digest()
@@ -41,22 +42,23 @@ class WebSocketBroadcaster:
         handler.send_header("Sec-WebSocket-Accept", accept_key)
         handler.end_headers()
         with self.lock:
-            self.clients.append(handler.request)
+            self.clients[handler.request] = user_id
         return True
 
     def remove(self, client: socket.socket) -> None:
         with self.lock:
-            if client in self.clients:
-                self.clients.remove(client)
+            self.clients.pop(client, None)
         try:
             client.close()
         except Exception:
             pass
 
-    def broadcast(self, payload: Dict[str, Any]) -> None:
+    def broadcast(self, payload: Dict[str, Any], user_id: str) -> None:
+        if not user_id:
+            return
         message = json.dumps(payload, ensure_ascii=True, default=str)
         with self.lock:
-            clients = list(self.clients)
+            clients = [client for client, client_user_id in self.clients.items() if client_user_id == user_id]
         stale: list[socket.socket] = []
         for client in clients:
             try:
@@ -86,6 +88,73 @@ class WebSocketBroadcaster:
         return header + body
 
 
+class WebSocketTicketValidator:
+    """Validate short-lived, one-time HS256 tickets issued by the Vercel frontend."""
+
+    AUDIENCE = "ai-trading-websocket"
+    ISSUER = "polycognition-web"
+
+    def __init__(self, secret: str, max_lifetime_seconds: int = 120) -> None:
+        self.secret = secret.encode("utf-8")
+        self.max_lifetime_seconds = max_lifetime_seconds
+        self.used_ticket_ids: dict[str, int] = {}
+        self.lock = Lock()
+
+    @staticmethod
+    def _decode_segment(value: str) -> bytes:
+        padding = "=" * ((4 - len(value) % 4) % 4)
+        return base64.urlsafe_b64decode(f"{value}{padding}".encode("ascii"))
+
+    def validate(self, token: str) -> Dict[str, Any]:
+        if not self.secret:
+            raise ValueError("websocket_ticket_signing_secret_missing")
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("websocket_ticket_format_invalid")
+        header_segment, payload_segment, signature_segment = parts
+        signing_input = f"{header_segment}.{payload_segment}".encode("ascii")
+        expected_signature = hmac.new(self.secret, signing_input, hashlib.sha256).digest()
+        try:
+            supplied_signature = self._decode_segment(signature_segment)
+        except Exception as exc:
+            raise ValueError("websocket_ticket_signature_invalid") from exc
+        if not hmac.compare_digest(expected_signature, supplied_signature):
+            raise ValueError("websocket_ticket_signature_invalid")
+        try:
+            header = json.loads(self._decode_segment(header_segment).decode("utf-8"))
+            claims = json.loads(self._decode_segment(payload_segment).decode("utf-8"))
+        except Exception as exc:
+            raise ValueError("websocket_ticket_payload_invalid") from exc
+        if header.get("alg") != "HS256" or header.get("typ") != "JWT":
+            raise ValueError("websocket_ticket_algorithm_invalid")
+        if claims.get("aud") != self.AUDIENCE or claims.get("iss") != self.ISSUER:
+            raise ValueError("websocket_ticket_scope_invalid")
+        user_id = str(claims.get("sub") or "").strip()
+        ticket_id = str(claims.get("jti") or "").strip()
+        try:
+            issued_at = int(claims.get("iat"))
+            expires_at = int(claims.get("exp"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("websocket_ticket_time_invalid") from exc
+        now = int(time.time())
+        if not user_id or not ticket_id:
+            raise ValueError("websocket_ticket_identity_invalid")
+        if issued_at > now + 30 or expires_at <= now:
+            raise ValueError("websocket_ticket_expired")
+        if expires_at <= issued_at or expires_at - issued_at > self.max_lifetime_seconds:
+            raise ValueError("websocket_ticket_lifetime_invalid")
+        with self.lock:
+            self.used_ticket_ids = {
+                used_id: used_expiry
+                for used_id, used_expiry in self.used_ticket_ids.items()
+                if used_expiry > now
+            }
+            if ticket_id in self.used_ticket_ids:
+                raise ValueError("websocket_ticket_replayed")
+            self.used_ticket_ids[ticket_id] = expires_at
+        return claims
+
+
 class AITradingOrchestrator:
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
@@ -97,6 +166,16 @@ class AITradingOrchestrator:
         self.event_state_path = self.config.agents_results_dir / "event-dispatch-state.json"
         self.event_state = self.storage.load_snapshot(self.event_state_path) or {"events": {}}
         self.event_lock = Lock()
+        websocket_signing_secret = (
+            os.getenv("AI_TRADING_WS_SIGNING_SECRET", "").strip()
+            or os.getenv("AI_TRADING_BACKEND_TOKEN", "").strip()
+        )
+        self.ws_ticket_validator = WebSocketTicketValidator(websocket_signing_secret)
+        self.allowed_websocket_origins = {
+            origin.strip().rstrip("/")
+            for origin in os.getenv("AI_TRADING_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+            if origin.strip()
+        }
 
     def run_forever(self) -> None:
         print("=" * 60)
@@ -250,12 +329,23 @@ class AITradingOrchestrator:
             )
             self.event_state.setdefault("events", {})[event_id] = existing
             self.storage.save_snapshot(self.event_state_path, self.event_state)
+        users: list[Dict[str, Any]] = []
+        user_results: list[Dict[str, Any]] = []
         try:
-            self._broadcast_event({"type": "intra_finder_event_accepted", "event": event})
             max_age = float(os.getenv("TRADING_AMOUNT_MAX_AGE_SECONDS", str(30 * 24 * 60 * 60)))
             users = AITradingStateService.configured_users(self.config.ai_trading_state_path, max_age_seconds=max_age)
-            user_results = []
             for user in users:
+                user_id = str(user.get("user_id") or "").strip()
+                if not user_id:
+                    continue
+                self._broadcast_event(
+                    {
+                        "type": "intra_finder_event_accepted",
+                        "event": event,
+                        "request_id": event_id,
+                    },
+                    user_id=user_id,
+                )
                 resolved = self.stock_agent.resolve_user_trade_config(user)
                 if not resolved.get("eligible"):
                     user_results.append(resolved)
@@ -266,16 +356,19 @@ class AITradingOrchestrator:
                     continue
                 result = self.stock_agent.run_event(
                     routed["event"],
-                    user_id=user["user_id"],
+                    user_id=user_id,
                     trade_config={
                         "trade_mode": resolved["trade_mode"],
                         "trade_amount": resolved["trade_amount"],
                         "amount_source": resolved["amount_source"],
                         "regime_analysis_enabled": False,
                     },
-                    event_callback=self._broadcast_event,
+                    event_callback=lambda payload, scoped_user_id=user_id: self._broadcast_event(
+                        {**payload, "request_id": event_id},
+                        user_id=scoped_user_id,
+                    ),
                 )
-                user_results.append({"user_id": user["user_id"], "eligible": True, "result": result})
+                user_results.append({"user_id": user_id, "eligible": True, "result": result})
             status = "completed"
             error = None
             decision = {"user_results": user_results, "configured_user_count": len(users)}
@@ -293,15 +386,26 @@ class AITradingOrchestrator:
             })
             self.event_state.setdefault("events", {})[event_id] = existing
             self.storage.save_snapshot(self.event_state_path, self.event_state)
-        self._broadcast_event(
-            {
-                "type": "intra_finder_event_finished",
-                "event_id": event_id,
-                "status": status,
-                "decision": decision,
-                "error": error,
-            }
-        )
+        result_by_user = {
+            str(result.get("user_id") or ""): result
+            for result in user_results
+            if isinstance(result, dict) and result.get("user_id")
+        }
+        for user in users:
+            user_id = str(user.get("user_id") or "").strip()
+            if not user_id:
+                continue
+            self._broadcast_event(
+                {
+                    "type": "intra_finder_event_finished",
+                    "event_id": event_id,
+                    "request_id": event_id,
+                    "status": status,
+                    "decision": result_by_user.get(user_id),
+                    "error": error,
+                },
+                user_id=user_id,
+            )
 
     def load_run_status(self) -> Dict[str, Any]:
         status = self.storage.load_snapshot(self.config.ai_trading_run_status_path)
@@ -315,6 +419,23 @@ class AITradingOrchestrator:
             "status": "idle",
             "current_stage": "idle",
             "message": None,
+            "stages": {
+                "stage2": {"status": "pending", "summary": None, "details": None},
+                "stock_agent": {"status": "pending", "summary": None, "details": None},
+            },
+        }
+
+    def load_run_status_for_user(self, user_id: str) -> Dict[str, Any]:
+        status = self.load_run_status()
+        request = status.get("request") if isinstance(status.get("request"), dict) else {}
+        status_user_id = str(request.get("user_id") or "").strip()
+        if status_user_id and status_user_id == user_id:
+            return status
+        return {
+            "status": "idle",
+            "current_stage": "idle",
+            "message": None,
+            "updated_at_utc": status.get("updated_at_utc"),
             "stages": {
                 "stage2": {"status": "pending", "summary": None, "details": None},
                 "stock_agent": {"status": "pending", "summary": None, "details": None},
@@ -361,23 +482,35 @@ class AITradingOrchestrator:
 
     def _handler_class(self):
         orchestrator = self
-        auth_token = os.getenv("AI_TRADING_BACKEND_TOKEN")
+        auth_token = os.getenv("AI_TRADING_BACKEND_TOKEN", "").strip()
+        if not auth_token or auth_token.startswith("replace_with_"):
+            raise RuntimeError(
+                "AI_TRADING_BACKEND_TOKEN is required; refusing to start the public AI trading gateway."
+            )
+        if (
+            len(orchestrator.ws_ticket_validator.secret) < 32
+            or orchestrator.ws_ticket_validator.secret.startswith(b"replace_with_")
+        ):
+            raise RuntimeError(
+                "The WebSocket signing key must contain at least 32 characters. "
+                "Set a strong AI_TRADING_BACKEND_TOKEN or override it with "
+                "AI_TRADING_WS_SIGNING_SECRET."
+            )
+        if not orchestrator.allowed_websocket_origins:
+            raise RuntimeError("AI_TRADING_ALLOWED_ORIGINS must contain at least one trusted origin.")
 
         class AITradingGatewayHandler(BaseHTTPRequestHandler):
             def _authorized(self) -> bool:
-                if not auth_token:
-                    return True
                 header = self.headers.get("authorization", "")
-                if header == f"Bearer {auth_token}":
-                    return True
-                query_token = (parse_qs(urlparse(self.path).query).get("token") or [""])[0]
-                return query_token == auth_token
+                return hmac.compare_digest(header, f"Bearer {auth_token}")
 
             def _json_response(self, payload: Dict[str, Any], status: int = 200) -> None:
                 body = json.dumps(payload).encode("utf-8")
                 self.send_response(status)
                 self.send_header("content-type", "application/json")
                 self.send_header("content-length", str(len(body)))
+                self.send_header("cache-control", "no-store")
+                self.send_header("x-content-type-options", "nosniff")
                 self.end_headers()
                 self.wfile.write(body)
 
@@ -392,12 +525,15 @@ class AITradingOrchestrator:
 
             def do_GET(self) -> None:
                 try:
+                    parsed = urlparse(self.path)
+                    if parsed.path == "/health":
+                        self._json_response({"status": "ok"})
+                        return
+                    if parsed.path == "/ai-trading/stream":
+                        self._websocket_stream(parsed)
+                        return
                     if not self._authorized():
                         self._json_response({"error": "unauthorized"}, status=401)
-                        return
-                    parsed = urlparse(self.path)
-                    if parsed.path == "/ai-trading/stream":
-                        self._websocket_stream()
                         return
                     if parsed.path == "/ai-trading/config":
                         user_id = (parse_qs(parsed.query).get("user_id") or [""])[0]
@@ -409,7 +545,11 @@ class AITradingOrchestrator:
                     if parsed.path != "/ai-trading/status":
                         self._json_response({"error": "not_found"}, status=404)
                         return
-                    self._json_response(orchestrator.load_run_status())
+                    user_id = (parse_qs(parsed.query).get("user_id") or [""])[0]
+                    if not user_id:
+                        self._json_response({"error": "user_id_required"}, status=400)
+                        return
+                    self._json_response(orchestrator.load_run_status_for_user(user_id))
                 except Exception as exc:
                     self._json_response({"error": f"status_handler_error: {type(exc).__name__}: {exc}"}, status=500)
 
@@ -441,11 +581,22 @@ class AITradingOrchestrator:
             def log_message(self, format: str, *args: Any) -> None:
                 return
 
-            def _websocket_stream(self) -> None:
+            def _websocket_stream(self, parsed) -> None:
                 if self.headers.get("Upgrade", "").lower() != "websocket":
                     self._json_response({"error": "upgrade_required"}, status=426)
                     return
-                if not orchestrator.ws.accept(self):
+                origin = self.headers.get("Origin", "").strip().rstrip("/")
+                if origin not in orchestrator.allowed_websocket_origins:
+                    self._json_response({"error": "websocket_origin_forbidden"}, status=403)
+                    return
+                ticket = (parse_qs(parsed.query).get("ticket") or [""])[0]
+                try:
+                    claims = orchestrator.ws_ticket_validator.validate(ticket)
+                except ValueError as exc:
+                    self._json_response({"error": str(exc)}, status=401)
+                    return
+                user_id = str(claims["sub"])
+                if not orchestrator.ws.accept(self, user_id):
                     self._json_response({"error": "bad_websocket_handshake"}, status=400)
                     return
                 client = self.request
@@ -453,7 +604,7 @@ class AITradingOrchestrator:
                     client,
                     {
                         "type": "status_snapshot",
-                        "status": orchestrator.load_run_status(),
+                        "status": orchestrator.load_run_status_for_user(user_id),
                         "sent_at_utc": datetime.now(timezone.utc).isoformat(),
                     },
                 )
@@ -526,7 +677,15 @@ class AITradingOrchestrator:
         }
         self.storage.save_snapshot(self.config.ai_trading_run_status_path, payload)
         self._save_trade_session_snapshot(payload, outputs)
-        self._broadcast_event({"type": "status_update", "status": payload})
+        user_id = str((request or {}).get("user_id") or "").strip()
+        self._broadcast_event(
+            {
+                "type": "status_update",
+                "status": payload,
+                "request_id": str((request or {}).get("request_id") or ""),
+            },
+            user_id=user_id,
+        )
 
     def _as_bool(self, value: Any, default: bool = True) -> bool:
         if value is None:
@@ -646,12 +805,13 @@ class AITradingOrchestrator:
         requested_at = request.get("requested_at_utc") or status_payload.get("updated_at_utc") or "Trade session"
         return f"Trade session {requested_at}"
 
-    def _broadcast_event(self, event: Dict[str, Any]) -> None:
+    def _broadcast_event(self, event: Dict[str, Any], user_id: str) -> None:
+        if not user_id:
+            return
         payload = dict(event)
+        payload["user_id"] = user_id
         payload.setdefault("sent_at_utc", datetime.now(timezone.utc).isoformat())
-        if self.last_request_id:
-            payload.setdefault("request_id", self.last_request_id)
-        self.ws.broadcast(payload)
+        self.ws.broadcast(payload, user_id)
 
 
 def main() -> None:
