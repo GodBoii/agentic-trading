@@ -25,20 +25,21 @@ const requestFilePath = path.join(process.cwd(), 'python-backend', 'ai_trading_r
 const statusFilePath = path.join(process.cwd(), 'python-backend', 'ai_trading_run_status.json')
 const backendUrl = process.env.AI_TRADING_BACKEND_URL?.replace(/\/$/, '')
 const backendToken = process.env.AI_TRADING_BACKEND_TOKEN
+const backendTimeoutMs = Number(process.env.AI_TRADING_BACKEND_TIMEOUT_MS || 10_000)
 
 async function callTradingBackend(endpoint: string, init: RequestInit = {}) {
   if (!backendUrl) return null
+  if (!backendToken) throw new Error('AI_TRADING_BACKEND_TOKEN is not configured')
 
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
-  if (backendToken) {
-    headers.set('Authorization', `Bearer ${backendToken}`)
-  }
+  headers.set('Authorization', `Bearer ${backendToken}`)
 
   const response = await fetch(`${backendUrl}${endpoint}`, {
     ...init,
     headers,
     cache: 'no-store',
+    signal: init.signal || AbortSignal.timeout(backendTimeoutMs),
   })
 
   const payload = await response.json().catch(() => null)
@@ -199,7 +200,10 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify(localRequest),
         })
       } catch (error) {
-        console.warn('[Toggle API] AI trading backend unavailable, falling back to request file:', error)
+        console.warn('[Toggle API] AI trading backend unavailable:', error)
+        if (backendUrl) {
+          return NextResponse.json({ error: 'Trading backend unavailable' }, { status: 502 })
+        }
       }
     }
     const startRequest = enabled
@@ -223,15 +227,29 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     try {
-      const backendPayload = await callTradingBackend('/ai-trading/status', { method: 'GET' })
+      const backendPayload = await callTradingBackend(
+        `/ai-trading/status?user_id=${encodeURIComponent(user.id)}`,
+        { method: 'GET' },
+      )
       if (backendPayload) {
         const status = normalizeRunStatus(backendPayload)
         await syncLatestTradeSession({ status, uploadToCloud: status?.status === 'completed' })
         return NextResponse.json(status)
       }
     } catch (error) {
-      console.warn('[Toggle API] AI trading backend status unavailable, falling back to status file:', error)
+      console.warn('[Toggle API] AI trading backend status unavailable:', error)
+      if (backendUrl) {
+        return NextResponse.json({ error: 'Trading backend unavailable' }, { status: 502 })
+      }
     }
     const status = await loadRunStatus()
     await syncLatestTradeSession({ status, uploadToCloud: status?.status === 'completed' })
