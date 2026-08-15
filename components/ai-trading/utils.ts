@@ -15,13 +15,9 @@ import type {
 export function websocketUrl() {
     if (typeof window === 'undefined') return null
     const configured = process.env.NEXT_PUBLIC_AI_TRADING_WS_URL
-    const base =
-        configured ||
-        `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8020/ai-trading/stream`
-    const token = process.env.NEXT_PUBLIC_AI_TRADING_WS_TOKEN
-    if (!token) return base
-    const separator = base.includes('?') ? '&' : '?'
-    return `${base}${separator}token=${encodeURIComponent(token)}`
+    if (configured) return configured
+    if (!['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) return null
+    return `ws://${window.location.hostname}:8020/ai-trading/stream`
 }
 
 const EVENT_TITLES: Record<string, string> = {
