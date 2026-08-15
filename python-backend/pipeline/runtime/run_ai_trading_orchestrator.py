@@ -6,14 +6,18 @@ import base64
 import hashlib
 import hmac
 import re
+import secrets
 import socket
 import struct
 import time
+import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
+
+import requests
 
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
@@ -89,7 +93,7 @@ class WebSocketBroadcaster:
 
 
 class WebSocketTicketValidator:
-    """Validate short-lived, one-time HS256 tickets issued by the Vercel frontend."""
+    """Issue and validate short-lived, one-time HS256 WebSocket tickets."""
 
     AUDIENCE = "ai-trading-websocket"
     ISSUER = "polycognition-web"
@@ -99,6 +103,41 @@ class WebSocketTicketValidator:
         self.max_lifetime_seconds = max_lifetime_seconds
         self.used_ticket_ids: dict[str, int] = {}
         self.lock = Lock()
+
+    def issue(self, user_id: str, lifetime_seconds: int = 45) -> Dict[str, Any]:
+        if not self.secret:
+            raise ValueError("websocket_ticket_signing_secret_missing")
+        normalized_user_id = str(user_id or "").strip()
+        if not normalized_user_id:
+            raise ValueError("websocket_ticket_identity_invalid")
+        lifetime = max(15, min(int(lifetime_seconds), self.max_lifetime_seconds))
+        issued_at = int(time.time())
+        expires_at = issued_at + lifetime
+        header = self._encode_segment({"alg": "HS256", "typ": "JWT"})
+        payload = self._encode_segment(
+            {
+                "iss": self.ISSUER,
+                "aud": self.AUDIENCE,
+                "sub": normalized_user_id,
+                "iat": issued_at,
+                "exp": expires_at,
+                "jti": secrets.token_urlsafe(24),
+            }
+        )
+        signing_input = f"{header}.{payload}"
+        signature = base64.urlsafe_b64encode(
+            hmac.new(self.secret, signing_input.encode("ascii"), hashlib.sha256).digest()
+        ).decode("ascii").rstrip("=")
+        return {
+            "ticket": f"{signing_input}.{signature}",
+            "expires_at": datetime.fromtimestamp(expires_at, timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def _encode_segment(value: Dict[str, Any]) -> str:
+        return base64.urlsafe_b64encode(
+            json.dumps(value, separators=(",", ":")).encode("utf-8")
+        ).decode("ascii").rstrip("=")
 
     @staticmethod
     def _decode_segment(value: str) -> bytes:
@@ -155,6 +194,66 @@ class WebSocketTicketValidator:
         return claims
 
 
+class SupabaseUserVerifier:
+    """Resolve a Supabase access token to its authoritative user identity."""
+
+    def __init__(
+        self,
+        supabase_url: str,
+        anon_key: str,
+        *,
+        timeout_seconds: float = 5.0,
+        cache_seconds: int = 30,
+    ) -> None:
+        self.supabase_url = supabase_url.strip().rstrip("/")
+        self.anon_key = anon_key.strip()
+        self.timeout_seconds = timeout_seconds
+        self.cache_seconds = max(0, cache_seconds)
+        self.cache: dict[str, tuple[float, Dict[str, Any]]] = {}
+        self.lock = Lock()
+
+    def verify(self, access_token: str) -> Dict[str, Any]:
+        token = str(access_token or "").strip()
+        if not token:
+            raise ValueError("supabase_token_missing")
+        if not self.supabase_url or not self.anon_key:
+            raise RuntimeError("supabase_auth_not_configured")
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        now = time.monotonic()
+        with self.lock:
+            cached = self.cache.get(token_hash)
+            if cached and cached[0] > now:
+                return dict(cached[1])
+            if cached:
+                self.cache.pop(token_hash, None)
+        try:
+            response = requests.get(
+                f"{self.supabase_url}/auth/v1/user",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "apikey": self.anon_key,
+                },
+                timeout=self.timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError("supabase_auth_unavailable") from exc
+        if response.status_code in {401, 403}:
+            raise ValueError("supabase_token_invalid")
+        if not response.ok:
+            raise RuntimeError(f"supabase_auth_failed_{response.status_code}")
+        try:
+            user = response.json()
+        except ValueError as exc:
+            raise RuntimeError("supabase_auth_response_invalid") from exc
+        user_id = str(user.get("id") or "").strip()
+        if not user_id:
+            raise ValueError("supabase_user_missing")
+        identity = {"id": user_id, "email": user.get("email")}
+        with self.lock:
+            self.cache[token_hash] = (now + self.cache_seconds, identity)
+        return dict(identity)
+
+
 class AITradingOrchestrator:
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
@@ -171,11 +270,41 @@ class AITradingOrchestrator:
             or os.getenv("AI_TRADING_BACKEND_TOKEN", "").strip()
         )
         self.ws_ticket_validator = WebSocketTicketValidator(websocket_signing_secret)
+        supabase_url = (
+            os.getenv("SUPABASE_URL", "").strip()
+            or os.getenv("NEXT_PUBLIC_SUPABASE_URL", "").strip()
+        )
+        supabase_anon_key = (
+            os.getenv("SUPABASE_ANON_KEY", "").strip()
+            or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "").strip()
+        )
+        self.supabase_user_verifier = SupabaseUserVerifier(
+            supabase_url,
+            supabase_anon_key,
+            timeout_seconds=float(os.getenv("SUPABASE_AUTH_TIMEOUT_SECONDS", "5")),
+            cache_seconds=int(os.getenv("SUPABASE_AUTH_CACHE_SECONDS", "30")),
+        )
+        self.ws_ticket_ttl_seconds = int(os.getenv("AI_TRADING_WS_TICKET_TTL_SECONDS", "45"))
         self.allowed_websocket_origins = {
             origin.strip().rstrip("/")
             for origin in os.getenv("AI_TRADING_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
             if origin.strip()
         }
+
+    @staticmethod
+    def audit_event(
+        event: str,
+        *,
+        request_id: str,
+        user_id: str = "",
+        detail: str = "",
+    ) -> None:
+        fields = [f"event={event}", f"request_id={request_id}"]
+        if user_id:
+            fields.append(f"user_id={user_id}")
+        if detail:
+            fields.append(f"detail={detail}")
+        print("[AI Gateway] " + " ".join(fields), flush=True)
 
     def run_forever(self) -> None:
         print("=" * 60)
@@ -309,6 +438,36 @@ class AITradingOrchestrator:
             },
         )
         return {"user_id": user_id, "trade_mode": trade_mode, "trade_amount": amount, "amount_updated_at_utc": now, "enabled": True, "generated_at_utc": state.get("generated_at_utc")}
+
+    def set_user_enabled(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        user_id = str(request.get("user_id") or "").strip()
+        if not user_id:
+            raise ValueError("user_id_required")
+        enabled = bool(request.get("enabled"))
+        previous_state = AITradingStateService.load_state(self.config.ai_trading_state_path)
+        previous_user_states = previous_state.get("user_states")
+        previous_entry = (
+            previous_user_states.get(user_id, {})
+            if isinstance(previous_user_states, dict)
+            else {}
+        )
+        previous_enabled = bool(
+            previous_entry.get("enabled") if isinstance(previous_entry, dict) else False
+        )
+        state = AITradingStateService.set_user_state(
+            self.config.ai_trading_state_path,
+            user_id,
+            enabled,
+            {"email": request.get("email")},
+        )
+        start_request = self.submit_start_request(request) if enabled else None
+        return {
+            "user_id": user_id,
+            "enabled": enabled,
+            "previous_enabled": previous_enabled,
+            "enabled_user_ids": state.get("enabled_user_ids", []),
+            "request": start_request,
+        }
 
     def load_user_config(self, user_id: str) -> Dict[str, Any]:
         entry = (AITradingStateService.load_state(self.config.ai_trading_state_path).get("user_states") or {}).get(user_id) or {}
@@ -498,11 +657,71 @@ class AITradingOrchestrator:
             )
         if not orchestrator.allowed_websocket_origins:
             raise RuntimeError("AI_TRADING_ALLOWED_ORIGINS must contain at least one trusted origin.")
+        if (
+            not orchestrator.supabase_user_verifier.supabase_url
+            or not orchestrator.supabase_user_verifier.anon_key
+        ):
+            raise RuntimeError(
+                "SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required "
+                "to authenticate public AI trading requests."
+            )
 
         class AITradingGatewayHandler(BaseHTTPRequestHandler):
-            def _authorized(self) -> bool:
-                header = self.headers.get("authorization", "")
-                return hmac.compare_digest(header, f"Bearer {auth_token}")
+            def _request_id(self) -> str:
+                existing = getattr(self, "_gateway_request_id", "")
+                if existing:
+                    return existing
+                supplied = self.headers.get("x-request-id", "").strip()
+                if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", supplied):
+                    supplied = str(uuid.uuid4())
+                self._gateway_request_id = supplied
+                return supplied
+
+            def _bearer_token(self) -> str:
+                header = self.headers.get("authorization", "").strip()
+                if not header.lower().startswith("bearer "):
+                    return ""
+                return header[7:].strip()
+
+            def _internal_authorized(self, token: str) -> bool:
+                return bool(token) and hmac.compare_digest(token, auth_token)
+
+            def _authenticate(self, *, allow_internal: bool) -> Optional[Dict[str, Any]]:
+                request_id = self._request_id()
+                token = self._bearer_token()
+                if allow_internal and self._internal_authorized(token):
+                    orchestrator.audit_event(
+                        "auth_success",
+                        request_id=request_id,
+                        detail="internal_service",
+                    )
+                    return {"kind": "internal"}
+                try:
+                    user = orchestrator.supabase_user_verifier.verify(token)
+                except ValueError as exc:
+                    orchestrator.audit_event(
+                        "auth_denied",
+                        request_id=request_id,
+                        detail=str(exc),
+                    )
+                    self._json_response({"error": "unauthorized"}, status=401)
+                    return None
+                except RuntimeError as exc:
+                    orchestrator.audit_event(
+                        "auth_unavailable",
+                        request_id=request_id,
+                        detail=str(exc),
+                    )
+                    self._json_response({"error": "authentication_unavailable"}, status=503)
+                    return None
+                user_id = str(user["id"])
+                orchestrator.audit_event(
+                    "auth_success",
+                    request_id=request_id,
+                    user_id=user_id,
+                    detail="supabase_user",
+                )
+                return {"kind": "user", "user": user}
 
             def _json_response(self, payload: Dict[str, Any], status: int = 200) -> None:
                 body = json.dumps(payload).encode("utf-8")
@@ -532,49 +751,131 @@ class AITradingOrchestrator:
                     if parsed.path == "/ai-trading/stream":
                         self._websocket_stream(parsed)
                         return
-                    if not self._authorized():
-                        self._json_response({"error": "unauthorized"}, status=401)
+                    if parsed.path not in {"/ai-trading/config", "/ai-trading/status"}:
+                        self._json_response({"error": "not_found"}, status=404)
                         return
-                    if parsed.path == "/ai-trading/config":
+                    request_id = self._request_id()
+                    orchestrator.audit_event(
+                        "request_received",
+                        request_id=request_id,
+                        detail=f"GET {parsed.path}",
+                    )
+                    identity = self._authenticate(allow_internal=True)
+                    if not identity:
+                        return
+                    if identity["kind"] == "user":
+                        user_id = str(identity["user"]["id"])
+                    else:
                         user_id = (parse_qs(parsed.query).get("user_id") or [""])[0]
                         if not user_id:
                             self._json_response({"error": "user_id_required"}, status=400)
                             return
+                    if parsed.path == "/ai-trading/config":
                         self._json_response(orchestrator.load_user_config(user_id))
-                        return
-                    if parsed.path != "/ai-trading/status":
-                        self._json_response({"error": "not_found"}, status=404)
-                        return
-                    user_id = (parse_qs(parsed.query).get("user_id") or [""])[0]
-                    if not user_id:
-                        self._json_response({"error": "user_id_required"}, status=400)
+                        orchestrator.audit_event(
+                            "request_completed",
+                            request_id=request_id,
+                            user_id=user_id,
+                            detail="GET /ai-trading/config status=200",
+                        )
                         return
                     self._json_response(orchestrator.load_run_status_for_user(user_id))
+                    orchestrator.audit_event(
+                        "request_completed",
+                        request_id=request_id,
+                        user_id=user_id,
+                        detail="GET /ai-trading/status status=200",
+                    )
                 except Exception as exc:
                     self._json_response({"error": f"status_handler_error: {type(exc).__name__}: {exc}"}, status=500)
 
             def do_POST(self) -> None:
                 try:
-                    if not self._authorized():
-                        self._json_response({"error": "unauthorized"}, status=401)
-                        return
                     path = urlparse(self.path).path
+                    if path not in {
+                        "/ai-trading/event",
+                        "/ai-trading/config",
+                        "/ai-trading/start",
+                        "/ai-trading/toggle",
+                        "/ai-trading/ws-ticket",
+                    }:
+                        self._json_response({"error": "not_found"}, status=404)
+                        return
+                    request_id = self._request_id()
+                    orchestrator.audit_event(
+                        "request_received",
+                        request_id=request_id,
+                        detail=f"POST {path}",
+                    )
+                    identity = self._authenticate(allow_internal=path != "/ai-trading/ws-ticket")
+                    if not identity:
+                        return
                     if path == "/ai-trading/event":
+                        if identity["kind"] != "internal":
+                            orchestrator.audit_event(
+                                "request_denied",
+                                request_id=request_id,
+                                user_id=str(identity["user"]["id"]),
+                                detail="internal_endpoint",
+                            )
+                            self._json_response({"error": "forbidden"}, status=403)
+                            return
                         result = orchestrator.submit_intra_finder_event(self._read_body())
                         self._json_response(
                             {"ok": bool(result["accepted"]), **result},
                             status=202 if result["accepted"] else 200,
                         )
                         return
+                    if path == "/ai-trading/ws-ticket":
+                        user_id = str(identity["user"]["id"])
+                        ticket = orchestrator.ws_ticket_validator.issue(
+                            user_id,
+                            orchestrator.ws_ticket_ttl_seconds,
+                        )
+                        self._json_response(ticket)
+                        orchestrator.audit_event(
+                            "websocket_ticket_issued",
+                            request_id=request_id,
+                            user_id=user_id,
+                        )
+                        return
+                    payload = self._read_body()
+                    if identity["kind"] == "user":
+                        user = identity["user"]
+                        payload["user_id"] = str(user["id"])
+                        payload["email"] = user.get("email")
+                    user_id = str(payload.get("user_id") or "")
+                    if not user_id:
+                        self._json_response({"error": "user_id_required"}, status=400)
+                        return
                     if path == "/ai-trading/config":
-                        result = orchestrator.save_user_config(self._read_body())
+                        result = orchestrator.save_user_config(payload)
                         self._json_response({"ok": True, "config": result})
+                        orchestrator.audit_event(
+                            "request_completed",
+                            request_id=request_id,
+                            user_id=user_id,
+                            detail="POST /ai-trading/config status=200",
+                        )
                         return
-                    if path != "/ai-trading/start":
-                        self._json_response({"error": "not_found"}, status=404)
+                    if path == "/ai-trading/toggle":
+                        result = orchestrator.set_user_enabled(payload)
+                        self._json_response({"ok": True, **result})
+                        orchestrator.audit_event(
+                            "request_completed",
+                            request_id=request_id,
+                            user_id=user_id,
+                            detail="POST /ai-trading/toggle status=200",
+                        )
                         return
-                    request_payload = orchestrator.submit_start_request(self._read_body())
+                    request_payload = orchestrator.submit_start_request(payload)
                     self._json_response({"ok": True, "request": request_payload})
+                    orchestrator.audit_event(
+                        "request_completed",
+                        request_id=request_id,
+                        user_id=user_id,
+                        detail="POST /ai-trading/start status=200",
+                    )
                 except Exception as exc:
                     self._json_response({"error": f"start_handler_error: {type(exc).__name__}: {exc}"}, status=500)
 
@@ -587,12 +888,22 @@ class AITradingOrchestrator:
                     return
                 origin = self.headers.get("Origin", "").strip().rstrip("/")
                 if origin not in orchestrator.allowed_websocket_origins:
+                    orchestrator.audit_event(
+                        "client_connection_denied",
+                        request_id=self._request_id(),
+                        detail="origin_forbidden",
+                    )
                     self._json_response({"error": "websocket_origin_forbidden"}, status=403)
                     return
                 ticket = (parse_qs(parsed.query).get("ticket") or [""])[0]
                 try:
                     claims = orchestrator.ws_ticket_validator.validate(ticket)
                 except ValueError as exc:
+                    orchestrator.audit_event(
+                        "client_connection_denied",
+                        request_id=self._request_id(),
+                        detail=str(exc),
+                    )
                     self._json_response({"error": str(exc)}, status=401)
                     return
                 user_id = str(claims["sub"])
@@ -600,6 +911,12 @@ class AITradingOrchestrator:
                     self._json_response({"error": "bad_websocket_handshake"}, status=400)
                     return
                 client = self.request
+                orchestrator.audit_event(
+                    "client_connected",
+                    request_id=self._request_id(),
+                    user_id=user_id,
+                    detail="websocket",
+                )
                 orchestrator.ws.send_one(
                     client,
                     {
@@ -618,6 +935,12 @@ class AITradingOrchestrator:
                             break
                 finally:
                     orchestrator.ws.remove(client)
+                    orchestrator.audit_event(
+                        "client_disconnected",
+                        request_id=self._request_id(),
+                        user_id=user_id,
+                        detail="websocket",
+                    )
 
         return AITradingGatewayHandler
 
