@@ -141,6 +141,30 @@ services:
         condition: service_healthy
       market-data-gateway:
         condition: service_healthy
+    expose:
+      - "8020"
     ports:
-      - "8020:8020"
+      - "127.0.0.1:8020:8020"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8020/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     volumes: *common-volumes
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["ai"]
+    container_name: trader-cloudflared
+    command: tunnel --no-autoupdate --loglevel info run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN:-}"
+    depends_on:
+      ai-trading-agents:
+        condition: service_healthy
+    restart: unless-stopped
