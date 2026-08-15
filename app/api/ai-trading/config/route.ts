@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { createClient } from '@/lib/supabase/server'
@@ -8,7 +9,6 @@ export const runtime = 'nodejs'
 
 const statePath = path.join(process.cwd(), 'python-backend', 'ai_trading_state.json')
 const backendUrl = process.env.AI_TRADING_BACKEND_URL?.replace(/\/$/, '')
-const backendToken = process.env.AI_TRADING_BACKEND_TOKEN
 const backendTimeoutMs = Number(process.env.AI_TRADING_BACKEND_TIMEOUT_MS || 10_000)
 const maxAgeMs = Number(process.env.TRADING_AMOUNT_MAX_AGE_SECONDS || 30 * 24 * 60 * 60) * 1000
 
@@ -18,12 +18,12 @@ function parseAmount(value: unknown): number | null {
   return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : null
 }
 
-async function backend(endpoint: string, init: RequestInit = {}) {
+async function backend(endpoint: string, accessToken: string, init: RequestInit = {}) {
   if (!backendUrl) return null
-  if (!backendToken) throw new Error('AI_TRADING_BACKEND_TOKEN is not configured')
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
-  headers.set('Authorization', `Bearer ${backendToken}`)
+  headers.set('Authorization', `Bearer ${accessToken}`)
+  headers.set('X-Request-ID', randomUUID())
   const response = await fetch(`${backendUrl}${endpoint}`, {
     ...init,
     headers,
@@ -38,8 +38,10 @@ async function backend(endpoint: string, init: RequestInit = {}) {
 async function authenticatedUser() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return { user: null, supabase }
-  return { user, supabase }
+  if (error || !user) return { user: null, session: null, supabase }
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return { user: null, session: null, supabase }
+  return { user, session, supabase }
 }
 
 async function localEntry(userId: string) {
@@ -74,10 +76,10 @@ function responseFor(entry: any) {
 }
 
 export async function GET() {
-  const { user } = await authenticatedUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { user, session } = await authenticatedUser()
+  if (!user || !session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    const remote = await backend(`/ai-trading/config?user_id=${encodeURIComponent(user.id)}`)
+    const remote = await backend('/ai-trading/config', session.access_token)
     if (remote) return NextResponse.json({ ...remote, configured: Boolean(remote.enabled), eligible: Boolean(remote.enabled && remote.eligible), status_code: remote.code || remote.status_code })
   } catch (error) {
     console.warn('[Trading config] Backend unavailable:', error)
@@ -89,8 +91,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { user, supabase } = await authenticatedUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { user, session, supabase } = await authenticatedUser()
+  if (!user || !session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => ({}))
   const rawAmount = body?.trade_amount
   const automatic = rawAmount === null || rawAmount === undefined || rawAmount === ''
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest) {
   const now = new Date().toISOString()
   const payload = { user_id: user.id, email: user.email, trade_mode: automatic ? 'auto' : 'manual', trade_amount: amount, amount_updated_at_utc: now }
   try {
-    const remote = await backend('/ai-trading/config', { method: 'POST', body: JSON.stringify(payload) })
+    const remote = await backend('/ai-trading/config', session.access_token, { method: 'POST', body: JSON.stringify(payload) })
     if (remote) return NextResponse.json({ ok: true, ...responseFor(remote.config) })
   } catch (error) {
     console.warn('[Trading config] Backend unavailable:', error)
