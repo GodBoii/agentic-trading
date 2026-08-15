@@ -9,6 +9,7 @@ export const runtime = 'nodejs'
 const statePath = path.join(process.cwd(), 'python-backend', 'ai_trading_state.json')
 const backendUrl = process.env.AI_TRADING_BACKEND_URL?.replace(/\/$/, '')
 const backendToken = process.env.AI_TRADING_BACKEND_TOKEN
+const backendTimeoutMs = Number(process.env.AI_TRADING_BACKEND_TIMEOUT_MS || 10_000)
 const maxAgeMs = Number(process.env.TRADING_AMOUNT_MAX_AGE_SECONDS || 30 * 24 * 60 * 60) * 1000
 
 function parseAmount(value: unknown): number | null {
@@ -19,10 +20,16 @@ function parseAmount(value: unknown): number | null {
 
 async function backend(endpoint: string, init: RequestInit = {}) {
   if (!backendUrl) return null
+  if (!backendToken) throw new Error('AI_TRADING_BACKEND_TOKEN is not configured')
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
-  if (backendToken) headers.set('Authorization', `Bearer ${backendToken}`)
-  const response = await fetch(`${backendUrl}${endpoint}`, { ...init, headers, cache: 'no-store' })
+  headers.set('Authorization', `Bearer ${backendToken}`)
+  const response = await fetch(`${backendUrl}${endpoint}`, {
+    ...init,
+    headers,
+    cache: 'no-store',
+    signal: init.signal || AbortSignal.timeout(backendTimeoutMs),
+  })
   const payload = await response.json().catch(() => null)
   if (!response.ok) throw new Error(payload?.error || `Trading backend failed with ${response.status}`)
   return payload
@@ -73,7 +80,10 @@ export async function GET() {
     const remote = await backend(`/ai-trading/config?user_id=${encodeURIComponent(user.id)}`)
     if (remote) return NextResponse.json({ ...remote, configured: Boolean(remote.enabled), eligible: Boolean(remote.enabled && remote.eligible), status_code: remote.code || remote.status_code })
   } catch (error) {
-    console.warn('[Trading config] Backend unavailable; reading shared state file:', error)
+    console.warn('[Trading config] Backend unavailable:', error)
+    if (backendUrl) {
+      return NextResponse.json({ error: 'Trading backend unavailable' }, { status: 502 })
+    }
   }
   return NextResponse.json(responseFor(await localEntry(user.id)))
 }
@@ -94,7 +104,10 @@ export async function POST(request: NextRequest) {
     const remote = await backend('/ai-trading/config', { method: 'POST', body: JSON.stringify(payload) })
     if (remote) return NextResponse.json({ ok: true, ...responseFor(remote.config) })
   } catch (error) {
-    console.warn('[Trading config] Backend unavailable; writing shared state file:', error)
+    console.warn('[Trading config] Backend unavailable:', error)
+    if (backendUrl) {
+      return NextResponse.json({ error: 'Trading backend unavailable' }, { status: 502 })
+    }
   }
   let state: any = { generated_at_utc: null, enabled_user_ids: [], user_states: {} }
   try { state = JSON.parse(await fs.readFile(statePath, 'utf8')) } catch {}
@@ -106,4 +119,3 @@ export async function POST(request: NextRequest) {
   await fs.writeFile(statePath, JSON.stringify(state, null, 2), 'utf8')
   return NextResponse.json({ ok: true, ...responseFor(state.user_states[user.id]) })
 }
-
