@@ -66,27 +66,43 @@ export function useAgentRun(active: boolean) {
         let socket: WebSocket | null = null
         let closedByCleanup = false
 
-        const connect = () => {
-            const url = websocketUrl()
-            if (!url) {
+        const reconnect = () => {
+            if (closedByCleanup) return
+            setStream('reconnecting')
+            reconnectTimer.current = setTimeout(() => void connect(), RECONNECT_DELAY_MS)
+        }
+
+        const connect = async () => {
+            const baseUrl = websocketUrl()
+            if (!baseUrl) {
                 setStream('unavailable')
                 return
             }
             try {
                 setStream('connecting')
-                socket = new WebSocket(url)
+                const ticketResponse = await fetch('/api/ai-trading/ws-ticket', {
+                    method: 'POST',
+                    cache: 'no-store',
+                })
+                if (!ticketResponse.ok) {
+                    throw new Error(`WebSocket ticket request failed (${ticketResponse.status})`)
+                }
+                const { ticket } = await ticketResponse.json()
+                if (!ticket || closedByCleanup) return
+                const url = new URL(baseUrl)
+                url.searchParams.set('ticket', String(ticket))
+                socket = new WebSocket(url.toString())
             } catch (socketError) {
                 console.error('AI trading stream setup failed:', socketError)
                 setStream('fallback')
+                reconnect()
                 return
             }
 
             socket.onopen = () => setStream('live')
             socket.onerror = () => setStream('fallback')
             socket.onclose = () => {
-                if (closedByCleanup) return
-                setStream('reconnecting')
-                reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY_MS)
+                reconnect()
             }
 
             socket.onmessage = (message) => {
@@ -166,7 +182,7 @@ export function useAgentRun(active: boolean) {
             }
         }
 
-        connect()
+        void connect()
         return () => {
             closedByCleanup = true
             if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
