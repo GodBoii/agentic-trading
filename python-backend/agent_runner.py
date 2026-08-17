@@ -16,12 +16,12 @@ from agno.tools import tool
 # V2 Imports
 from agno.run.team import TeamRunEvent
 from agno.run.agent import RunEvent
-from agno.db.postgres import PostgresDb
 
 # Tool Imports
 from agno.tools import Toolkit
 from agno.tools.googlesearch import GoogleSearchTools
 from pipeline.llm import create_trading_model
+from pipeline.services.cloud_persistence_service import CloudPersistenceService
 
 # Other Imports
 from supabase_client import supabase_client
@@ -45,17 +45,9 @@ def get_llm_os(
     """
     direct_tools: List[Union[Toolkit, callable]] = []
 
-    db_url_full = os.getenv("DATABASE_URL")
-    if not db_url_full:
-        raise ValueError("DATABASE_URL environment variable is not set.")
-    db_url_sqlalchemy = db_url_full.replace("postgresql://", "postgresql+psycopg2://")
-
-    # This PostgresDb object is now the single source of truth for persistence.
-    # The Team will use it automatically to save runs and memories to Supabase.
-    db = PostgresDb(
-        db_url=db_url_sqlalchemy,
-        db_schema="public"
-    )
+    # Agno keeps its native PostgreSQL provider while complete sessions/runs
+    # are mirrored into Convex by the shared persistence adapter.
+    db = CloudPersistenceService.agno_db()
 
     if internet_search:
         direct_tools.append(GoogleSearchTools(fixed_max_results=15))

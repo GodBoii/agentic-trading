@@ -42,7 +42,25 @@ class CloudPersistenceService:
                     "Install sqlalchemy and psycopg[binary]."
                 ) from exc
 
-            cls._db = PostgresDb(
+            from pipeline.services.convex_service import (
+                ConvexMirroringPostgresDbMixin,
+                ConvexService,
+            )
+
+            db_class: Any = PostgresDb
+            if ConvexService.configured():
+                db_class = type(
+                    "ConvexMirroringPostgresDb",
+                    (ConvexMirroringPostgresDbMixin, PostgresDb),
+                    {},
+                )
+            elif ConvexService.required():
+                raise RuntimeError(
+                    "Convex persistence is required but CONVEX_URL or "
+                    "CONVEX_ADMIN_KEY is missing."
+                )
+
+            cls._db = db_class(
                 db_url=cls._sqlalchemy_url(db_url),
                 db_schema=os.getenv("AGNO_DB_SCHEMA", "public"),
                 session_table=os.getenv("AGNO_SESSION_TABLE", "agno_sessions"),
