@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.convex_service import ConvexService
 from pipeline.services.trading_amount_service import TradingAmountService
 
 
@@ -53,7 +54,11 @@ class TradingAmountContractTests(unittest.TestCase):
 
     def test_multi_user_amounts_are_isolated(self):
         now = datetime.now(timezone.utc).isoformat()
-        with tempfile.TemporaryDirectory() as directory:
+        with (
+            patch.object(ConvexService, "configured", return_value=False),
+            patch.object(ConvexService, "required", return_value=False),
+            tempfile.TemporaryDirectory() as directory,
+        ):
             path = Path(directory) / "state.json"
             AITradingStateService.set_user_state(path, "small", True, {"trade_amount": 100, "amount_updated_at_utc": now})
             AITradingStateService.set_user_state(path, "large", True, {"trade_amount": 1000, "amount_updated_at_utc": now})
