@@ -99,13 +99,15 @@ services:
         condition: service_healthy
       universe-scanner:
         condition: service_healthy
+      ai-trading-agents:
+        condition: service_healthy
     stop_grace_period: 45s
     healthcheck:
       test:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8040/health', timeout=3)"
+        - "import http.client,sys; c=http.client.HTTPConnection('localhost',8040,timeout=3); c.request('GET','/health'); r=c.getresponse(); r.read(); c.close(); sys.exit(0 if r.status == 200 else 1)"
       interval: 30s
       timeout: 5s
       retries: 5
@@ -125,12 +127,21 @@ services:
         condition: service_healthy
       market-data-gateway:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,os,sys; from datetime import datetime; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; s=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/nifty-50-market-depth/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; t=d.get('generated_at_utc') or d.get('updated_at_utc'); age=(datetime.now(datetime.fromisoformat(t).tzinfo)-datetime.fromisoformat(t)).total_seconds() if t else 10**9; sys.exit(0 if (not s.is_trading_day or s.is_after_close or age <= 120) else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
     stop_grace_period: 45s
     volumes: *common-volumes
 
   ai-trading-agents:
     <<: *service
-    profiles: ["ai"]
     container_name: trader-ai-trading-agents
     command: python -m pipeline.runtime.run_ai_trading_orchestrator
     environment:
