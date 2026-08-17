@@ -25,11 +25,18 @@ class IntraFinderHealthHandler(BaseHTTPRequestHandler):
             return
         healthy, payload = self.service.health_payload()
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-        self.send_response(HTTPStatus.OK if healthy else HTTPStatus.SERVICE_UNAVAILABLE)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(HTTPStatus.OK if healthy else HTTPStatus.SERVICE_UNAVAILABLE)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except ConnectionError:
+            # Health clients are allowed to close as soon as they have read the
+            # status line (notably when a 503 makes the probe fail).  The
+            # scanner's health and lifecycle are unaffected by that transport
+            # race, so do not turn it into a noisy server traceback.
+            return
 
 
 def main() -> None:
