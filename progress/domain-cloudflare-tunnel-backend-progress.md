@@ -1,6 +1,6 @@
 # Custom Domain, Cloudflare Tunnel, and Trading Backend — Progress and Handoff
 
-Last updated: 15 August 2026
+Last updated: 17 August 2026
 
 ## Current status
 
@@ -30,6 +30,43 @@ Verified infrastructure state:
 - A request to a protected endpoint without credentials returns HTTP `401`, confirming that publishing the tunnel did not make trading controls anonymously accessible.
 
 The implementation changes are currently local and have not yet been committed or pushed to `origin/master`.
+
+## 17 August live-production verification
+
+The complete backend was restored and verified during the live market session:
+
+- Dhan auth manager, market-data gateway, Universe Scanner, Intra-Finder and AI
+  trading gateway were healthy.
+- The NIFTY depth worker and Cloudflare connector were running and receiving
+  current data.
+- `https://api.polycognition.online/health` and the local gateway health route
+  returned HTTP `200`.
+- Protected public gateway routes rejected unauthenticated requests with HTTP
+  `401`; unauthenticated Vercel dashboard/API requests redirected to `/login`.
+- The full Python backend suite passed: 116 tests.
+- Read-only Dhan reconciliation reported zero positions, orders and trades
+  before agent processing.
+- Intra-Finder subscribed to all 792 universe instruments and reached 792/792
+  Full Packet coverage with no reconnect or dispatch failures.
+
+No agent event or order was created during this verification. The service was
+restarted late in the session and correctly held every candidate behind
+`INSUFFICIENT_COMPLETED_BARS` (45 completed one-minute bars). Opening-range
+recovery restores the 09:15-09:30 range, but does not currently backfill the
+full intraday indicator-bar history. This is safe fail-closed behavior, not an
+AI gateway failure; a normal pre-market start avoids it.
+
+Compose was hardened so `ai-trading-agents` is now part of the default service
+set and Intra-Finder explicitly waits for its health check. The Cloudflare
+connector remains in the `ai` profile, so the production startup command is:
+
+```powershell
+docker compose --profile ai up -d --build
+```
+
+A market-calendar-aware NIFTY depth health check was also added. These Compose
+source changes take effect when their containers are next recreated; the live
+NIFTY worker was deliberately not restarted during the market session.
 
 ## Domain and DNS work completed
 

@@ -11,17 +11,22 @@
    docker compose config --quiet
    ```
 
-4. Build and start:
+4. Build and start the complete production stack, including the Cloudflare
+   connector:
 
    ```powershell
-   docker compose up --build -d
+   docker compose --profile ai up --build -d
    ```
+
+   `ai-trading-agents` is part of the default stack. The `ai` profile adds
+   `cloudflared`, which publishes the gateway at `api.polycognition.online`.
 
 5. Check:
 
    ```powershell
    docker compose ps
    docker compose logs dhan-auth-manager
+   docker compose logs ai-trading-agents
    docker compose logs universe-scanner
    docker compose logs intra-finder
    ```
@@ -30,6 +35,7 @@
 
 - Auth manager becomes healthy.
 - Gateway becomes healthy.
+- AI trading gateway becomes healthy before Intra-Finder is allowed to start.
 - Universe Scanner runs at or after 08:40 IST.
 - Intra-Finder starts after today's successful universe exists.
 - One-minute indicator calculations begin after the first completed candle.
@@ -61,6 +67,13 @@ feed.
 
 `CONNECTION_WARMING_UP` protects the first thirty seconds after a real
 reconnection.
+
+`INSUFFICIENT_COMPLETED_BARS` means the current Intra-Finder process has not
+yet accumulated the configured number of completed one-minute bars. Opening
+range recovery reconstructs 09:15-09:30, but it does not seed the complete
+current-day indicator history. A late intraday restart therefore fails closed
+until the warm-up requirement is met; do not bypass this gate during a live
+session.
 
 `global_packet_idle` means no instrument produced a packet within the aggregate
 idle deadline. This causes a controlled reconnect and resubscription.
