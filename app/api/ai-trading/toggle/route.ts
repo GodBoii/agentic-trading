@@ -4,6 +4,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { createClient } from '@/lib/supabase/server'
 import { syncLatestTradeSession } from '@/lib/ai-trading-sessions'
+import { convexAdminMutation, convexAdminQuery } from '@/lib/convex/server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -188,39 +189,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { error: updateError } = await supabase
-      .from('user_trading_keys')
-      .update({ is_trading_enabled: enabled })
-      .eq('user_id', user.id)
-
-    if (updateError) {
-      console.error('Failed to update AI trading status in Supabase:', updateError)
-      if (backendPayload) {
-        await callTradingBackend('/ai-trading/toggle', session.access_token, {
-          method: 'POST',
-          body: JSON.stringify({
-            ...toggleRequest,
-            enabled: Boolean(backendPayload.previous_enabled),
-          }),
-        }).catch((rollbackError) => {
-          console.error('[Toggle API] Backend rollback failed:', rollbackError)
-        })
-      }
-      return NextResponse.json({ error: 'Failed to update trading status' }, { status: 500 })
-    }
-
     if (!backendUrl) {
+      const existing = await convexAdminQuery<any>('tradingConfigurations:get', {
+        supabaseUserId: user.id,
+      })
+      const now = new Date().toISOString()
+      await convexAdminMutation('tradingConfigurations:upsert', {
+        supabaseUserId: user.id,
+        enabled,
+        tradeMode: tradeMode === 'manual' ? 'manual' : (existing?.tradeMode || 'auto'),
+        ...(tradeAmount ? { tradeAmount } : {}),
+        updatedAt: now,
+      })
       const state = await loadState()
       state.user_states[user.id] = {
         enabled,
-        updated_at_utc: new Date().toISOString(),
-        email: user.email ?? null,
+        updated_at_utc: now,
       }
       state.enabled_user_ids = Object.entries(state.user_states)
         .filter(([, value]) => Boolean(value?.enabled))
         .map(([userId]) => userId)
         .sort()
-      state.generated_at_utc = new Date().toISOString()
+      state.generated_at_utc = now
       await saveState(state)
       backendPayload = {
         enabled_user_ids: state.enabled_user_ids,
