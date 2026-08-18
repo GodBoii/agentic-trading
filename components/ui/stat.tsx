@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import type { Direction } from '@/lib/format'
+import { NumberFlow } from '@/components/motion/number-flow'
 import { Meter } from './meter'
 
 const DIRECTION_TEXT: Record<Direction, string> = {
@@ -15,6 +16,17 @@ const DIRECTION_TEXT: Record<Direction, string> = {
  * `direction` colours the value by P&L sign and is the only place tone is
  * decided, so a positive number can never accidentally render red.
  * Designed to sit inside a `CellGrid`, which supplies the frame and dividers.
+ *
+ * Motion. When `value` is a string, it is rendered through the number pop-in
+ * recipe (recipe 02): on every change the characters re-enter from below with
+ * a 2px blur, the last two staggered. This is the answer to a real problem on
+ * this screen — five broker figures refresh at once, and without it a number
+ * silently becoming a different number is completely invisible. It marks the
+ * change without demanding attention, which is why it is the pop-in and not
+ * the spinning counter.
+ *
+ * Non-string values (a composed node) render as given; there is no single
+ * string to split into characters.
  */
 export function StatTile({
     label,
@@ -51,7 +63,7 @@ export function StatTile({
                     DIRECTION_TEXT[direction],
                 )}
             >
-                {value}
+                {typeof value === 'string' ? <NumberFlow value={value} /> : value}
             </p>
             {meter && <Meter className="mt-3" value={meter.value} tone={meter.tone} />}
             {note && <p className="mt-1.5 truncate text-[10px] text-ink-tertiary">{note}</p>}

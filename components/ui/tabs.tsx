@@ -1,7 +1,9 @@
 'use client'
 
-import { useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { cn } from '@/lib/cn'
+
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 export interface TabItem<T extends string> {
     id: T
@@ -11,11 +13,20 @@ export interface TabItem<T extends string> {
 }
 
 /**
- * SegmentedTabs — a real tablist.
+ * SegmentedTabs — a real tablist with a sliding active pill.
  *
- * Implements the WAI-ARIA automatic-activation tabs pattern: roving tabindex
- * plus Arrow/Home/End handling, so the control is operable without a mouse.
- * The previous tab strips were plain buttons with no tablist semantics.
+ * Behaviour: implements the WAI-ARIA automatic-activation tabs pattern —
+ * roving tabindex plus Arrow/Home/End handling — so the control is fully
+ * operable without a mouse.
+ *
+ * Motion (recipe 16): the active pill travels between options over 250ms
+ * instead of the background colour cutting from one tab to the next. The
+ * movement is what carries the meaning: it shows *which* tab you came from,
+ * so the change of view is attributable rather than just sudden. Symmetric in
+ * both directions — moving left and moving right are the same motion.
+ *
+ * The pill's geometry is measured and written inline, because CSS cannot know
+ * a tab's width when the labels are arbitrary strings and carry counts.
  */
 export function SegmentedTabs<T extends string>({
     items,
@@ -34,6 +45,48 @@ export function SegmentedTabs<T extends string>({
     className?: string
 }) {
     const buttons = useRef<(HTMLButtonElement | null)[]>([])
+    const pill = useRef<HTMLSpanElement | null>(null)
+    /** First paint must snap; every later move animates. */
+    const painted = useRef(false)
+
+    const movePill = useCallback((animate: boolean) => {
+        const index = items.findIndex((item) => item.id === value)
+        const target = buttons.current[index < 0 ? 0 : index]
+        const node = pill.current
+        if (!target || !node) return
+
+        const write = () => {
+            node.style.transform = `translateX(${target.offsetLeft}px)`
+            node.style.width = `${target.offsetWidth}px`
+        }
+
+        if (animate) {
+            write()
+            return
+        }
+
+        // Suspend the transition, write, reflow, restore. Without this the
+        // pill animates in from translateX(0)/width:0 on mount and on every
+        // resize, which reads as the control assembling itself.
+        const previous = node.style.transition
+        node.style.transition = 'none'
+        write()
+        void node.offsetWidth
+        node.style.transition = previous
+    }, [items, value])
+
+    useIsomorphicLayoutEffect(() => {
+        movePill(painted.current)
+        painted.current = true
+    }, [movePill])
+
+    // Reflow changes tab widths, so the pill has to be re-measured — and
+    // snapped, not animated, since nothing was activated.
+    useEffect(() => {
+        const onResize = () => movePill(false)
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
+    }, [movePill])
 
     const move = (from: number, delta: number) => {
         const next = (from + delta + items.length) % items.length
@@ -63,7 +116,8 @@ export function SegmentedTabs<T extends string>({
     }
 
     return (
-        <div className={cn('product-tabs', className)} role="tablist" aria-label={ariaLabel}>
+        <div className={cn('t-tabs', className)} role="tablist" aria-label={ariaLabel}>
+            <span ref={pill} className="t-tabs-pill" aria-hidden />
             {items.map((item, index) => {
                 const active = item.id === value
                 return (
@@ -78,17 +132,12 @@ export function SegmentedTabs<T extends string>({
                         aria-selected={active}
                         aria-controls={panelId}
                         tabIndex={active ? 0 : -1}
-                        data-active={active}
                         onClick={() => onChange(item.id)}
                         onKeyDown={(event) => onKeyDown(event, index)}
-                        className="product-tab"
+                        className="t-tab"
                     >
                         {item.label}
-                        {item.count !== undefined && (
-                            <span className={cn('nums font-mono text-[10px]', active ? 'text-ink-secondary' : 'text-ink-tertiary')}>
-                                {item.count}
-                            </span>
-                        )}
+                        {item.count !== undefined && <span className="t-tab-count">{item.count}</span>}
                     </button>
                 )
             })}
