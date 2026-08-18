@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ArrowLeft } from '@/components/ui/icons'
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel'
+import { ThinkingOrb } from '@/components/motion/thinking-orb'
 import { count } from '@/lib/format'
 import type { AgentResult } from '@/components/ai-trading/types'
 import { AttachmentGallery } from './attachment-gallery'
@@ -18,9 +19,17 @@ import { slotState, type AgentSlot } from './agent-roster'
  * One agent in full.
  *
  * Ordered conclusion → evidence → audit trail: the decision first, then the
- * charts it was made from, then the raw event log, then run accounting. The
- * previous layout opened with metadata and the chart rail, so the actual
- * decision sat below the fold under a wall of streamed text.
+ * charts it was made from, then the raw event log, then run accounting.
+ *
+ * Motion. The entrance is owned by the parent — `AgentConsole` slides this in
+ * from the right as the roster exits left, so nothing here stages its own
+ * arrival. Adding a second entrance on top would double-animate the same
+ * navigation.
+ *
+ * The one indicator that belongs to this component is the orb beside the
+ * workspace title while the agent is still running: on a screen the reader may
+ * sit on for a minute waiting for a decision, "still working" is the most
+ * useful thing the header can say.
  */
 export function AgentWorkspace({
     slot,
@@ -33,6 +42,7 @@ export function AgentWorkspace({
 }) {
     const state = slotState(slot)
     const latest = slot.events[slot.events.length - 1]
+    const running = !slot.complete && !slot.failed && slot.events.length > 0
 
     const decision = result?.decision || latest?.decision
     const attachments = result?.attachments || latest?.attachments
@@ -56,8 +66,11 @@ export function AgentWorkspace({
                     label="Agent workspace"
                     title={slot.name}
                     actions={
-                        <span className="nums font-mono text-[10px] text-ink-tertiary">
-                            {count(slot.events.length)} events
+                        <span className="flex items-center gap-2.5">
+                            {running && <ThinkingOrb state="working" size={20} className="text-warning" />}
+                            <span className="nums font-mono text-[10px] text-ink-tertiary">
+                                {count(slot.events.length)} events
+                            </span>
                         </span>
                     }
                 />
