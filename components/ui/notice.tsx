@@ -1,5 +1,8 @@
+'use client'
+
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { RevealBlock } from '@/components/motion/reveal'
 import { Alert } from './icons'
 
 export type NoticeTone = 'danger' | 'warning' | 'neutral'
@@ -14,6 +17,14 @@ const TONE: Record<NoticeTone, { wrap: string; icon: string }> = {
  * Inline notice for recoverable conditions — a partial data failure, an expired
  * broker token, a degraded stream. Carries its own remedy via `action` so the
  * message is never a dead end.
+ *
+ * Motion. Notices are inserted into a settled layout, usually pushing content
+ * down, so they enter on the texts-reveal recipe (recipe 18) rather than
+ * appearing between frames. The 12px rise with blur reads as the message
+ * arriving; a hard insert reads as the page reflowing under the reader.
+ *
+ * A notice is not a toast: it stays until the condition is resolved, so there
+ * is no exit motion to design and no timer to run.
  */
 export function Notice({
     tone = 'neutral',
@@ -28,19 +39,20 @@ export function Notice({
 }) {
     const styles = TONE[tone]
     return (
-        <div
-            role={tone === 'danger' ? 'alert' : 'status'}
-            className={cn(
-                'flex flex-col gap-2.5 rounded-xl border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between',
-                styles.wrap,
-                className,
-            )}
-        >
-            <div className="flex min-w-0 items-start gap-2.5">
-                <Alert className={cn('mt-px flex-shrink-0', styles.icon)} size={14} />
-                <p className="text-[11.5px] leading-relaxed">{children}</p>
+        <RevealBlock immediate className={className}>
+            <div
+                role={tone === 'danger' ? 'alert' : 'status'}
+                className={cn(
+                    'flex flex-col gap-2.5 rounded-xl border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between',
+                    styles.wrap,
+                )}
+            >
+                <div className="flex min-w-0 items-start gap-2.5">
+                    <Alert className={cn('mt-px flex-shrink-0', styles.icon)} size={14} />
+                    <p className="text-[11.5px] leading-relaxed">{children}</p>
+                </div>
+                {action && <div className="flex flex-shrink-0 items-center gap-2 sm:ml-3">{action}</div>}
             </div>
-            {action && <div className="flex flex-shrink-0 items-center gap-2 sm:ml-3">{action}</div>}
-        </div>
+        </RevealBlock>
     )
 }
