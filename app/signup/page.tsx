@@ -1,346 +1,216 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import BrandMark from "@/components/brand-mark";
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { AuthDivider, AuthShell } from '@/components/auth/auth-shell'
+import { AuthField, AuthSubmit, GoogleButton } from '@/components/auth/auth-form'
+import { ErrorMessage, useErrorShake } from '@/components/motion/error-field'
+import { Reveal } from '@/components/motion/reveal'
+import { SuccessBadge } from '@/components/motion/success-check'
 
-const ease = [0.16, 1, 0.3, 1] as const;
-
+/**
+ * Create an account.
+ *
+ * Motion. Two moments carry it, and both are real state changes:
+ *
+ *   - Validation failure shakes the form and reveals the message beneath it
+ *     (recipe 12). This page has two client-side rules — passwords matching and
+ *     a minimum length — which fire instantly, with no network round trip. That
+ *     is precisely the case where a static message is easiest to miss: nothing
+ *     else on the screen changes, so without the shake a mistyped confirmation
+ *     just appears to do nothing when submitted.
+ *
+ *   - Success draws a check (recipe 10): the badge fades in, rotates upright,
+ *     settles with a bob, and the tick strokes itself over 500ms. This replaced
+ *     a static SVG checkmark inside a circle. It is worth the ceremony here
+ *     because it is the one genuinely celebratory moment in the product, and
+ *     because the screen it announces is a dead end that redirects — the draw
+ *     gives the user something to read the outcome from before the page moves.
+ */
 export default function SignUpPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState(false)
+    const form = useErrorShake<HTMLFormElement>()
+    const router = useRouter()
+    const supabase = createClient()
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
-      return;
+    const fail = (message: string) => {
+        setError(message)
+        form.trigger()
+        setLoading(false)
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      setLoading(false);
-      return;
+    const edit = (setter: (value: string) => void) => (value: string) => {
+        setter(value)
+        if (error) {
+            setError(null)
+            form.clear()
+        }
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    const handleSignUp = async (event: React.FormEvent) => {
+        event.preventDefault()
+        setLoading(true)
+        setError(null)
+        form.clear()
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      setSuccess(true);
-      setLoading(false);
-      setTimeout(() => {
-        router.push("/login");
-      }, 3000);
+        if (password !== confirmPassword) {
+            fail('Passwords do not match.')
+            return
+        }
+        if (password.length < 6) {
+            fail('Password must be at least 6 characters.')
+            return
+        }
+
+        const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        })
+
+        if (signUpError) {
+            fail(signUpError.message)
+            return
+        }
+
+        setSuccess(true)
+        setLoading(false)
+        setTimeout(() => router.push('/login'), 3000)
     }
-  };
 
-  const handleGoogleSignUp = async () => {
-    setLoading(true);
-    setError(null);
+    const handleGoogleSignUp = async () => {
+        setLoading(true)
+        setError(null)
+        form.clear()
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+        const { error: oauthError } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: `${window.location.origin}/auth/callback` },
+        })
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
+        if (oauthError) fail(oauthError.message)
     }
-  };
 
-  if (success) {
+    if (success) {
+        return (
+            <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050505]">
+                <div className="absolute inset-0 bg-grid-fine opacity-50" />
+                <div className="absolute inset-0 bg-spotlight" />
+
+                <Reveal immediate className="relative z-10 w-full max-w-md px-6">
+                    <div className="surface rounded-2xl p-10 text-center">
+                        {/* The check draws itself as the panel lands, so the
+                            outcome reads as earned rather than pre-printed. */}
+                        <SuccessBadge size={64} className="mx-auto mb-6" />
+                        <h1 className="mb-3 font-display text-[32px] tracking-[-0.025em] text-white">
+                            Account <span className="font-serif-italic text-white/80">created.</span>
+                        </h1>
+                        <p className="text-[14px] leading-relaxed text-ink-secondary">
+                            Check your email to verify your account. Redirecting to sign in…
+                        </p>
+                        <div className="mt-8 flex items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-tertiary">
+                            <span className="relative flex h-1.5 w-1.5">
+                                <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-accent opacity-60" />
+                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                            </span>
+                            Verifying
+                        </div>
+                    </div>
+                </Reveal>
+            </div>
+        )
+    }
+
     return (
-      <div className="relative min-h-screen w-full bg-[#050505] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-grid-fine opacity-50" />
-        <div className="absolute inset-0 bg-spotlight" />
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease }}
-          className="relative z-10 w-full max-w-md px-6"
-        >
-          <div className="surface rounded-2xl p-10 text-center">
-            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/[0.1] border border-success/30 mb-6">
-              <svg
-                className="h-7 w-7 text-success"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <h1 className="font-display text-[32px] text-white tracking-[-0.025em] mb-3">
-              Account{" "}
-              <span className="font-serif-italic text-white/80">created.</span>
-            </h1>
-            <p className="text-[14px] text-ink-secondary leading-relaxed">
-              Check your email to verify your account. Redirecting to sign in…
-            </p>
-            <div className="mt-8 flex items-center justify-center gap-2 text-[11px] font-mono uppercase tracking-[0.18em] text-ink-tertiary">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-60 animate-pulse-ring" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
-              </span>
-              Verifying
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative min-h-screen w-full bg-[#050505] overflow-hidden">
-      <div className="absolute inset-0 bg-grid-fine opacity-50" />
-      <div className="absolute inset-0 bg-spotlight" />
-      <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-accent/[0.06] rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-success/[0.04] rounded-full blur-[120px] pointer-events-none" />
-
-      <header className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8 py-6 flex items-center justify-between">
-        <Link href="/" className="group flex items-center gap-2.5">
-          <BrandMark className="h-8 w-8 transition-transform duration-300 group-hover:scale-105" priority />
-          <span className="text-[15px] font-medium tracking-[-0.02em] text-white">
-            PolyCognition
-          </span>
-        </Link>
-        <Link
-          href="/"
-          className="text-[12px] text-white/50 hover:text-white transition-colors tracking-[-0.01em]"
-        >
-          ← Back to home
-        </Link>
-      </header>
-
-      <main className="relative z-10 flex items-center justify-center px-6 py-12 sm:py-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease }}
-          className="w-full max-w-md"
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease, delay: 0.1 }}
-            className="inline-flex items-center gap-2 mb-6"
-          >
-            <span className="h-px w-8 bg-accent" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-accent">
-              Get started
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease, delay: 0.15 }}
-            className="font-display text-[44px] sm:text-[52px] text-white tracking-[-0.035em] leading-[0.95] mb-3"
-          >
-            Deploy your{" "}
-            <span className="font-serif-italic text-white/80">first agent.</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease, delay: 0.2 }}
-            className="text-[14px] text-ink-secondary mb-10"
-          >
-            Create your account to begin autonomous trading in under 60 seconds.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease, delay: 0.25 }}
-            className="surface rounded-2xl p-7 sm:p-8"
-          >
-            {error && (
-              <div className="mb-6 rounded-lg border border-danger/30 bg-danger/[0.08] px-4 py-3">
-                <p className="text-[13px] text-danger">{error}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleSignUp} className="flex flex-col gap-5">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-[11px] font-mono uppercase tracking-[0.18em] text-ink-tertiary mb-2"
-                >
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-[#0a0a0c] border border-line rounded-lg px-4 py-3 text-[14px] text-white placeholder-ink-tertiary outline-none focus:border-accent/50 focus:bg-[#0c0c0e] transition-colors"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-[11px] font-mono uppercase tracking-[0.18em] text-ink-tertiary mb-2"
-                >
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-[#0a0a0c] border border-line rounded-lg px-4 py-3 text-[14px] text-white placeholder-ink-tertiary outline-none focus:border-accent/50 focus:bg-[#0c0c0e] transition-colors"
-                  placeholder="At least 6 characters"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="block text-[11px] font-mono uppercase tracking-[0.18em] text-ink-tertiary mb-2"
-                >
-                  Confirm password
-                </label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="w-full bg-[#0a0a0c] border border-line rounded-lg px-4 py-3 text-[14px] text-white placeholder-ink-tertiary outline-none focus:border-accent/50 focus:bg-[#0c0c0e] transition-colors"
-                  placeholder="Repeat password"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="group mt-2 relative inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3.5 text-[14px] font-medium text-black transition-all duration-500 ease-out-expo hover:shadow-[0_0_32px_rgba(255,255,255,0.18)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                {loading ? (
-                  <>
-                    <svg
-                      className="animate-spin h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
+        <AuthShell
+            eyebrow={
+                <>
+                    <span className="h-px w-8 bg-accent" />
+                    <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent">Get started</span>
+                </>
+            }
+            title={
+                <>
+                    Deploy your <span className="font-serif-italic text-white/80">first agent.</span>
+                </>
+            }
+            subtitle="Create your account to begin autonomous trading in under 60 seconds."
+            footer={
+                <>
+                    Already have an account?{' '}
+                    <Link
+                        href="/login"
+                        className="text-white underline-offset-4 transition-colors duration-[250ms] hover:text-accent hover:underline"
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <span>Creating account…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Create account</span>
-                    <span className="inline-block transition-transform duration-300 group-hover:translate-x-0.5">
-                      →
-                    </span>
-                  </>
-                )}
-              </button>
-            </form>
+                        Sign in
+                    </Link>
+                </>
+            }
+        >
+            <div className={form.wrapClass}>
+                <form
+                    ref={form.fieldRef}
+                    onSubmit={handleSignUp}
+                    className={`${form.fieldClass} flex flex-col gap-5 !border-0`}
+                    noValidate
+                >
+                    <AuthField
+                        id="email"
+                        label="Email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => edit(setEmail)(event.target.value)}
+                        required
+                        autoComplete="email"
+                        placeholder="you@example.com"
+                        aria-invalid={form.errored}
+                        aria-describedby="signup-error"
+                    />
 
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-line" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="px-3 bg-[#0E0E10] text-[10px] font-mono uppercase tracking-[0.22em] text-ink-tertiary">
-                  or
-                </span>
-              </div>
+                    <AuthField
+                        id="password"
+                        label="Password"
+                        type="password"
+                        value={password}
+                        onChange={(event) => edit(setPassword)(event.target.value)}
+                        required
+                        autoComplete="new-password"
+                        placeholder="At least 6 characters"
+                        aria-invalid={form.errored}
+                        aria-describedby="signup-error"
+                    />
+
+                    <AuthField
+                        id="confirmPassword"
+                        label="Confirm password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(event) => edit(setConfirmPassword)(event.target.value)}
+                        required
+                        autoComplete="new-password"
+                        placeholder="Repeat password"
+                        aria-invalid={form.errored}
+                        aria-describedby="signup-error"
+                    />
+
+                    <AuthSubmit pending={loading} pendingLabel="Creating account">
+                        Create account
+                    </AuthSubmit>
+                </form>
+
+                <ErrorMessage id="signup-error">{error}</ErrorMessage>
             </div>
 
-            <button
-              type="button"
-              onClick={handleGoogleSignUp}
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2.5 rounded-full border border-line bg-white/[0.02] backdrop-blur-sm px-5 py-3 text-[14px] font-medium text-white transition-all duration-500 ease-out-expo hover:bg-white/[0.06] hover:border-white/20 disabled:opacity-50"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
-          </motion.div>
+            <AuthDivider />
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, ease, delay: 0.5 }}
-            className="text-center text-[13px] text-ink-secondary mt-8"
-          >
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="text-white hover:text-accent transition-colors underline-offset-4 hover:underline"
-            >
-              Sign in
-            </Link>
-          </motion.p>
-        </motion.div>
-      </main>
-    </div>
-  );
+            <GoogleButton onClick={handleGoogleSignUp} disabled={loading} label="Continue with Google" />
+        </AuthShell>
+    )
 }
