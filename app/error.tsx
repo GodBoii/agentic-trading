@@ -1,64 +1,76 @@
-"use client";
+'use client'
 
-import { useEffect } from "react";
-import Link from "next/link";
+import { useEffect } from 'react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Reveal } from '@/components/motion/reveal'
+import { LearnMoreChevron } from '@/components/motion/learn-more'
+import { Alert } from '@/components/ui/icons'
 
+/**
+ * Route-level error boundary.
+ *
+ * Motion. The copy uses the texts-reveal recipe so the screen arrives rather
+ * than snapping in — an error page is jarring enough without it appearing in a
+ * single frame.
+ *
+ * Deliberately no shake here. The error shake is validation feedback: it means
+ * "the thing you just did was wrong, try again". A route-level crash is not the
+ * user's action being rejected, and percussive motion on a page that is already
+ * bad news reads as the interface panicking. The same reasoning applies to the
+ * 404.
+ */
 export default function Error({
-  error,
-  reset,
+    error,
+    reset,
 }: {
-  error: Error & { digest?: string };
-  reset: () => void;
+    error: Error & { digest?: string }
+    reset: () => void
 }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
+    useEffect(() => {
+        console.error(error)
+    }, [error])
 
-  return (
-    <div className="relative min-h-screen w-full bg-[#050505] flex items-center justify-center px-6 overflow-hidden">
-      <div className="absolute inset-0 bg-grid-fine opacity-50" />
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-danger/[0.05] rounded-full blur-[120px] pointer-events-none" />
+    return (
+        <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050505] px-6">
+            <div className="absolute inset-0 bg-grid-fine opacity-50" />
+            <div className="pointer-events-none absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-danger/[0.05] blur-[120px]" />
 
-      <div className="relative z-10 w-full max-w-md text-center">
-        <div className="inline-flex items-center gap-2 mb-6">
-          <span className="h-px w-8 bg-danger" />
-          <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-danger">
-            Runtime error
-          </span>
-          <span className="h-px w-8 bg-danger" />
+            <Reveal immediate className="relative z-10 w-full max-w-md text-center">
+                <span className="mx-auto mb-6 grid h-10 w-10 place-items-center rounded-full border border-danger/30 bg-danger/[0.08] text-danger">
+                    <Alert size={18} />
+                </span>
+
+                <h1 className="mb-4 font-display text-[44px] leading-[0.95] tracking-[-0.035em] text-white sm:text-[56px]">
+                    Something broke.
+                </h1>
+
+                <p className="mx-auto mb-8 max-w-sm text-[14px] leading-relaxed text-ink-secondary">
+                    We hit an unexpected condition. The error has been logged. You can try again or return to the
+                    homepage.
+                </p>
+
+                {error.message ? (
+                    <div className="mb-8 rounded-lg border border-danger/30 bg-danger/[0.08] px-4 py-3 text-left">
+                        <p className="break-all font-mono text-[12px] text-danger">{error.message}</p>
+                    </div>
+                ) : (
+                    <></>
+                )}
+
+                <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                    <Button variant="solid" onClick={reset} className="h-11 rounded-full px-5 text-[14px]">
+                        Try again
+                    </Button>
+                    <Link
+                        href="/"
+                        className="group t-press inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-line bg-white/[0.02] px-5 text-[14px] font-medium text-white backdrop-blur-sm transition-[background-color,border-color] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-white/20 hover:bg-white/[0.06]"
+                    >
+                        Go home
+                        <LearnMoreChevron size={15} />
+                    </Link>
+                </div>
+            </Reveal>
         </div>
-
-        <h1 className="font-display text-[44px] sm:text-[56px] text-white tracking-[-0.035em] leading-[0.95] mb-4">
-          Something broke.
-        </h1>
-        <p className="text-[14px] text-ink-secondary leading-relaxed mb-8 max-w-sm mx-auto">
-          We hit an unexpected condition. The error has been logged. You can
-          try again or return to the homepage.
-        </p>
-
-        {error.message && (
-          <div className="mb-8 rounded-lg border border-danger/30 bg-danger/[0.08] px-4 py-3 text-left">
-            <p className="text-[12px] font-mono text-danger break-all">
-              {error.message}
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <button
-            onClick={() => reset()}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-[14px] font-medium text-black transition-all duration-500 ease-out-expo hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(255,255,255,0.15)]"
-          >
-            <span>Try again</span>
-          </button>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-line bg-white/[0.02] backdrop-blur-sm px-5 py-3 text-[14px] font-medium text-white transition-all duration-500 ease-out-expo hover:bg-white/[0.06] hover:border-white/20"
-          >
-            <span>Go home</span>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+    )
 }
