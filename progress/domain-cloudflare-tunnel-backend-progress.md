@@ -58,10 +58,10 @@ AI gateway failure; a normal pre-market start avoids it.
 
 Compose was hardened so `ai-trading-agents` is now part of the default service
 set and Intra-Finder explicitly waits for its health check. The Cloudflare
-connector remains in the `ai` profile, so the production startup command is:
+connector is part of the default stack, so the production startup command is:
 
 ```powershell
-docker compose --profile ai up -d --build
+docker compose up -d --build
 ```
 
 A market-calendar-aware NIFTY depth health check was also added. These Compose
@@ -117,7 +117,7 @@ The `cloudflared` logs confirmed:
 
 ## Docker deployment changes
 
-`docker-compose.yml` now includes a `cloudflared` service under the `ai` profile.
+`docker-compose.yml` includes `cloudflared` in the default backend stack.
 
 Important behavior:
 
@@ -412,13 +412,13 @@ The Next.js build reports only non-blocking maintenance notices for outdated Bro
 Start or rebuild the AI backend and tunnel:
 
 ```powershell
-docker compose --profile ai up -d --build cloudflared
+docker compose up -d --build cloudflared
 ```
 
 Inspect container status:
 
 ```powershell
-docker compose --profile ai ps
+docker compose ps
 ```
 
 Inspect tunnel logs:
@@ -442,7 +442,7 @@ Invoke-WebRequest -UseBasicParsing https://api.polycognition.online/health
 Recreate the connector after changing its token:
 
 ```powershell
-docker compose --profile ai up -d --force-recreate cloudflared
+docker compose up -d --force-recreate cloudflared
 ```
 
 ## Remaining work
