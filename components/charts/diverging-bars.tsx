@@ -55,7 +55,7 @@ export function DivergingBars({
                             <div className="flex h-full w-1/2 items-center justify-end">
                                 {!positive && item.value !== 0 && (
                                     <span
-                                        className="h-[7px] rounded-l-sm bg-negative/80"
+                                        className="chart-grow h-[7px] rounded-l-sm bg-negative/80"
                                         style={{ width: `${share}%` }}
                                     />
                                 )}
@@ -64,7 +64,7 @@ export function DivergingBars({
                             <div className="flex h-full w-1/2 items-center">
                                 {positive && (
                                     <span
-                                        className="h-[7px] rounded-r-sm bg-positive/80"
+                                        className="chart-grow h-[7px] rounded-r-sm bg-positive/80"
                                         style={{ width: `${share}%` }}
                                     />
                                 )}

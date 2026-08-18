@@ -102,6 +102,7 @@ export function CompositionBar({
                 {positive.map((segment, index) => (
                     <span
                         key={segment.key}
+                        className="chart-grow"
                         title={`${segment.label} · ${formatValue(segment.value)}`}
                         style={{
                             width: `${(segment.value / total) * 100}%`,
