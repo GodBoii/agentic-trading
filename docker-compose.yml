@@ -98,7 +98,11 @@ services:
       market-data-gateway:
         condition: service_healthy
       universe-scanner:
-        condition: service_healthy
+        # Intra-Finder has its own safe WAITING_FOR_UNIVERSE loop and validates
+        # that the snapshot is completed and belongs to the current market day.
+        # Starting the process here avoids leaving the container in Created
+        # state for the duration of the (potentially long) daily universe scan.
+        condition: service_started
       ai-trading-agents:
         condition: service_healthy
     stop_grace_period: 45s
@@ -107,7 +111,7 @@ services:
         - CMD
         - python
         - -c
-        - "import http.client,sys; c=http.client.HTTPConnection('localhost',8040,timeout=3); c.request('GET','/health'); r=c.getresponse(); r.read(); c.close(); sys.exit(0 if r.status == 200 else 1)"
+        - "import http.client,sys; c=http.client.HTTPConnection('localhost',8040,timeout=3); c.request('GET','/live'); r=c.getresponse(); r.read(); c.close(); sys.exit(0 if r.status == 200 else 1)"
       interval: 30s
       timeout: 5s
       retries: 5
@@ -170,7 +174,6 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
-    profiles: ["ai"]
     container_name: trader-cloudflared
     command: tunnel --no-autoupdate --loglevel info run
     environment:
