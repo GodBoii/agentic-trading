@@ -7,6 +7,12 @@ import type { LiveAgentEvent } from '@/components/ai-trading/types'
  * The agent lifecycle as a stepper: Selected → Started → Charts ready →
  * Completed. Answers "how far did this get, and where did it stall" without
  * reading the event log, which is the first question on a run in flight.
+ *
+ * Motion. The dots and connectors tween their colour and the connector grows
+ * from the left as a stage is reached. That is the whole point of a stepper on
+ * a live run: the reader is watching for the next stage to land, and a stage
+ * that simply changes colour between frames is easy to miss while looking
+ * elsewhere on the page. Nothing moves once the run is settled.
  */
 export function MilestoneTrack({ events, className }: { events: LiveAgentEvent[]; className?: string }) {
     const milestones = agentMilestones(events)
@@ -22,7 +28,7 @@ export function MilestoneTrack({ events, className }: { events: LiveAgentEvent[]
                                 <span
                                     aria-hidden
                                     className={cn(
-                                        'h-2 w-2 flex-shrink-0 rounded-full',
+                                        'h-2 w-2 flex-shrink-0 rounded-full transition-[background-color,border-color] duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
                                         milestone.failed
                                             ? 'bg-negative'
                                             : milestone.reached
@@ -32,7 +38,7 @@ export function MilestoneTrack({ events, className }: { events: LiveAgentEvent[]
                                 />
                                 <span
                                     className={cn(
-                                        'whitespace-nowrap text-[11px]',
+                                        'whitespace-nowrap text-[11px] transition-colors duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
                                         milestone.failed
                                             ? 'text-negative'
                                             : milestone.reached
@@ -48,13 +54,20 @@ export function MilestoneTrack({ events, className }: { events: LiveAgentEvent[]
                             </span>
                         </div>
                         {!last && (
+                            // The connector fills from the left as the stage is
+                            // reached, so progress reads as travelling forward
+                            // rather than as segments lighting up at random.
                             <span
                                 aria-hidden
-                                className={cn(
-                                    'mx-3 mt-[3px] h-px w-8 flex-shrink-0 sm:w-12',
-                                    milestone.reached ? 'bg-positive/30' : 'bg-line',
-                                )}
-                            />
+                                className="relative mx-3 mt-[3px] h-px w-8 flex-shrink-0 bg-line sm:w-12"
+                            >
+                                <span
+                                    className={cn(
+                                        'absolute inset-y-0 left-0 bg-positive/40 transition-[width] duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
+                                        milestone.reached ? 'w-full' : 'w-0',
+                                    )}
+                                />
+                            </span>
                         )}
                     </li>
                 )
