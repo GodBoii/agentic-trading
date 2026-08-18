@@ -31,7 +31,14 @@ const DOT_TONE: Record<Tone, string> = {
     accent: 'dash-dot-accent',
 }
 
-/** Compact uppercase state marker. */
+/**
+ * Compact uppercase state marker.
+ *
+ * A badge's tone changes as the underlying state does — `working` → `succeeded`,
+ * `PENDING` → `TRADED` — so the colour transition is tweened rather than cut.
+ * Only colour is animated: a badge that scales or slides on every status
+ * change would be noise in a table of thirty rows.
+ */
 export function Badge({
     children,
     tone = 'neutral',
@@ -47,6 +54,7 @@ export function Badge({
         <span
             className={cn(
                 'inline-flex max-w-full items-center gap-1 truncate rounded-full border font-mono font-medium uppercase tracking-[0.08em]',
+                'transition-[color,background-color,border-color] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
                 BADGE_TONE[tone],
                 BADGE_SIZE[size],
                 className,

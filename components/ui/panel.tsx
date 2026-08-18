@@ -1,24 +1,47 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { BorderBeam, type BeamTone } from '@/components/motion/border-beam'
 
 /**
  * Panel — the framed reading surface every data view sits in.
  *
  * Structural styling lives in `.panel*` (globals.css) so nested tables and
  * cell grids clip against the same radius.
+ *
+ * Motion. `beam` wraps the panel in the border-beam effect for a surface that
+ * is genuinely live — a run in flight. It is opt-in and state-driven, never
+ * decorative: an animated edge on a panel that is not doing anything is noise,
+ * and several at once compete with each other and with the figures inside.
+ * `pulse` breathes without rotating and is the safer choice when more than one
+ * panel could be emphasised.
  */
 export function Panel({
     children,
     className,
     as: Tag = 'section',
+    beam,
+    beamTone = 'accent',
     ...rest
 }: {
     children: ReactNode
     className?: string
     as?: 'section' | 'div' | 'article'
+    /** Animated edge. `false`/omitted leaves the panel static. */
+    beam?: 'travel' | 'pulse' | false
+    beamTone?: BeamTone
     'aria-labelledby'?: string
     'aria-label'?: string
 }) {
+    if (beam) {
+        return (
+            <BorderBeam mode={beam} tone={beamTone} strength={0.75} className="rounded-[14px]">
+                <Tag className={cn('panel', className)} {...rest}>
+                    {children}
+                </Tag>
+            </BorderBeam>
+        )
+    }
+
     return (
         <Tag className={cn('panel', className)} {...rest}>
             {children}
