@@ -113,8 +113,11 @@ export function OrderFlowTimeline({
                             />
                         ))}
                         {showNow && (
+                            // The only moving part of this chart: it advances
+                            // once a minute, so it glides rather than jumping
+                            // a pixel while the reader is looking at it.
                             <span
-                                className="absolute inset-y-0 w-px bg-accent/60"
+                                className="chart-move absolute inset-y-0 w-px bg-accent/60"
                                 style={{ left: `${positionOf(nowMinutes)}%` }}
                             />
                         )}

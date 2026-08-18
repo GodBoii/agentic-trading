@@ -40,14 +40,14 @@ export function PriceLadder({ plan, className }: { plan: DecisionPlan; className
                 {stop !== undefined && (
                     <span
                         aria-hidden
-                        className="absolute inset-y-0 bg-negative/35"
+                        className="chart-grow chart-move absolute inset-y-0 bg-negative/35"
                         style={zone(stop, entry)}
                     />
                 )}
                 {target !== undefined && (
                     <span
                         aria-hidden
-                        className="absolute inset-y-0 bg-positive/35"
+                        className="chart-grow chart-move absolute inset-y-0 bg-positive/35"
                         style={zone(entry, target)}
                     />
                 )}
