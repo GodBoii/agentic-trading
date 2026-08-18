@@ -4,13 +4,17 @@ import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ArrowRight, ChevronDown } from '@/components/ui/icons'
 import { Notice } from '@/components/ui/notice'
 import { CellGrid, Panel } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { StatTile } from '@/components/ui/stat'
-import { cn } from '@/lib/cn'
+import { AccordionChevron, AccordionShell } from '@/components/motion/accordion'
+import { IconSwap } from '@/components/motion/icon-swap'
+import { LearnMoreChevron } from '@/components/motion/learn-more'
+import { SkeletonReveal } from '@/components/motion/skeleton-reveal'
+import { SpinningCounter } from '@/components/motion/number-flow'
+import { useHoverGroup } from '@/components/motion/hover-group'
 import { count, formatClock, formatLongDate, formatWeekday, pluralize } from '@/lib/format'
 import type { TradeSessionSummary } from './types'
 import { countAgents, groupSessionsByDate, sessionStatusTone, sessionTimestamp, tallyStatuses } from './utils'
@@ -18,13 +22,29 @@ import { countAgents, groupSessionsByDate, sessionStatusTone, sessionTimestamp, 
 /**
  * Trade history, grouped by trading day.
  *
- * Rebuilt from an editorial layout — a `clamp(2.6rem, 6vw, 5.8rem)` headline,
- * serif-italic accents, and a GSAP scroll-scrubbed word reveal — into
- * information density. This screen exists to find a specific run, so runs are
- * rows with time, name, size and outcome, and the aggregate counts are stated
- * rather than animated. Dropping the scroll animation also removes GSAP and
- * ScrollTrigger from the bundle; the disclosure now uses the existing CSS
- * grid-template-rows transition.
+ * This screen exists to find a specific run, so runs are rows with time, name,
+ * size and outcome, and the aggregate counts are stated rather than decorated.
+ *
+ * Motion, and why each piece is here:
+ *
+ *   - The day groups use the accordion recipe (recipe 21) via `AccordionShell`,
+ *     replacing this file's own bespoke `grid-template-rows` transition. It was
+ *     already the right technique; the change is that the archive, the agent
+ *     disclosures and every other collapsible now share one expand feel instead
+ *     of three near-identical implementations. The chevron flips rather than
+ *     rotating 180°, which also fixes it on non-Chromium browsers.
+ *
+ *   - The four headline totals use the spinning counter (recipe 26). This is the
+ *     one place in the product where that treatment fits: these numbers change
+ *     once, when the archive loads, and they are the headline of the screen.
+ *     Applying it to a live broker figure would be exhausting, which is why the
+ *     dashboard uses the quieter number pop-in instead.
+ *
+ *   - Run rows cross-fade their arrow into a spinner while opening (recipe 09)
+ *     rather than swapping between frames and collapsing the slot for a frame.
+ *
+ *   - The rows in an open day form a hover group (recipe 11), so scanning down a
+ *     day's runs combs the list.
  */
 export function TradeArchive({
     sessions,
@@ -48,9 +68,10 @@ export function TradeArchive({
     const [openKey, setOpenKey] = useState<string | null>(groups[0]?.key ?? null)
     const totals = useMemo(() => tallyStatuses(sessions), [sessions])
 
-    if (loading && !sessions.length) return <ArchiveSkeleton />
-
-    if (!sessions.length) {
+    // Only the first load gets a placeholder. A refresh that already has rows
+    // on screen keeps them, because replacing real history with a skeleton
+    // discards information the reader was mid-scan through.
+    if (!loading && !sessions.length) {
         return (
             <Panel>
                 <EmptyState
@@ -59,7 +80,7 @@ export function TradeArchive({
                     minHeight={340}
                     action={
                         error ? (
-                            <Button variant="subtle" onClick={onRetry}>
+                            <Button variant="subtle" onClick={onRetry} swapLabel>
                                 Try again
                             </Button>
                         ) : undefined
@@ -70,12 +91,19 @@ export function TradeArchive({
     }
 
     return (
-        <div className="space-y-4">
+        <SkeletonReveal
+            loading={loading && !sessions.length}
+            skeleton={<ArchiveSkeleton />}
+            label="Loading trade history"
+            flow
+            className="space-y-4"
+        >
+            <div className="space-y-4">
             {error && (
                 <Notice
                     tone="warning"
                     action={
-                        <Button size="sm" variant="subtle" onClick={onRetry}>
+                        <Button size="sm" variant="subtle" onClick={onRetry} swapLabel>
                             Retry
                         </Button>
                     }
@@ -85,16 +113,24 @@ export function TradeArchive({
             )}
 
             <CellGrid className="grid-cols-2 lg:grid-cols-4">
-                <StatTile label="Archived runs" value={count(sessions.length)} emphasis="primary" />
+                <StatTile
+                    label="Archived runs"
+                    value={<SpinningCounter value={sessions.length} />}
+                    emphasis="primary"
+                />
                 <StatTile
                     label="Trading days"
-                    value={count(groups.length)}
+                    value={<SpinningCounter value={groups.length} />}
                     note={`${pluralize(countAgents(sessions), 'agent')} in total`}
                 />
-                <StatTile label="Completed" value={count(totals.completed)} direction="positive" />
+                <StatTile
+                    label="Completed"
+                    value={<SpinningCounter value={totals.completed} />}
+                    direction="positive"
+                />
                 <StatTile
                     label="Failed"
-                    value={count(totals.failed)}
+                    value={<SpinningCounter value={totals.failed} />}
                     direction={totals.failed > 0 ? 'negative' : 'neutral'}
                     note={totals.inProgress ? `${totals.inProgress} still in progress` : undefined}
                 />
@@ -107,7 +143,6 @@ export function TradeArchive({
                             at={group.at}
                             sessions={group.sessions}
                             open={openKey === group.key}
-                            panelId={`trade-day-${group.key}`}
                             openingId={openingId}
                             onToggle={() => setOpenKey((current) => (current === group.key ? null : group.key))}
                             onOpen={onOpen}
@@ -116,7 +151,8 @@ export function TradeArchive({
                     </li>
                 ))}
             </ul>
-        </div>
+            </div>
+        </SkeletonReveal>
     )
 }
 
@@ -124,7 +160,6 @@ function DayGroup({
     at,
     sessions,
     open,
-    panelId,
     openingId,
     onToggle,
     onOpen,
@@ -133,64 +168,65 @@ function DayGroup({
     at: string
     sessions: TradeSessionSummary[]
     open: boolean
-    panelId: string
     openingId: string | null
     onToggle: () => void
     onOpen: (sessionId: string) => void
     onPrefetch: (sessionId: string) => void
 }) {
     const tally = tallyStatuses(sessions)
+    const { groupProps, itemProps } = useHoverGroup<HTMLUListElement>()
 
     return (
         <Panel as="article">
-            <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={panelId}
-                onClick={onToggle}
-                className="trade-date-trigger flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left sm:px-5"
+            <AccordionShell
+                open={open}
+                onToggle={onToggle}
+                ariaLabel={`${formatWeekday(at)}, ${pluralize(sessions.length, 'run')}`}
+                headerClassName="justify-between gap-4 px-4 py-3.5 sm:px-5"
+                header={
+                    <>
+                        <div className="flex min-w-0 items-baseline gap-3">
+                            <h3 className="text-[14px] font-medium tracking-[-0.02em] text-ink-primary">
+                                {formatWeekday(at)}
+                            </h3>
+                            <span className="nums truncate font-mono text-[10px] text-ink-tertiary">
+                                {formatLongDate(at)}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-shrink-0 items-center gap-3 sm:gap-4">
+                            {tally.completed > 0 && (
+                                <Badge tone="positive" size="sm">
+                                    {tally.completed} done
+                                </Badge>
+                            )}
+                            {tally.failed > 0 && (
+                                <Badge tone="negative" size="sm">
+                                    {tally.failed} failed
+                                </Badge>
+                            )}
+                            {tally.inProgress > 0 && (
+                                <Badge tone="warning" size="sm">
+                                    {tally.inProgress} running
+                                </Badge>
+                            )}
+                            <span className="nums hidden font-mono text-[10px] text-ink-tertiary sm:inline">
+                                {pluralize(sessions.length, 'run')}
+                            </span>
+                            <AccordionChevron size={15} className="text-ink-tertiary" />
+                        </div>
+                    </>
+                }
             >
-                <div className="flex min-w-0 items-baseline gap-3">
-                    <h3 className="text-[14px] font-medium tracking-[-0.02em] text-ink-primary">
-                        {formatWeekday(at)}
-                    </h3>
-                    <span className="nums truncate font-mono text-[10px] text-ink-tertiary">{formatLongDate(at)}</span>
-                </div>
-
-                <div className="flex flex-shrink-0 items-center gap-3 sm:gap-4">
-                    {tally.completed > 0 && (
-                        <Badge tone="positive" size="sm">
-                            {tally.completed} done
-                        </Badge>
-                    )}
-                    {tally.failed > 0 && (
-                        <Badge tone="negative" size="sm">
-                            {tally.failed} failed
-                        </Badge>
-                    )}
-                    {tally.inProgress > 0 && (
-                        <Badge tone="warning" size="sm">
-                            {tally.inProgress} running
-                        </Badge>
-                    )}
-                    <span className="nums hidden font-mono text-[10px] text-ink-tertiary sm:inline">
-                        {pluralize(sessions.length, 'run')}
-                    </span>
-                    <ChevronDown
-                        size={15}
-                        className={cn(
-                            'text-ink-tertiary transition-transform duration-200',
-                            open && 'rotate-180',
-                        )}
-                    />
-                </div>
-            </button>
-
-            <div id={panelId} className="trade-date-panel" data-open={open} aria-hidden={!open}>
-                <div className="trade-date-panel-inner">
-                    <ul className="border-t border-line">
-                        {sessions.map((session) => (
-                            <li key={session.session_id} className="border-b border-line last:border-b-0">
+                <ul {...groupProps} className="border-t border-line">
+                    {sessions.map((session, index) => {
+                        const { className: itemClass, ...itemHandlers } = itemProps(index)
+                        return (
+                            <li
+                                key={session.session_id}
+                                className={`border-b border-line last:border-b-0 ${itemClass}`}
+                                {...itemHandlers}
+                            >
                                 <RunRow
                                     session={session}
                                     opening={openingId === session.session_id}
@@ -199,10 +235,10 @@ function DayGroup({
                                     onPrefetch={() => onPrefetch(session.session_id)}
                                 />
                             </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
+                        )
+                    })}
+                </ul>
+            </AccordionShell>
         </Panel>
     )
 }
@@ -246,15 +282,15 @@ function RunRow({
                 {session.status}
             </Badge>
 
-            <span className="flex w-4 flex-shrink-0 justify-end">
-                {opening ? (
-                    <Spinner />
-                ) : (
-                    <ArrowRight
-                        size={14}
-                        className="text-ink-tertiary transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-ink-secondary"
-                    />
-                )}
+            {/* Cross-faded rather than conditionally rendered, so the slot never
+                collapses and the row's other columns do not shift. */}
+            <span className="flex w-4 flex-shrink-0 justify-end text-ink-tertiary transition-colors duration-[250ms] group-hover:text-ink-secondary">
+                <IconSwap
+                    showB={opening}
+                    a={<LearnMoreChevron size={14} />}
+                    b={<Spinner size={12} />}
+                    label={opening ? 'Opening run' : undefined}
+                />
             </span>
         </button>
     )
@@ -262,20 +298,20 @@ function RunRow({
 
 function ArchiveSkeleton() {
     return (
-        <div className="space-y-4" aria-busy="true" aria-label="Loading trade history">
+        <div className="space-y-4">
             <CellGrid className="grid-cols-2 lg:grid-cols-4">
                 {[0, 1, 2, 3].map((item) => (
                     <div key={item} className="p-4 sm:p-5">
-                        <Skeleton className="h-2.5 w-20" />
-                        <Skeleton className="mt-4 h-5 w-16" />
+                        <Skeleton className="h-2.5 w-20" delay={item * 40} />
+                        <Skeleton className="mt-4 h-5 w-16" delay={item * 40} />
                     </div>
                 ))}
             </CellGrid>
             {[0, 1, 2].map((item) => (
                 <Panel key={item}>
                     <div className="flex items-center justify-between px-5 py-3.5">
-                        <Skeleton className="h-3.5 w-40" />
-                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3.5 w-40" delay={item * 40} />
+                        <Skeleton className="h-3 w-20" delay={item * 40} />
                     </div>
                 </Panel>
             ))}

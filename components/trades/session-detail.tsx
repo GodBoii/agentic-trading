@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from '@/components/ui/icons'
 import { CellGrid, Panel, PanelHeader } from '@/components/ui/panel'
+import { Tooltip } from '@/components/motion/tooltip'
 import { count, formatDateTime } from '@/lib/format'
 import { sessionStatusTone } from './utils'
 
@@ -15,6 +16,14 @@ import { sessionStatusTone } from './utils'
  * The sessions API synthesizes a `status_snapshot` in the same shape the live
  * stream produces, so history and live runs render through identical components
  * — an archived decision is presented exactly as it was when it was made.
+ *
+ * Motion. The entrance belongs to the parent: the Trades page slides this in
+ * from the right as the archive exits left. Nothing here stages its own arrival,
+ * because two entrances on one navigation read as a stutter.
+ *
+ * The run reference gets a tooltip rather than a `title` attribute — it is
+ * truncated, so without one the full identifier was unreachable for keyboard
+ * and touch users.
  */
 export function SessionDetail({ session, onBack }: { session: TradeSession; onBack: () => void }) {
     const agents = session.agents || []
@@ -71,15 +80,24 @@ function Cell({
     mono?: boolean
     truncate?: boolean
 }) {
+    const body = (
+        <p
+            className={`text-[12px] text-ink-primary ${mono ? 'nums font-mono text-[11px]' : ''} ${truncate ? 'truncate' : ''}`}
+        >
+            {value}
+        </p>
+    )
+
     return (
-        <div className="px-4 py-3.5">
+        <div className="min-w-0 px-4 py-3.5">
             <p className="dash-label mb-1.5">{label}</p>
-            <p
-                className={`text-[12px] text-ink-primary ${mono ? 'nums font-mono text-[11px]' : ''} ${truncate ? 'truncate' : ''}`}
-                title={truncate ? value : undefined}
-            >
-                {value}
-            </p>
+            {truncate ? (
+                <Tooltip label={value} align="end">
+                    {body}
+                </Tooltip>
+            ) : (
+                body
+            )}
         </div>
     )
 }
