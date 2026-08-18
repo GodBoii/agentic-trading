@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "node scripts/dev-server.js",
     "dev:next": "next dev",
+    "backend:start": "docker compose up --build -d",
+    "backend:status": "docker compose ps -a",
+    "backend:logs": "docker compose logs --tail 100",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
     "build": "next build",
