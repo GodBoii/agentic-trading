@@ -11,6 +11,8 @@ import { Notice } from '@/components/ui/notice'
 import { CellGrid, Panel } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SegmentedTabs, type TabItem } from '@/components/ui/tabs'
+import { Reveal } from '@/components/motion/reveal'
+import { ViewSlide } from '@/components/motion/view-slide'
 
 const TABS: TabItem<AgentView>[] = [
     { id: 'live', label: 'Live run' },
@@ -52,7 +54,7 @@ function AgentPageContent() {
     return (
         <>
             <header className="mb-6 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-                <div>
+                <Reveal immediate>
                     <p className="dash-label mb-2">Autonomous execution</p>
                     <h1 className="text-[28px] font-medium leading-none tracking-[-0.04em] text-ink-primary sm:text-[34px]">
                         Agent
@@ -61,7 +63,7 @@ function AgentPageContent() {
                         The scanner and Intra-Finder monitor the market continuously. Runs start on their own; this is
                         where you watch them and set how much capital each trade may use.
                     </p>
-                </div>
+                </Reveal>
                 <SegmentedTabs
                     items={TABS}
                     value={view}
@@ -78,16 +80,20 @@ function AgentPageContent() {
             )}
 
             <div id={VIEW_PANEL_ID} role="tabpanel" aria-labelledby={`tab-${view}`}>
-                {view === 'live' ? (
-                    <div className="space-y-4">
-                        <RunSummary status={status} />
-                        <AgentConsole runStatus={status} liveEvents={events} stream={stream} />
-                    </div>
-                ) : (
-                    <div className="max-w-2xl">
-                        <TradingStatus />
-                    </div>
-                )}
+                {/* The tab pill has already shown which way the reader moved;
+                    the panel travels the same direction so the two agree. */}
+                <ViewSlide index={view === 'live' ? 0 : 1}>
+                    {view === 'live' ? (
+                        <div className="space-y-4">
+                            <RunSummary status={status} />
+                            <AgentConsole runStatus={status} liveEvents={events} stream={stream} />
+                        </div>
+                    ) : (
+                        <div className="max-w-2xl">
+                            <TradingStatus />
+                        </div>
+                    )}
+                </ViewSlide>
             </div>
         </>
     )

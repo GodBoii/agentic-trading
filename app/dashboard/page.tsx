@@ -2,11 +2,12 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AnimatePresence, motion } from 'framer-motion'
 import DhanConnect from '@/components/dhan-connect'
 import PortfolioOverview from '@/components/dashboard/portfolio-overview'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CellGrid, Panel } from '@/components/ui/panel'
+import { Reveal } from '@/components/motion/reveal'
+import { Toast, useToast } from '@/components/motion/toast'
 import { formatHeaderDate } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -25,7 +26,14 @@ const CONNECT_ERRORS: Record<string, string> = {
 function DashboardContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+    /**
+     * The OAuth result surfaces as a toast (recipe 22): it rises on the slower
+     * open clock and leaves on the faster close clock, so it reads as
+     * deliberate arriving and out-of-the-way leaving. Previously an
+     * `AnimatePresence` block whose exit ran at the same speed as its
+     * entrance, which made dismissal feel sluggish.
+     */
+    const { toast, show, dismiss } = useToast()
 
     // Surface the result of the Dhan OAuth round trip, then clean the URL so a
     // refresh does not replay the message.
@@ -34,14 +42,15 @@ function DashboardContent() {
         const error = searchParams.get('error')
         if (!success && !error) return
 
-        setToast(
+        show(
             success === 'true'
                 ? { tone: 'success', message: 'Dhan account connected.' }
                 : { tone: 'error', message: CONNECT_ERRORS[error || ''] || 'Unable to connect Dhan.' },
         )
         router.replace('/dashboard')
-        const timer = window.setTimeout(() => setToast(null), 6000)
-        return () => window.clearTimeout(timer)
+        // `show` is stable for the life of the hook; depending on it would
+        // re-fire the toast on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router, searchParams])
 
     /**
@@ -54,26 +63,10 @@ function DashboardContent() {
 
     return (
         <>
-            <AnimatePresence>
-                {toast && (
-                    <motion.div
-                        role="status"
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className={`fixed right-5 top-[68px] z-50 rounded-xl border px-4 py-3 text-[12px] shadow-2xl backdrop-blur-xl ${
-                            toast.tone === 'success'
-                                ? 'border-positive/25 bg-[#101713] text-positive'
-                                : 'border-negative/25 bg-[#191111] text-negative'
-                        }`}
-                    >
-                        {toast.message}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <Toast toast={toast} onDismiss={dismiss} />
 
             <header className="mb-7 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-                <div>
+                <Reveal immediate>
                     {/* Non-breaking space holds the line so the heading does not shift. */}
                     <p className="dash-label mb-2">{today || '\u00A0'}</p>
                     <h1 className="text-[28px] font-medium leading-none tracking-[-0.04em] text-ink-primary sm:text-[34px]">
@@ -82,7 +75,7 @@ function DashboardContent() {
                     <p className="mt-2.5 text-[12px] text-ink-tertiary">
                         Balances, positions and order flow from your connected Dhan account.
                     </p>
-                </div>
+                </Reveal>
                 <DhanConnect />
             </header>
 
@@ -103,16 +96,16 @@ function DashboardFallback() {
             <div className="mb-7 flex flex-col justify-between gap-6 md:flex-row md:items-end">
                 <div>
                     <Skeleton className="h-2.5 w-40" />
-                    <Skeleton className="mt-3 h-8 w-52" />
-                    <Skeleton className="mt-3 h-2.5 w-72" />
+                    <Skeleton className="mt-3 h-8 w-52" delay={40} />
+                    <Skeleton className="mt-3 h-2.5 w-72" delay={80} />
                 </div>
-                <Skeleton className="h-12 w-52 rounded-2xl" />
+                <Skeleton className="h-12 w-52 rounded-2xl" delay={120} />
             </div>
             <CellGrid className="grid-cols-2 lg:grid-cols-5">
                 {[0, 1, 2, 3, 4].map((item) => (
                     <div key={item} className="p-5">
-                        <Skeleton className="h-2.5 w-20" />
-                        <Skeleton className="mt-4 h-5 w-24" />
+                        <Skeleton className="h-2.5 w-20" delay={item * 40} />
+                        <Skeleton className="mt-4 h-5 w-24" delay={item * 40} />
                     </div>
                 ))}
             </CellGrid>

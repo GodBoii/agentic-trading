@@ -8,6 +8,8 @@ import { useTradeSessions } from '@/components/trades/use-trade-sessions'
 import { Notice } from '@/components/ui/notice'
 import { CellGrid, Panel } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageSwitch } from '@/components/motion/page-switch'
+import { Reveal } from '@/components/motion/reveal'
 
 /**
  * Trade history, now a route of its own.
@@ -45,7 +47,7 @@ function TradesPageContent() {
 
     return (
         <>
-            <header className="mb-6">
+            <Reveal immediate as="header" className="mb-6">
                 <p className="dash-label mb-2">History</p>
                 <h1 className="text-[28px] font-medium leading-none tracking-[-0.04em] text-ink-primary sm:text-[34px]">
                     Trades
@@ -54,7 +56,7 @@ function TradesPageContent() {
                     Every archived agent run, grouped by trading day. Open a run for its decision, the charts it was
                     made from, and the full event log.
                 </p>
-            </header>
+            </Reveal>
 
             {detailError && (
                 <Notice tone="danger" className="mb-4">
@@ -62,19 +64,25 @@ function TradesPageContent() {
                 </Notice>
             )}
 
-            {selected ? (
-                <SessionDetail session={selected} onBack={closeSession} />
-            ) : (
-                <TradeArchive
-                    sessions={sessions}
-                    loading={listLoading}
-                    error={listError}
-                    openingId={openingId}
-                    onOpen={open}
-                    onPrefetch={prefetchSession}
-                    onRetry={() => void reload()}
-                />
-            )}
+            {/* Archive ⇄ run detail is a list/detail pair, so it slides
+                (recipe 08): the archive exits left as the run enters from the
+                right, and the reverse on the way back. The direction is what
+                tells the reader they went deeper rather than sideways. */}
+            <PageSwitch
+                page={selected ? 2 : 1}
+                list={
+                    <TradeArchive
+                        sessions={sessions}
+                        loading={listLoading}
+                        error={listError}
+                        openingId={openingId}
+                        onOpen={open}
+                        onPrefetch={prefetchSession}
+                        onRetry={() => void reload()}
+                    />
+                }
+                detail={selected ? <SessionDetail session={selected} onBack={closeSession} /> : null}
+            />
         </>
     )
 }
@@ -90,8 +98,8 @@ function TradesFallback() {
             <CellGrid className="grid-cols-2 lg:grid-cols-4">
                 {[0, 1, 2, 3].map((item) => (
                     <div key={item} className="p-5">
-                        <Skeleton className="h-2.5 w-20" />
-                        <Skeleton className="mt-4 h-5 w-16" />
+                        <Skeleton className="h-2.5 w-20" delay={item * 40} />
+                        <Skeleton className="mt-4 h-5 w-16" delay={item * 40} />
                     </div>
                 ))}
             </CellGrid>
