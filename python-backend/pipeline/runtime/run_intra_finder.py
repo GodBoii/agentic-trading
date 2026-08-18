@@ -20,10 +20,20 @@ class IntraFinderHealthHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib signature
-        if self.path.rstrip("/") != "/health":
+        path = self.path.rstrip("/")
+        if path not in {"/health", "/live"}:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        healthy, payload = self.service.health_payload()
+        ready, payload = self.service.health_payload()
+        if path == "/live":
+            healthy = True
+            payload = {
+                "status": "healthy",
+                "readiness": payload.get("status", "unknown"),
+                "reason": payload.get("reason", "unknown"),
+            }
+        else:
+            healthy = ready
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         try:
             self.send_response(HTTPStatus.OK if healthy else HTTPStatus.SERVICE_UNAVAILABLE)
