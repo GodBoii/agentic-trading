@@ -12,14 +12,15 @@
    ```
 
 4. Build and start the complete production stack, including the Cloudflare
-   connector:
+   connector, in detached mode:
 
    ```powershell
-   docker compose --profile ai up --build -d
+   npm run backend:start
    ```
 
-   `ai-trading-agents` is part of the default stack. The `ai` profile adds
-   `cloudflared`, which publishes the gateway at `api.polycognition.online`.
+   This runs `docker compose up --build -d`. The `cloudflared` connector is
+   part of the default stack and publishes the gateway at
+   `api.polycognition.online`.
 
 5. Check:
 
@@ -37,7 +38,9 @@
 - Gateway becomes healthy.
 - AI trading gateway becomes healthy before Intra-Finder is allowed to start.
 - Universe Scanner runs at or after 08:40 IST.
-- Intra-Finder starts after today's successful universe exists.
+- Intra-Finder starts immediately, reports `WAITING_FOR_UNIVERSE` while the
+  daily scan is running, and subscribes only after today's successful universe
+  exists.
 - One-minute indicator calculations begin after the first completed candle.
 - EMA and RSI need enough completed candles before their first event can appear.
 - Aggregated indicator events appear in `results/stage2/YYYY-MM-DD/setup-events.jsonl`.
