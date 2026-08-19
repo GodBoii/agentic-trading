@@ -29,6 +29,13 @@ import { Tooltip } from '@/components/motion/tooltip'
  *     attribute. A native `title` has an uncontrollable delay, cannot be
  *     styled, and never appears for keyboard users — which for a truncated
  *     identifier means the full value was effectively unavailable.
+ *
+ * The wordmark links to `/`. It pointed at `/dashboard`, which made it a third
+ * control doing the same job as the Dashboard tab sitting inches away, and left
+ * the marketing site unreachable from inside the app: the one gesture everybody
+ * tries for "take me back to the start" did nothing on the dashboard and looked
+ * like a dead link. A logo going home is the strongest convention on the web,
+ * and the tab rail already owns section switching.
  */
 
 const NAV_ITEMS = [
@@ -64,18 +71,23 @@ export default function ProductHeader({
         try {
             await createClient().auth.signOut()
             router.push('/')
+            // `/` renders its auth-dependent copy on the server now, so the
+            // router cache would hand back the payload from before sign-out and
+            // the landing page would still offer "Open dashboard". Refresh
+            // discards it and re-renders against the cleared cookie.
+            router.refresh()
         } finally {
             setSigningOut(false)
         }
     }
 
     return (
-        <header className="sticky top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur-xl">
+        <header className="sticky top-0 z-[var(--z-header)] border-b border-line bg-canvas/90 backdrop-blur-xl">
             <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-3 px-5 sm:gap-5 sm:px-8">
                 <Link
-                    href="/dashboard"
-                    className="group flex flex-shrink-0 items-center gap-2.5 rounded-lg"
-                    aria-label="PolyCognition dashboard"
+                    href="/"
+                    className="group t-press flex flex-shrink-0 items-center gap-2.5 rounded-lg"
+                    aria-label="PolyCognition home"
                 >
                     <BrandMark
                         className="h-7 w-7 transition-transform duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
