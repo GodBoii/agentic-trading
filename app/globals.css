@@ -1653,10 +1653,17 @@ body {
 /* `aria-current` is honoured alongside `aria-selected` so the same pill
    mechanics can drive route navigation, where the correct semantic is
    "this is the current page", not "this tab is selected". */
-.t-tab:not([aria-selected="true"]):not([aria-current="page"]):hover,
+.t-tab:not([aria-selected="true"]):not([aria-current="page"]):not([aria-checked="true"]):hover,
 .t-tab[aria-selected="true"],
-.t-tab[aria-current="page"] {
+.t-tab[aria-current="page"],
+.t-tab[aria-checked="true"] {
   color: var(--tabs-text-active);
+}
+/* `aria-checked` covers the radio-group variant: the same control, used for a
+   value the user commits rather than a view they are browsing. */
+.t-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 .t-tab[aria-current="page"] .t-tab-count { color: var(--dash-text-secondary); }
 .t-tab:focus-visible {
