@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 import { motionMs } from './tokens'
 
@@ -54,6 +55,22 @@ export function useModal(open: boolean) {
  * Hand-rolled rather than pulled from a dialog library: the project has no
  * component-primitive dependency, and this needs exactly three behaviours —
  * dismiss, restore focus, and trap Tab.
+ *
+ * Rendered into `document.body` through a portal. `position: fixed` and a high
+ * z-index are not enough on their own, and this is not a theoretical concern —
+ * it was a live bug. `DhanConnect` renders its log-out dialog inside a
+ * `SkeletonReveal`, whose content layer carries a `filter` at all times. A
+ * non-`none` filter makes an element a containing block for fixed-position
+ * descendants *and* opens a stacking context, so the dialog sized itself
+ * against the 320px broker pill and its z-index was clamped inside a box that
+ * painted below the portfolio cards. The scrim could not cover the page and the
+ * dialog appeared behind the metrics row.
+ *
+ * A portal is the only fix that holds regardless of what an ancestor does with
+ * `filter`, `transform`, `contain`, `backdrop-filter`, `will-change`, or
+ * `overflow`. Any of those would re-trap the dialog. Keeping the JSX inside the
+ * owning component (rather than hoisting the dialog to a layout) keeps the
+ * state colocated; the portal only changes where it paints.
  */
 export function Modal({
     open,
@@ -73,6 +90,41 @@ export function Modal({
     const { present, open: shown } = useModal(open)
     const surface = useRef<HTMLDivElement | null>(null)
     const restoreTo = useRef<HTMLElement | null>(null)
+    /** Resolved after mount: `document` does not exist during SSR. */
+    const [host, setHost] = useState<HTMLElement | null>(null)
+
+    useEffect(() => {
+        setHost(document.body)
+    }, [])
+
+    // Hold the page still for as long as the dialog is mounted. Keyed on
+    // `present`, not `open`, so the lock outlives the exit animation instead of
+    // releasing under a dialog that is still fading.
+    //
+    // The lock goes on the root element, not `body`. The viewport takes its
+    // overflow from `html`, so `overflow: hidden` on `body` leaves the document
+    // scrollable in the general case, and this project already sets
+    // `body { overflow-x: hidden }` — writing an inline `overflow` there would
+    // fight a rule that exists for a different reason.
+    //
+    // Hiding the scrollbar frees its gutter, which re-centres every `mx-auto`
+    // container on the page: an 8px sideways jerk at the exact moment the dialog
+    // scales in. Replacing the gutter with equal padding keeps the content box
+    // the width it already was, so nothing moves.
+    useEffect(() => {
+        if (!present) return
+        const root = document.documentElement
+        const gutter = window.innerWidth - root.clientWidth
+        const previous = { overflow: root.style.overflow, paddingRight: root.style.paddingRight }
+
+        root.style.overflow = 'hidden'
+        if (gutter > 0) root.style.paddingRight = `${gutter}px`
+
+        return () => {
+            root.style.overflow = previous.overflow
+            root.style.paddingRight = previous.paddingRight
+        }
+    }, [present])
 
     // Remember what had focus so it can be handed back on dismissal —
     // otherwise focus falls to the top of the document and keyboard users
@@ -128,10 +180,13 @@ export function Modal({
         [onClose],
     )
 
-    if (!present) return null
+    if (!present || !host) return null
 
-    return (
-        <div className="fixed inset-0 z-[100] grid place-items-center px-5" onKeyDown={onKeyDown}>
+    return createPortal(
+        <div
+            className="fixed inset-0 z-[var(--z-modal)] grid place-items-center px-5"
+            onKeyDown={onKeyDown}
+        >
             <div
                 className={cn('t-modal-scrim absolute inset-0 bg-black/70 backdrop-blur-sm', shown && 'is-open')}
                 onClick={onClose}
@@ -153,6 +208,7 @@ export function Modal({
             >
                 {children}
             </div>
-        </div>
+        </div>,
+        host,
     )
 }
