@@ -53,8 +53,8 @@ function TradesPageContent() {
                     Trades
                 </h1>
                 <p className="mt-2.5 max-w-xl text-[12px] leading-relaxed text-ink-tertiary">
-                    Every archived agent run, grouped by trading day. Open a run for its decision, the charts it was
-                    made from, and the full event log.
+                    Every archived agent run, grouped by trading day. Open a run for its decision and the full event
+                    log, charts included.
                 </p>
             </Reveal>
 
