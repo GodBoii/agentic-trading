@@ -68,6 +68,24 @@
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
+  /* ── Z layers ──
+     One ordered scale for everything that stacks. Overlay z-index used to be
+     eight unrelated literals spread across component files, which is how the
+     Dhan log-out dialog ended up painting underneath the portfolio cards: the
+     dialog asked for 100 and got it, but inside an ancestor stacking context
+     that itself sat below the page body. z-index alone cannot fix that — an
+     overlay also has to escape its ancestors (see `Modal`'s portal) — but a
+     shared scale is what makes the intended order reviewable in one place.
+
+     Anything below `--z-overlay` participates in page flow. Anything at or
+     above it is chrome that must render over the whole document. */
+  --z-raised: 1;      /* sticky table head, active tab pill */
+  --z-header: 40;     /* product header (sticky) */
+  --z-nav: 50;        /* landing nav (fixed) */
+  --z-overlay: 60;    /* tooltip: floats over content, dismisses on blur */
+  --z-toast: 90;      /* transient, non-blocking */
+  --z-modal: 100;     /* blocking: scrim + focus trap, tops everything */
+
   /* ─────────────────────────────────────────────────────────────
      MOTION TOKENS — the shared scale
      One source of truth for every duration, easing, travel distance,
@@ -1559,6 +1577,15 @@ body {
 .t-skel-flow > .t-skel-content { display: none; }
 .t-skel-flow.is-revealed > .t-skel-skeleton { display: none; }
 .t-skel-flow.is-revealed > .t-skel-content { display: block; }
+/* Drop the filter entirely once revealed, rather than resting at `blur(0)`.
+   In the flow variant the layers swap via `display`, so no transition can run
+   between them and the cross-blur above is inert here — but a non-`none`
+   filter still costs a permanent compositing layer, creates a stacking
+   context, and makes the element a containing block for `position: fixed`
+   descendants. That last one is what trapped the Dhan dialog: `fixed inset-0`
+   resolved against a 320px pill instead of the viewport. Purely a no-op
+   visually, since neither property can animate across a `display` change. */
+.t-skel-flow.is-revealed > .t-skel-content { filter: none; }
 
 /* Pulse lives on the bars, not the skeleton itself, so the skeleton's
    own opacity/filter stay free for the cross-fade above. */
@@ -1717,7 +1744,7 @@ body {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 50%;
-  z-index: 60;
+  z-index: var(--z-overlay);
   transform: translate(-50%, 0) scale(var(--tt-scale));
   transform-origin: 50% 100%;
   padding: 6px 10px;
