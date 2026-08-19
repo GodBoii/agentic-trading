@@ -39,33 +39,27 @@ export function groupSessionsByDate(sessions: TradeSessionSummary[]): TradeDateG
 }
 
 /**
- * Replaces `statusColor()`, which returned `bg-success` / `bg-danger` /
- * `bg-warning` — none of which existed in the Tailwind config, so every status
- * dot in the archive rendered transparent.
+ * Status presentation for an opened run. Only the detail request reads the
+ * `runs` column, so this is the one place in Trades where the backend status is
+ * real rather than a placeholder.
  */
 export function sessionStatusTone(status: string): Tone {
     if (status === 'completed') return 'positive'
     if (status === 'failed' || status === 'error') return 'negative'
-    return 'warning'
+    if (status === 'running') return 'warning'
+    return 'neutral'
 }
 
-export interface StatusTally {
-    completed: number
-    failed: number
-    inProgress: number
-}
-
-export function tallyStatuses(sessions: TradeSessionSummary[]): StatusTally {
-    return sessions.reduce<StatusTally>(
-        (tally, session) => {
-            const tone = sessionStatusTone(session.status)
-            if (tone === 'positive') tally.completed += 1
-            else if (tone === 'negative') tally.failed += 1
-            else tally.inProgress += 1
-            return tally
-        },
-        { completed: 0, failed: 0, inProgress: 0 },
-    )
+/**
+ * The raw value can be `unknown`, which happens when a session was persisted
+ * with no run records. "Archived" is what that means to somebody reading their
+ * own trade history; "UNKNOWN" is what it means to whoever wrote the query.
+ */
+export function sessionStatusLabel(status: string) {
+    if (status === 'completed') return 'Completed'
+    if (status === 'failed' || status === 'error') return 'Failed'
+    if (status === 'running') return 'Running'
+    return 'Archived'
 }
 
 export function countAgents(sessions: TradeSessionSummary[]) {
