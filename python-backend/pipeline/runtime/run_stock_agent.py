@@ -13,6 +13,7 @@ from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.ip_whitelist_guard import IpWhitelistGuard
 from pipeline.services.trading_amount_service import TradingAmountService
 from pipeline.stock import StockAgent, StockDecisionContextBuilder
 from pipeline.stock.toolkits import (
@@ -446,7 +447,9 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         )
         results: Dict[int, Dict[str, Any]] = {}
         failures: List[Dict[str, Any]] = []
-        execution_coordinator = StockExecutionCoordinator()
+        execution_coordinator = StockExecutionCoordinator(
+            ip_guard=IpWhitelistGuard(self.dhan, self.config.ai_trading_state_path),
+        )
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
