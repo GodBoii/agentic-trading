@@ -1,7 +1,0 @@
-interface:
-  display_name: "UI Motion Recipes"
-  short_description: "Polished UI motion and visual effects"
-  default_prompt: "Use $ui-motion-recipes to choose and implement an appropriate UI animation or effect."
-
-policy:
-  allow_implicit_invocation: false

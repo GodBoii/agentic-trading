@@ -135,3 +135,8 @@ python-backend/all_stocks_*.json
 *access-token*.png
 dhan-*.png
 alpha-vantage.png
+
+# Agent instructions and skills
+AGENTS.md
+agents.md
+skills/
