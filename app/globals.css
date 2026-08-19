@@ -562,6 +562,26 @@ body {
   border-top: 1px solid var(--dash-border);
 }
 
+/* Phone widths. 1.25rem each side costs 40px of a 360px viewport, which is
+   where agent prose and chart grids started losing a word per line. The
+   header also stops forcing its title and actions onto one line — a long
+   instrument name beside a status badge had nowhere to go but squeezed. */
+@media (max-width: 640px) {
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+  /* The title block takes the line it wrapped onto, so `truncate` still has a
+     width to truncate against. */
+  .panel-header > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .panel-body { padding: 1rem; }
+  .panel-footer { padding: 0.6875rem 1rem; }
+}
+
 /* ── Hairline cell grid ──
    Replaces the `gap-px bg-line + per-cell background` idiom that was
    repeated in a dozen places. Column count still comes from Tailwind
@@ -696,6 +716,33 @@ body {
 /* While one card is loading, the others dim — but the busy one stays legible
    so the spinner reads as progress rather than as a disabled control. */
 .card-button:disabled:not([aria-busy="true"]) { opacity: 0.45; }
+
+/* ── Archive run row ──
+   A full-width row inside a clipped panel, so hover is a background tint
+   (from .card-button) plus a rail that wipes in from the row's centre.
+   Deliberately not the hover-group lift: a transform on these rows scales
+   the text blurry, nudges the neighbouring rows, and crops against the
+   panel's overflow:hidden at the top and bottom of a day. */
+.archive-row { position: relative; }
+.archive-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.archive-row:hover::before,
+.archive-row:focus-visible::before { transform: scaleY(1); }
+.archive-row:disabled::before { transform: scaleY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .archive-row::before { transition: none !important; }
+}
 
 /* ── Agent event timeline rail ── */
 .event-timeline { position: relative; }
