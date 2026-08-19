@@ -72,7 +72,7 @@ export function Toast({
             aria-live="polite"
             data-from="top"
             className={cn(
-                't-toast fixed right-5 top-[68px] z-[90] flex max-w-[calc(100vw-2.5rem)] items-center gap-2.5 rounded-xl border px-3.5 py-3 text-[12px] shadow-[0_22px_60px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl',
+                't-toast fixed right-5 top-[68px] z-[var(--z-toast)] flex max-w-[calc(100vw-2.5rem)] items-center gap-2.5 rounded-xl border px-3.5 py-3 text-[12px] shadow-[0_22px_60px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl',
                 TONE_SURFACE[shown.tone],
                 open && 'is-open',
             )}
