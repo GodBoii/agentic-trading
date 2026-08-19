@@ -7,10 +7,15 @@ import { Notice } from '@/components/ui/notice'
 import { Panel, PanelBody, PanelFooter, PanelHeader } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { SegmentedChoice, type TabItem } from '@/components/ui/tabs'
+import { DisclosurePanel } from '@/components/motion/accordion'
 import { ErrorMessage, useErrorShake } from '@/components/motion/error-field'
+import { NumberFlow } from '@/components/motion/number-flow'
 import { SkeletonReveal } from '@/components/motion/skeleton-reveal'
 import { SuccessCheck } from '@/components/motion/success-check'
 import { formatDateTime, money } from '@/lib/format'
+import { autoSlotAmount, parseSlotCount } from '@/lib/trade-sizing'
+import type { Funds } from '@/components/dashboard/types'
 
 interface TradingKeys {
     token_expiry: string | null
@@ -24,38 +29,68 @@ interface AmountStatus {
     message: string
     trade_amount: number | null
     amount_updated_at_utc?: string
+    /**
+     * Slots auto mode budgets for. Optional: the API does not return it yet, so
+     * the UI falls back to the shared constant until the backend owns the rule.
+     */
+    auto_slots?: number
 }
+
+/** `manual` is the API's word for it; `fixed` is what the user is choosing. */
+type SizingMode = 'auto' | 'fixed'
+
+const MODES: TabItem<SizingMode>[] = [
+    { id: 'auto', label: 'Auto' },
+    { id: 'fixed', label: 'Fixed amount' },
+]
 
 /**
  * Per-trade capital sizing.
  *
- * Blank means "size from available balance at execution time"; a value fixes
- * the amount. That distinction drives which trades the scanner considers
- * affordable, so the resolved mode is stated explicitly rather than left
- * implied by an empty input.
+ * Two modes, and which one is active used to be implied by whether the input
+ * was empty. That is a poor way to express a setting that moves real money: an
+ * empty field reads as "not filled in yet" far more naturally than it reads as
+ * "size from the balance automatically", and the panel could not state what was
+ * actually saved because the badge was derived from the draft input rather than
+ * from the stored configuration. Mode is now an explicit choice, and the header
+ * badge reports the committed value — `Auto: available balance` or the rupee
+ * figure — regardless of what is currently typed.
+ *
+ * Auto divides the available balance into equal slots rather than letting one
+ * event consume all of it; see `lib/trade-sizing.ts` for the rule.
  *
  * Motion. This is a form that commits a number affecting real money, so the
  * feedback is where the motion goes:
  *
+ *   - The mode pill travels between Auto and Fixed (recipe 16), as a radio
+ *     group rather than a tablist: this is a value the user commits, not a view
+ *     they are browsing.
+ *
+ *   - Each mode's detail grows and shrinks on the accordion's grid-rows
+ *     mechanics (recipe 21), so switching mode resizes one region instead of
+ *     cutting between two panels of different heights. The collapsed branch's
+ *     input is disabled, so it cannot be reached by keyboard.
+ *
+ *   - The auto figures re-enter when the broker balance arrives or moves
+ *     (recipe 02). They are live money read from Dhan, and marking that they
+ *     changed is the point.
+ *
  *   - An invalid amount shakes the field and reveals its message beneath it
- *     (recipe 12). Previously the validation message replaced the hint text in
- *     place and a red notice appeared at the bottom of the panel — easy to miss
- *     while the eye is still on the field that caused it. The shake puts the
- *     feedback where the problem is, and typing cancels it so the user is not
- *     shaking at a value they are already correcting.
+ *     (recipe 12). The shake puts the feedback where the problem is, and typing
+ *     cancels it so the user is not shaking at a value they are already
+ *     correcting.
  *
- *   - A successful save draws a check beside the button (recipe 10). Saving
- *     produced no acknowledgement at all before: the label reverted from
- *     "Saving" and the button greyed out because the form was no longer dirty,
- *     which is indistinguishable from the request having failed silently.
- *
- *   - The label swaps in place while saving (recipe 04), and the panel
- *     cross-fades in from its placeholder (recipe 14).
+ *   - A successful save draws a check beside the button (recipe 10), the label
+ *     swaps in place while saving (recipe 04), and the panel cross-fades in
+ *     from its placeholder (recipe 14).
  */
 export default function TradingStatus() {
     const [tradingKeys, setTradingKeys] = useState<TradingKeys | null>(null)
+    const [mode, setMode] = useState<SizingMode>('auto')
     const [tradeAmount, setTradeAmount] = useState('')
     const [status, setStatus] = useState<AmountStatus | null>(null)
+    /** Available broker balance, for the auto-mode preview. */
+    const [available, setAvailable] = useState<number | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -84,6 +119,7 @@ export default function TradingStatus() {
                 if (!response.ok) throw new Error('Could not load your trading amount setting.')
                 const loaded: AmountStatus = await response.json()
                 setStatus(loaded)
+                setMode(loaded.trade_mode === 'manual' ? 'fixed' : 'auto')
                 setTradeAmount(loaded.trade_amount ? String(loaded.trade_amount) : '')
             } catch (loadError) {
                 setError(loadError instanceof Error ? loadError.message : 'Could not load trading settings.')
@@ -94,14 +130,27 @@ export default function TradingStatus() {
         void load()
     }, [])
 
-    const save = async () => {
-        const trimmed = tradeAmount.trim()
-        const parsed = trimmed === '' ? null : Number(trimmed)
-        if (parsed !== null && (!Number.isFinite(parsed) || parsed <= 0)) {
-            setError('Enter an amount greater than zero, or leave it blank for automatic sizing.')
-            amount.trigger()
-            return
+    /**
+     * The balance is a preview of what auto mode will divide, not a
+     * precondition for saving one, so it loads on its own and a broker outage
+     * leaves the rest of the panel intact.
+     */
+    useEffect(() => {
+        const loadBalance = async () => {
+            try {
+                const response = await fetch('/api/dhan/funds', { cache: 'no-store' })
+                if (!response.ok) return
+                const funds: Funds = await response.json()
+                const balance = Number(funds?.availabelBalance)
+                if (Number.isFinite(balance)) setAvailable(balance)
+            } catch {
+                // Preview only. The agent re-reads the balance at execution.
+            }
         }
+        void loadBalance()
+    }, [])
+
+    const save = async (nextMode: SizingMode, nextAmount: number | null) => {
         try {
             setSaving(true)
             setSaved(false)
@@ -110,12 +159,15 @@ export default function TradingStatus() {
             const response = await fetch('/api/ai-trading/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ trade_amount: parsed }),
+                body: JSON.stringify({ trade_amount: nextMode === 'auto' ? null : nextAmount }),
             })
             const payload = await response.json().catch(() => null)
             if (!response.ok) throw new Error(payload?.error || 'Could not save your trading amount setting.')
             setStatus(payload)
-            setTradeAmount(payload.trade_amount ? String(payload.trade_amount) : '')
+            setMode(payload.trade_mode === 'manual' ? 'fixed' : 'auto')
+            // Keep the typed figure when auto is saved: it is the value the user
+            // will want back if they switch to a fixed cap again.
+            if (payload.trade_amount) setTradeAmount(String(payload.trade_amount))
             setSaved(true)
         } catch (saveError) {
             setError(saveError instanceof Error ? saveError.message : 'Could not save your trading amount setting.')
@@ -131,8 +183,8 @@ export default function TradingStatus() {
                 <PanelHeader label="Trade sizing" title="Connect your broker first" />
                 <PanelBody>
                     <p className="text-[12px] leading-relaxed text-ink-secondary">
-                        Link your Dhan account from the Portfolio screen. Once connected you can leave sizing automatic
-                        or fix an amount per trade.
+                        Link your Dhan account from the Portfolio screen. Once connected you can let the agent size each
+                        trade from your balance, or fix an amount per trade.
                     </p>
                 </PanelBody>
             </Panel>
@@ -143,8 +195,42 @@ export default function TradingStatus() {
     const trimmed = tradeAmount.trim()
     const parsed = trimmed === '' ? null : Number(trimmed)
     const invalid = parsed !== null && (!Number.isFinite(parsed) || parsed <= 0)
-    const automatic = trimmed === ''
-    const dirty = String(status?.trade_amount ?? '') !== trimmed
+
+    const savedMode: SizingMode = status?.trade_mode === 'manual' ? 'fixed' : 'auto'
+    const savedAmount = status?.trade_amount ?? null
+    const configured = Boolean(status?.configured)
+    const slots = parseSlotCount(status?.auto_slots)
+    const perSlot = available === null ? null : autoSlotAmount(available, slots)
+
+    /**
+     * A saved-but-not-eligible configuration (a stale timestamp) is fixed by
+     * saving the same value again, which the status message tells the user to
+     * do — so "nothing changed" must not disable the button in that state.
+     */
+    const needsResave = configured && status?.eligible === false
+    const changed = mode === 'auto' ? savedMode !== 'auto' : parsed !== savedAmount || savedMode !== 'fixed'
+    const complete = mode === 'auto' || (parsed !== null && !invalid)
+    /** Nothing is stored yet, so Auto is still a change even if it is selected. */
+    const pending = !configured || changed
+    const canSave = complete && !invalid && !tokenExpired && (pending || needsResave)
+
+    const changeMode = (next: SizingMode) => {
+        setMode(next)
+        setSaved(false)
+        setError(null)
+        amount.clear()
+        // Offer the stored cap back rather than an empty field.
+        if (next === 'fixed' && trimmed === '' && savedAmount) setTradeAmount(String(savedAmount))
+    }
+
+    const submit = () => {
+        if (mode === 'fixed' && (parsed === null || invalid)) {
+            setError('Enter an amount greater than zero, or switch to Auto.')
+            amount.trigger()
+            return
+        }
+        void save(mode, parsed)
+    }
 
     return (
         <SkeletonReveal loading={loading} skeleton={<SizingSkeleton />} label="Loading trade sizing" flow>
@@ -154,81 +240,144 @@ export default function TradingStatus() {
                     label="Trade sizing"
                     title="Capital per trade"
                     actions={
-                        <Badge tone={automatic ? 'accent' : 'neutral'}>
-                            {automatic ? 'Auto: available balance' : 'Fixed'}
+                        // Reports what is stored, not what is typed. The saved
+                        // configuration is the one the agent will trade on.
+                        <Badge tone={!configured ? 'warning' : savedMode === 'auto' ? 'accent' : 'neutral'}>
+                            {!configured
+                                ? 'Not saved'
+                                : savedMode === 'auto'
+                                  ? 'Auto: available balance'
+                                  : money(savedAmount || 0)}
                         </Badge>
                     }
                 />
                 <PanelBody className="space-y-5">
                     <p className="max-w-prose text-[12px] leading-relaxed text-ink-secondary">
-                        Leave this blank to size automatically from the available balance at the moment of execution.
-                        Enter an amount to cap it instead — the scanner will then only consider events your account can
-                        afford; saving does not start a scan.
+                        Auto splits your available balance into {slots} equal slots, so the agent can hold {slots}{' '}
+                        trades at once instead of spending everything on the first one it finds. Fixed caps every trade
+                        at the amount you enter, and the scanner then only considers events your account can afford;
+                        saving does not start a scan.
                     </p>
 
-                    <div className={amount.wrapClass}>
-                        <label htmlFor="trade-amount" className="dash-label">
-                            Amount per trade
-                        </label>
-                        <div className="mt-2 flex items-center gap-2">
-                            {/* The bordered wrapper is the shaking element, not
-                                the input: the border is what changes tone, and
-                                translating the input alone would slide the
-                                currency glyph out of its own field. */}
-                            <div ref={amount.fieldRef} className={`${amount.fieldClass} relative flex-1 rounded-lg`}>
-                                <span
-                                    aria-hidden
-                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[13px] text-ink-tertiary"
-                                >
-                                    ₹
-                                </span>
-                                <input
-                                    id="trade-amount"
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
-                                    inputMode="decimal"
-                                    value={tradeAmount}
-                                    onChange={(event) => {
-                                        setTradeAmount(event.target.value)
-                                        setSaved(false)
-                                        // Correcting the value clears the error
-                                        // immediately rather than waiting out
-                                        // the revert timer.
-                                        amount.clear()
-                                        setError(null)
-                                    }}
-                                    placeholder="Automatic — use available balance"
-                                    disabled={tokenExpired}
-                                    aria-label="Trading amount in rupees"
-                                    aria-invalid={invalid || amount.errored}
-                                    aria-describedby="trade-amount-hint trade-amount-error"
-                                    className="dash-input dash-input-currency border-0 bg-transparent focus:shadow-none"
-                                />
-                            </div>
-                            <span className="flex items-center gap-2">
-                                <Button
-                                    variant="solid"
-                                    onClick={save}
-                                    disabled={saving || invalid || tokenExpired || !dirty}
-                                    swapLabel
-                                >
-                                    {saving ? 'Saving' : status?.configured ? 'Update' : 'Save'}
-                                </Button>
-                                {/* Persistent, not a toast: the confirmation
-                                    belongs next to the control that produced
-                                    it, and it clears on the next edit. */}
-                                {saved && <SuccessCheck size={16} className="text-positive" />}
-                            </span>
-                        </div>
-
-                        <ErrorMessage id="trade-amount-error">{error}</ErrorMessage>
-
-                        <p id="trade-amount-hint" className="mt-1 text-[10px] text-ink-tertiary">
-                            {automatic
-                                ? 'Blank field means automatic sizing from available balance.'
-                                : `Each trade will use up to ${money(parsed || 0)}.`}
+                    <div>
+                        <p id="sizing-mode-label" className="dash-label">
+                            Sizing mode
                         </p>
+                        <div className="mt-2">
+                            <SegmentedChoice
+                                items={MODES}
+                                value={mode}
+                                onChange={changeMode}
+                                ariaLabelledBy="sizing-mode-label"
+                                disabled={tokenExpired}
+                            />
+                        </div>
+                    </div>
+
+                    {/* One region, two branches. Both are grid-rows disclosures
+                        so the panel resizes rather than jumping between two
+                        heights when the mode changes. */}
+                    {/* The disclosure clips its own overflow, which would cut
+                        the field's focus ring and the error shake's travel. The
+                        inner padding gives both room; the negative margin puts
+                        the content back on the panel's own alignment. */}
+                    <div className="-mx-3 -my-2">
+                        <DisclosurePanel
+                            open={mode === 'auto'}
+                            ariaLabel="Automatic sizing"
+                            panelClassName="px-3 py-2"
+                        >
+                            <div className="rounded-lg border border-line bg-white/[0.02] p-3.5">
+                                <dl className="grid grid-cols-3 gap-3">
+                                    <SlotFigure label="Available" value={available === null ? '—' : money(available)} />
+                                    <SlotFigure label="Per trade" value={perSlot === null ? '—' : money(perSlot)} />
+                                    <SlotFigure label="Slots" value={String(slots)} plain />
+                                </dl>
+                                <p className="mt-3 text-[11px] leading-relaxed text-ink-tertiary">
+                                    {perSlot === null
+                                        ? `Your balance could not be read just now. The split still happens at execution, against whatever is available then.`
+                                        : `Up to ${money(perSlot)} per trade. The balance is re-read at execution, so each slot grows as earlier trades close.`}
+                                </p>
+                            </div>
+                        </DisclosurePanel>
+
+                        <DisclosurePanel
+                            open={mode === 'fixed'}
+                            ariaLabel="Fixed amount"
+                            panelClassName="px-3 py-2"
+                        >
+                            <div className={amount.wrapClass}>
+                                <label htmlFor="trade-amount" className="dash-label">
+                                    Amount per trade
+                                </label>
+                                <div className="mt-2 flex items-center gap-2">
+                                    {/* The bordered wrapper is the shaking
+                                        element, not the input: the border is
+                                        what changes tone, and translating the
+                                        input alone would slide the currency
+                                        glyph out of its own field. */}
+                                    <div
+                                        ref={amount.fieldRef}
+                                        className={`${amount.fieldClass} relative flex-1 rounded-lg`}
+                                    >
+                                        <span
+                                            aria-hidden
+                                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[13px] text-ink-tertiary"
+                                        >
+                                            ₹
+                                        </span>
+                                        <input
+                                            id="trade-amount"
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            inputMode="decimal"
+                                            value={tradeAmount}
+                                            onChange={(event) => {
+                                                setTradeAmount(event.target.value)
+                                                setSaved(false)
+                                                // Correcting the value clears
+                                                // the error immediately rather
+                                                // than waiting out the revert
+                                                // timer.
+                                                amount.clear()
+                                                setError(null)
+                                            }}
+                                            placeholder="Cap per trade"
+                                            // A collapsed panel still holds
+                                            // focusable children, so the field
+                                            // is disabled out of Fixed mode.
+                                            disabled={tokenExpired || mode !== 'fixed'}
+                                            aria-label="Trading amount in rupees"
+                                            aria-invalid={invalid || amount.errored}
+                                            aria-describedby="trade-amount-hint trade-amount-error"
+                                            className="dash-input dash-input-currency border-0 bg-transparent focus:shadow-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <ErrorMessage id="trade-amount-error">{error}</ErrorMessage>
+
+                                <p id="trade-amount-hint" className="mt-1 text-[10px] text-ink-tertiary">
+                                    {parsed === null || invalid
+                                        ? 'The most one trade may use. Nothing is placed above it.'
+                                        : `Each trade will use up to ${money(parsed)}.`}
+                                </p>
+                            </div>
+                        </DisclosurePanel>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button variant="solid" onClick={submit} disabled={saving || !canSave} swapLabel>
+                            {saving ? 'Saving' : configured ? 'Update' : 'Save'}
+                        </Button>
+                        {/* Persistent, not a toast: the confirmation belongs
+                            next to the control that produced it, and it clears
+                            on the next edit. */}
+                        {saved && <SuccessCheck size={16} className="text-positive" />}
+                        {pending && !saving && !saved && (
+                            <span className="text-[10px] text-ink-tertiary">Not saved yet</span>
+                        )}
                     </div>
 
                     {tokenExpired ? (
@@ -238,7 +387,7 @@ export default function TradingStatus() {
                         </Notice>
                     ) : (
                         <Notice tone={status?.eligible ? 'neutral' : 'warning'}>
-                            {status?.message || 'Leave blank for automatic balance sizing, or enter a fixed amount.'}
+                            {status?.message || 'Choose Auto to size from your balance, or Fixed to cap each trade.'}
                         </Notice>
                     )}
                 </PanelBody>
@@ -255,6 +404,24 @@ export default function TradingStatus() {
     )
 }
 
+/**
+ * One figure in the auto-mode split.
+ *
+ * `plain` opts out of the pop-in for values that are configuration rather than
+ * money: the slot count does not move on its own, so animating it would imply
+ * a change that never happens.
+ */
+function SlotFigure({ label, value, plain }: { label: string; value: string; plain?: boolean }) {
+    return (
+        <div>
+            <dt className="dash-label">{label}</dt>
+            <dd className="mt-1 font-mono text-[13px] tabular-nums text-ink-primary">
+                {plain ? value : <NumberFlow value={value} />}
+            </dd>
+        </div>
+    )
+}
+
 function SizingSkeleton() {
     return (
         <Panel>
@@ -263,8 +430,9 @@ function SizingSkeleton() {
             </div>
             <div className="panel-body space-y-4">
                 <Skeleton className="h-2.5 w-full max-w-md" delay={40} />
-                <Skeleton className="h-9 w-full" delay={80} />
-                <Skeleton className="h-10 w-full" delay={120} />
+                <Skeleton className="h-9 w-48" delay={80} />
+                <Skeleton className="h-16 w-full" delay={120} />
+                <Skeleton className="h-9 w-24" delay={160} />
             </div>
         </Panel>
     )
