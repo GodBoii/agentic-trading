@@ -9,13 +9,27 @@ import { CodeBlock, Disclosure } from './disclosure'
  * emitted three placeholder cards reading "Not captured in this run" — filling
  * a third of the workspace with the information that there is no information.
  */
+/**
+ * Billing is not part of a trading audit trail.
+ *
+ * Agno writes a `cost` figure into every run's `metrics`, so it arrived in this
+ * panel by default and put the model provider's invoice next to the decision the
+ * agent made. Filtered on a key match rather than one hardcoded name, because
+ * the same block also carries `total_cost` depending on the provider.
+ */
+function isCostKey(key: string) {
+    return /(^|_)cost(_|$)/i.test(key)
+}
+
 function readRunMetadata(metadata?: Record<string, unknown> | null) {
     const usage = pickRecord(metadata?.token_usage) || pickRecord(metadata?.metrics)
     const toolSummary = pickRecord(metadata?.tool_summary)
     return {
-        usageEntries: scalarEntries(usage),
+        usageEntries: scalarEntries(usage).filter(([key]) => !isCostKey(key)),
         // `largest_result` is a payload dump, not a metric; it belongs in raw data.
-        summaryEntries: scalarEntries(toolSummary).filter(([key]) => key !== 'largest_result'),
+        summaryEntries: scalarEntries(toolSummary).filter(
+            ([key]) => key !== 'largest_result' && !isCostKey(key),
+        ),
         toolCalls: Array.isArray(metadata?.tool_calls) ? metadata.tool_calls : [],
         reasoning: readReasoning(metadata),
     }
