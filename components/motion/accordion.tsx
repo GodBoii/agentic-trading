@@ -74,6 +74,41 @@ export function Accordion({
     )
 }
 
+/**
+ * The accordion's growing region without a trigger of its own.
+ *
+ * For a region whose open state belongs to a control that already exists — a
+ * mode selector, a checkbox, a filter — where adding a second header button
+ * would give the user two ways to reach one piece of state.
+ *
+ * The caller is responsible for keeping collapsed content out of the tab
+ * order. `aria-hidden` hides it from assistive tech, but a `0fr` grid track
+ * with `overflow: hidden` does not remove a focusable child from the sequence,
+ * so inputs inside a closed panel must also be `disabled`.
+ */
+export function DisclosurePanel({
+    open,
+    children,
+    className,
+    panelClassName,
+    ariaLabel,
+}: {
+    open: boolean
+    children: ReactNode
+    className?: string
+    /** Padding goes here, never on the grid track. */
+    panelClassName?: string
+    ariaLabel?: string
+}) {
+    return (
+        <div className={cn('t-acc', className)} data-open={open}>
+            <div className="t-acc-panel" role="group" aria-label={ariaLabel} aria-hidden={!open}>
+                <div className={cn('t-acc-panel-inner', panelClassName)}>{children}</div>
+            </div>
+        </div>
+    )
+}
+
 /** Controlled disclosure, for accordion groups with one-open-at-a-time. */
 export function AccordionShell({
     open,
