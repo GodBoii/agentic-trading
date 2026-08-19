@@ -40,6 +40,7 @@ const secondsFormat = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute:
 const dateTimeFormat = new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 const weekdayFormat = new Intl.DateTimeFormat(LOCALE, { weekday: 'long' })
 const longDateFormat = new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: 'long', year: 'numeric' })
+const shortDateFormat = new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: 'short', year: 'numeric' })
 const headerDateFormat = new Intl.DateTimeFormat(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })
 
 export const money = (value = 0) => moneyFormat.format(value)
@@ -98,6 +99,8 @@ export const formatDateTime = (value?: string | number | null, fallback = '—')
 export const formatWeekday = (value?: string | number | null, fallback = 'Unknown') => formatWith(weekdayFormat, value, fallback)
 /** 15 August 2026 */
 export const formatLongDate = (value?: string | number | null, fallback = 'Date unavailable') => formatWith(longDateFormat, value, fallback)
+/** 15 Aug 2026 — the long form does not fit a phone-width row. */
+export const formatShortDate = (value?: string | number | null, fallback = 'Date unavailable') => formatWith(shortDateFormat, value, fallback)
 /** Saturday, 15 August */
 export const formatHeaderDate = (value: Date) => headerDateFormat.format(value)
 
