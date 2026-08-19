@@ -35,7 +35,7 @@ export { NumberFlow, SpinningCounter } from './number-flow'
 export { Modal, useModal } from './modal'
 export { Dropdown, useDropdown, type DropdownOrigin } from './dropdown'
 export { Toast, useToast, type ToastMessage, type ToastTone } from './toast'
-export { Accordion, AccordionShell, AccordionChevron } from './accordion'
+export { Accordion, AccordionShell, AccordionChevron, DisclosurePanel } from './accordion'
 export { PageSwitch } from './page-switch'
 export { Morph } from './morph'
 
