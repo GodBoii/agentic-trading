@@ -14,6 +14,12 @@ import { StreamIndicator, streamHint } from './stream-indicator'
 /**
  * Roster ⇄ workspace switch for a run, live or archived.
  *
+ * With `soloDirect`, a run holding one agent skips the roster and renders the
+ * workspace on its own. Trade history uses it: nearly every archived run has a
+ * single agent, and the roster in between was a panel containing one card that
+ * repeated the run title from the header above it, costing a click that offered
+ * no choice.
+ *
  * Motion (recipe 08, page side-by-side). Opening an agent and coming back out
  * are the clearest list ⇄ detail pair in the product, so they slide: the roster
  * exits left as the workspace enters from the right, and the reverse on the way
@@ -35,12 +41,21 @@ export function AgentConsole({
     sessionAgents,
     stream,
     emptyState,
+    soloDirect = false,
 }: {
     runStatus: AgentRunStatus | null
     liveEvents: Record<number, LiveAgentEvent[]>
     sessionAgents?: AgentResult[]
     stream: StreamState
     emptyState?: { title: string; detail: string }
+    /**
+     * Skip the roster when the run holds exactly one agent and open it directly.
+     * A one-card roster is a click that carries no choice, and the card repeats
+     * the run title the caller has already shown. Off by default: on the live
+     * page the roster is where a run grows from one agent to several, so a
+     * second agent arriving must not yank the reader out of the first.
+     */
+    soloDirect?: boolean
 }) {
     const results: AgentResult[] = useMemo(
         () => (sessionAgents?.length ? sessionAgents : runStatus?.stages?.stock_agent?.details?.results || []),
@@ -71,10 +86,20 @@ export function AgentConsole({
         setFocusedRank(null)
     }, [runIdentity])
 
-    const focused = slots.find((slot) => slot.rank === focusedRank)
     const active = slots.filter((slot) => slot.events.length > 0)
     const completed = slots.filter((slot) => slot.complete).length
     const failed = slots.filter((slot) => slot.failed).length
+
+    // One agent and nothing to choose between: the workspace *is* the run.
+    // No back control, because the only way out belongs to the caller.
+    if (soloDirect && active.length === 1) {
+        const solo = active[0]
+        return (
+            <AgentWorkspace slot={solo} result={results.find((item) => Number(item.rank) === solo.rank)} />
+        )
+    }
+
+    const focused = slots.find((slot) => slot.rank === focusedRank)
 
     const roster = (
         <Panel aria-labelledby="agents-title" beam={stream === 'live' ? 'travel' : false}>
@@ -105,9 +130,7 @@ export function AgentConsole({
                     <div className="panel-footer flex flex-wrap items-center gap-x-5 gap-y-1 text-[10px] text-ink-tertiary">
                         <span>{completed} completed</span>
                         {failed > 0 && <span className="text-negative">{failed} failed</span>}
-                        <span className="ml-auto">
-                            Select an agent to open its decision, charts and full event log.
-                        </span>
+                        <span className="sm:ml-auto">Open an agent for its decision and full event log.</span>
                     </div>
                 </>
             )}
