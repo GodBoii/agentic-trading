@@ -35,6 +35,9 @@ class DhanAPIError(RuntimeError):
 
 class DhanService:
     RATE_LIMIT_ERROR_CODES = {"904", "805", "dh-904", "dh904", "dh-805", "dh805"}
+    # Dhan rejects order placement, modification and cancellation from a non-whitelisted
+    # IP with DH-905. Data endpoints are exempt, so this never surfaces on reads.
+    INVALID_IP_ERROR_CODES = {"905", "dh-905"}
     FOREVER_ORDER_LIST_ENDPOINTS = ("/forever/orders", "/forever/all")
     VALID_HISTORICAL_INSTRUMENTS = {
         "INDEX",
@@ -1111,7 +1114,7 @@ class DhanService:
                 return
 
             code, error_type, message = self._response_error_details(resp)
-            if code not in {"905", "dh-905"}:
+            if code not in self.INVALID_IP_ERROR_CODES:
                 return
 
             signature = f"{code}|{error_type.lower()}|{message.lower()}"
@@ -1525,6 +1528,21 @@ class DhanService:
             or code in self.RATE_LIMIT_ERROR_CODES
             or any(rate_code in joined for rate_code in self.RATE_LIMIT_ERROR_CODES if rate_code.startswith("dh"))
         )
+
+    @classmethod
+    def is_invalid_ip(cls, resp: Any) -> bool:
+        """True when Dhan refused the call because the caller IP is not whitelisted.
+
+        Order placement is the only path that can produce this, and it is never
+        retryable: every later order fails identically until the whitelist is fixed.
+        """
+        if isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success":
+            return False
+        if cls._normalized_error_code(resp) in cls.INVALID_IP_ERROR_CODES:
+            return True
+        # The dhanhq SDK nests the code under `remarks`, and callers merge the response
+        # into wider payloads, so fall back to a scan of the serialized body.
+        return "dh-905" in json.dumps(resp, default=str).lower()
 
     def is_auth_invalid(self, resp: Optional[Dict[str, Any]]) -> bool:
         if not isinstance(resp, dict):
