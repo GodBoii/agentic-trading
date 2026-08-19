@@ -2,23 +2,40 @@ import Link from 'next/link'
 import BrandMark from '@/components/brand-mark'
 
 /**
- * Footer — brand, a one-line description, real links, and the disclaimer.
+ * Footer — brand, a one-line description, links that match the session, and the
+ * disclaimer.
  *
- * Stays a server component: nothing here has state, and the only motion is a
- * colour tween on the links. Making it a client component to add an entrance
- * reveal would ship JavaScript for the least-read part of the page.
+ * Stays a server component: nothing here has state, `signedIn` arrives as a
+ * prop, and the only motion is a colour tween on the links. Making it a client
+ * component to add an entrance reveal would ship JavaScript for the least-read
+ * part of the page.
  *
- * The link hover is tokenised (250ms on the house curve) so it matches the nav
- * rather than using its own 300ms as it did before.
+ * The links used to be a fixed list of Get started / Sign in / Dashboard shown
+ * to everyone. Signed in, the first two invite you to re-create an account you
+ * already have. Signed out, "Dashboard" is a trap: `middleware.ts` bounces it
+ * straight to `/login`, so the link advertises a destination it cannot deliver.
+ * Each state now lists only the routes that work from it, and both keep the two
+ * section anchors so the footer stays a real navigation block rather than a
+ * single orphaned link.
+ *
+ * The hover is tokenised (250ms on the house curve) so it matches the nav.
  */
 
-const LINKS = [
-    { href: '/signup', label: 'Get started' },
-    { href: '/login', label: 'Sign in' },
-    { href: '/dashboard', label: 'Dashboard' },
+const SECTION_LINKS = [
+    { href: '/#platform', label: 'Platform' },
+    { href: '/#how-it-works', label: 'How it works' },
 ]
 
-export default function Footer() {
+const SIGNED_IN_LINKS = [{ href: '/dashboard', label: 'Dashboard' }]
+
+const SIGNED_OUT_LINKS = [
+    { href: '/signup', label: 'Get started' },
+    { href: '/login', label: 'Sign in' },
+]
+
+export default function Footer({ signedIn }: { signedIn: boolean }) {
+    const links = [...SECTION_LINKS, ...(signedIn ? SIGNED_IN_LINKS : SIGNED_OUT_LINKS)]
+
     return (
         <footer className="border-t border-white/[0.05] bg-[#030303] px-5 py-12 sm:px-8">
             <div className="mx-auto flex max-w-6xl flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
@@ -32,8 +49,8 @@ export default function Footer() {
                     </p>
                 </div>
 
-                <nav className="flex gap-6 text-[13px]" aria-label="Footer">
-                    {LINKS.map((link) => (
+                <nav className="flex flex-wrap gap-x-6 gap-y-3 text-[13px]" aria-label="Footer">
+                    {links.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
