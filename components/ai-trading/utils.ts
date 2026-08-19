@@ -173,6 +173,20 @@ export function agentSlotRanks(
     return ranks.length ? ranks : [fallback]
 }
 
+const LIFECYCLE_EVENTS = ['stock_agent_selection', 'stock_agent_started', 'stock_agent_charts_ready']
+
+/**
+ * True when the stream records how the run progressed, not just that it ended.
+ *
+ * A run replayed from `agno_sessions` has no stored timeline, so
+ * `mergedEventsForRank` gives it one synthesized `completed` event. Deriving a
+ * stepper from that reports three unreached stages on work that finished, which
+ * is why the workspace asks this before drawing one.
+ */
+export function hasLifecycleEvents(events: LiveAgentEvent[]) {
+    return events.some((event) => LIFECYCLE_EVENTS.includes(event.type))
+}
+
 export interface AgentMilestone {
     key: string
     label: string
