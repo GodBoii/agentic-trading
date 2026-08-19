@@ -162,18 +162,26 @@ export default function DhanConnect() {
     return (
         <SkeletonReveal
             loading={isChecking}
-            skeleton={<Skeleton className="h-12 w-full rounded-2xl sm:w-[220px]" />}
+            skeleton={<Skeleton className="h-12 w-full rounded-2xl sm:w-[320px]" />}
             label="Checking broker connection"
             flow
-            className="w-full sm:w-auto"
+            className="w-full sm:w-[320px]"
         >
-            <div className="relative w-full sm:w-auto">
+            {/* The width is declared here, on an element in normal flow.
+                `Morph` applies its size inline, but both of its layers are
+                absolutely positioned, so the pill has no in-flow content to
+                shrink-wrap: anything that resolves its width to auto collapses
+                it to zero. An auto-width utility carrying `!important` used to
+                sit on the Morph, which outranks a plain inline style, so the
+                control was 0px wide at every breakpoint above mobile. Keep
+                width off the Morph. */}
+            <div className="relative w-full sm:w-[320px]">
                 <Morph
                     open={connectOpen}
                     closedSize={{ width: '100%', height: 48 }}
                     openSize={{ width: '100%', height: 48 }}
                     className={cn(
-                        'border shadow-[0_18px_50px_-30px_rgba(0,0,0,0.9)] sm:!w-auto',
+                        'border shadow-[0_18px_50px_-30px_rgba(0,0,0,0.9)]',
                         connection && !tokenExpired
                             ? 'border-positive/20 bg-[#0D1510]'
                             : tokenExpired
@@ -182,7 +190,9 @@ export default function DhanConnect() {
                     )}
                     label="Dhan broker connection"
                     resting={
-                        <div className="flex h-full items-stretch sm:min-w-[220px]">
+                        // `min-width` here could only make this layer overflow
+                        // its own frame; the pill's width is set on the wrapper.
+                        <div className="flex h-full items-stretch">
                             <button
                                 type="button"
                                 onClick={openConnect}
