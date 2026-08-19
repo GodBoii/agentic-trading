@@ -8,18 +8,28 @@ from agno.tools import Toolkit
 
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.ip_whitelist_guard import IpWhitelistGuard
 from pipeline.stock.toolkits.markdown_result import json_tool_result_markdown, tool_result_markdown
 
 
 class StockExecutionCoordinator:
     """Serializes final margin checks and placements across stock agents in one run."""
 
-    def __init__(self) -> None:
+    def __init__(self, ip_guard: Optional[IpWhitelistGuard] = None) -> None:
         self.placement_lock = Lock()
         self.successful_orders: list[Dict[str, Any]] = []
+        self.ip_guard = ip_guard
 
     def record_success(self, event: Dict[str, Any]) -> None:
         self.successful_orders.append(dict(event))
+
+    def report_ip_block(self, response: Any) -> None:
+        """Escalate a DH-905 rejection to a run-wide halt when a guard is wired in."""
+        if self.ip_guard is not None:
+            self.ip_guard.inspect_order_response(response)
+
+    def ip_block_active(self) -> bool:
+        return self.ip_guard is not None and self.ip_guard.tripped
 
 
 class StockExecutionToolkit(Toolkit):
@@ -73,6 +83,8 @@ class StockExecutionToolkit(Toolkit):
         """
         if self._halted:
             return json_tool_result_markdown(self._failure("execution_halted_after_input_error"))
+        if self.coordinator.ip_block_active():
+            return json_tool_result_markdown(self._failure("execution_halted_dhan_ip_not_whitelisted"))
         response = self._dhan_tools.calculate_intraday_equity_order_quantity(
             security_id=self.security_id,
             side=side,
@@ -116,6 +128,9 @@ class StockExecutionToolkit(Toolkit):
             return json_tool_result_markdown(self._failure("entry_order_already_placed"))
         if self._halted:
             return json_tool_result_markdown(self._failure("execution_halted_after_input_error"))
+        # A sibling agent in this run already proved the whitelist is stale.
+        if self.coordinator.ip_block_active():
+            return json_tool_result_markdown(self._failure("execution_halted_dhan_ip_not_whitelisted"))
         if self._protected_attempts >= 1:
             return self._record_preflight_failure(
                 "protected",
@@ -547,6 +562,11 @@ class StockExecutionToolkit(Toolkit):
         )
         if any(marker in serialized for marker in markers):
             self._halted = True
+        # A bad parameter is this agent's problem. DH-905 is the operator's: every
+        # other agent in this run, and every later run, fails the same way until the
+        # Dhan whitelist matches this host's public IP.
+        if DhanService.is_invalid_ip(payload):
+            self.coordinator.report_ip_block(payload)
 
     @staticmethod
     def _strict_order_type(value: str, allowed: set[str]) -> Optional[str]:
