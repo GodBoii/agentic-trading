@@ -17,6 +17,18 @@ interface TradingConfiguration {
   updatedAt: string
 }
 
+interface OrderPlacementState {
+  allowed: boolean
+  statusCode: string
+  reason: string
+  verifiedAt: string
+  nextVerificationAt: string
+  detectedIp?: string
+  primaryIp?: string
+  secondaryIp?: string
+  ordersAllowed?: boolean
+}
+
 function parseAmount(value: unknown): number | null {
   if (typeof value !== 'number' && typeof value !== 'string') return null
   const amount = Number(value)
@@ -29,7 +41,21 @@ async function authenticatedUser() {
   return { user: error ? null : user, supabase }
 }
 
-function responseFor(entry: TradingConfiguration | null) {
+function orderPlacementResponse(state: OrderPlacementState | null) {
+  return {
+    allowed: Boolean(state?.allowed),
+    status_code: state?.statusCode || 'ORDER_PLACEMENT_UNKNOWN',
+    reason: state?.reason || 'order_placement_not_verified',
+    verified_at_utc: state?.verifiedAt || null,
+    next_verification_at_utc: state?.nextVerificationAt || null,
+    detected_ip: state?.detectedIp || null,
+    primary_ip: state?.primaryIp || null,
+    secondary_ip: state?.secondaryIp || null,
+    orders_allowed: state?.ordersAllowed ?? null,
+  }
+}
+
+function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPlacementState | null) {
   const configured = Boolean(entry?.enabled)
   const mode = entry?.tradeMode || 'auto'
   if (mode === 'auto') return {
@@ -42,24 +68,27 @@ function responseFor(entry: TradingConfiguration | null) {
       : 'Leave the amount blank and save to use your available broker balance automatically.',
     trade_amount: null,
     amount_updated_at_utc: entry?.amountUpdatedAt || null,
+    order_placement: orderPlacementResponse(orderPlacement),
   }
   const amount = parseAmount(entry?.tradeAmount)
   const updatedAt = Date.parse(String(entry?.amountUpdatedAt || ''))
-  if (!amount) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_missing_or_invalid', message: 'The saved manual amount is invalid. Enter a positive amount or leave it blank for automatic sizing.', trade_amount: null }
-  if (!Number.isFinite(updatedAt)) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_timestamp_unavailable', message: 'The saved trading amount cannot be verified. Save it again.', trade_amount: amount }
-  if (Date.now() - updatedAt > maxAgeMs) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_stale', message: 'The saved trading amount is stale. Review and save it again.', trade_amount: amount, amount_updated_at_utc: entry?.amountUpdatedAt }
-  return { configured, eligible: configured, trade_mode: 'manual', status_code: 'manual_amount', message: 'Manual trading amount saved. Live monitoring continues automatically.', trade_amount: amount, amount_updated_at_utc: entry?.amountUpdatedAt }
+  if (!amount) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_missing_or_invalid', message: 'The saved manual amount is invalid. Enter a positive amount or leave it blank for automatic sizing.', trade_amount: null, order_placement: orderPlacementResponse(orderPlacement) }
+  if (!Number.isFinite(updatedAt)) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_timestamp_unavailable', message: 'The saved trading amount cannot be verified. Save it again.', trade_amount: amount, order_placement: orderPlacementResponse(orderPlacement) }
+  if (Date.now() - updatedAt > maxAgeMs) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_stale', message: 'The saved trading amount is stale. Review and save it again.', trade_amount: amount, amount_updated_at_utc: entry?.amountUpdatedAt, order_placement: orderPlacementResponse(orderPlacement) }
+  return { configured, eligible: configured, trade_mode: 'manual', status_code: 'manual_amount', message: 'Manual trading amount saved. Live monitoring continues automatically.', trade_amount: amount, amount_updated_at_utc: entry?.amountUpdatedAt, order_placement: orderPlacementResponse(orderPlacement) }
 }
 
 export async function GET() {
   const { user } = await authenticatedUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    const entry = await convexAdminQuery<TradingConfiguration | null>(
-      'tradingConfigurations:get',
-      { supabaseUserId: user.id },
-    )
-    return NextResponse.json(responseFor(entry))
+    const [entry, orderPlacement] = await Promise.all([
+      convexAdminQuery<TradingConfiguration | null>('tradingConfigurations:get', {
+        supabaseUserId: user.id,
+      }),
+      convexAdminQuery<OrderPlacementState | null>('orderPlacementStates:get', { broker: 'dhan' }),
+    ])
+    return NextResponse.json(responseFor(entry, orderPlacement))
   } catch (error) {
     console.error('[Trading config] Convex read failed:', error)
     return NextResponse.json({ error: 'Trading configuration storage unavailable' }, { status: 503 })
@@ -108,7 +137,11 @@ export async function POST(request: NextRequest) {
         updatedAt: now,
       },
     )
-    return NextResponse.json({ ok: true, ...responseFor(entry) })
+    const orderPlacement = await convexAdminQuery<OrderPlacementState | null>(
+      'orderPlacementStates:get',
+      { broker: 'dhan' },
+    )
+    return NextResponse.json({ ok: true, ...responseFor(entry, orderPlacement) })
   } catch (error) {
     console.error('[Trading config] Convex write failed:', error)
     return NextResponse.json({ error: 'Trading configuration storage unavailable' }, { status: 503 })
