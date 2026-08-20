@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from threading import Lock
 from unittest.mock import patch
 import sys
@@ -18,6 +20,9 @@ if "dhanhq" not in sys.modules:
     sys.modules["dhanhq"] = fake_dhan
 
 from pipeline.runtime.run_ai_trading_orchestrator import AITradingOrchestrator
+from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.convex_service import ConvexService
+from pipeline.services.order_placement_gate import OrderPlacementState
 
 
 class _Storage:
@@ -105,6 +110,59 @@ class AIOrchestratorAdmissionTests(unittest.TestCase):
         self.assertTrue(duplicate["duplicate"])
         self.assertEqual(started, ["same"])
         self.assertEqual(len(_ImmediateThread.names), 1)
+
+    def test_blocked_order_placement_does_not_start_agent_thread(self) -> None:
+        orchestrator = self.orchestrator()
+        blocked_state = types.SimpleNamespace(
+            allowed=False,
+            status_code="DH-905_INVALID_IP",
+            reason="dhan_rejected_order_source_ip",
+        )
+        orchestrator.order_placement_gate = types.SimpleNamespace(
+            refresh_from_store=lambda: blocked_state,
+        )
+
+        result = orchestrator.submit_intra_finder_event(_event("blocked"))
+
+        self.assertFalse(result["accepted"])
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["status_code"], "DH-905_INVALID_IP")
+        self.assertEqual(_ImmediateThread.names, [])
+
+    def test_successful_verification_restores_user_disabled_by_old_guard(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(ConvexService, "configured", return_value=False),
+            patch.object(ConvexService, "required", return_value=False),
+        ):
+            state_path = Path(directory) / "ai-state.json"
+            AITradingStateService.set_user_state(
+                state_path,
+                "user-1",
+                False,
+                {"trade_mode": "auto", "status_code": "DH-905_INVALID_IP"},
+            )
+            orchestrator = AITradingOrchestrator.__new__(AITradingOrchestrator)
+            orchestrator.config = types.SimpleNamespace(ai_trading_state_path=state_path)
+            verified = OrderPlacementState(
+                allowed=True,
+                status_code="ORDER_PLACEMENT_ALLOWED",
+                reason="dhan_order_placement_verified",
+                verified_at=datetime.now(timezone.utc).isoformat(),
+                next_verification_at=datetime.now(timezone.utc).isoformat(),
+                detected_ip="1.2.3.4",
+                primary_ip="1.2.3.4",
+                orders_allowed=True,
+            )
+
+            orchestrator._handle_order_placement_verification(verified)
+
+            restored = AITradingStateService.load_state(state_path)
+            self.assertTrue(restored["user_states"]["user-1"]["enabled"])
+            self.assertEqual(
+                restored["user_states"]["user-1"]["status_code"],
+                "automatic_balance",
+            )
 
 
 if __name__ == "__main__":
