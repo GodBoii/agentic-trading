@@ -13,7 +13,7 @@ from pipeline.runtime.run_stock_analyzer import MultiStockAnalyzerRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_service import DhanService
-from pipeline.services.ip_whitelist_guard import IpWhitelistGuard
+from pipeline.services.order_placement_gate import OrderPlacementGate
 from pipeline.services.trading_amount_service import TradingAmountService
 from pipeline.stock import StockAgent, StockDecisionContextBuilder
 from pipeline.stock.toolkits import (
@@ -29,6 +29,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         super().__init__(config, initialize_agent=False)
         self.execution_helper = ExecutionerRunner(self.config, initialize_agent=False)
+        self.order_placement_gate = OrderPlacementGate(
+            self.dhan,
+            self.config.order_placement_state_path,
+        )
 
     def run_cycle(
         self,
@@ -38,6 +42,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         run_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None and not gate.allowed:
+            print("Dhan order placement is blocked. Stock agent is idling.")
+            return None
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Stock agent is idling.")
             return None
@@ -174,6 +182,9 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Run exactly one Intra-Finder-qualified stock through the agent."""
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None and not gate.allowed:
+            raise RuntimeError("order_placement_blocked")
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             raise RuntimeError("ai_trading_disabled")
         market_date = self.market_time.market_date_str()
@@ -448,7 +459,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         results: Dict[int, Dict[str, Any]] = {}
         failures: List[Dict[str, Any]] = []
         execution_coordinator = StockExecutionCoordinator(
-            ip_guard=IpWhitelistGuard(self.dhan, self.config.ai_trading_state_path),
+            order_placement_gate=self.order_placement_gate,
         )
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -502,6 +513,9 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         run_context: Optional[Dict[str, Any]] = None,
         execution_coordinator: Optional[StockExecutionCoordinator] = None,
     ) -> Dict[str, Any]:
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None and not gate.allowed:
+            raise RuntimeError("order_placement_blocked")
         security_id = int(candidate_packet["security_id"])
         CloudPersistenceService.validate_agno_db()
         self._emit(
@@ -689,6 +703,9 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "input": stock_packet,
             }
         )
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None and not gate.allowed:
+            raise RuntimeError("order_placement_blocked_before_agent")
         report_text = agent.analyze(
             stock_packet,
             cloud_image_urls,
