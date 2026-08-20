@@ -10,6 +10,7 @@ import requests
 
 from pipeline.config import PipelineConfig
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.order_placement_gate import OrderPlacementStateService
 from pipeline.services.market_calendar_service import MarketCalendarService, MarketSessionStatus
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
@@ -186,6 +187,10 @@ class SessionSupervisor:
             print(f"AI agents not triggered: {reason}.")
             return
 
+        order_state_path = getattr(self.config, "order_placement_state_path", None)
+        if order_state_path is not None and not OrderPlacementStateService.is_allowed(order_state_path):
+            print("AI agents not triggered: Dhan order placement is blocked.")
+            return
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI agents not triggered: AI trading state has no enabled user.")
             return
