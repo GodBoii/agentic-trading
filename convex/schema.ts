@@ -13,6 +13,21 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index('by_supabase_user_id', ['supabaseUserId']),
 
+  orderPlacementStates: defineTable({
+    broker: v.string(),
+    allowed: v.boolean(),
+    statusCode: v.string(),
+    reason: v.string(),
+    verifiedAt: v.string(),
+    nextVerificationAt: v.string(),
+    detectedIp: v.optional(v.string()),
+    primaryIp: v.optional(v.string()),
+    secondaryIp: v.optional(v.string()),
+    ordersAllowed: v.optional(v.boolean()),
+    brokerMessage: v.optional(v.string()),
+    updatedAt: v.string(),
+  }).index('by_broker', ['broker']),
+
   agentSessions: defineTable({
     sessionId: v.string(),
     sessionType: v.string(),
