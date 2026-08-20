@@ -34,6 +34,17 @@ interface AmountStatus {
      * the UI falls back to the shared constant until the backend owns the rule.
      */
     auto_slots?: number
+    order_placement?: {
+        allowed: boolean
+        status_code: string
+        reason: string
+        verified_at_utc: string | null
+        next_verification_at_utc: string | null
+        detected_ip: string | null
+        primary_ip: string | null
+        secondary_ip: string | null
+        orders_allowed: boolean | null
+    }
 }
 
 /** `manual` is the API's word for it; `fixed` is what the user is choosing. */
@@ -388,6 +399,21 @@ export default function TradingStatus() {
                     ) : (
                         <Notice tone={status?.eligible ? 'neutral' : 'warning'}>
                             {status?.message || 'Choose Auto to size from your balance, or Fixed to cap each trade.'}
+                        </Notice>
+                    )}
+                    {status?.order_placement && !status.order_placement.allowed && (
+                        <Notice tone="danger">
+                            Dhan order placement is paused, so AI agents will not run. The detected IP is{' '}
+                            <span className="font-mono">
+                                {status.order_placement.detected_ip || 'unavailable'}
+                            </span>
+                            . The next automatic verification is{' '}
+                            <span className="font-mono">
+                                {status.order_placement.next_verification_at_utc
+                                    ? formatDateTime(status.order_placement.next_verification_at_utc)
+                                    : 'pending'}
+                            </span>
+                            .
                         </Notice>
                     )}
                 </PanelBody>
