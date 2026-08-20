@@ -114,6 +114,17 @@ class FakeStockDhan:
         }
 
 
+class FakeOrderPlacementGate:
+    def __init__(self):
+        self.allowed = True
+        self.placement_lock = threading.Lock()
+        self.block_calls = 0
+
+    def block_from_order_response(self, _response):
+        self.block_calls += 1
+        self.allowed = False
+
+
 class ConcurrentFakeStockDhan(FakeStockDhan):
     def __init__(self):
         super().__init__(margin_required=20.0, include_selected_position=False)
@@ -669,11 +680,14 @@ class StockToolkitTests(unittest.TestCase):
             },
             "data": "",
         }
+        gate = FakeOrderPlacementGate()
+        coordinator = StockExecutionCoordinator(order_placement_gate=gate)
         toolkit = StockExecutionToolkit(
             dhan,
             111,
             500,
             exchange_segment="NSE_EQ",
+            coordinator=coordinator,
         )
         toolkit._dhan_tools.allow_live_orders = True
 
@@ -692,6 +706,26 @@ class StockToolkitTests(unittest.TestCase):
         self.assertEqual(decision["execution_status"], "failed")
         self.assertEqual(decision["order_id"], "NONE")
         self.assertEqual(toolkit.coordinator.successful_orders, [])
+        self.assertFalse(gate.allowed)
+        self.assertEqual(gate.block_calls, 1)
+
+        sibling = StockExecutionToolkit(
+            dhan,
+            111,
+            500,
+            exchange_segment="NSE_EQ",
+            coordinator=StockExecutionCoordinator(order_placement_gate=gate),
+        )
+        sibling._dhan_tools.allow_live_orders = True
+        blocked = sibling.place_protected_intraday_order(
+            side="BUY",
+            quantity=1,
+            entry_price=100.0,
+            target_price=105.0,
+            stop_loss_price=98.0,
+        )
+        self.assertIn("execution_halted_order_placement_blocked", blocked)
+        self.assertEqual(dhan.super_order_calls, 0)
 
     def test_only_traded_order_is_reported_as_executed(self):
         dhan = FakeStockDhan(
