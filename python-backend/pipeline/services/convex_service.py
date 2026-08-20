@@ -82,6 +82,16 @@ class ConvexService:
         return dict(result or {})
 
     @classmethod
+    def get_order_placement_state(cls, broker: str = "dhan") -> Optional[Dict[str, Any]]:
+        result = cls.client().query("orderPlacementStates:get", {"broker": str(broker)})
+        return dict(result) if result else None
+
+    @classmethod
+    def set_order_placement_state(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+        result = cls.client().mutation("orderPlacementStates:set", dict(payload))
+        return dict(result or {})
+
+    @classmethod
     def mirror_session(cls, session: Any) -> None:
         session_dict = cls._as_dict(session)
         session_id = str(session_dict.get("session_id") or session_dict.get("sessionId") or "").strip()
