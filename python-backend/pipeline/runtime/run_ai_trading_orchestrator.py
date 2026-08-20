@@ -22,6 +22,11 @@ import requests
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.order_placement_gate import (
+    DH905_INVALID_IP,
+    OrderPlacementState,
+    OrderPlacementStateService,
+)
 from pipeline.services.trading_amount_service import TradingAmountService
 from pipeline.services.storage_service import StorageService
 
@@ -259,6 +264,7 @@ class AITradingOrchestrator:
         self.config = config or PipelineConfig()
         self.storage = StorageService
         self.stock_agent = MultiStockAgentRunner(self.config)
+        self.order_placement_gate = self.stock_agent.order_placement_gate
         self.last_request_id: Optional[str] = None
         self._boot_time_utc = datetime.now(timezone.utc)
         self.ws = WebSocketBroadcaster()
@@ -311,6 +317,10 @@ class AITradingOrchestrator:
         print("AI TRADING ORCHESTRATOR")
         print("=" * 60)
         print("Continuous detector routing is active; no manual start request is required.")
+        self.order_placement_gate.start_periodic_verification(
+            verify_now=True,
+            on_verified=self._handle_order_placement_verification,
+        )
         self._start_http_gateway()
 
         while True:
@@ -320,6 +330,30 @@ class AITradingOrchestrator:
                 print(f"AI trading orchestrator error: {type(exc).__name__}: {exc}")
                 self._save_status("failed", "orchestrator", error=str(exc))
                 time.sleep(5)
+
+    def _handle_order_placement_verification(self, state: OrderPlacementState) -> None:
+        """Restore users disabled by the retired DH-905 guard after Dhan verifies recovery."""
+        if not state.allowed:
+            return
+        trading_state = AITradingStateService.load_state(self.config.ai_trading_state_path)
+        for user_id, entry in (trading_state.get("user_states") or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("enabled") or entry.get("status_code") != DH905_INVALID_IP:
+                continue
+            trade_mode = str(entry.get("trade_mode") or "auto").lower()
+            AITradingStateService.set_user_state(
+                self.config.ai_trading_state_path,
+                str(user_id),
+                True,
+                {
+                    "status_code": "manual_amount" if trade_mode == "manual" else "automatic_balance",
+                },
+            )
+            print(
+                f"[Order Gate] restored AI trading for user {user_id} after successful verification.",
+                flush=True,
+            )
 
     def _load_pending_request(self) -> Optional[Dict[str, Any]]:
         request = self.storage.load_snapshot(self.config.ai_trading_request_path)
@@ -375,6 +409,26 @@ class AITradingOrchestrator:
         if missing:
             raise ValueError(f"invalid_intra_finder_event_missing:{','.join(missing)}")
         event_id = str(event["event_id"])
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None:
+            order_state = gate.refresh_from_store()
+            if not order_state.allowed:
+                with self.event_lock:
+                    self.event_state.setdefault("events", {})[event_id] = {
+                        "status": "blocked",
+                        "accepted_at_utc": datetime.now(timezone.utc).isoformat(),
+                        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                        "status_code": order_state.status_code,
+                        "reason": order_state.reason,
+                    }
+                    self.storage.save_snapshot(self.event_state_path, self.event_state)
+                return {
+                    "accepted": False,
+                    "duplicate": False,
+                    "blocked": True,
+                    "event_id": event_id,
+                    "status_code": order_state.status_code,
+                }
         with self.event_lock:
             existing = (self.event_state.get("events") or {}).get(event_id)
             if existing:
@@ -477,6 +531,21 @@ class AITradingOrchestrator:
 
     def _run_intra_finder_event(self, event: Dict[str, Any]) -> None:
         event_id = str(event["event_id"])
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None and not gate.allowed:
+            with self.event_lock:
+                existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
+                existing.update(
+                    {
+                        "status": "blocked",
+                        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                        "status_code": gate.state.status_code,
+                        "reason": gate.state.reason,
+                    }
+                )
+                self.event_state.setdefault("events", {})[event_id] = existing
+                self.storage.save_snapshot(self.event_state_path, self.event_state)
+            return
         started_at = datetime.now(timezone.utc)
         with self.event_lock:
             existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
@@ -494,6 +563,8 @@ class AITradingOrchestrator:
             max_age = float(os.getenv("TRADING_AMOUNT_MAX_AGE_SECONDS", str(30 * 24 * 60 * 60)))
             users = AITradingStateService.configured_users(self.config.ai_trading_state_path, max_age_seconds=max_age)
             for user in users:
+                if gate is not None and not gate.allowed:
+                    break
                 user_id = str(user.get("user_id") or "").strip()
                 if not user_id:
                     continue
@@ -951,6 +1022,9 @@ class AITradingOrchestrator:
         trade_amount = request.get("trade_amount")
         regime_analysis_enabled = False
 
+        if not OrderPlacementStateService.is_allowed(self.config.order_placement_state_path):
+            self._save_status("blocked", "requested", request, "Dhan order placement is blocked.")
+            return
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             self._save_status("blocked", "requested", request, "AI trading is not enabled for any user.")
             return
