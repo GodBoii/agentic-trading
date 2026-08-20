@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from pipeline.analyzer import StockAnalyzerAgent
 from pipeline.config import PipelineConfig
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.order_placement_gate import OrderPlacementStateService
 from pipeline.services.charting_service import CandlestickChartService
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
@@ -34,6 +35,10 @@ class MultiStockAnalyzerRunner:
         trade_config: Optional[Dict[str, Any]] = None,
         use_regime_analysis: Optional[bool] = None,
     ) -> Optional[Dict[str, Any]]:
+        order_state_path = getattr(self.config, "order_placement_state_path", None)
+        if order_state_path is not None and not OrderPlacementStateService.is_allowed(order_state_path):
+            print("Dhan order placement is blocked. Stock analyzer is idling.")
+            return None
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Stock analyzer is idling.")
             return None
