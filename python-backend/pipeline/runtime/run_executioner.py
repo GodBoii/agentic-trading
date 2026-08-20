@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from pipeline.config import PipelineConfig
 from pipeline.execution import ExecutionerAgent
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.order_placement_gate import OrderPlacementStateService
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
@@ -24,6 +25,10 @@ class ExecutionerRunner:
         self.agent = ExecutionerAgent(self.toolkit) if self.toolkit else None
 
     def run_cycle(self, force: bool = False, trade_config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        order_state_path = getattr(self.config, "order_placement_state_path", None)
+        if order_state_path is not None and not OrderPlacementStateService.is_allowed(order_state_path):
+            print("Dhan order placement is blocked. Executioner is idling.")
+            return None
         if not AITradingStateService.is_any_user_enabled(self.config.ai_trading_state_path):
             print("AI trading is disabled. Executioner is idling.")
             return None
