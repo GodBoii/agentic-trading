@@ -31,6 +31,7 @@ class PipelineConfig:
     session_supervisor_state_path: Path = backend_dir / "session_supervisor_state.json"
     session_supervisor_status_path: Path = backend_dir / "session_supervisor_status.json"
     ai_trading_state_path: Path = backend_dir / "ai_trading_state.json"
+    order_placement_state_path: Path = backend_dir / "order_placement_state.json"
     ai_trading_request_path: Path = results_dir / "agents" / "request.json"
     ai_trading_run_status_path: Path = results_dir / "agents" / "run-status.json"
     ai_trading_sessions_dir: Path = results_dir / "agents" / "sessions"
