@@ -27,6 +27,7 @@ from pipeline.models import SetupEvent
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.market_calendar_service import MarketCalendarService
+from pipeline.services.process_memory_service import release_unused_process_memory
 from pipeline.services.storage_service import StorageService
 from pipeline.stages.indicator_event_engine import IndicatorEventEngine
 from pipeline.stages.trade_readiness import evaluate_trade_readiness, fresh_indicator_events
@@ -80,6 +81,7 @@ class IntraFinder:
         self.connection_state = "STARTING"
         self.last_connection_error: Optional[str] = None
         self.session_state = "STARTING"
+        self.released_session_date: Optional[str] = None
         self.state_lock = RLock()
         self.dispatch_lock = RLock()
         self.current_feed: Any = None
@@ -446,7 +448,10 @@ class IntraFinder:
             "pending_indicator_generation",
         )
 
-    def _runtime_state_payload(self) -> Dict[str, Any]:
+    def _runtime_state_payload(
+        self,
+        market_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
         states: Dict[str, Any] = {}
         with self.state_lock:
             for security_id, state in self.states.items():
@@ -461,7 +466,7 @@ class IntraFinder:
                 states[str(security_id)] = item
         return {
             "schema_version": self.RUNTIME_STATE_SCHEMA_VERSION,
-            "market_date": self.market_time.market_date_str(),
+            "market_date": market_date or self.market_time.market_date_str(),
             "universe_version": self.universe_version,
             "saved_at": self.market_time.now().isoformat(),
             "states": states,
@@ -2126,8 +2131,9 @@ class IntraFinder:
         raw: List[Dict[str, Any]],
         derived: List[Dict[str, Any]],
         checkpoint: Dict[str, Any],
+        market_date: str,
     ) -> None:
-        base = self.config.stage2_results_dir / self.market_time.market_date_str()
+        base = self.config.stage2_results_dir / market_date
         for rows, directory_name, prefix in (
             (raw, "raw-depth", "packets"),
             (derived, "one-second", "snapshots"),
@@ -2142,17 +2148,37 @@ class IntraFinder:
             for hour, hour_rows in grouped.items():
                 self._write_parquet(base / directory_name / f"hour={hour}", prefix, hour_rows)
         StorageService.save_snapshot(
-            self.config.stage2_runtime_state_path(self.market_time.market_date_str()),
+            self.config.stage2_runtime_state_path(market_date),
             checkpoint,
         )
 
-    def flush(self) -> None:
+    def flush(
+        self,
+        *,
+        force_checkpoint: bool = False,
+        checkpoint_market_date: Optional[str] = None,
+    ) -> None:
         if not self.raw_buffer and not self.derived_buffer:
+            if force_checkpoint and self.states:
+                self._submit_io(
+                    StorageService.save_snapshot,
+                    self.config.stage2_runtime_state_path(
+                        checkpoint_market_date or self.market_time.market_date_str()
+                    ),
+                    self._runtime_state_payload(checkpoint_market_date),
+                )
             return
         raw, derived = self.raw_buffer, self.derived_buffer
         self.raw_buffer, self.derived_buffer = [], []
-        checkpoint = self._runtime_state_payload()
-        self._submit_io(self._persist_buffers, raw, derived, checkpoint)
+        checkpoint = self._runtime_state_payload(checkpoint_market_date)
+        market_date = checkpoint_market_date or self.market_time.market_date_str()
+        self._submit_io(
+            self._persist_buffers,
+            raw,
+            derived,
+            checkpoint,
+            market_date,
+        )
         self.last_flush = time.time()
 
     def _flush_if_due(self) -> None:
@@ -2404,13 +2430,87 @@ class IntraFinder:
         except Exception:
             pass
 
-    def _mark_session_ended(self) -> None:
+    def _mark_session_ended(self, market_date: str) -> None:
         self.session_state = "SESSION_ENDED"
         self.connection_state = "SESSION_ENDED"
         for state in self.states.values():
             state["state"] = "SESSION_ENDED"
-        self.flush()
+        self.flush(
+            force_checkpoint=True,
+            checkpoint_market_date=market_date,
+        )
         self._save_status_if_due(force=True)
+
+    def _wait_for_pending_io(self) -> bool:
+        for future in list(self.io_futures):
+            try:
+                future.result()
+            except Exception as exc:
+                self._log(
+                    f"Final session persistence failed; retaining memory for retry: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                return False
+        self.io_futures.clear()
+        return True
+
+    def _release_session_memory(self, market_date: str) -> int:
+        with self.state_lock:
+            released_stock_count = len(self.states)
+            self.states.clear()
+            self.stocks_by_security_id.clear()
+            self.universe_payload = {}
+            self.universe_version = ""
+            self.raw_buffer.clear()
+            self.derived_buffer.clear()
+            self.pending_indicator_deadlines.clear()
+            self.event_state = {}
+
+        self.received_security_ids.clear()
+        self.full_packet_security_ids.clear()
+        self.quote_verified_security_ids.clear()
+        self.coverage_milestones_logged.clear()
+        self.gate_failure_counts.clear()
+        for future in self.recovery_futures:
+            future.cancel()
+        self.recovery_futures.clear()
+        self.coverage_verification_future = None
+        self.opening_range_recovery_started = False
+        self.last_global_packet_at = None
+        self.connected_at = None
+        self.packet_count = 0
+        self.reconnect_count = 0
+        self.universe_wait_count = 0
+        self.events_formed = 0
+        self.events_triggered = 0
+        self.events_suppressed = 0
+        self.connection_generation = 0
+        self.opening_range_recovery_requested = 0
+        self.opening_range_recovery_completed = 0
+        self.opening_range_recovery_failed = 0
+        self.agent_dispatch_successes = 0
+        self.agent_dispatch_failures = 0
+        self.candidates_seen = 0
+        self.indicator_events_detected = 0
+        self.indicator_aggregates_formed = 0
+        self.readiness_evaluations = 0
+        self.readiness_passed = 0
+        self.readiness_rechecks = 0
+        self.released_session_date = market_date
+        release_unused_process_memory()
+        return released_stock_count
+
+    def _finalize_and_release_session(self, market_date: str) -> None:
+        if self.released_session_date == market_date:
+            return
+        self._mark_session_ended(market_date)
+        if not self._wait_for_pending_io():
+            return
+        released_stock_count = self._release_session_memory(market_date)
+        self._log(
+            f"Session memory released for {market_date}; "
+            f"cleared_states={released_stock_count:,}."
+        )
 
     def run_forever(self) -> None:
         while True:
@@ -2418,6 +2518,14 @@ class IntraFinder:
             try:
                 session = self.market_calendar.session_status()
                 if not session.is_trading_day:
+                    if self.states:
+                        previous_market_date = str(
+                            (self.universe_payload.get("summary") or {}).get(
+                                "market_date"
+                            )
+                            or session.market_date
+                        )
+                        self._finalize_and_release_session(previous_market_date)
                     self.session_state = "MARKET_CLOSED"
                     self.connection_state = "WAITING_FOR_TRADING_DAY"
                     print(f"Intra-Finder idle: {session.reason}")
@@ -2433,7 +2541,7 @@ class IntraFinder:
                     time.sleep(30)
                     continue
                 if session.is_after_close:
-                    self._mark_session_ended()
+                    self._finalize_and_release_session(session.market_date)
                     time.sleep(300)
                     continue
                 stocks = self.load_universe()
@@ -2487,7 +2595,9 @@ class IntraFinder:
             except SessionEnded:
                 self._close_feed(feed)
                 self.current_feed = None
-                self._mark_session_ended()
+                self._finalize_and_release_session(
+                    self.market_calendar.session_status().market_date
+                )
                 time.sleep(300)
             except (FileNotFoundError, RuntimeError) as exc:
                 if isinstance(exc, FileNotFoundError) or "Universe Scanner" in str(exc):
