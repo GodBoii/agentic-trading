@@ -22,11 +22,15 @@ import requests
 from pipeline.config import PipelineConfig
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
+from pipeline.services.dhan_service import DhanService
+from pipeline.services.market_calendar_service import MarketCalendarService
 from pipeline.services.order_placement_gate import (
     DH905_INVALID_IP,
+    OrderPlacementGate,
     OrderPlacementState,
     OrderPlacementStateService,
 )
+from pipeline.services.process_memory_service import release_unused_process_memory
 from pipeline.services.trading_amount_service import TradingAmountService
 from pipeline.services.storage_service import StorageService
 
@@ -263,14 +267,27 @@ class AITradingOrchestrator:
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
         self.storage = StorageService
-        self.stock_agent = MultiStockAgentRunner(self.config)
-        self.order_placement_gate = self.stock_agent.order_placement_gate
+        self.stock_agent: Optional[MultiStockAgentRunner] = None
+        self.stock_agent_lock = Lock()
+        self.order_placement_gate = OrderPlacementGate(
+            DhanService(self.config),
+            self.config.order_placement_state_path,
+        )
+        self.market_calendar = MarketCalendarService(self.config)
+        self.released_session_key: Optional[str] = None
         self.last_request_id: Optional[str] = None
         self._boot_time_utc = datetime.now(timezone.utc)
         self.ws = WebSocketBroadcaster()
         self.event_state_path = self.config.agents_results_dir / "event-dispatch-state.json"
+        self.event_decision_archive_path = (
+            self.config.agents_results_dir / "event-decision-archive.ndjson"
+        )
         self.event_state = self.storage.load_snapshot(self.event_state_path) or {"events": {}}
         self.event_lock = Lock()
+        with self.event_lock:
+            if self._compact_event_state_locked():
+                self.storage.save_snapshot(self.event_state_path, self.event_state)
+                release_unused_process_memory()
         websocket_signing_secret = (
             os.getenv("AI_TRADING_WS_SIGNING_SECRET", "").strip()
             or os.getenv("AI_TRADING_BACKEND_TOKEN", "").strip()
@@ -317,11 +334,17 @@ class AITradingOrchestrator:
         print("AI TRADING ORCHESTRATOR")
         print("=" * 60)
         print("Continuous detector routing is active; no manual start request is required.")
+        self._apply_market_lifecycle()
         self.order_placement_gate.start_periodic_verification(
             verify_now=True,
             on_verified=self._handle_order_placement_verification,
         )
         self._start_http_gateway()
+        Thread(
+            target=self._market_lifecycle_loop,
+            name="ai-market-lifecycle",
+            daemon=True,
+        ).start()
 
         while True:
             try:
@@ -330,6 +353,147 @@ class AITradingOrchestrator:
                 print(f"AI trading orchestrator error: {type(exc).__name__}: {exc}")
                 self._save_status("failed", "orchestrator", error=str(exc))
                 time.sleep(5)
+
+    def _get_stock_agent(self) -> MultiStockAgentRunner:
+        with self.stock_agent_lock:
+            if self.stock_agent is None:
+                runner = MultiStockAgentRunner(self.config)
+                runner.order_placement_gate = self.order_placement_gate
+                self.stock_agent = runner
+            return self.stock_agent
+
+    def _compact_event_state_locked(self) -> bool:
+        raw_events = self.event_state.get("events") or {}
+        if not isinstance(raw_events, dict):
+            self.event_state = {"events": {}}
+            return True
+
+        compact_fields = (
+            "status",
+            "market_date",
+            "accepted_at_utc",
+            "started_at_utc",
+            "finished_at_utc",
+            "status_code",
+            "reason",
+            "error",
+            "configured_user_count",
+            "decision_archive",
+            "decision_archive_error",
+        )
+        compact_events: Dict[str, Dict[str, Any]] = {}
+        changed = False
+        for event_id, raw_record in raw_events.items():
+            if not isinstance(raw_record, dict):
+                changed = True
+                continue
+            record = {
+                field: raw_record[field]
+                for field in compact_fields
+                if raw_record.get(field) is not None
+            }
+            if raw_record.get("decision") is not None:
+                try:
+                    self._archive_event_decision(str(event_id), raw_record)
+                    record["decision_archive"] = str(
+                        self.event_decision_archive_path
+                    )
+                except Exception as exc:
+                    record["decision"] = raw_record["decision"]
+                    record["decision_archive_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
+            compact_events[str(event_id)] = record
+            changed = changed or record != raw_record
+
+        max_records = max(
+            100,
+            int(os.getenv("AI_TRADING_EVENT_STATE_MAX_RECORDS", "10000")),
+        )
+        if len(compact_events) > max_records:
+            protected = {
+                event_id: record
+                for event_id, record in compact_events.items()
+                if record.get("decision") is not None
+            }
+            ordered = sorted(
+                (
+                    item
+                    for item in compact_events.items()
+                    if item[0] not in protected
+                ),
+                key=lambda item: str(
+                    item[1].get("finished_at_utc")
+                    or item[1].get("started_at_utc")
+                    or item[1].get("accepted_at_utc")
+                    or ""
+                ),
+                reverse=True,
+            )
+            available_slots = max(0, max_records - len(protected))
+            compact_events = {
+                **protected,
+                **dict(ordered[:available_slots]),
+            }
+            changed = True
+
+        if changed:
+            self.event_state = {"events": compact_events}
+        return changed
+
+    def _archive_event_decision(
+        self,
+        event_id: str,
+        record: Dict[str, Any],
+    ) -> None:
+        self.storage.append_json_line(
+            self.event_decision_archive_path,
+            {
+                "event_id": event_id,
+                "status": record.get("status"),
+                "market_date": record.get("market_date"),
+                "accepted_at_utc": record.get("accepted_at_utc"),
+                "started_at_utc": record.get("started_at_utc"),
+                "finished_at_utc": record.get("finished_at_utc"),
+                "decision": record.get("decision"),
+                "error": record.get("error"),
+            },
+        )
+
+    def _release_closed_market_memory(self, session_key: str) -> None:
+        with self.stock_agent_lock:
+            self.stock_agent = None
+        with self.event_lock:
+            changed = self._compact_event_state_locked()
+            if changed:
+                self.storage.save_snapshot(self.event_state_path, self.event_state)
+        release_unused_process_memory()
+        self.released_session_key = session_key
+        print(
+            f"[AI Gateway] market workers released; session={session_key}",
+            flush=True,
+        )
+
+    def _apply_market_lifecycle(self) -> None:
+        session = self.market_calendar.session_status()
+        if session.is_market_hours:
+            self.released_session_key = None
+            return
+        session_key = f"{session.market_date}:{session.reason}"
+        if self.released_session_key != session_key:
+            self._release_closed_market_memory(session_key)
+
+    def _market_lifecycle_loop(self) -> None:
+        while True:
+            try:
+                self._apply_market_lifecycle()
+            except Exception as exc:
+                print(
+                    f"[AI Gateway] market lifecycle check failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+            time.sleep(60)
 
     def _handle_order_placement_verification(self, state: OrderPlacementState) -> None:
         """Restore users disabled by the retired DH-905 guard after Dhan verifies recovery."""
@@ -435,6 +599,7 @@ class AITradingOrchestrator:
                 return {"accepted": False, "duplicate": True, "event_id": event_id}
             self.event_state.setdefault("events", {})[event_id] = {
                 "status": "starting",
+                "market_date": str(event["market_date"]),
                 "accepted_at_utc": datetime.now(timezone.utc).isoformat(),
             }
             try:
@@ -560,6 +725,7 @@ class AITradingOrchestrator:
         users: list[Dict[str, Any]] = []
         user_results: list[Dict[str, Any]] = []
         try:
+            stock_agent = self._get_stock_agent()
             max_age = float(os.getenv("TRADING_AMOUNT_MAX_AGE_SECONDS", str(30 * 24 * 60 * 60)))
             users = AITradingStateService.configured_users(self.config.ai_trading_state_path, max_age_seconds=max_age)
             for user in users:
@@ -576,15 +742,15 @@ class AITradingOrchestrator:
                     },
                     user_id=user_id,
                 )
-                resolved = self.stock_agent.resolve_user_trade_config(user)
+                resolved = stock_agent.resolve_user_trade_config(user)
                 if not resolved.get("eligible"):
                     user_results.append(resolved)
                     continue
-                routed = self.stock_agent.prepare_user_event(event, resolved)
+                routed = stock_agent.prepare_user_event(event, resolved)
                 if not routed.get("eligible"):
                     user_results.append(routed)
                     continue
-                result = self.stock_agent.run_event(
+                result = stock_agent.run_event(
                     routed["event"],
                     user_id=user_id,
                     trade_config={
@@ -601,19 +767,41 @@ class AITradingOrchestrator:
                 user_results.append({"user_id": user_id, "eligible": True, "result": result})
             status = "completed"
             error = None
-            decision = {"user_results": user_results, "configured_user_count": len(users)}
         except Exception as exc:
             status = "failed"
             error = f"{type(exc).__name__}: {exc}"
-            decision = None
         with self.event_lock:
             existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
+            archive_error = None
+            try:
+                self._archive_event_decision(
+                    event_id,
+                    {
+                        **existing,
+                        "status": status,
+                        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                        "decision": {
+                            "user_results": user_results,
+                            "configured_user_count": len(users),
+                        },
+                        "error": error,
+                    },
+                )
+            except Exception as exc:
+                archive_error = f"{type(exc).__name__}: {exc}"
             existing.update({
                 "status": status,
                 "finished_at_utc": datetime.now(timezone.utc).isoformat(),
-                "decision": decision,
+                "configured_user_count": len(users),
+                "decision_archive": str(self.event_decision_archive_path),
                 "error": error,
             })
+            if archive_error:
+                existing["decision"] = {
+                    "user_results": user_results,
+                    "configured_user_count": len(users),
+                }
+                existing["decision_archive_error"] = archive_error
             self.event_state.setdefault("events", {})[event_id] = existing
             self.storage.save_snapshot(self.event_state_path, self.event_state)
         result_by_user = {
