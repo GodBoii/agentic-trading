@@ -71,7 +71,7 @@ services:
         - CMD
         - python
         - -c
-        - "import json,os,sys; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; session=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); artifact_ok=s.get('status')=='completed' and s.get('market_date')==session.market_date and int(s.get('baseline_schema_version') or 0)>=2; sys.exit(0 if (not session.is_trading_day or artifact_ok) else 1)"
+        - "import json,os,sys; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; session=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); artifact_ok=s.get('status')=='completed' and s.get('market_date')==session.market_date and int(s.get('baseline_schema_version') or 0)>=2; sys.exit(0 if (not session.is_trading_day or session.is_before_open or artifact_ok) else 1)"
       interval: 30s
       timeout: 5s
       retries: 120
@@ -123,6 +123,10 @@ services:
     command: python -m pipeline.runtime.run_nifty_50_market_depth
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
+      # The research recorder stays parked until an F&O strategy consumes it.
+      # Set NIFTY_DEPTH_MONITOR_ENABLED=1 in .env and recreate this service to
+      # enable collection again.
+      NIFTY_DEPTH_MONITOR_ENABLED: "${NIFTY_DEPTH_MONITOR_ENABLED:-0}"
       NIFTY_DEPTH_PERSIST_EVERY_PACKET: "1"
       NIFTY_DEPTH_RAW_WRITE_SECONDS: "0"
       NIFTY_DEPTH_PROGRESS_LOG_SECONDS: "60"
@@ -136,7 +140,7 @@ services:
         - CMD
         - python
         - -c
-        - "import json,os,sys; from datetime import datetime; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; s=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/nifty-50-market-depth/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; t=d.get('generated_at_utc') or d.get('updated_at_utc'); age=(datetime.now(datetime.fromisoformat(t).tzinfo)-datetime.fromisoformat(t)).total_seconds() if t else 10**9; sys.exit(0 if (not s.is_trading_day or s.is_after_close or age <= 120) else 1)"
+        - "import os,sys; enabled=os.getenv('NIFTY_DEPTH_MONITOR_ENABLED','1').strip().lower() in {'1','true','yes','y','on'}; sys.exit(0) if not enabled else None; import json; from datetime import datetime; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; s=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/nifty-50-market-depth/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; t=d.get('generated_at_utc') or d.get('updated_at_utc'); age=(datetime.now(datetime.fromisoformat(t).tzinfo)-datetime.fromisoformat(t)).total_seconds() if t else 10**9; sys.exit(0 if (not s.is_trading_day or s.is_after_close or age <= 120) else 1)"
       interval: 30s
       timeout: 5s
       retries: 5
