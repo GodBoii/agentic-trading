@@ -64,6 +64,20 @@ export default function Footer({ signedIn }: { signedIn: boolean }) {
 
             <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-2 border-t border-white/[0.05] pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-[12px] text-white/30">© 2026 PolyCognition</span>
+                <div className="flex gap-4 text-[12px]">
+                    <Link
+                        href="/privacy-policy"
+                        className="text-white/30 transition-colors duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-white/60"
+                    >
+                        Privacy Policy
+                    </Link>
+                    <Link
+                        href="/terms-of-service"
+                        className="text-white/30 transition-colors duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-white/60"
+                    >
+                        Terms of Service
+                    </Link>
+                </div>
                 <span className="text-[12px] text-white/30">
                     For research purposes only · Not investment advice
                 </span>
