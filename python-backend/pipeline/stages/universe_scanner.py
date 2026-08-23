@@ -17,6 +17,7 @@ import pandas as pd
 import requests
 
 from pipeline.config import PipelineConfig
+from pipeline.contracts import UNIVERSE_BASELINE_SCHEMA_VERSION
 from pipeline.models import UniverseRecord, VenueIdentity
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
@@ -43,7 +44,7 @@ class UniverseScanner:
         "BUY_SELL_INDICATOR",
     }
     ALLOWED_SERIES = {"NSE": {"EQ"}, "BSE": {"A", "B", "X"}}
-    BASELINE_SCHEMA_VERSION = 2
+    BASELINE_SCHEMA_VERSION = UNIVERSE_BASELINE_SCHEMA_VERSION
 
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         self.config = config or PipelineConfig()
