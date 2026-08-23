@@ -102,6 +102,7 @@ screenshots/
 python-backend/ai_trading_request.json
 python-backend/ai_trading_run_status.json
 python-backend/ai_trading_state.json
+python-backend/order_placement_state.json
 python-backend/ai_trading_sessions/
 python-backend/dhan_rate_limit_state.json
 python-backend/*_latest.json
