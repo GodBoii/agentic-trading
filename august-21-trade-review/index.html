@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="A run-by-run audit of the 44 stock-agent decisions made on August 21, 2026.">
+  <title>August 21 trading replay</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#review">Skip to run review</a>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">T/21</span>
+      <div>
+        <p class="eyebrow">Live trading audit</p>
+        <h1>August 21 replay</h1>
+      </div>
+    </div>
+    <div class="market-stamp">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span>Recorded session</span>
+      <strong>09:15–15:30 IST</strong>
+    </div>
+  </header>
+
+  <main id="review">
+    <section class="summary-shell" aria-labelledby="session-summary-title">
+      <div class="summary-intro">
+        <p class="eyebrow">What actually happened</p>
+        <h2 id="session-summary-title">44 analyses did not mean 44 filled trades.</h2>
+        <p id="summary-copy">Loading the recorded agent and broker responses…</p>
+      </div>
+      <dl class="summary-grid" id="summary-grid" aria-label="Session totals"></dl>
+    </section>
+
+    <section class="workspace" aria-label="Run explorer">
+      <aside class="run-rail" aria-labelledby="run-list-title">
+        <div class="rail-head">
+          <div>
+            <p class="eyebrow">Decision tape</p>
+            <h2 id="run-list-title">All 44 runs</h2>
+          </div>
+          <span class="count-badge" id="visible-count">44</span>
+        </div>
+
+        <label class="search-field">
+          <span class="sr-only">Search runs by stock name or symbol</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+          <input id="run-search" type="search" placeholder="Search stock or symbol" autocomplete="off">
+        </label>
+
+        <div class="filters" role="group" aria-label="Filter runs">
+          <button class="filter is-active" type="button" data-filter="all" aria-pressed="true">All</button>
+          <button class="filter" type="button" data-filter="pass" aria-pressed="false">No trade</button>
+          <button class="filter" type="button" data-filter="traded" aria-pressed="false">Filled</button>
+          <button class="filter" type="button" data-filter="open" aria-pressed="false">Pending / transit</button>
+          <button class="filter" type="button" data-filter="failed" aria-pressed="false">Rejected / not sent</button>
+        </div>
+
+        <div class="run-list" id="run-list" aria-live="polite"></div>
+      </aside>
+
+      <article class="run-review" id="run-review" aria-live="polite">
+        <div class="loading-state">
+          <span class="loader" aria-hidden="true"></span>
+          Reading the session archive…
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <template id="metric-template">
+    <div class="summary-metric">
+      <dt></dt>
+      <dd></dd>
+      <span></span>
+    </div>
+  </template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
