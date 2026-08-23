@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
 
     // Public routes must remain available even when the auth service is down.
     // Check this before making any network request to Supabase.
-    const publicPaths = ['/', '/login', '/signup', '/signin', '/singin', '/auth', '/api/dhan/callback', '/api/dhan/postback']
+    const publicPaths = ['/', '/login', '/signup', '/signin', '/singin', '/auth', '/api/dhan/callback', '/api/dhan/postback', '/privacy-policy', '/terms-of-service']
     const isPublic = publicPaths.some(p =>
         p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(`${p}/`)
     )
