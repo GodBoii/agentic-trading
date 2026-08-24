@@ -782,7 +782,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             max_risk_fraction_per_slot=float(
                 self.config.stock_agent_max_risk_fraction_per_slot
             ),
-            max_concurrent_trades=int(self.config.stock_agent_max_concurrent_trades),
+            max_concurrent_trades=int(
+                trade_config.get("max_concurrent_trades")
+                or self.config.stock_agent_max_concurrent_trades
+            ),
             final_state_loader=market_data_toolkit.current_stock_state_payload,
             final_quote_max_age_seconds=float(self.config.stock_agent_final_quote_max_age_seconds),
             final_candle_max_age_seconds=float(self.config.stock_agent_final_candle_max_age_seconds),
