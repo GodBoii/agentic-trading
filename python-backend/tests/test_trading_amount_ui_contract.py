@@ -9,6 +9,8 @@ class TradingAmountUIContractTests(unittest.TestCase):
         self.assertIn("Auto: available balance", source)
         self.assertIn("Auto splits your available margin", source)
         self.assertIn("Margin per trade", source)
+        self.assertIn("fixedSlotCount", source)
+        self.assertIn("Current capacity", source)
         self.assertIn("saving does not start a scan", source)
         self.assertNotIn("Start trading", source)
         self.assertNotIn("startAITrading", source)
