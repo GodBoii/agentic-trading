@@ -36,9 +36,7 @@ class StockDecisionContextBuilder:
             for key in cls._LIVE_CIRCUIT_KEYS:
                 tradability.pop(key, None)
 
-        scanner_signal = dict(security_overview.get("stage2_momentum_snapshot") or {})
-        # The chart bundle is newer and is the canonical VWAP source.
-        scanner_signal.pop("price_vs_vwap_percent", None)
+        market_evidence = dict(security_overview.get("market_evidence") or {})
 
         technical = dict(technical_data.get("readings") or {})
         chart_close = cls._number(technical.pop("latest_price", None))
@@ -54,7 +52,7 @@ class StockDecisionContextBuilder:
         account.pop("assigned_security_id", None)
         account.pop("intraday_margin_budget", None)
         account_errors = account.pop("errors", None)
-        account_status = account.pop("status", None)
+        account.pop("status", None)
 
         component_errors = []
         for payload in (security_overview, technical_data):
@@ -108,7 +106,7 @@ class StockDecisionContextBuilder:
                 },
             },
             "risk_budget": {
-                "strict_cash_notional_cap_rupees": selected_stock.get("trade_amount"),
+                "margin_allocation_rupees": selected_stock.get("trade_amount"),
                 "trade_mode": selected_stock.get("trade_mode"),
                 "amount_source": selected_stock.get("amount_source"),
                 "requested_whole_share_quantity": selected_stock.get("requested_quantity"),
@@ -117,7 +115,7 @@ class StockDecisionContextBuilder:
                     "estimated_slippage_percent"
                 ),
             },
-            "scanner_signal": scanner_signal,
+            "market_evidence": market_evidence,
             "live_market": market_state,
             "technical": {
                 "basis": technical_data.get("basis"),
@@ -127,13 +125,7 @@ class StockDecisionContextBuilder:
                 "readings": technical,
             },
             "account": account,
-            "data_quality": {
-                "source_status": {
-                    "security_overview": security_overview.get("status") or "success",
-                    "current_stock_state": current_state.get("status") or "error",
-                    "technical_data": technical_data.get("status") or "success",
-                    "account_overview": account_status or "error",
-                },
+            "evidence_availability": {
                 "missing_fields": current_state.get("missing_fields"),
                 "errors": component_errors,
             },
