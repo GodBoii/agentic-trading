@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const maxAgeMs = Number(process.env.TRADING_AMOUNT_MAX_AGE_SECONDS || 30 * 24 * 60 * 60) * 1000
+const autoSlots = 3
+const maxLeverage = 5
 
 interface TradingConfiguration {
   supabaseUserId: string
@@ -56,6 +58,7 @@ function orderPlacementResponse(state: OrderPlacementState | null) {
 }
 
 function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPlacementState | null) {
+  const sizingPolicy = { auto_slots: autoSlots, max_leverage: maxLeverage }
   const configured = Boolean(entry?.enabled)
   const mode = entry?.tradeMode || 'auto'
   if (mode === 'auto') return {
@@ -64,18 +67,19 @@ function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPl
     trade_mode: 'auto',
     status_code: configured ? 'automatic_balance' : 'automatic_balance_not_saved',
     message: configured
-      ? 'Automatic sizing is active. Available broker balance will be checked for each event.'
-      : 'Leave the amount blank and save to use your available broker balance automatically.',
+      ? `Automatic sizing is active. Available margin is split across ${autoSlots} trade slots.`
+      : `Save Auto to split available margin across ${autoSlots} trade slots.`,
     trade_amount: null,
+    ...sizingPolicy,
     amount_updated_at_utc: entry?.amountUpdatedAt || null,
     order_placement: orderPlacementResponse(orderPlacement),
   }
   const amount = parseAmount(entry?.tradeAmount)
   const updatedAt = Date.parse(String(entry?.amountUpdatedAt || ''))
-  if (!amount) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_missing_or_invalid', message: 'The saved manual amount is invalid. Enter a positive amount or leave it blank for automatic sizing.', trade_amount: null, order_placement: orderPlacementResponse(orderPlacement) }
-  if (!Number.isFinite(updatedAt)) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_timestamp_unavailable', message: 'The saved trading amount cannot be verified. Save it again.', trade_amount: amount, order_placement: orderPlacementResponse(orderPlacement) }
-  if (Date.now() - updatedAt > maxAgeMs) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_stale', message: 'The saved trading amount is stale. Review and save it again.', trade_amount: amount, amount_updated_at_utc: entry?.amountUpdatedAt, order_placement: orderPlacementResponse(orderPlacement) }
-  return { configured, eligible: configured, trade_mode: 'manual', status_code: 'manual_amount', message: 'Manual trading amount saved. Live monitoring continues automatically.', trade_amount: amount, amount_updated_at_utc: entry?.amountUpdatedAt, order_placement: orderPlacementResponse(orderPlacement) }
+  if (!amount) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_missing_or_invalid', message: 'The saved manual margin allocation is invalid. Enter a positive amount or use automatic sizing.', trade_amount: null, ...sizingPolicy, order_placement: orderPlacementResponse(orderPlacement) }
+  if (!Number.isFinite(updatedAt)) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_timestamp_unavailable', message: 'The saved margin allocation cannot be verified. Save it again.', trade_amount: amount, ...sizingPolicy, order_placement: orderPlacementResponse(orderPlacement) }
+  if (Date.now() - updatedAt > maxAgeMs) return { configured, eligible: false, trade_mode: 'manual', status_code: 'amount_stale', message: 'The saved margin allocation is stale. Review and save it again.', trade_amount: amount, ...sizingPolicy, amount_updated_at_utc: entry?.amountUpdatedAt, order_placement: orderPlacementResponse(orderPlacement) }
+  return { configured, eligible: configured, trade_mode: 'manual', status_code: 'manual_amount', message: 'Manual margin allocation saved. Live monitoring continues automatically.', trade_amount: amount, ...sizingPolicy, amount_updated_at_utc: entry?.amountUpdatedAt, order_placement: orderPlacementResponse(orderPlacement) }
 }
 
 export async function GET() {
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest) {
   const amount = automatic ? null : parseAmount(rawAmount)
   if (!automatic && !amount) {
     return NextResponse.json(
-      { error: 'Enter a trading amount greater than zero, or leave it blank for automatic sizing.' },
+      { error: 'Enter a margin allocation greater than zero, or use automatic sizing.' },
       { status: 400 },
     )
   }
