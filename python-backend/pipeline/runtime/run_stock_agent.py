@@ -268,7 +268,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                     "message": "This account's manual amount is invalid. Save a positive amount or leave it blank for automatic sizing.",
                 }
             try:
-                account_context = self._build_account_context()
+                account_context = self._build_sizing_account_context()
                 capacity = self._account_margin_capacity(account_context)
                 available = self._account_available_balance(account_context)
             except Exception as exc:
@@ -301,7 +301,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "max_concurrent_trades": max_concurrent_trades,
             }
         try:
-            account_context = self._build_account_context()
+            account_context = self._build_sizing_account_context()
             effective = self._with_effective_trade_amount({"trade_mode": "auto"}, account_context) or {}
             amount = TradingAmountService.parse(effective.get("trade_amount"))
         except Exception as exc:
@@ -356,6 +356,18 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         copied["account_margin_capacity"] = capacity
         copied["margin_slot_count"] = slots
         return copied
+
+    def _build_sizing_account_context(self) -> Dict[str, Any]:
+        fund_limits = self.dhan.fetch_fund_limits()
+        raw_data = fund_limits.get("data") if isinstance(fund_limits, dict) else {}
+        if isinstance(raw_data, dict) and isinstance(raw_data.get("data"), dict):
+            raw_data = raw_data["data"]
+        return {
+            "funds": {
+                "status": fund_limits.get("status") if isinstance(fund_limits, dict) else "failure",
+                "data": raw_data if isinstance(raw_data, dict) else {},
+            }
+        }
 
     @staticmethod
     def _account_fund_data(account_context: Dict[str, Any]) -> Dict[str, Any]:
