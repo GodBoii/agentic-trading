@@ -289,12 +289,53 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             }
         return {"user_id": user_id, "eligible": True, "trade_mode": "auto", "amount_source": "available_balance", "trade_amount": amount}
 
+    def _with_effective_trade_amount(
+        self,
+        trade_config: Optional[Dict[str, Any]],
+        account_context: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        resolved = super()._with_effective_trade_amount(trade_config, account_context)
+        if not resolved or str(resolved.get("trade_mode") or "auto").lower() != "auto":
+            return resolved
+        if (
+            (trade_config or {}).get("trade_amount") not in (None, "")
+            and str((trade_config or {}).get("amount_source") or "") == "available_balance"
+        ):
+            return resolved
+        copied = dict(resolved)
+        try:
+            available = float(copied.get("trade_amount") or 0.0)
+        except (TypeError, ValueError):
+            available = 0.0
+        slots = max(1, int(self.config.stock_agent_max_concurrent_trades))
+        copied["trade_amount"] = (
+            int((available * 100) // slots) / 100.0
+            if available > 0
+            else None
+        )
+        copied["account_available_balance"] = available
+        copied["margin_slot_count"] = slots
+        return copied
+
     def prepare_user_event(self, event: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
         """Apply dynamic, user-specific Stage 2 eligibility without changing Stage 1."""
         user_id = str(user.get("user_id") or "")
         amount = TradingAmountService.parse(user.get("trade_amount"))
         price = self._reference_price(event)
-        quantity = TradingAmountService.quantity(amount, price)
+        direction = str(event.get("direction") or "LONG").upper()
+        side = "SELL" if direction == "SHORT" else "BUY"
+        margin_check = (
+            self._calculate_one_share_margin(event, side, price)
+            if amount is not None and price > 0
+            else {"status": "failure", "total_margin": None}
+        )
+        margin_per_share = margin_check.get("total_margin")
+        quantity = 0
+        if amount is not None and price > 0 and margin_per_share:
+            quantity = min(
+                int(float(amount) // float(margin_per_share)),
+                int((float(amount) * float(self.config.stock_agent_max_leverage)) // price),
+            )
         base = {
             "user_id": user_id,
             "trade_mode": user.get("trade_mode"),
@@ -307,9 +348,8 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         if price <= 0:
             return {**base, "eligible": False, "status_code": "price_unavailable", "message": "Agent dispatch paused for this user because the current stock price is unavailable."}
         if quantity < 1:
-            return {**base, "eligible": False, "status_code": "price_above_trading_amount", "message": "This stock costs more than the user's trading amount, so no agent was started."}
+            return {**base, "eligible": False, "status_code": "margin_allocation_too_small", "message": "The assigned margin slot cannot support one share at Dhan's current margin."}
         depth = event.get("five_level_depth") or []
-        direction = str(event.get("direction") or "LONG").upper()
         slippage = TradingAmountService.estimated_slippage(depth, direction=direction if direction in {"LONG", "SHORT"} else "LONG", price=price, quantity=quantity)
         if slippage is None:
             return {**base, "requested_quantity": quantity, "eligible": False, "status_code": "user_depth_unavailable", "message": "Agent dispatch paused for this user because five-level depth cannot fill the requested quantity."}
@@ -322,9 +362,10 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             "trade_mode": user.get("trade_mode"),
             "amount_source": user.get("amount_source"),
             "requested_quantity": quantity,
+            "margin_per_share": margin_per_share,
             "user_estimated_notional": round(quantity * price, 2),
             "user_estimated_slippage_percent": slippage,
-            "affordability": {"eligible": True, "price": price, "trade_amount": amount, "trade_mode": user.get("trade_mode"), "amount_source": user.get("amount_source"), "requested_quantity": quantity},
+            "affordability": {"eligible": True, "price": price, "margin_allocation": amount, "margin_per_share": margin_per_share, "trade_mode": user.get("trade_mode"), "amount_source": user.get("amount_source"), "requested_quantity": quantity},
         })
         return {**base, "requested_quantity": quantity, "estimated_slippage_percent": slippage, "eligible": True, "status_code": "eligible", "event": routed}
 
@@ -385,10 +426,14 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             reference_price = self._reference_price(stock)
             if reference_price <= 0:
                 continue
-            quantity = TradingAmountService.quantity(margin_budget, reference_price)
+            quantity = int(
+                (margin_budget * float(self.config.stock_agent_max_leverage))
+                // reference_price
+            )
             enriched = dict(stock)
             enriched["manual_margin_filter"] = {
                 "trade_amount": margin_budget,
+                "max_leverage": float(self.config.stock_agent_max_leverage),
                 "reference_price": reference_price,
                 "requested_quantity": quantity,
                 "included": quantity >= 1,
@@ -529,33 +574,99 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "message": "Fetching intraday history and building charts.",
             },
         )
-        intraday_resp = self.dhan.fetch_intraday_history(
-            security_id,
-            days=25,
-            interval=1,
-            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
-            instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
+        exchange_segment = str(candidate_packet.get("exchange_segment") or "").upper()
+        intraday_frame = self.signal_cache.load_frame(
+            market_date=str(candidate_packet["market_date"]),
+            exchange_segment=exchange_segment,
+            security_id=security_id,
+            recent_bars=candidate_packet.get("chart_seed_bars") or [],
         )
-        if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
-            remarks = intraday_resp.get("remarks") if isinstance(intraday_resp, dict) else None
-            if self.dhan.is_auth_invalid(intraday_resp):
-                raise RuntimeError(f"stock_agent_auth_invalid::{remarks}")
-            raise RuntimeError(f"stock_agent_intraday_history_failed::{security_id}::{remarks}")
+        # Full-session seed bars are chart transport, not model or session evidence.
+        candidate_packet.pop("chart_seed_bars", None)
+        cache_used = intraday_frame is not None and not intraday_frame.empty
+        if not cache_used:
+            intraday_resp = self.dhan.fetch_intraday_history(
+                security_id,
+                days=25,
+                interval=1,
+                exchange_segment=exchange_segment,
+                instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
+            )
+            if not intraday_resp or str(intraday_resp.get("status", "")).lower() != "success":
+                remarks = intraday_resp.get("remarks") if isinstance(intraday_resp, dict) else None
+                if self.dhan.is_auth_invalid(intraday_resp):
+                    raise RuntimeError(f"stock_agent_auth_invalid::{remarks}")
+                raise RuntimeError(f"stock_agent_intraday_history_failed::{security_id}::{remarks}")
+            intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
 
         intraday_frame_fetched_at = self.market_time.now()
-        intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
+        artifact_identity = self._slugify(
+            candidate_packet.get("event_id")
+            or (run_context or {}).get("request_id")
+            or f"manual-{int(time.time() * 1000)}"
+        )
         artifacts_dir = (
             self.config.stock_analyzer_artifacts_dir
             / candidate_packet["market_date"]
             / self._slugify(candidate_packet["display_name"])
+            / artifact_identity
         )
-        chart_bundle = self.charting.build_intraday_chart_set(
-            frame=intraday_frame,
-            display_name=candidate_packet["display_name"],
-            market_date=candidate_packet["market_date"],
-            output_dir=artifacts_dir,
+
+        selected_stock = self.execution_helper._normalize_selected_stock(
+            {"rank": index + 1, "candidate": candidate_packet}
         )
-        if int(chart_bundle.get("chart_count") or 0) != 9:
+        isolated_dhan = DhanService(self.config, prefer_gateway=False)
+        margin_budget = self._resolve_margin_budget(trade_config, candidate_packet)
+        market_data_toolkit = StockMarketDataToolkit(
+            dhan=isolated_dhan,
+            market_time=self.market_time,
+            security_id=security_id,
+            symbol=str(candidate_packet.get("symbol") or ""),
+            display_name=str(candidate_packet.get("display_name") or candidate_packet.get("symbol") or ""),
+            stock_context=candidate_packet,
+            instrument=candidate_packet.get("instrument"),
+            intraday_frame=intraday_frame,
+            intraday_frame_fetched_at=intraday_frame_fetched_at,
+            exchange_segment=exchange_segment,
+        )
+        account_toolkit = StockAccountToolkit(
+            isolated_dhan,
+            security_id=security_id,
+            margin_budget=margin_budget,
+        )
+        context_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="stock-context")
+        context_futures = {
+            "security_overview": context_executor.submit(
+                self._safe_initial_context_component,
+                "security_overview",
+                market_data_toolkit.security_overview_payload,
+            ),
+            "current_stock_state": context_executor.submit(
+                self._safe_initial_context_component,
+                "current_stock_state",
+                market_data_toolkit.current_stock_state_payload,
+            ),
+            "account_overview": context_executor.submit(
+                self._safe_initial_context_component,
+                "account_overview",
+                account_toolkit.account_overview_payload,
+            ),
+        }
+        try:
+            chart_bundle = self.charting.build_intraday_chart_set(
+                frame=intraday_frame,
+                display_name=candidate_packet["display_name"],
+                market_date=candidate_packet["market_date"],
+                output_dir=artifacts_dir,
+                signal_time_ist=candidate_packet.get("created_at"),
+            )
+            security_overview = context_futures["security_overview"].result()
+            current_stock_state = context_futures["current_stock_state"].result()
+            account_overview = context_futures["account_overview"].result()
+        finally:
+            context_executor.shutdown(wait=True, cancel_futures=True)
+        chart_bundle["history_cache_used"] = cache_used
+        if int(chart_bundle.get("chart_count") or 0) != 8:
             raise RuntimeError(
                 f"stock_agent_chart_contract_incomplete::{security_id}::"
                 f"{chart_bundle.get('chart_count')} charts"
@@ -586,29 +697,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             },
         )
 
-        selected_stock = self.execution_helper._normalize_selected_stock(
-            {"rank": index + 1, "candidate": candidate_packet}
-        )
-        isolated_dhan = DhanService(self.config, prefer_gateway=False)
-        margin_budget = self._resolve_margin_budget(trade_config, candidate_packet)
-        market_data_toolkit = StockMarketDataToolkit(
-            dhan=isolated_dhan,
-            market_time=self.market_time,
-            security_id=security_id,
-            symbol=str(candidate_packet.get("symbol") or ""),
-            display_name=str(candidate_packet.get("display_name") or candidate_packet.get("symbol") or ""),
-            stock_context=candidate_packet,
-            instrument=candidate_packet.get("instrument"),
-            intraday_frame=intraday_frame,
-            intraday_frame_fetched_at=intraday_frame_fetched_at,
-            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
-        )
         technical_toolkit = StockTechnicalToolkit(chart_bundle, market_time=self.market_time)
-        account_toolkit = StockAccountToolkit(
-            isolated_dhan,
-            security_id=security_id,
-            margin_budget=margin_budget,
-        )
         execution_toolkit = StockExecutionToolkit(
             isolated_dhan,
             security_id=security_id,
@@ -616,6 +705,17 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
             coordinator=execution_coordinator,
             amount_source=str(trade_config.get("amount_source") or "user_amount"),
+            max_leverage=float(self.config.stock_agent_max_leverage),
+            max_risk_fraction_per_slot=float(
+                self.config.stock_agent_max_risk_fraction_per_slot
+            ),
+            max_concurrent_trades=int(self.config.stock_agent_max_concurrent_trades),
+            final_state_loader=market_data_toolkit.current_stock_state_payload,
+            final_quote_max_age_seconds=float(self.config.stock_agent_final_quote_max_age_seconds),
+            final_candle_max_age_seconds=float(self.config.stock_agent_final_candle_max_age_seconds),
+            max_entry_drift_risk_fraction=float(
+                self.config.stock_agent_max_entry_drift_risk_fraction
+            ),
         )
         selected_stock_context = {
             "security_id": selected_stock.get("security_id"),
@@ -632,22 +732,13 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         decision_context = StockDecisionContextBuilder.build(
             selected_stock=selected_stock_context,
             timing_context=timing_context,
-            security_overview=self._safe_initial_context_component(
-                "security_overview",
-                market_data_toolkit.security_overview_payload,
-            ),
-            current_state=self._safe_initial_context_component(
-                "current_stock_state",
-                market_data_toolkit.current_stock_state_payload,
-            ),
+            security_overview=security_overview,
+            current_state=current_stock_state,
             technical_data=self._safe_initial_context_component(
                 "technical_data",
                 technical_toolkit.technical_data_payload,
             ),
-            account_overview=self._safe_initial_context_component(
-                "account_overview",
-                account_toolkit.account_overview_payload,
-            ),
+            account_overview=account_overview,
         )
         # The LLM receives exactly two functions. All read-only evidence is supplied once above.
         agent = StockAgent([execution_toolkit])
@@ -697,7 +788,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "type": "stock_agent_input",
                 "message": (
                     f"Analyze {candidate_packet.get('display_name') or candidate_packet.get('symbol')} "
-                    "using the nine attached evidence charts, the initial decision snapshot, "
+                    "using the eight attached evidence charts, the initial decision snapshot, "
                     "and the two protected-execution tools."
                 ),
                 "input": stock_packet,
@@ -812,14 +903,29 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             for info in (chart_records or {}).values()
             if isinstance(info, dict) and info.get("path")
         }
-        cloud_urls: List[str] = []
-        for chart_path in chart_paths:
+        def upload_one(chart_path: str) -> tuple[str, Dict[str, Any]]:
             filename = Path(str(chart_path)).name
             storage_path = (
                 f"{trade_session_id}/agents/{rank}-{agent_slug}/images/{filename}"
             )
             uploaded = CloudPersistenceService.upload_image(chart_path, storage_path)
-            cloud_urls.append(uploaded["cloud_url"])
+            return str(chart_path), uploaded
+
+        workers = min(4, max(1, len(chart_paths)))
+        uploaded_by_path: Dict[str, Dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="chart-upload") as executor:
+            future_by_path = {
+                executor.submit(upload_one, str(chart_path)): str(chart_path)
+                for chart_path in chart_paths
+            }
+            for future in as_completed(future_by_path):
+                chart_path, uploaded = future.result()
+                uploaded_by_path[chart_path] = uploaded
+
+        cloud_urls: List[str] = []
+        for chart_path in chart_paths:
+            uploaded = uploaded_by_path[str(chart_path)]
+            cloud_urls.append(str(uploaded["cloud_url"]))
             chart_info = by_path.get(str(chart_path))
             if isinstance(chart_info, dict):
                 chart_info.update(uploaded)
@@ -887,10 +993,11 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         ]
         if instrument.get("symbol"):
             lines.append(f"- Symbol: {instrument.get('symbol')}")
-        if risk_budget.get("strict_cash_notional_cap_rupees") is not None:
+        if risk_budget.get("margin_allocation_rupees") is not None:
             lines.extend([
-                f"- Strict cash/notional cap: Rs {risk_budget.get('strict_cash_notional_cap_rupees')}",
-                "- Do not assume leverage. Current LTP and affordability are revalidated immediately before placement.",
+                f"- Margin allocation: Rs {risk_budget.get('margin_allocation_rupees')}",
+                f"- Maximum leverage: {self.config.stock_agent_max_leverage:.2f}x, further limited by Dhan's current margin response.",
+                "- Current balance, LTP, setup freshness, and margin are revalidated immediately before placement.",
             ])
         return "\n".join(lines)
 
