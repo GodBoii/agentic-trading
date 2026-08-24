@@ -267,7 +267,39 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                     "status_code": "manual_amount_invalid",
                     "message": "This account's manual amount is invalid. Save a positive amount or leave it blank for automatic sizing.",
                 }
-            return {"user_id": user_id, "eligible": True, "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": amount}
+            try:
+                account_context = self._build_account_context()
+                capacity = self._account_margin_capacity(account_context)
+                available = self._account_available_balance(account_context)
+            except Exception as exc:
+                return {
+                    "user_id": user_id,
+                    "eligible": False,
+                    "status_code": "available_balance_unavailable",
+                    "message": "Fixed sizing is paused because account margin could not be loaded.",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            max_concurrent_trades = int(capacity // amount) if capacity > 0 else 0
+            if max_concurrent_trades < 1:
+                return {
+                    "user_id": user_id,
+                    "eligible": False,
+                    "status_code": "manual_amount_exceeds_account_capacity",
+                    "message": "The fixed margin allocation exceeds the account's current margin capacity.",
+                    "trade_mode": "manual",
+                    "trade_amount": amount,
+                    "account_margin_capacity": capacity,
+                }
+            return {
+                "user_id": user_id,
+                "eligible": True,
+                "trade_mode": "manual",
+                "amount_source": "user_amount",
+                "trade_amount": amount,
+                "account_available_balance": available,
+                "account_margin_capacity": capacity,
+                "max_concurrent_trades": max_concurrent_trades,
+            }
         try:
             account_context = self._build_account_context()
             effective = self._with_effective_trade_amount({"trade_mode": "auto"}, account_context) or {}
@@ -287,7 +319,16 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "status_code": "available_balance_unavailable",
                 "message": "Automatic sizing is paused for this account because available broker balance is missing or zero.",
             }
-        return {"user_id": user_id, "eligible": True, "trade_mode": "auto", "amount_source": "available_balance", "trade_amount": amount}
+        return {
+            "user_id": user_id,
+            "eligible": True,
+            "trade_mode": "auto",
+            "amount_source": "available_balance",
+            "trade_amount": amount,
+            "account_available_balance": effective.get("account_available_balance"),
+            "account_margin_capacity": effective.get("account_margin_capacity"),
+            "max_concurrent_trades": int(self.config.stock_agent_max_concurrent_trades),
+        }
 
     def _with_effective_trade_amount(
         self,
@@ -303,19 +344,51 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         ):
             return resolved
         copied = dict(resolved)
-        try:
-            available = float(copied.get("trade_amount") or 0.0)
-        except (TypeError, ValueError):
-            available = 0.0
+        available = self._account_available_balance(account_context)
+        capacity = self._account_margin_capacity(account_context)
         slots = max(1, int(self.config.stock_agent_max_concurrent_trades))
         copied["trade_amount"] = (
-            int((available * 100) // slots) / 100.0
-            if available > 0
+            int((capacity * 100) // slots) / 100.0
+            if capacity > 0
             else None
         )
         copied["account_available_balance"] = available
+        copied["account_margin_capacity"] = capacity
         copied["margin_slot_count"] = slots
         return copied
+
+    @staticmethod
+    def _account_fund_data(account_context: Dict[str, Any]) -> Dict[str, Any]:
+        funds = (account_context.get("funds") or {}).get("data") or {}
+        if isinstance(funds, dict) and isinstance(funds.get("data"), dict):
+            funds = funds["data"]
+        return funds if isinstance(funds, dict) else {}
+
+    @classmethod
+    def _account_available_balance(cls, account_context: Dict[str, Any]) -> float:
+        funds = cls._account_fund_data(account_context)
+        for key in ("availabelBalance", "availableBalance", "withdrawableBalance"):
+            try:
+                value = float(funds.get(key) or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+        return 0.0
+
+    @classmethod
+    def _account_margin_capacity(cls, account_context: Dict[str, Any]) -> float:
+        funds = cls._account_fund_data(account_context)
+        available = cls._account_available_balance(account_context)
+        try:
+            utilized = max(0.0, float(funds.get("utilizedAmount") or 0.0))
+        except (TypeError, ValueError):
+            utilized = 0.0
+        try:
+            start_of_day = max(0.0, float(funds.get("sodLimit") or 0.0))
+        except (TypeError, ValueError):
+            start_of_day = 0.0
+        return max(available, available + utilized, start_of_day)
 
     def prepare_user_event(self, event: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
         """Apply dynamic, user-specific Stage 2 eligibility without changing Stage 1."""
