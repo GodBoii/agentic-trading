@@ -173,11 +173,12 @@ class DhanExecutionToolkit(Toolkit):
         product_type: str = "INTRADAY",
         exchange_segment: str = "BSE_EQ",
         trigger_price: float = 0.0,
+        max_leverage: float = 5.0,
     ) -> str:
-        """Size a whole-share equity order from a strict cash/notional cap.
+        """Size a whole-share equity order from Dhan margin and explicit risk caps.
 
-        Dhan margin is evidence only and never expands the user's buying power.
-        The final order is rechecked with current LTP immediately before placement.
+        The broker decides current margin. The caller limits leverage and rupee risk.
+        The final order is rechecked with current LTP and current Dhan margin.
         """
         normalized_side = str(side).strip().upper()
         budget = max(0.0, float(margin_budget))
@@ -223,14 +224,25 @@ class DhanExecutionToolkit(Toolkit):
                 ensure_ascii=True,
             )
 
+        raw_leverage = margin_data.get("leverage")
+        match = re.search(r"[0-9]+(?:\.[0-9]+)?", str(raw_leverage or ""))
+        broker_leverage = float(match.group(0)) if match else entry / margin_per_share
+        configured_leverage = max(1.0, float(max_leverage))
+        effective_leverage = max(1.0, min(broker_leverage, configured_leverage))
         qty_by_cash = int(budget // entry)
+        qty_by_margin = int(budget // margin_per_share)
+        qty_by_leverage = int((budget * effective_leverage) // entry)
         qty_by_risk: Optional[int] = None
         per_share_risk: Optional[float] = None
         if stop is not None and max_risk_rupees is not None and float(max_risk_rupees) > 0:
             per_share_risk = abs(entry - stop)
-            qty_by_risk = int(float(max_risk_rupees) // per_share_risk) if per_share_risk > 0 else qty_by_cash
+            qty_by_risk = (
+                int(float(max_risk_rupees) // per_share_risk)
+                if per_share_risk > 0
+                else min(qty_by_margin, qty_by_leverage)
+            )
 
-        caps = [qty_by_cash]
+        caps = [qty_by_margin, qty_by_leverage]
         if qty_by_risk is not None:
             caps.append(qty_by_risk)
         if max_quantity is not None and int(max_quantity) > 0:
@@ -248,7 +260,12 @@ class DhanExecutionToolkit(Toolkit):
                 "stop_loss_price": stop,
                 "margin_budget": budget,
                 "margin_per_share": margin_per_share,
+                "broker_leverage": round(broker_leverage, 4),
+                "configured_max_leverage": configured_leverage,
+                "effective_leverage": round(effective_leverage, 4),
                 "max_qty_by_cash": qty_by_cash,
+                "max_qty_by_margin": qty_by_margin,
+                "max_qty_by_leverage": qty_by_leverage,
                 "max_risk_rupees": float(max_risk_rupees) if max_risk_rupees is not None else None,
                 "per_share_risk": per_share_risk,
                 "max_qty_by_risk": qty_by_risk,
