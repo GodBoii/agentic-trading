@@ -1,0 +1,63 @@
+{
+  "model": "stealth/ox-alpha",
+  "chart": "python-backend/results/agents/artifacts/2026-08-21/kiri-industries/kiri-industries-2026-08-21-current-15m.png",
+  "response": "## Chart Explanation\n\n**Header / context:** This is a 15-minute candlestick chart of **Kiri Industries** for the current day, **2026-08-21**, with data through **10:49:00 IST**. The title states: LAST ₹464.40, VWAP ₹463.38, ATR(14) ₹3.94, and flags the final bar as a **PARTIAL LAST CANDLE** (still forming at 10:49).\n\n**Indicators shown (per legend):** EMA 9 (cyan), EMA 21 (magenta), and VWAP (orange). No other indicators are plotted.\n\n**Reference levels (right-edge labels):**\n- PDH (previous day high): 479.95 — far above current price\n- PDC (previous day close): 460.50 — dashed line below price\n- PDL (previous day low): 434.00 — far below current price\n- LAST marker line at 464.40\n\n**Price action, candle by candle (IST):**\n- **09:15:** Large red candle, body roughly 463.9 → 461.6, with a very long lower wick to ~458.5 and upper wick to ~466 — heavy early selling that was sharply bought back.\n- **09:30:** Small green candle (~461.5 → 462.1) with wicks to ~460.9 and ~463.8 — stabilization.\n- **09:45:** Small green candle with a long upper wick to ~465.9 — an attempted push higher that faded.\n- **10:00:** Strong green candle, body ~462.0 → 465.25, high ~466.4 — the day's main rally leg.\n- **10:15:** Large red candle, body ~466.0 → 463.55 — a sharp rejection/pullback from the highs.\n- **10:30:** Green recovery candle (~463.6 → 465.05).\n- **10:45 (partial):** Small red candle near 464.4–465.0, still forming at 10:49; last price 464.40.\n\n**Indicator behavior:** VWAP (orange) is fairly flat around ~463.1–463.4. EMA 9 (cyan) climbs steadily from ~461.6 and ends slightly **above** VWAP (~463.45). EMA 21 (magenta) rises more slowly to ~462.6, so **EMA 9 is above EMA 21**. Price (464.40) is trading **above VWAP** (463.38) and above the previous day close (460.50), but well below the previous day high (479.95).\n\n**Overall read:** After a volatile, wick-heavy open, the stock built an upward bias, pulled back hard at 10:15, and is now consolidating just above VWAP with EMAs positively stacked — though the last (partial) candle is red.\n\n```json\n{\n  \"stock\": \"Kiri Industries\",\n  \"timeframe\": \"15m\",\n  \"data_through_ist\": \"2026-08-21 10:49:00\",\n  \"last_price\": 464.40,\n  \"vwap\": 463.38,\n  \"atr_14\": 3.94,\n  \"last_candle_status\": \"partial_red_in_progress\",\n  \"trend_vs_vwap\": \"above\",\n  \"ema_9_vs_ema_21\": \"ema_9_above_ema_21\",\n  \"previous_day_high\": 479.95,\n  \"previous_day_close\": 460.50,\n  \"previous_day_low\": 434.00\n}\n```",
+  "extracted": {
+    "stock": "Kiri Industries",
+    "timeframe": "15m",
+    "data_through_ist": "2026-08-21 10:49:00",
+    "last_price": 464.4,
+    "vwap": 463.38,
+    "atr_14": 3.94,
+    "last_candle_status": "partial_red_in_progress",
+    "trend_vs_vwap": "above",
+    "ema_9_vs_ema_21": "ema_9_above_ema_21",
+    "previous_day_high": 479.95,
+    "previous_day_close": 460.5,
+    "previous_day_low": 434.0
+  },
+  "grade": {
+    "passed": true,
+    "score": 12,
+    "maximum": 12,
+    "checks": {
+      "stock": true,
+      "timeframe": true,
+      "data_time": true,
+      "last_price": true,
+      "vwap": true,
+      "atr": true,
+      "partial_candle": true,
+      "above_vwap": true,
+      "ema_alignment": true,
+      "previous_day_high": true,
+      "previous_day_close": true,
+      "previous_day_low": true
+    }
+  },
+  "usage": {
+    "prompt_tokens": 5740,
+    "completion_tokens": 1812,
+    "total_tokens": 7552,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 64,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0,
+      "upstream_inference_prompt_cost": 0,
+      "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "provider": "Stealth",
+  "request_id": "gen-1787523692-BWK7UWTd9GqYRR9W6VEu"
+}
