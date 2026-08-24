@@ -24,10 +24,11 @@ class StockAnalyzerIndicatorPromptTests(unittest.TestCase):
                 "recent_closed_bars": [{"close": 100.0}],
             }
         )
-        self.assertIn("attention flag, not a recommendation", prompt)
-        self.assertIn("MIXED", prompt)
-        self.assertIn("BULLISH_ENGULFING", prompt)
-        self.assertIn("Reject weak or conflicting evidence", prompt)
+        self.assertIn("supplies no trade recommendation", prompt)
+        self.assertNotIn("MIXED", prompt)
+        self.assertNotIn("BULLISH_ENGULFING", prompt)
+        self.assertNotIn("setup_score", prompt)
+        self.assertIn("Recent Objective Evidence", prompt)
 
 
 if __name__ == "__main__":
