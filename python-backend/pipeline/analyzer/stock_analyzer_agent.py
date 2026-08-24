@@ -120,27 +120,23 @@ class StockAnalyzerAgent:
         account_context = candidate_packet.get("account_context") or {}
         funds = (account_context.get("funds") or {}).get("data") or {}
         live_quote = stage2.get("live_quote") or {}
-        live_liquidity = stage2.get("live_liquidity") or {}
-        data_quality = stage2.get("data_quality") or {}
-        indicator_events = candidate_packet.get("indicator_events") or []
         indicator_snapshot = candidate_packet.get("indicator_snapshot") or {}
         recent_closed_bars = candidate_packet.get("recent_closed_bars") or []
 
         lines = [
             "Analyze the supplied intraday stock candidate.",
             "Your downstream reader is this stock's executioner agent, so be precise, concrete, and usable.",
-            "Chart images are provided in order: Current day 1m EXECUTION, 5m SETUP, 15m STRUCTURE.",
+            "Chart images are provided in order: current day 1m EXECUTION, 5m SETUP, 15m STRUCTURE, previous-session 15m, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO profile.",
             "Each image is price-only; use technical_metadata for RSI, ATR, volume, patterns, and exact levels.",
             "Cross-reference the technical snapshot with what you see on charts.",
-            "An indicator event is an attention flag, not a recommendation or proof of a trade.",
-            "Independently decide whether the evidence is continuation, reversal, noise, or contradictory.",
+            "Intra-Finder selected the stock for inspection. It supplies no trade recommendation.",
+            "Independently decide whether the objective evidence is continuation, reversal, noise, or contradictory.",
             "Use timing_context.current_market_time_ist and the Indian market session fields for all time-sensitive conclusions.",
             "",
             "## Stock",
             f"Display name: {candidate_packet.get('display_name') or candidate_packet.get('symbol') or 'Unknown'}",
             f"Security ID: {candidate_packet.get('security_id')}",
             f"Symbol: {candidate_packet.get('symbol') or 'Unknown'}",
-            f"Candidate source: {candidate_packet.get('candidate_source') or 'unknown'}",
             f"Market date: {candidate_packet.get('market_date') or 'unknown'}",
             "",
             "## Timing Context",
@@ -168,26 +164,21 @@ class StockAnalyzerAgent:
                 ]
             )
 
-        if indicator_events:
+        if indicator_snapshot or recent_closed_bars:
             lines.extend(
                 [
                     "",
-                    "## Why Intra-Finder Requested Analysis",
-                    f"Event setup type: {candidate_packet.get('setup_type')}",
-                    f"Directional hint (may be MIXED or NEUTRAL): {candidate_packet.get('direction')}",
-                    f"Attention priority (not trade probability): {candidate_packet.get('setup_score')}",
-                    f"Trigger rule: {candidate_packet.get('event_trigger_rule')}",
-                    f"New completed-candle events: {json.dumps(indicator_events, ensure_ascii=False)}",
+                    "## Recent Objective Evidence",
                     f"Latest indicator snapshot: {json.dumps(indicator_snapshot, ensure_ascii=False)}",
                     f"Recent completed 1-minute bars: {json.dumps(recent_closed_bars, ensure_ascii=False)}",
-                    "Validate these events against the 1m, 5m and 15m charts, market structure, volume, liquidity, invalidation and reward/risk. Reject weak or conflicting evidence.",
+                    "Validate this evidence against the charts, market structure, volume, liquidity, invalidation and reward/risk.",
                 ]
             )
 
         lines.extend(
             [
                 "",
-                "## Selection Context",
+                "## Market Evidence",
                 f"Cash price reference: {stock.get('price')}",
                 f"ADV 20d (Cr): {stock.get('adv_20_cr')}",
                 f"Average volume 20d: {stock.get('avg_volume_20')}",
@@ -195,16 +186,11 @@ class StockAnalyzerAgent:
                 f"Previous session: {json.dumps(stock.get('previous_session'), ensure_ascii=False)}",
                 f"Static tradability: {json.dumps(stock.get('static_tradability'), ensure_ascii=False)}",
                 f"Derivatives reference: {json.dumps(stock.get('derivatives'), ensure_ascii=False)}",
-                f"Legacy Stage 2 score: {stage2.get('score')}",
-                f"Stage 2 selection score: {stage2.get('selection_score')}",
                 f"Time-of-day RVOL: {stage2.get('time_of_day_rvol')}",
                 f"Price vs VWAP percent: {stage2.get('price_vs_vwap_percent')}",
                 f"Opening-range breakout percent: {stage2.get('opening_range_breakout_percent')}",
                 f"Volume acceleration ratio: {stage2.get('volume_acceleration_ratio')}",
                 f"Live quote: {json.dumps(live_quote, ensure_ascii=False)}",
-                f"Live liquidity score: {json.dumps(live_liquidity, ensure_ascii=False)}",
-                f"Data quality score: {json.dumps(data_quality, ensure_ascii=False)}",
-                f"Monitor passed: {monitor.get('passed')}",
                 f"Monitor spread percent: {monitor.get('spread_percent')}",
                 f"Monitor ticks last 10 min: {monitor.get('ticks_last_10min')}",
                 "",
