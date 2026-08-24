@@ -119,10 +119,17 @@ class FakeOrderPlacementGate:
         self.allowed = True
         self.placement_lock = threading.Lock()
         self.block_calls = 0
+        self.reserved_security_ids = set()
 
     def block_from_order_response(self, _response):
         self.block_calls += 1
         self.allowed = False
+
+    def reserve_trade_slot(self, security_id):
+        self.reserved_security_ids.add(str(security_id))
+
+    def active_trade_slots(self, broker_security_ids):
+        return set(broker_security_ids) | self.reserved_security_ids
 
 
 class ConcurrentFakeStockDhan(FakeStockDhan):
@@ -907,6 +914,40 @@ class StockToolkitTests(unittest.TestCase):
 
         self.assertIn("maximum_concurrent_trade_slots_in_use", response)
         self.assertEqual(dhan.super_order_calls, 0)
+
+    def test_shared_gate_reserves_slot_before_broker_book_catches_up(self):
+        dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False)
+        dhan.fetch_positions = lambda: {"status": "success", "data": []}
+        dhan.fetch_order_book = lambda: {"status": "success", "data": []}
+        dhan.fetch_super_orders = lambda: {"status": "success", "data": []}
+        gate = FakeOrderPlacementGate()
+        first = StockExecutionToolkit(
+            dhan,
+            111,
+            500,
+            coordinator=StockExecutionCoordinator(order_placement_gate=gate),
+            max_concurrent_trades=1,
+        )
+        second = StockExecutionToolkit(
+            dhan,
+            222,
+            500,
+            coordinator=StockExecutionCoordinator(order_placement_gate=gate),
+            max_concurrent_trades=1,
+        )
+        first._dhan_tools.allow_live_orders = True
+        second._dhan_tools.allow_live_orders = True
+
+        placed = first.place_protected_intraday_order(
+            side="BUY", quantity=1, entry_price=100, target_price=105, stop_loss_price=98
+        )
+        blocked = second.place_protected_intraday_order(
+            side="BUY", quantity=1, entry_price=100, target_price=105, stop_loss_price=98
+        )
+
+        self.assertIn("- status: success", placed)
+        self.assertIn("maximum_concurrent_trade_slots_in_use", blocked)
+        self.assertEqual(dhan.super_order_calls, 1)
 
     def test_execution_blocks_when_final_price_has_moved_too_far(self):
         dhan = FakeStockDhan(margin_required=20.0, include_selected_position=False)
