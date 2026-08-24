@@ -14,7 +14,7 @@ import { NumberFlow } from '@/components/motion/number-flow'
 import { SkeletonReveal } from '@/components/motion/skeleton-reveal'
 import { SuccessCheck } from '@/components/motion/success-check'
 import { formatDateTime, money } from '@/lib/format'
-import { autoSlotAmount, parseSlotCount } from '@/lib/trade-sizing'
+import { autoSlotAmount, fixedSlotCount, parseSlotCount } from '@/lib/trade-sizing'
 import type { Funds } from '@/components/dashboard/types'
 
 interface TradingKeys {
@@ -99,7 +99,7 @@ export default function TradingStatus() {
     const [tradeAmount, setTradeAmount] = useState('')
     const [status, setStatus] = useState<AmountStatus | null>(null)
     /** Available broker balance, for the auto-mode preview. */
-    const [available, setAvailable] = useState<number | null>(null)
+    const [marginCapacity, setMarginCapacity] = useState<number | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -151,7 +151,15 @@ export default function TradingStatus() {
                 if (!response.ok) return
                 const funds: Funds = await response.json()
                 const balance = Number(funds?.availabelBalance)
-                if (Number.isFinite(balance)) setAvailable(balance)
+                const utilized = Number(funds?.utilizedAmount)
+                const startOfDay = Number(funds?.sodLimit)
+                if (Number.isFinite(balance)) {
+                    setMarginCapacity(Math.max(
+                        balance,
+                        balance + (Number.isFinite(utilized) ? Math.max(0, utilized) : 0),
+                        Number.isFinite(startOfDay) ? Math.max(0, startOfDay) : 0,
+                    ))
+                }
             } catch {
                 // Preview only. The agent re-reads the balance at execution.
             }
@@ -209,7 +217,10 @@ export default function TradingStatus() {
     const savedAmount = status?.trade_amount ?? null
     const configured = Boolean(status?.configured)
     const slots = parseSlotCount(status?.auto_slots)
-    const perSlot = available === null ? null : autoSlotAmount(available, slots)
+    const perSlot = marginCapacity === null ? null : autoSlotAmount(marginCapacity, slots)
+    const fixedSlots = marginCapacity === null || parsed === null || invalid
+        ? null
+        : fixedSlotCount(marginCapacity, parsed)
 
     /**
      * A saved-but-not-eligible configuration (a stale timestamp) is fixed by
@@ -263,7 +274,8 @@ export default function TradingStatus() {
                 <PanelBody className="space-y-5">
                     <p className="max-w-prose text-[12px] leading-relaxed text-ink-secondary">
                         Auto splits your available margin into {slots} equal slots, so the agent can hold {slots}{' '}
-                        trades at once. Fixed sets the margin allocation for each trade. Dhan decides the live margin,
+                        trades at once. Fixed derives the live-trade limit from balance divided by your margin allocation.
+                        Dhan decides the live margin,
                         and exposure is capped at {status?.max_leverage || 5}x before stop-risk sizing can reduce it;
                         saving does not start a scan.
                     </p>
@@ -298,7 +310,7 @@ export default function TradingStatus() {
                         >
                             <div className="rounded-lg border border-line bg-white/[0.02] p-3.5">
                                 <dl className="grid grid-cols-3 gap-3">
-                                    <SlotFigure label="Available" value={available === null ? '—' : money(available)} />
+                                    <SlotFigure label="Margin capacity" value={marginCapacity === null ? '—' : money(marginCapacity)} />
                                     <SlotFigure label="Margin per trade" value={perSlot === null ? '—' : money(perSlot)} />
                                     <SlotFigure label="Slots" value={String(slots)} plain />
                                 </dl>
@@ -370,7 +382,7 @@ export default function TradingStatus() {
                                 <p id="trade-amount-hint" className="mt-1 text-[10px] text-ink-tertiary">
                                     {parsed === null || invalid
                                         ? 'The maximum broker margin one trade may use.'
-                                        : `Each trade may use up to ${money(parsed)} margin before leverage and stop-risk limits.`}
+                                        : `Each trade may use up to ${money(parsed)} margin. Current capacity: ${fixedSlots ?? 0} concurrent trades before leverage and stop-risk limits.`}
                                 </p>
                             </div>
                         </DisclosurePanel>
