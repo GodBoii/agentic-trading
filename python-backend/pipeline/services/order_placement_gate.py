@@ -175,6 +175,12 @@ class OrderPlacementGate:
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._state_lock = Lock()
         self.placement_lock = Lock()
+        self._trade_slot_lock = Lock()
+        self._trade_slot_reservations: Dict[str, datetime] = {}
+        self.trade_slot_reservation_grace_seconds = max(
+            5,
+            int(os.getenv("AI_TRADING_SLOT_RESERVATION_GRACE_SECONDS", "30")),
+        )
         self._stop = Event()
         self._dh905_latched = Event()
         self._verification_thread: Optional[Thread] = None
@@ -263,6 +269,24 @@ class OrderPlacementGate:
         self._persist(blocked)
         print("[Order Gate] Dhan returned DH-905. Order placement is blocked.", flush=True)
         return blocked
+
+    def reserve_trade_slot(self, security_id: int) -> None:
+        with self._trade_slot_lock:
+            self._trade_slot_reservations[str(int(security_id))] = self._now()
+
+    def active_trade_slots(self, broker_security_ids: set[str]) -> set[str]:
+        """Merge broker state with recent placements that may not be visible yet."""
+        now = self._now()
+        normalized_broker_ids = {
+            str(value) for value in broker_security_ids if str(value).strip()
+        }
+        with self._trade_slot_lock:
+            for security_id, reserved_at in list(self._trade_slot_reservations.items()):
+                if security_id in normalized_broker_ids:
+                    continue
+                if (now - reserved_at).total_seconds() > self.trade_slot_reservation_grace_seconds:
+                    self._trade_slot_reservations.pop(security_id, None)
+            return normalized_broker_ids | set(self._trade_slot_reservations)
 
     def start_periodic_verification(
         self,
