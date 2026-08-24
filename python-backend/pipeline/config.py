@@ -40,6 +40,7 @@ class PipelineConfig:
     risk_analyzer_latest_path: Path = results_dir / "agents" / "risk-analyzer-latest.json"
     executioner_latest_path: Path = results_dir / "agents" / "executioner-latest.json"
     stock_analyzer_artifacts_dir: Path = results_dir / "agents" / "artifacts"
+    signal_data_cache_dir: Path = results_dir / "agents" / "signal-cache"
     regime_source_catalog_path: Path = backend_dir / "pipeline" / "regime" / "market_sources.json"
     regime_inputs_dir: Path = backend_dir / "regime_inputs"
     regime_market_news_path: Path = backend_dir / "regime_inputs" / "market_news.json"
@@ -172,6 +173,13 @@ class PipelineConfig:
     stock_analyzer_top_n: int = 3
     stock_agent_manual_scan_limit: int = 30
     stock_agent_max_workers: int = 4
+    stock_agent_max_concurrent_trades: int = 3
+    stock_agent_max_leverage: float = 5.0
+    stock_agent_max_risk_fraction_per_slot: float = 0.02
+    stock_agent_signal_cache_max_age_seconds: int = 180
+    stock_agent_final_quote_max_age_seconds: int = 30
+    stock_agent_final_candle_max_age_seconds: int = 120
+    stock_agent_max_entry_drift_risk_fraction: float = 0.50
     risk_analyzer_loop_interval_seconds: int = 30
     risk_analyzer_report_refresh_seconds: int = 300
     executioner_loop_interval_seconds: int = 30
