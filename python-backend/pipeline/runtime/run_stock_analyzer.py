@@ -13,6 +13,7 @@ from pipeline.services.order_placement_gate import OrderPlacementStateService
 from pipeline.services.charting_service import CandlestickChartService
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
+from pipeline.services.signal_data_cache import SignalDataCacheService
 from pipeline.services.storage_service import StorageService
 
 
@@ -22,6 +23,7 @@ class MultiStockAnalyzerRunner:
         self.market_time = MarketTimeService(self.config)
         self.storage = StorageService
         self.dhan = DhanService(self.config)
+        self.signal_cache = SignalDataCacheService(self.config, self.dhan, self.market_time)
         self.charting = CandlestickChartService(
             self.config.market_timezone,
             market_open=(self.config.market_open_hour, self.config.market_open_minute),
