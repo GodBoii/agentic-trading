@@ -585,7 +585,11 @@ class StockExecutionToolkit(Toolkit):
             "response": parsed,
         }
         self._halt_if_input_error(parsed)
-        if str(parsed.get("status") or "").lower() == "success":
+        broker_status = str(parsed.get("broker_order_status") or "").upper()
+        if (
+            str(parsed.get("status") or "").lower() == "success"
+            and broker_status not in {"REJECTED", "CANCELLED", "EXPIRED"}
+        ):
             self.coordinator.record_success(
                 {
                     "security_id": self.security_id,
