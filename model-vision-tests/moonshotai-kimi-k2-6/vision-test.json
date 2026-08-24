@@ -1,0 +1,63 @@
+{
+  "model": "moonshotai/kimi-k2.6",
+  "chart": "python-backend/results/agents/artifacts/2026-08-21/kiri-industries/kiri-industries-2026-08-21-current-15m.png",
+  "response": "The image is a 15-minute intraday candlestick chart for **Kiri Industries** dated **21 August 2026**, with streaming data through **10:49:00 IST**. The header reads:\n\n**Kiri Industries 15m | LAST ₹464.40 | VWAP ₹463.38 | ATR(14) ₹3.94 | PARTIAL LAST CANDLE**\n\nVisible plotted indicators are limited to three lines: a **cyan EMA 9**, a **purple EMA 21**, and an **orange VWAP**. Prior-session reference levels are annotated on the right: **PDH 479.95** (Previous Day High), **PDC 460.50** (Previous Day Close), and **PDL 434.00** (Previous Day Low).\n\n**Price action description:**\n\n*   **09:15:** The session opened with a wide-range bearish red candle. Price briefly spiked near ₹466, then sold off sharply to a wick low around ₹458.50, and closed near ₹461.60.\n*   **09:30:** A green recovery candle formed with a low near ₹461.00 and a high around ₹463.80, closing slightly higher.\n*   **09:45:** A small-bodied green candle printed near ₹462.70 but left a very long upper wick stretching up to roughly ₹465.90, showing rejection at higher levels while holding a higher low near ₹461.60.\n*   **10:00:** A strong bullish green candle broke out, rallying from near ₹462.00 to about ₹465.20, with a wick high near ₹466.40. This move pushed price firmly above the VWAP and both EMAs.\n*   **10:15:** A red retracement candle gave back much of the prior gain, falling from near ₹466.00 down to about ₹463.70; the wick low reached roughly ₹462.10.\n*   **10:30:** Another green candle reclaimed ground, moving from near ₹463.70 up to about ₹465.00, with a wick high near ₹465.50 and a low around ₹462.90.\n*   **10:45 (current):** The last candle is **partial** and red, showing a modest pullback from about ₹465.00 to the current **LAST** price of **₹464.40**, with a wick low near ₹464.20.\n\n**Current relationships to visible lines:**  \nThe last price of ₹464.40 is **above** the VWAP of ₹463.38. The **EMA 9** is positioned **above** the **EMA 21**, and both exponential moving averages are sloping upward through the 10:45 candle. The EMA 9 is currently below the last tick while the EMA 21 remains further underneath.\n\n```json\n{\n  \"stock\": \"Kiri Industries\",\n  \"timeframe\": \"15m\",\n  \"data_through_ist\": \"10:49:00\",\n  \"last_price\": 464.40,\n  \"vwap\": 463.38,\n  \"atr_14\": 3.94,\n  \"last_candle_status\": \"PARTIAL LAST CANDLE\",\n  \"trend_vs_vwap\": \"above\",\n  \"ema_9_vs_ema_21\": \"above\",\n  \"previous_day_high\": 479.95,\n  \"previous_day_close\": 460.50,\n  \"previous_day_low\": 434.00\n}\n```",
+  "extracted": {
+    "stock": "Kiri Industries",
+    "timeframe": "15m",
+    "data_through_ist": "10:49:00",
+    "last_price": 464.4,
+    "vwap": 463.38,
+    "atr_14": 3.94,
+    "last_candle_status": "PARTIAL LAST CANDLE",
+    "trend_vs_vwap": "above",
+    "ema_9_vs_ema_21": "above",
+    "previous_day_high": 479.95,
+    "previous_day_close": 460.5,
+    "previous_day_low": 434.0
+  },
+  "grade": {
+    "passed": true,
+    "score": 12,
+    "maximum": 12,
+    "checks": {
+      "stock": true,
+      "timeframe": true,
+      "data_time": true,
+      "last_price": true,
+      "vwap": true,
+      "atr": true,
+      "partial_candle": true,
+      "above_vwap": true,
+      "ema_alignment": true,
+      "previous_day_high": true,
+      "previous_day_close": true,
+      "previous_day_low": true
+    }
+  },
+  "usage": {
+    "prompt_tokens": 4333,
+    "completion_tokens": 6659,
+    "total_tokens": 10992,
+    "cost": 0.0161828928,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 2989,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0161828928,
+      "upstream_inference_prompt_cost": 0.0010003728,
+      "upstream_inference_completions_cost": 0.01518252
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 5927,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "provider": "Baidu",
+  "request_id": "gen-1787524591-nC9PCN8v4H5O9vQfOgTJ"
+}
