@@ -7,7 +7,8 @@ class TradingAmountUIContractTests(unittest.TestCase):
         source = (Path(__file__).parents[2] / "components" / "trading-status.tsx").read_text(encoding="utf-8")
         self.assertIn('aria-label="Trading amount in rupees"', source)
         self.assertIn("Auto: available balance", source)
-        self.assertIn("Leave this blank to size automatically", source)
+        self.assertIn("Auto splits your available margin", source)
+        self.assertIn("Margin per trade", source)
         self.assertIn("saving does not start a scan", source)
         self.assertNotIn("Start trading", source)
         self.assertNotIn("startAITrading", source)
@@ -30,4 +31,3 @@ class TradingAmountUIContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
