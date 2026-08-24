@@ -29,11 +29,9 @@ interface AmountStatus {
     message: string
     trade_amount: number | null
     amount_updated_at_utc?: string
-    /**
-     * Slots auto mode budgets for. Optional: the API does not return it yet, so
-     * the UI falls back to the shared constant until the backend owns the rule.
-     */
+    /** Slots auto mode budgets for. Older API responses use the shared fallback. */
     auto_slots?: number
+    max_leverage?: number
     order_placement?: {
         allowed: boolean
         status_code: string
@@ -264,9 +262,9 @@ export default function TradingStatus() {
                 />
                 <PanelBody className="space-y-5">
                     <p className="max-w-prose text-[12px] leading-relaxed text-ink-secondary">
-                        Auto splits your available balance into {slots} equal slots, so the agent can hold {slots}{' '}
-                        trades at once instead of spending everything on the first one it finds. Fixed caps every trade
-                        at the amount you enter, and the scanner then only considers events your account can afford;
+                        Auto splits your available margin into {slots} equal slots, so the agent can hold {slots}{' '}
+                        trades at once. Fixed sets the margin allocation for each trade. Dhan decides the live margin,
+                        and exposure is capped at {status?.max_leverage || 5}x before stop-risk sizing can reduce it;
                         saving does not start a scan.
                     </p>
 
@@ -301,13 +299,13 @@ export default function TradingStatus() {
                             <div className="rounded-lg border border-line bg-white/[0.02] p-3.5">
                                 <dl className="grid grid-cols-3 gap-3">
                                     <SlotFigure label="Available" value={available === null ? '—' : money(available)} />
-                                    <SlotFigure label="Per trade" value={perSlot === null ? '—' : money(perSlot)} />
+                                    <SlotFigure label="Margin per trade" value={perSlot === null ? '—' : money(perSlot)} />
                                     <SlotFigure label="Slots" value={String(slots)} plain />
                                 </dl>
                                 <p className="mt-3 text-[11px] leading-relaxed text-ink-tertiary">
                                     {perSlot === null
                                         ? `Your balance could not be read just now. The split still happens at execution, against whatever is available then.`
-                                        : `Up to ${money(perSlot)} per trade. The balance is re-read at execution, so each slot grows as earlier trades close.`}
+                                        : `Up to ${money(perSlot)} margin per trade. Dhan margin, the leverage cap, and stop risk determine the final quantity.`}
                                 </p>
                             </div>
                         </DisclosurePanel>
@@ -319,7 +317,7 @@ export default function TradingStatus() {
                         >
                             <div className={amount.wrapClass}>
                                 <label htmlFor="trade-amount" className="dash-label">
-                                    Amount per trade
+                                    Margin per trade
                                 </label>
                                 <div className="mt-2 flex items-center gap-2">
                                     {/* The bordered wrapper is the shaking
@@ -354,7 +352,7 @@ export default function TradingStatus() {
                                                 amount.clear()
                                                 setError(null)
                                             }}
-                                            placeholder="Cap per trade"
+                                            placeholder="Margin per trade"
                                             // A collapsed panel still holds
                                             // focusable children, so the field
                                             // is disabled out of Fixed mode.
@@ -371,8 +369,8 @@ export default function TradingStatus() {
 
                                 <p id="trade-amount-hint" className="mt-1 text-[10px] text-ink-tertiary">
                                     {parsed === null || invalid
-                                        ? 'The most one trade may use. Nothing is placed above it.'
-                                        : `Each trade will use up to ${money(parsed)}.`}
+                                        ? 'The maximum broker margin one trade may use.'
+                                        : `Each trade may use up to ${money(parsed)} margin before leverage and stop-risk limits.`}
                                 </p>
                             </div>
                         </DisclosurePanel>
