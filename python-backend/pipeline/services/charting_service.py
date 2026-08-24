@@ -14,12 +14,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 class CandlestickChartService:
     """Generates professional candlestick chart images optimized for LLM vision analysis.
 
-    Produces five neutral price charts and four dedicated evidence charts.
+    Produces four neutral price charts and four dedicated evidence charts.
     Every chart is derived from OHLCV; order-flow data is never synthesized.
     """
 
     CURRENT_DAY_TIMEFRAMES: List[int] = [1, 5, 15]
-    PREVIOUS_DAY_TIMEFRAMES: List[int] = [5, 15]
+    PREVIOUS_DAY_TIMEFRAMES: List[int] = [15]
 
     # Color palette — carefully chosen for LLM visual clarity
     COLORS = {
@@ -69,6 +69,7 @@ class CandlestickChartService:
         display_name: str,
         market_date: str,
         output_dir: Path,
+        signal_time_ist: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Build the full chart set with technical metadata for LLM consumption."""
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -129,6 +130,7 @@ class CandlestickChartService:
                 sd_zones=sd_zones,
                 patterns=patterns,
                 prev_day_levels=prev_day_levels,
+                signal_time_ist=signal_time_ist,
             )
             key = f"current_{tf_label}"
             charts[key] = {
@@ -232,6 +234,7 @@ class CandlestickChartService:
                 data_as_of=data_as_of,
                 output_path=path,
                 prev_day_levels=prev_day_levels,
+                signal_time_ist=signal_time_ist,
             )
             charts[key] = {
                 "chart_type": key,
@@ -251,7 +254,8 @@ class CandlestickChartService:
             "chart_count": len(charts),
             "charts": charts,
             "chart_paths_ordered": chart_paths_ordered,
-            "chart_contract_version": "stock-evidence-v4",
+            "chart_contract_version": "stock-evidence-v5",
+            "signal_time_ist": signal_time_ist,
             "technical_metadata": technical_metadata,
         }
 
@@ -580,6 +584,7 @@ class CandlestickChartService:
         sd_zones: List[Dict[str, Any]],
         patterns: List[Dict[str, Any]],
         prev_day_levels: Dict[str, float],
+        signal_time_ist: Optional[str] = None,
     ) -> None:
         """Render one uncluttered price chart for a specific decision role.
 
@@ -782,6 +787,33 @@ class CandlestickChartService:
                 )
             )
 
+        market_day = date.fromisoformat(market_date)
+        signal_at = self._parse_signal_time(signal_time_ist)
+        if signal_at is not None and signal_at.date() == market_day:
+            naive_signal = signal_at.replace(tzinfo=None)
+            nearest = min(
+                range(candle_count),
+                key=lambda index: abs((timestamps[index] - naive_signal).total_seconds()),
+            )
+            ax_price.axvline(
+                nearest,
+                color=colors["rsi_line"],
+                linestyle="--",
+                linewidth=1.1,
+                alpha=0.85,
+                zorder=4,
+            )
+            ax_price.text(
+                nearest,
+                y_max - y_padding * 0.15,
+                "SIGNAL",
+                color=colors["rsi_line"],
+                fontsize=8,
+                ha="center",
+                va="top",
+                fontweight="bold",
+            )
+
         ax_price.axhline(
             latest_close,
             color=colors["text"],
@@ -913,6 +945,7 @@ class CandlestickChartService:
         market_date: str,
         data_as_of: pd.Timestamp,
         output_path: Path,
+        signal_time_ist: Optional[str] = None,
         **_: Any,
     ) -> Dict[str, Any]:
         """Render volume evidence without pretending candle color is trade side."""
@@ -984,11 +1017,51 @@ class CandlestickChartService:
             if not prior.empty
             else pd.Series(dtype=float)
         )
+        lower_by_minute = (
+            prior.groupby("minute_of_day")["cumulative_volume"].quantile(0.25)
+            if not prior.empty
+            else pd.Series(dtype=float)
+        )
+        upper_by_minute = (
+            prior.groupby("minute_of_day")["cumulative_volume"].quantile(0.75)
+            if not prior.empty
+            else pd.Series(dtype=float)
+        )
+
+        five_history = history.copy()
+        if not five_history.empty:
+            five_history["five_minute_of_day"] = (
+                (five_history["minute_of_day"] // 5) * 5
+            )
+            five_history = (
+                five_history.groupby(
+                    ["market_date", "five_minute_of_day"],
+                    as_index=False,
+                )["volume"]
+                .sum()
+            )
+        prior_five = five_history.loc[
+            five_history["market_date"].isin(completed_dates)
+        ] if not five_history.empty else pd.DataFrame()
+        expected_five_volume = (
+            prior_five.groupby("five_minute_of_day")["volume"].median()
+            if not prior_five.empty
+            else pd.Series(dtype=float)
+        )
 
         current = history.loc[history["market_date"] == current_day].copy()
         current_expected = current["minute_of_day"].map(expected_by_minute)
+        current_lower = current["minute_of_day"].map(lower_by_minute)
+        current_upper = current["minute_of_day"].map(upper_by_minute)
         current_rvol = current["cumulative_volume"] / current_expected.replace(0, np.nan)
         latest_rvol = self._latest_series_value(current_rvol)
+
+        five_minute_keys = five.index.hour * 60 + five.index.minute
+        expected_five = pd.Series(
+            five_minute_keys.map(expected_five_volume),
+            index=five.index,
+            dtype=float,
+        )
 
         completed_five = five.copy()
         now = datetime.now(self.resolved_timezone)
@@ -998,15 +1071,18 @@ class CandlestickChartService:
             for value in completed_five.index
         ]
         completed_volumes = completed_five.loc[completed_mask, "volume"]
-        volume_acceleration = None
-        if len(completed_volumes) >= 2:
-            denominator_floor = max(
-                float(completed_volumes.median()) * 0.10,
-                1.0,
-            )
-            volume_acceleration = float(completed_volumes.iloc[-1]) / max(
-                float(completed_volumes.iloc[-2]),
-                denominator_floor,
+        participation_impulse = None
+        completed_expected = expected_five.loc[completed_mask]
+        comparable = pd.DataFrame(
+            {
+                "actual": completed_volumes,
+                "expected": completed_expected,
+            }
+        ).dropna()
+        recent_three = comparable.tail(3)
+        if not recent_three.empty and float(recent_three["expected"].sum()) > 0:
+            participation_impulse = float(recent_three["actual"].sum()) / float(
+                recent_three["expected"].sum()
             )
 
         fig, axes = plt.subplots(
@@ -1021,24 +1097,35 @@ class CandlestickChartService:
             self._style_evidence_axis(axis)
 
         five_times = five.index.tz_localize(None)
-        bar_colors = np.where(
-            five["close"].to_numpy() >= five["open"].to_numpy(),
-            self.COLORS["candle_up"],
-            self.COLORS["candle_down"],
-        )
         axes[0].bar(
             five_times,
             five["volume"].to_numpy(dtype=float),
             width=4.2 / (24 * 60),
-            color=bar_colors,
+            color=self.COLORS["ema9"],
             alpha=0.82,
+            label="Actual completed/current 5m volume",
         )
+        if expected_five.notna().any():
+            axes[0].plot(
+                five_times,
+                expected_five,
+                color=self.COLORS["text_dim"],
+                linewidth=1.3,
+                linestyle="--",
+                label="Prior-session same-time median",
+            )
         axes[0].set_ylabel("5m volume", color=self.COLORS["text_dim"])
         axes[0].set_title(
             f"{display_name} | VOLUME AND PARTICIPATION | DATA THROUGH {data_as_of.strftime('%H:%M IST')}",
             color=self.COLORS["text"],
             fontweight="bold",
             fontsize=14,
+        )
+        axes[0].legend(
+            loc="upper left",
+            facecolor=self.COLORS["bg"],
+            edgecolor=self.COLORS["spine"],
+            labelcolor=self.COLORS["text"],
         )
 
         current_times = current["timestamp"].dt.tz_localize(None)
@@ -1057,6 +1144,15 @@ class CandlestickChartService:
                 linewidth=1.4,
                 linestyle="--",
                 label="Prior-session same-time median",
+            )
+        if current_lower.notna().any() and current_upper.notna().any():
+            axes[1].fill_between(
+                current_times,
+                current_lower.to_numpy(dtype=float),
+                current_upper.to_numpy(dtype=float),
+                color=self.COLORS["text_dim"],
+                alpha=0.16,
+                label="Prior-session 25th-75th percentile",
             )
         axes[1].set_ylabel("Cumulative", color=self.COLORS["text_dim"])
         axes[1].legend(
@@ -1080,21 +1176,43 @@ class CandlestickChartService:
         suffix = "unavailable"
         if latest_rvol is not None:
             suffix = f"{latest_rvol:.2f}x"
-        acceleration_text = (
-            f"{volume_acceleration:.2f}x"
-            if volume_acceleration is not None
+        impulse_text = (
+            f"{participation_impulse:.2f}x"
+            if participation_impulse is not None
             else "unavailable"
         )
         axes[2].text(
             0.99,
             0.90,
-            f"Latest RVOL: {suffix} | Completed 5m acceleration: {acceleration_text}",
+            f"Latest RVOL: {suffix} | Last 3 completed 5m participation: {impulse_text}",
             transform=axes[2].transAxes,
             ha="right",
             va="top",
             color=self.COLORS["text"],
             fontsize=9,
         )
+        signal_at = self._parse_signal_time(signal_time_ist)
+        if signal_at is not None and signal_at.date() == current_day:
+            naive_signal = signal_at.replace(tzinfo=None)
+            for axis in axes:
+                axis.axvline(
+                    naive_signal,
+                    color=self.COLORS["rsi_line"],
+                    linestyle="--",
+                    linewidth=1.0,
+                    alpha=0.85,
+                )
+            axes[0].text(
+                naive_signal,
+                0.96,
+                "SIGNAL",
+                transform=axes[0].get_xaxis_transform(),
+                color=self.COLORS["rsi_line"],
+                fontsize=8,
+                ha="center",
+                va="top",
+                fontweight="bold",
+            )
         plt.setp(axes[2].get_xticklabels(), rotation=30, ha="right")
         fig.tight_layout()
         fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
@@ -1103,11 +1221,14 @@ class CandlestickChartService:
             "source": "dhan_historical_ohlcv",
             "baseline_completed_sessions": int(prior["market_date"].nunique()),
             "time_of_day_rvol": round(latest_rvol, 3) if latest_rvol is not None else None,
-            "completed_5m_volume_acceleration": (
-                round(volume_acceleration, 3)
-                if volume_acceleration is not None
+            "completed_5m_participation_impulse_3bar": (
+                round(participation_impulse, 3)
+                if participation_impulse is not None
                 else None
             ),
+            "cumulative_volume_percentile_band": "25th-75th",
+            "five_minute_expected_volume_baseline": "same-time median",
+            "signal_time_ist": signal_at.isoformat() if signal_at is not None else None,
             "trade_side_inference": False,
         }
 
@@ -2001,6 +2122,17 @@ class CandlestickChartService:
         )
         local_frame = local_frame.dropna(subset=["timestamp"]).sort_values("timestamp")
         return local_frame
+
+    def _parse_signal_time(self, value: Any) -> Optional[datetime]:
+        if value in (None, ""):
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=self.resolved_timezone)
+        return parsed.astimezone(self.resolved_timezone)
 
     def _day_frame(self, frame: pd.DataFrame, market_date_str: str) -> pd.DataFrame:
         if frame.empty:
