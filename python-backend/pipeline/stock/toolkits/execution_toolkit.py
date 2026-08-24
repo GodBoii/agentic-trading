@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from threading import Lock
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from agno.tools import Toolkit
 
@@ -24,6 +24,23 @@ class StockExecutionCoordinator:
 
     def record_success(self, event: Dict[str, Any]) -> None:
         self.successful_orders.append(dict(event))
+        if self.order_placement_gate is not None:
+            reserve = getattr(self.order_placement_gate, "reserve_trade_slot", None)
+            if callable(reserve):
+                reserve(int(event["security_id"]))
+
+    def active_trade_slots(self, broker_security_ids: set[str]) -> set[str]:
+        if self.order_placement_gate is not None:
+            merge = getattr(self.order_placement_gate, "active_trade_slots", None)
+            if callable(merge):
+                return set(merge(set(broker_security_ids)))
+        combined = set(broker_security_ids)
+        combined.update(
+            str(item.get("security_id"))
+            for item in self.successful_orders
+            if item.get("security_id") not in (None, "")
+        )
+        return combined
 
     def report_order_placement_block(self, response: Any) -> None:
         """Block order placement immediately when Dhan returns DH-905."""
@@ -35,7 +52,7 @@ class StockExecutionCoordinator:
 
 
 class StockExecutionToolkit(Toolkit):
-    """New-entry execution tools bound to one stock and a cash/notional cap."""
+    """New-entry execution tools bound to one stock and a margin allocation."""
 
     def __init__(
         self,
@@ -45,11 +62,31 @@ class StockExecutionToolkit(Toolkit):
         exchange_segment: Optional[str] = "BSE_EQ",
         coordinator: Optional[StockExecutionCoordinator] = None,
         amount_source: str = "user_amount",
+        max_leverage: float = 5.0,
+        max_risk_fraction_per_slot: float = 0.02,
+        max_concurrent_trades: int = 3,
+        final_state_loader: Optional[Callable[[], Dict[str, Any]]] = None,
+        final_quote_max_age_seconds: float = 30.0,
+        final_candle_max_age_seconds: float = 120.0,
+        max_entry_drift_risk_fraction: float = 0.50,
     ) -> None:
         self.security_id = int(security_id)
         self.margin_budget = max(0.0, float(margin_budget))
         self.trade_amount = self.margin_budget
         self.amount_source = str(amount_source or "user_amount")
+        self.max_leverage = max(1.0, float(max_leverage))
+        self.max_risk_fraction_per_slot = min(
+            1.0,
+            max(0.0001, float(max_risk_fraction_per_slot)),
+        )
+        self.max_concurrent_trades = max(1, int(max_concurrent_trades))
+        self.final_state_loader = final_state_loader
+        self.final_quote_max_age_seconds = max(1.0, float(final_quote_max_age_seconds))
+        self.final_candle_max_age_seconds = max(1.0, float(final_candle_max_age_seconds))
+        self.max_entry_drift_risk_fraction = max(
+            0.0,
+            float(max_entry_drift_risk_fraction),
+        )
         self.exchange_segment = str(exchange_segment or "BSE_EQ").upper()
         if self.exchange_segment not in {"NSE_EQ", "BSE_EQ"}:
             raise ValueError("StockExecutionToolkit requires NSE_EQ or BSE_EQ.")
@@ -75,7 +112,7 @@ class StockExecutionToolkit(Toolkit):
         stop_loss_price: Optional[float] = None,
         max_risk_rupees: Optional[float] = None,
     ) -> str:
-        """Calculate whole-share quantity from the assigned cash/notional cap.
+        """Calculate whole-share quantity from Dhan margin, leverage, and risk caps.
 
         Args:
             side: BUY or SELL.
@@ -87,14 +124,39 @@ class StockExecutionToolkit(Toolkit):
             return json_tool_result_markdown(self._failure("execution_halted_after_input_error"))
         if self.coordinator.order_placement_blocked():
             return json_tool_result_markdown(self._failure("execution_halted_order_placement_blocked"))
+        try:
+            stop = float(stop_loss_price) if stop_loss_price is not None else 0.0
+        except (TypeError, ValueError):
+            stop = 0.0
+        if stop <= 0 or stop == float(reference_price):
+            return json_tool_result_markdown(
+                self._failure("valid_stop_loss_price_required_for_leveraged_sizing")
+            )
+        normalized_side = str(side or "").upper()
+        if (
+            normalized_side == "BUY" and stop >= float(reference_price)
+        ) or (
+            normalized_side == "SELL" and stop <= float(reference_price)
+        ):
+            return json_tool_result_markdown(
+                self._failure("stop_loss_price_has_invalid_side_geometry")
+            )
+        hard_risk_cap = self.margin_budget * self.max_risk_fraction_per_slot
+        requested_risk_cap = (
+            float(max_risk_rupees)
+            if max_risk_rupees is not None and float(max_risk_rupees) > 0
+            else hard_risk_cap
+        )
+        effective_risk_cap = min(hard_risk_cap, requested_risk_cap)
         response = self._dhan_tools.calculate_intraday_equity_order_quantity(
             security_id=self.security_id,
             side=side,
             reference_price=float(reference_price),
             margin_budget=self.margin_budget,
             stop_loss_price=stop_loss_price,
-            max_risk_rupees=max_risk_rupees,
+            max_risk_rupees=effective_risk_cap,
             exchange_segment=self.exchange_segment,
+            max_leverage=self.max_leverage,
         )
         parsed = self._parse(response)
         parsed = self._compact_quantity_result(parsed)
@@ -115,8 +177,9 @@ class StockExecutionToolkit(Toolkit):
     ) -> str:
         """Place one protected intraday entry for the assigned stock.
 
-        Quantity is checked against the bound cash amount and current LTP immediately before
-        placement. This tool cannot modify or exit any existing trade.
+        Quantity is checked against the assigned margin allocation, current balance,
+        current LTP, and current Dhan margin immediately before placement. This tool
+        cannot modify or exit any existing trade.
 
         Args:
             side: BUY or SELL.
@@ -159,6 +222,21 @@ class StockExecutionToolkit(Toolkit):
                 return self._record_preflight_failure(
                     "protected",
                     overlap_error,
+                    side=side,
+                    quantity=quantity,
+                    order_type=normalized_type,
+                    reference_price=entry_price,
+                )
+            freshness_error = self._validate_fresh_setup(
+                side=side,
+                entry_price=entry_price,
+                target_price=target_price,
+                stop_loss_price=stop_loss_price,
+            )
+            if freshness_error:
+                return self._record_preflight_failure(
+                    "protected",
+                    freshness_error,
                     side=side,
                     quantity=quantity,
                     order_type=normalized_type,
@@ -294,33 +372,35 @@ class StockExecutionToolkit(Toolkit):
             return self._failure(f"current_ltp_unavailable:{type(exc).__name__}")
         if current_ltp <= 0:
             return self._failure("current_ltp_unavailable")
-        effective_cap = self.trade_amount
-        if self.amount_source == "available_balance":
-            try:
-                funds = self._dhan_tools.dhan.fetch_fund_limits()
-                data = funds.get("data") if isinstance(funds, dict) else {}
-                if isinstance(data, dict) and isinstance(data.get("data"), dict):
-                    data = data["data"]
-                current_balance = float(
-                    (data or {}).get("availabelBalance")
-                    or (data or {}).get("availableBalance")
-                    or (data or {}).get("sodLimit")
-                    or 0
-                )
-            except Exception as exc:
-                return self._failure(f"available_balance_unavailable:{type(exc).__name__}")
-            if current_balance <= 0:
-                return self._failure("available_balance_unavailable")
-            effective_cap = min(effective_cap, current_balance)
+        try:
+            funds = self._dhan_tools.dhan.fetch_fund_limits()
+            data = funds.get("data") if isinstance(funds, dict) else {}
+            if isinstance(data, dict) and isinstance(data.get("data"), dict):
+                data = data["data"]
+            current_balance = float(
+                (data or {}).get("availabelBalance")
+                or (data or {}).get("availableBalance")
+                or (data or {}).get("sodLimit")
+                or 0
+            )
+        except Exception as exc:
+            return self._failure(f"available_balance_unavailable:{type(exc).__name__}")
+        if current_balance <= 0:
+            return self._failure("available_balance_unavailable")
+        effective_margin_budget = min(self.margin_budget, current_balance)
         requested_notional = current_ltp * int(quantity)
-        if requested_notional > effective_cap + 1e-9:
+        maximum_notional = effective_margin_budget * self.max_leverage
+        if requested_notional > maximum_notional + 1e-9:
             return json.dumps(
                 {
                     "status": "blocked",
-                    "remarks": "current_price_exceeds_trading_amount",
-                    "trade_amount": self.trade_amount,
+                    "remarks": "current_notional_exceeds_leverage_cap",
+                    "margin_budget": self.margin_budget,
                     "amount_source": self.amount_source,
-                    "effective_current_cap": effective_cap,
+                    "available_balance": current_balance,
+                    "effective_margin_budget": effective_margin_budget,
+                    "max_leverage": self.max_leverage,
+                    "maximum_notional": maximum_notional,
                     "current_ltp": current_ltp,
                     "requested_quantity": int(quantity),
                     "requested_notional": requested_notional,
@@ -352,16 +432,68 @@ class StockExecutionToolkit(Toolkit):
             required = 0.0
         if required <= 0:
             return self._failure("invalid_margin_response")
-        if required > self.margin_budget:
+        if required > effective_margin_budget:
             return json.dumps(
                 {
                     "status": "blocked",
                     "remarks": "quantity_exceeds_intraday_margin_budget",
                     "margin_budget": self.margin_budget,
+                    "available_balance": current_balance,
+                    "effective_margin_budget": effective_margin_budget,
                     "margin_required": required,
                 },
                 ensure_ascii=True,
             )
+        return None
+
+    def _validate_fresh_setup(
+        self,
+        *,
+        side: str,
+        entry_price: float,
+        target_price: float,
+        stop_loss_price: float,
+    ) -> Optional[str]:
+        if self.final_state_loader is None:
+            return None
+        try:
+            state = self.final_state_loader()
+        except Exception as exc:
+            return self._failure(f"final_market_state_unavailable:{type(exc).__name__}")
+        if not isinstance(state, dict) or str(state.get("status") or "").lower() == "error":
+            return self._failure("final_market_state_unavailable")
+        quote = state.get("quote") if isinstance(state.get("quote"), dict) else {}
+        try:
+            ltp = float(quote.get("last_price") or 0.0)
+        except (TypeError, ValueError):
+            ltp = 0.0
+        if ltp <= 0:
+            return self._failure("final_ltp_unavailable")
+        try:
+            quote_age = float(quote.get("last_trade_age_seconds"))
+        except (TypeError, ValueError):
+            quote_age = float("inf")
+        if quote_age > self.final_quote_max_age_seconds:
+            return self._failure("final_quote_stale")
+        try:
+            candle_age = float(state.get("candle_data_age_seconds"))
+        except (TypeError, ValueError):
+            candle_age = float("inf")
+        if candle_age > self.final_candle_max_age_seconds:
+            return self._failure("final_candle_data_stale")
+
+        normalized_side = str(side or "").upper()
+        entry = float(entry_price)
+        target = float(target_price)
+        stop = float(stop_loss_price)
+        if normalized_side == "BUY" and not stop < ltp < target:
+            return self._failure("final_price_invalidates_buy_setup")
+        if normalized_side == "SELL" and not target < ltp < stop:
+            return self._failure("final_price_invalidates_sell_setup")
+        initial_risk = abs(entry - stop)
+        allowed_drift = initial_risk * self.max_entry_drift_risk_fraction
+        if initial_risk <= 0 or abs(ltp - entry) > allowed_drift:
+            return self._failure("final_price_drift_exceeds_limit")
         return None
 
     def _validate_no_existing_trade(self) -> Optional[str]:
@@ -377,16 +509,21 @@ class StockExecutionToolkit(Toolkit):
         if not all(self._broker_request_succeeded(response) for response in responses):
             return self._failure("account_overlap_recheck_unavailable")
 
+        active_security_ids: set[str] = set()
         for row in self._extract_rows(positions_response):
-            if not self._matches_security(row):
-                continue
             if str(row.get("productType") or "").upper() != "INTRADAY":
                 continue
             try:
-                if float(row.get("netQty") or 0) != 0:
+                if float(row.get("netQty") or 0) == 0:
+                    continue
+                row_security_id = str(row.get("securityId") or row.get("security_id") or "")
+                if row_security_id:
+                    active_security_ids.add(row_security_id)
+                if self._matches_security(row):
                     return self._failure("assigned_stock_open_intraday_position_exists")
             except (TypeError, ValueError):
-                return self._failure("assigned_stock_position_state_invalid")
+                if self._matches_security(row):
+                    return self._failure("assigned_stock_position_state_invalid")
 
         active_statuses = {
             "PENDING",
@@ -400,17 +537,31 @@ class StockExecutionToolkit(Toolkit):
             *self._extract_rows(orders_response),
             *self._extract_rows(super_orders_response),
         ]:
-            if not self._matches_security(row):
-                continue
-            if str(row.get("orderStatus") or "").upper() in active_statuses:
-                return self._failure("assigned_stock_active_order_exists")
+            row_active = str(row.get("orderStatus") or "").upper() in active_statuses
             legs = row.get("legDetails")
-            if isinstance(legs, list) and any(
+            row_active = row_active or isinstance(legs, list) and any(
                 isinstance(leg, dict)
                 and str(leg.get("orderStatus") or "").upper() in active_statuses
                 for leg in legs
-            ):
+            )
+            if not row_active:
+                continue
+            row_security_id = str(row.get("securityId") or row.get("security_id") or "")
+            if row_security_id:
+                active_security_ids.add(row_security_id)
+            if self._matches_security(row):
                 return self._failure("assigned_stock_active_order_exists")
+        active_security_ids = self.coordinator.active_trade_slots(active_security_ids)
+        if len(active_security_ids) >= self.max_concurrent_trades:
+            return json.dumps(
+                {
+                    "status": "blocked",
+                    "remarks": "maximum_concurrent_trade_slots_in_use",
+                    "active_trade_count": len(active_security_ids),
+                    "max_concurrent_trades": self.max_concurrent_trades,
+                },
+                ensure_ascii=True,
+            )
         return None
 
     @staticmethod
@@ -598,7 +749,12 @@ class StockExecutionToolkit(Toolkit):
             "reference_price",
             "stop_loss_price",
             "margin_per_share",
+            "broker_leverage",
+            "configured_max_leverage",
+            "effective_leverage",
             "max_qty_by_cash",
+            "max_qty_by_margin",
+            "max_qty_by_leverage",
             "max_risk_rupees",
             "per_share_risk",
             "max_qty_by_risk",
