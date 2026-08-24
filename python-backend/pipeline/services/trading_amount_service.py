@@ -47,7 +47,7 @@ class TradingAmountService:
             return {
                 "eligible": True,
                 "code": "automatic_balance",
-                "message": "Automatic sizing is active. Available broker balance will be checked for each event.",
+                "message": "Automatic sizing is active. Available broker margin is split across the configured trade slots.",
                 "trade_mode": "auto",
                 "trade_amount": None,
             }
@@ -86,4 +86,3 @@ class TradingAmountService:
         if filled < quantity or filled <= 0:
             return None
         return abs((cost / filled) - price) / price * 100
-
