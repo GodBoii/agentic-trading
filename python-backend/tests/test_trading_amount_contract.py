@@ -39,18 +39,26 @@ class TradingAmountContractTests(unittest.TestCase):
         )
         self.assertEqual(stale["code"], "amount_stale")
 
-    def test_price_above_amount_is_rejected_and_equal_or_below_is_eligible(self):
+    def test_margin_allocation_uses_dhan_margin_and_leverage_cap(self):
         runner = object.__new__(MultiStockAgentRunner)
-        runner.config = SimpleNamespace(intra_finder_max_slippage_percent=1.0)
+        runner.config = SimpleNamespace(
+            intra_finder_max_slippage_percent=1.0,
+            stock_agent_max_leverage=5.0,
+        )
+        runner._calculate_one_share_margin = lambda *_args: {
+            "status": "success",
+            "total_margin": 100.0,
+        }
         base = {"price": 500.0, "direction": "LONG", "five_level_depth": DEPTH}
         rejected = runner.prepare_user_event(base, {"user_id": "small", "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": 499.99})
         equal = runner.prepare_user_event(base, {"user_id": "equal", "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": 500.0})
         below = runner.prepare_user_event(base, {"user_id": "larger", "trade_mode": "manual", "amount_source": "user_amount", "trade_amount": 1000.0})
-        self.assertEqual(rejected["status_code"], "price_above_trading_amount")
+        self.assertTrue(rejected["eligible"])
+        self.assertEqual(rejected["requested_quantity"], 4)
         self.assertTrue(equal["eligible"])
-        self.assertEqual(equal["requested_quantity"], 1)
+        self.assertEqual(equal["requested_quantity"], 5)
         self.assertTrue(below["eligible"])
-        self.assertEqual(below["requested_quantity"], 2)
+        self.assertEqual(below["requested_quantity"], 10)
 
     def test_multi_user_amounts_are_isolated(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -68,14 +76,16 @@ class TradingAmountContractTests(unittest.TestCase):
 
     def test_auto_mode_resolves_current_available_balance(self):
         runner = object.__new__(MultiStockAgentRunner)
+        runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
         runner._build_account_context = lambda: {"funds": {"data": {"availabelBalance": 1250.0}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertTrue(resolved["eligible"])
-        self.assertEqual(resolved["trade_amount"], 1250.0)
+        self.assertEqual(resolved["trade_amount"], 416.66)
         self.assertEqual(resolved["amount_source"], "available_balance")
 
     def test_auto_mode_fails_closed_when_balance_is_unavailable(self):
         runner = object.__new__(MultiStockAgentRunner)
+        runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
         runner._build_account_context = lambda: {"funds": {"data": {}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertFalse(resolved["eligible"])
