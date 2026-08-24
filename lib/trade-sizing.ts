@@ -35,3 +35,10 @@ export function parseSlotCount(value: unknown): number {
     const slots = Number(value)
     return Number.isInteger(slots) && slots >= 1 && slots <= 20 ? slots : AUTO_TRADE_SLOTS
 }
+
+/** Concurrent Fixed-mode trades supported by the current account margin. */
+export function fixedSlotCount(availableBalance: number, marginPerTrade: number): number | null {
+    if (!Number.isFinite(availableBalance) || availableBalance <= 0) return null
+    if (!Number.isFinite(marginPerTrade) || marginPerTrade <= 0) return null
+    return Math.floor(availableBalance / marginPerTrade)
+}
