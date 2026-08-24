@@ -18,7 +18,7 @@ export const AUTO_TRADE_SLOTS = 3
 /**
  * Rupees one auto-mode trade may use.
  *
- * Floored to whole rupees: the figure is a cap, and rounding a cap up would
+ * Floored to paise: the figure is a cap, and rounding a cap up would
  * let a slot ask for money the account does not have. Returns `null` when the
  * balance cannot fund a slot, so callers must handle "no slot available"
  * rather than render a misleading zero.
@@ -26,7 +26,7 @@ export const AUTO_TRADE_SLOTS = 3
 export function autoSlotAmount(availableBalance: number, slots: number = AUTO_TRADE_SLOTS): number | null {
     if (!Number.isFinite(availableBalance) || availableBalance <= 0) return null
     if (!Number.isInteger(slots) || slots < 1) return null
-    const perSlot = Math.floor(availableBalance / slots)
+    const perSlot = Math.floor((availableBalance * 100) / slots) / 100
     return perSlot > 0 ? perSlot : null
 }
 
