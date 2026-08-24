@@ -1,0 +1,63 @@
+{
+  "model": "deepseek/deepseek-v4-flash-vision-exp",
+  "chart": "python-backend/results/agents/artifacts/2026-08-21/kiri-industries/kiri-industries-2026-08-21-current-15m.png",
+  "response": "This is a 15-minute intraday chart for **Kiri Industries** on **2026-08-21**, with data through **10:49:00 IST**. The chart shows a partial last candle, with the current price at **₹464.40**.\n\n### Readable text from the chart:\n- **Header:** CURRENT DAY — 2026-08-21 | DATA THROUGH 10:49:00 IST | LAST ₹464.40 | VWAP ₹463.38 | ATR(14) ₹3.94 | PARTIAL LAST CANDLE\n- **Legend:** EMA 9 (cyan), EMA 21 (magenta), VWAP (orange)\n- **Right-side levels:** ↑ PDH 479.95, LAST 464.40, PDC 460.50, ↓ PDL 434.00\n\n### Price action description:\n- The first candle (09:15) is a large red candle that opened near ₹464, pushed up to ₹466, then sold off sharply to a low near ₹458.50 before closing around ₹461.50. This shows early volatility and a strong dip.\n- The next two candles (09:30 and 09:45) are green and small. The 09:45 candle has a long upper wick, showing a rejection near ₹465.80 but closing near ₹462.80.\n- The 10:00 candle is a large green one, rallying from about ₹462 to near ₹465.30.\n- The 10:15 candle is red, giving back some gains and closing near ₹463.70.\n- The 10:30 candle is green, bouncing back to near ₹465.\n- The final partial candle (10:45) is red and currently at ₹464.40.\n\n### Indicator state:\n- **EMA 9** is above **EMA 21** throughout most of the session, and both are rising, indicating short-term bullish momentum.\n- **VWAP** is at ₹463.38, and the current price (₹464.40) is trading **above** it.\n- The dotted line for **PDC** at ₹460.50 is well below the current price, meaning the stock is trading above the previous day's close.\n\n```json\n{\n  \"stock\": \"Kiri Industries\",\n  \"timeframe\": \"15m\",\n  \"data_through_ist\": \"10:49:00 IST\",\n  \"last_price\": 464.40,\n  \"vwap\": 463.38,\n  \"atr_14\": 3.94,\n  \"last_candle_status\": \"partial red\",\n  \"trend_vs_vwap\": \"above\",\n  \"ema_9_vs_ema_21\": \"above\",\n  \"previous_day_high\": 479.95,\n  \"previous_day_close\": 460.50,\n  \"previous_day_low\": 434.00\n}\n```",
+  "extracted": {
+    "stock": "Kiri Industries",
+    "timeframe": "15m",
+    "data_through_ist": "10:49:00 IST",
+    "last_price": 464.4,
+    "vwap": 463.38,
+    "atr_14": 3.94,
+    "last_candle_status": "partial red",
+    "trend_vs_vwap": "above",
+    "ema_9_vs_ema_21": "above",
+    "previous_day_high": 479.95,
+    "previous_day_close": 460.5,
+    "previous_day_low": 434.0
+  },
+  "grade": {
+    "passed": true,
+    "score": 12,
+    "maximum": 12,
+    "checks": {
+      "stock": true,
+      "timeframe": true,
+      "data_time": true,
+      "last_price": true,
+      "vwap": true,
+      "atr": true,
+      "partial_candle": true,
+      "above_vwap": true,
+      "ema_alignment": true,
+      "previous_day_high": true,
+      "previous_day_close": true,
+      "previous_day_low": true
+    }
+  },
+  "usage": {
+    "prompt_tokens": 563,
+    "completion_tokens": 2179,
+    "total_tokens": 2742,
+    "cost": 0.001562,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.001562,
+      "upstream_inference_prompt_cost": 0.00012386,
+      "upstream_inference_completions_cost": 0.00143814
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1565,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "provider": "DeepSeek",
+  "request_id": "gen-1787528804-tOvqz3xYMch6n11VTXY8"
+}
