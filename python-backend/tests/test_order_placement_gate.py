@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -141,6 +141,22 @@ class OrderPlacementGateTests(unittest.TestCase):
 
         self.assertFalse(state.allowed)
         self.assertEqual(state.reason, "dhan_ip_verification_failed")
+
+    def test_recent_trade_slot_reservation_covers_broker_visibility_delay(self):
+        clock = [datetime(2026, 8, 21, 3, 0, tzinfo=timezone.utc)]
+        gate = OrderPlacementGate(
+            FakeDhan(success_response()),
+            self.state_path,
+            interval_seconds=21600,
+            now=lambda: clock[0],
+        )
+
+        gate.reserve_trade_slot(111)
+        self.assertEqual(gate.active_trade_slots(set()), {"111"})
+        self.assertEqual(gate.active_trade_slots({"222"}), {"111", "222"})
+
+        clock[0] += timedelta(seconds=31)
+        self.assertEqual(gate.active_trade_slots(set()), set())
 
 
 if __name__ == "__main__":
