@@ -77,7 +77,7 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_auto_mode_resolves_current_available_balance(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
-        runner._build_account_context = lambda: {"funds": {"data": {"availabelBalance": 1250.0}}}
+        runner._build_sizing_account_context = lambda: {"funds": {"data": {"availabelBalance": 1250.0}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertTrue(resolved["eligible"])
         self.assertEqual(resolved["trade_amount"], 416.66)
@@ -86,10 +86,66 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_auto_mode_fails_closed_when_balance_is_unavailable(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
-        runner._build_account_context = lambda: {"funds": {"data": {}}}
+        runner._build_sizing_account_context = lambda: {"funds": {"data": {}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertFalse(resolved["eligible"])
         self.assertEqual(resolved["status_code"], "available_balance_unavailable")
+
+    def test_fixed_mode_derives_dynamic_trade_limit_from_account_capacity(self):
+        runner = object.__new__(MultiStockAgentRunner)
+        runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
+        runner._build_sizing_account_context = lambda: {
+            "funds": {
+                "data": {
+                    "availabelBalance": 2000.0,
+                    "utilizedAmount": 0.0,
+                    "sodLimit": 2000.0,
+                }
+            }
+        }
+
+        expected = {500: 4, 1000: 2, 1500: 1}
+        for amount, slots in expected.items():
+            with self.subTest(amount=amount):
+                resolved = runner.resolve_user_trade_config(
+                    {"user_id": "fixed", "trade_mode": "manual", "trade_amount": amount}
+                )
+                self.assertTrue(resolved["eligible"])
+                self.assertEqual(resolved["max_concurrent_trades"], slots)
+
+        runner._build_sizing_account_context = lambda: {
+            "funds": {
+                "data": {
+                    "availabelBalance": 10000.0,
+                    "utilizedAmount": 0.0,
+                    "sodLimit": 10000.0,
+                }
+            }
+        }
+        resolved = runner.resolve_user_trade_config(
+            {"user_id": "fixed", "trade_mode": "manual", "trade_amount": 500}
+        )
+        self.assertEqual(resolved["max_concurrent_trades"], 20)
+
+    def test_fixed_mode_capacity_includes_margin_already_utilized(self):
+        runner = object.__new__(MultiStockAgentRunner)
+        runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
+        runner._build_sizing_account_context = lambda: {
+            "funds": {
+                "data": {
+                    "availabelBalance": 8500.0,
+                    "utilizedAmount": 1500.0,
+                    "sodLimit": 10000.0,
+                }
+            }
+        }
+
+        resolved = runner.resolve_user_trade_config(
+            {"user_id": "fixed", "trade_mode": "manual", "trade_amount": 500}
+        )
+
+        self.assertEqual(resolved["account_margin_capacity"], 10000.0)
+        self.assertEqual(resolved["max_concurrent_trades"], 20)
 
     def test_quantity_is_cash_based_without_leverage(self):
         self.assertEqual(TradingAmountService.quantity(499.99, 500), 0)
