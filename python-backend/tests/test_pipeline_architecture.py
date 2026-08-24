@@ -47,7 +47,7 @@ class CredentialStoreTests(unittest.TestCase):
     def test_encrypted_versioned_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = temp_config(Path(directory))
-            with patch.dict(os.environ, {"DHAN_CREDENTIAL_ENCRYPTION_SECRET": "test-secret"}, clear=False):
+            with patch.dict(os.environ, {"DHAN_CREDENTIAL_ENCRYPTION_SECRET": "test-secret", "DHAN_CREDENTIAL_ENCRYPTION_SECRET_FILE": ""}, clear=False):
                 store = DhanCredentialStore(config)
                 first = store.publish(
                     client_id="123456",
@@ -89,7 +89,7 @@ class CredentialStoreTests(unittest.TestCase):
                 def renew_access_token(self):
                     return {"status": "success", "data": {"accessToken": "renewed-token"}}
 
-            with patch.dict(os.environ, {"DHAN_CREDENTIAL_ENCRYPTION_SECRET": "test-secret"}, clear=False):
+            with patch.dict(os.environ, {"DHAN_CREDENTIAL_ENCRYPTION_SECRET": "test-secret", "DHAN_CREDENTIAL_ENCRYPTION_SECRET_FILE": ""}, clear=False):
                 store = DhanCredentialStore(config)
                 store.publish(
                     client_id="123456",
