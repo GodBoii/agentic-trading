@@ -1,0 +1,63 @@
+{
+  "model": "minimax/minimax-m3",
+  "chart": "python-backend/results/agents/artifacts/2026-08-21/kiri-industries/kiri-industries-2026-08-21-current-15m.png",
+  "response": "# Kiri Industries — 15-Minute Chart Analysis\n\n## Chart Header (Visible Text)\n- **Stock:** Kiri Industries\n- **Timeframe:** 15m\n- **Date:** 2026-08-21\n- **Data through:** 10:49:00 IST\n- **Last Price:** ₹464.40\n- **VWAP:** ₹463.38\n- **ATR(14):** ₹3.94\n- **Status:** Partial last candle\n\n## Reference Levels (Right-Side Labels)\n- **1 PDH (Previous Day High):** ₹479.35\n- **LAST:** ₹464.40 (horizontal reference line)\n- **PDC (Previous Day Close):** ₹460.50\n- **1 PDL (Previous Day Low):** ₹434.00\n\n## Price Action (Candle-by-Candle)\n1. **09:15 — Red candle:** Opened near ₹464, closed near ₹461.5, with a long lower wick extending down to ~₹458.5. Strong opening rejection.\n2. **09:30 — Small green candle:** Tight body around ₹461.5–₹462, indicating indecision/consolidation.\n3. **09:45 — Doji-like candle:** Very small body near ₹462.5–₹463, signaling a pause.\n4. **10:00 — Large bullish green candle:** Opened near ₹462, closed near ₹465.5, with an upper wick to ~₹466.5. Strong buying momentum.\n5. **10:15 — Red candle:** Opened near ₹466, closed near ₹463.5, with an upper wick to ~₹466.5. Profit-taking / rejection at highs.\n6. **10:30 — Green candle:** Opened near ₹463.5, closed near ₹465, recovering the prior red candle.\n7. **10:45 — Partial red candle:** Opened near ₹465, currently trading near ₹464.5 (still forming).\n\n## Indicator Behavior\n- **EMA 9 (blue):** Rising, currently around ₹463.5.\n- **EMA 21 (purple):** Rising, currently around ₹462.5.\n- **VWAP (orange):** Flat-to-slightly-rising near ₹463.38.\n\n## Trend Summary\n- Price (₹464.40) is **above VWAP** (₹463.38) → intraday bullish bias.\n- **EMA 9 is above EMA 21** → bullish alignment, with EMAs fanning upward.\n- Price is comfortably **above PDC (₹460.50)** but well below **PDH (₹479.35)**, leaving room to the upside.\n- The session opened weak, consolidated, then rallied from ~₹462 to ~₹466, and is now consolidating near the highs.\n\n```json\n{\n  \"stock\": \"Kiri Industries\",\n  \"timeframe\": \"15m\",\n  \"data_through_ist\": \"10:49:00\",\n  \"last_price\": 464.40,\n  \"vwap\": 463.38,\n  \"atr_14\": 3.94,\n  \"last_candle_status\": \"partial\",\n  \"trend_vs_vwap\": \"above\",\n  \"ema_9_vs_ema_21\": \"ema_9_above_ema_21\",\n  \"previous_day_high\": 479.35,\n  \"previous_day_close\": 460.50,\n  \"previous_day_low\": 434.00\n}\n```",
+  "extracted": {
+    "stock": "Kiri Industries",
+    "timeframe": "15m",
+    "data_through_ist": "10:49:00",
+    "last_price": 464.4,
+    "vwap": 463.38,
+    "atr_14": 3.94,
+    "last_candle_status": "partial",
+    "trend_vs_vwap": "above",
+    "ema_9_vs_ema_21": "ema_9_above_ema_21",
+    "previous_day_high": 479.35,
+    "previous_day_close": 460.5,
+    "previous_day_low": 434.0
+  },
+  "grade": {
+    "passed": true,
+    "score": 11,
+    "maximum": 12,
+    "checks": {
+      "stock": true,
+      "timeframe": true,
+      "data_time": true,
+      "last_price": true,
+      "vwap": true,
+      "atr": true,
+      "partial_candle": true,
+      "above_vwap": true,
+      "ema_alignment": true,
+      "previous_day_high": false,
+      "previous_day_close": true,
+      "previous_day_low": true
+    }
+  },
+  "usage": {
+    "prompt_tokens": 841,
+    "completion_tokens": 1296,
+    "total_tokens": 2137,
+    "cost": 0.00143759,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00143759,
+      "upstream_inference_prompt_cost": 0.00019343,
+      "upstream_inference_completions_cost": 0.00124416
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 418,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "provider": "CoreWeave",
+  "request_id": "gen-1787524584-TjvRtGM1FEsesXSZncZI"
+}
