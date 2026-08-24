@@ -757,6 +757,8 @@ class AITradingOrchestrator:
                         "trade_mode": resolved["trade_mode"],
                         "trade_amount": resolved["trade_amount"],
                         "amount_source": resolved["amount_source"],
+                        "account_margin_capacity": resolved.get("account_margin_capacity"),
+                        "max_concurrent_trades": resolved["max_concurrent_trades"],
                         "regime_analysis_enabled": False,
                     },
                     event_callback=lambda payload, scoped_user_id=user_id: self._broadcast_event(
