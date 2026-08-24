@@ -71,6 +71,36 @@ class StockMarketDataToolkit(Toolkit):
                 pass
 
         stage2 = self.stock_context.get("stage2") or {}
+        indicator_snapshot = dict(self.stock_context.get("indicator_snapshot") or {})
+        indicator_snapshot.pop("patterns", None)
+        relative_volume = self.stock_context.get("relative_volume")
+        if relative_volume is None:
+            relative_volume = stage2.get("time_of_day_rvol")
+        volume_acceleration = self.stock_context.get("volume_acceleration")
+        if volume_acceleration is None:
+            volume_acceleration = stage2.get("volume_acceleration_ratio")
+        evidence = {
+            "observed_at_ist": self.stock_context.get("created_at"),
+            "observation_price": self.stock_context.get("price") or stock.get("price"),
+            "relative_volume": relative_volume,
+            "volume_acceleration": volume_acceleration,
+            "vwap_at_observation": self.stock_context.get("vwap"),
+            "opening_range": self.stock_context.get("opening_range"),
+            "spread_percent": self.stock_context.get("spread"),
+            "five_level_depth_summary": self.stock_context.get(
+                "five_level_depth_summary"
+            ),
+            "five_level_depth": self.stock_context.get("five_level_depth"),
+            "estimated_slippage_percent": self.stock_context.get("estimated_slippage"),
+            "depth_levels": (
+                (self.stock_context.get("data_quality") or {}).get("depth_levels")
+            ),
+            "indicator_values": indicator_snapshot,
+            "recent_completed_one_minute_bars": list(
+                self.stock_context.get("recent_closed_bars") or []
+            )[-10:],
+            "evidence_timestamps": self.stock_context.get("evidence_timestamps"),
+        }
         payload = {
             "security_id": self.security_id,
             "symbol": self.symbol,
@@ -79,17 +109,7 @@ class StockMarketDataToolkit(Toolkit):
             "average_daily_value_crore": stock.get("adv_20_cr"),
             "historical_atr_percent": stock.get("atr_percent"),
             "average_volume_20_sessions": stock.get("avg_volume_20"),
-            "stage2_momentum_snapshot": {
-                "score": stage2.get("score"),
-                "selection_score": stage2.get("selection_score"),
-                "time_of_day_rvol": stage2.get("time_of_day_rvol"),
-                "price_vs_vwap_percent": stage2.get("price_vs_vwap_percent"),
-                "opening_range_breakout_percent": stage2.get("opening_range_breakout_percent"),
-                "volume_acceleration_ratio": stage2.get("volume_acceleration_ratio"),
-                "selection_reason": stage2.get("stage2_reason"),
-                "live_liquidity": stage2.get("live_liquidity"),
-                "data_quality": stage2.get("data_quality"),
-            },
+            "market_evidence": evidence,
             "tradability": tradability,
         }
         return self._without_empty(payload)
