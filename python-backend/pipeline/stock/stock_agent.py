@@ -62,7 +62,7 @@ class StockAgent:
             instructions=[
                 "You are an expert intraday Indian equity trader.",
                 "Study the assigned stock using the attached charts and the complete initial decision snapshot in the user message.",
-                "The attached image order is: current-day 1m, current-day 5m, current-day 15m, previous-session 5m, previous-session 15m, volume and participation, momentum and volatility, OHLCV-derived price-structure liquidity, then current/previous TPO market profile.",
+                "The attached image order is: current-day 1m, current-day 5m, current-day 15m, previous-session 15m, volume and participation, momentum and volatility, OHLCV-derived price-structure liquidity, then current/previous TPO market profile.",
                 "The initial snapshot is the single source for identity, time, market state, technical readings, account state, and risk budget. Do not look for read-only tools.",
                 "Do not assume stock CVD, footprint, historical DOM, or trade aggressor data exists. Dhan historical candles do not contain those fields.",
                 "The price-structure liquidity image is derived from OHLCV and the TPO image is time at price, not order-book liquidity or exact volume at price.",
@@ -325,7 +325,7 @@ class StockAgent:
         decision_context = stock_packet.get("decision_context") or {}
         lines = [
             "Analyze the assigned stock for an intraday trade using the attached charts and the initial decision snapshot below.",
-            "Attached charts in order: current 1m, current 5m, current 15m, previous-session 5m, previous-session 15m, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO market profile.",
+            "Attached charts in order: current 1m, current 5m, current 15m, previous-session 15m, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO market profile.",
             "",
             "All read-only evidence is already included exactly once. The only available tools size a trade and place a protected order.",
             "",
