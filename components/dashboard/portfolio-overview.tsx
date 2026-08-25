@@ -164,7 +164,7 @@ export default function PortfolioOverview() {
                             }
                         />
                         <StatTile
-                            label="Margin used"
+                            label="Dhan charges"
                             value={funds ? money(funds.utilizedAmount) : '—'}
                             trailing={funds ? percent(analytics.marginUse) : undefined}
                             meter={
