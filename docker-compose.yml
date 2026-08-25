@@ -24,7 +24,9 @@ services:
     environment:
       DHAN_AUTH_HEALTH_PORT: "8030"
       DHAN_AUTO_RENEW_BEFORE_MINUTES: "240"
+      DHAN_AUTO_RENEW_MAX_AGE_HOURS: "12"
       DHAN_AUTO_RENEW_CHECK_SECONDS: "900"
+      DHAN_DAILY_VERIFICATION_TIME_IST: "08:30"
     healthcheck:
       test:
         - CMD
@@ -155,6 +157,7 @@ services:
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
       STOCK_AGENT_DEBUG: "1"
+      DHAN_DAILY_VERIFICATION_TIME_IST: "08:30"
     depends_on:
       dhan-auth-manager:
         condition: service_healthy
