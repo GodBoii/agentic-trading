@@ -5,7 +5,7 @@ import tempfile
 import time
 import unittest
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
 from types import SimpleNamespace
@@ -118,6 +118,11 @@ class CredentialStoreTests(unittest.TestCase):
                 generated = False
 
                 def fetch_user_profile(self):
+                    if self.generated:
+                        return {
+                            "status": "success",
+                            "data": {"tokenValidity": "26/08/2026 08:30"},
+                        }
                     return {"status": "failure", "remarks": "expired"}
 
                 def generate_access_token(self, *, pin, totp):
@@ -151,6 +156,84 @@ class CredentialStoreTests(unittest.TestCase):
             self.assertTrue(fake.generated)
             self.assertEqual(loaded.access_token, "recovered-token")
             self.assertEqual(manager.health["last_refresh_method"], "totp_recovery")
+
+    def test_auth_manager_rotates_valid_token_after_twelve_hours(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = temp_config(Path(directory))
+            now = datetime(2026, 8, 25, 3, 0, tzinfo=timezone.utc)
+            expiry = now.astimezone(ZoneInfo("Asia/Kolkata")) + timedelta(hours=10)
+
+            class FakeDhan:
+                client_id = "123456"
+                credential_version = 1
+                renew_calls = 0
+
+                def fetch_user_profile(self):
+                    return {
+                        "status": "success",
+                        "data": {"tokenValidity": expiry.strftime("%d/%m/%Y %H:%M")},
+                    }
+
+                def renew_access_token(self):
+                    self.renew_calls += 1
+                    return {"status": "success", "data": {"accessToken": "rotated-token"}}
+
+            fake = FakeDhan()
+            env = {
+                "DHAN_CREDENTIAL_ENCRYPTION_SECRET": "test-secret",
+                "DHAN_CREDENTIAL_ENCRYPTION_SECRET_FILE": "",
+                "DHAN_AUTO_RENEW_MAX_AGE_HOURS": "12",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                store = DhanCredentialStore(config)
+                store.publish(
+                    client_id="123456",
+                    access_token="old-token",
+                    expires_at=expiry.isoformat(),
+                    source="test",
+                )
+                manager = DhanAuthManager(config, now=lambda: now)
+                manager.store.bootstrap = lambda: SimpleNamespace(
+                    issued_at=(now - timedelta(hours=12)).isoformat()
+                )
+                with patch(
+                    "pipeline.runtime.run_dhan_auth_manager.DhanService",
+                    return_value=fake,
+                ):
+                    self.assertTrue(manager.run_once())
+                loaded = store.load()
+            self.assertEqual(fake.renew_calls, 1)
+            self.assertEqual(loaded.access_token, "rotated-token")
+            self.assertEqual(manager.health["last_refresh_method"], "scheduled_12h_renewal")
+
+    def test_auth_manager_wakes_at_0830_ist_and_records_live_check(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = temp_config(Path(directory))
+            before_check = datetime(2026, 8, 25, 2, 59, tzinfo=timezone.utc)
+            at_check = datetime(2026, 8, 25, 3, 0, tzinfo=timezone.utc)
+            manager = DhanAuthManager(config, now=lambda: before_check)
+            self.assertEqual(manager._seconds_until_daily_verification(), 60)
+
+            manager = DhanAuthManager(config, now=lambda: at_check)
+            manager._record_live_check(scheduled_0830=True)
+            self.assertEqual(manager.health["last_0830_token_check_date"], "2026-08-25")
+            self.assertEqual(manager.health["last_0830_token_check_status"], "healthy")
+
+    def test_auth_manager_schedules_exact_twelve_hour_rotation_deadline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = temp_config(Path(directory))
+            now = datetime(2026, 8, 25, 3, 0, tzinfo=timezone.utc)
+            env = {
+                "DHAN_CREDENTIAL_ENCRYPTION_SECRET": "test-secret",
+                "DHAN_CREDENTIAL_ENCRYPTION_SECRET_FILE": "",
+                "DHAN_AUTO_RENEW_MAX_AGE_HOURS": "12",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                manager = DhanAuthManager(config, now=lambda: now)
+                manager.store.load = lambda required=False: SimpleNamespace(
+                    issued_at=(now - timedelta(hours=11, minutes=59)).isoformat()
+                )
+                self.assertEqual(manager._seconds_until_rotation(), 60)
 
 
 class UniverseScannerTests(unittest.TestCase):
