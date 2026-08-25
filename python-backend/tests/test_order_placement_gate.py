@@ -71,6 +71,17 @@ class OrderPlacementGateTests(unittest.TestCase):
         self.assertEqual(state.status_code, ORDER_PLACEMENT_ALLOWED)
         self.assertTrue(OrderPlacementStateService.is_allowed(self.state_path))
 
+    def test_daily_verification_scheduler_targets_0830_ist(self):
+        now = datetime(2026, 8, 25, 2, 59, tzinfo=timezone.utc)
+        gate = OrderPlacementGate(
+            FakeDhan(success_response()),
+            self.state_path,
+            interval_seconds=21600,
+            now=lambda: now,
+        )
+
+        self.assertEqual(gate._seconds_until_daily_verification(), 60)
+
     def test_mismatch_or_false_orders_allowed_closes_gate(self):
         for response in (
             success_response(detected="9.9.9.9"),
