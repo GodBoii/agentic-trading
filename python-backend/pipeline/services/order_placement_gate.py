@@ -13,12 +13,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Event, Lock, Thread
 from typing import Any, Callable, Dict, Optional
+from zoneinfo import ZoneInfo
 
 from pipeline.services.convex_service import ConvexService
 from pipeline.services.storage_service import StorageService
 
 BROKER = "dhan"
 DEFAULT_VERIFY_INTERVAL_SECONDS = 6 * 60 * 60
+DEFAULT_DAILY_VERIFY_TIME_IST = "08:30"
 ORDER_PLACEMENT_ALLOWED = "ORDER_PLACEMENT_ALLOWED"
 ORDER_PLACEMENT_UNKNOWN = "ORDER_PLACEMENT_UNKNOWN"
 ORDER_PLACEMENT_VERIFICATION_FAILED = "ORDER_PLACEMENT_VERIFICATION_FAILED"
@@ -173,6 +175,10 @@ class OrderPlacementGate:
         )
         self.interval_seconds = max(60, configured_interval)
         self._now = now or (lambda: datetime.now(timezone.utc))
+        self._market_timezone = ZoneInfo("Asia/Kolkata")
+        self._daily_verify_hour, self._daily_verify_minute = self._parse_daily_verify_time(
+            os.getenv("DHAN_DAILY_VERIFICATION_TIME_IST", DEFAULT_DAILY_VERIFY_TIME_IST)
+        )
         self._state_lock = Lock()
         self.placement_lock = Lock()
         self._trade_slot_lock = Lock()
@@ -312,7 +318,9 @@ class OrderPlacementGate:
         self._stop.set()
 
     def _verification_loop(self) -> None:
-        while not self._stop.wait(self.interval_seconds):
+        while not self._stop.wait(
+            min(self.interval_seconds, self._seconds_until_daily_verification())
+        ):
             state = self.verify()
             if self._on_verified is not None:
                 try:
@@ -322,6 +330,29 @@ class OrderPlacementGate:
                         f"[Order Gate] verification callback failed: {type(exc).__name__}: {exc}",
                         flush=True,
                     )
+
+    @staticmethod
+    def _parse_daily_verify_time(raw: str) -> tuple[int, int]:
+        try:
+            parsed = datetime.strptime(raw.strip(), "%H:%M")
+        except ValueError as exc:
+            raise ValueError("DHAN_DAILY_VERIFICATION_TIME_IST must use HH:MM format.") from exc
+        return parsed.hour, parsed.minute
+
+    def _seconds_until_daily_verification(self) -> float:
+        now = self._now()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        local_now = now.astimezone(self._market_timezone)
+        target = local_now.replace(
+            hour=self._daily_verify_hour,
+            minute=self._daily_verify_minute,
+            second=0,
+            microsecond=0,
+        )
+        if target <= local_now:
+            target += timedelta(days=1)
+        return max(0.0, (target - local_now).total_seconds())
 
     def _state_from_verification(
         self,
