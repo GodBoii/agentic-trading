@@ -11,6 +11,7 @@ from agno.models.openrouter import OpenRouter
 
 DEFAULT_TEXT_MODEL_ID = "xiaomi/mimo-v2.5-pro"
 DEFAULT_MULTIMODAL_MODEL_ID = "deepseek/deepseek-v4-flash-vision-exp"
+DEFAULT_REASONING_EFFORT = "xhigh"
 _ENV_LOADED = False
 
 
@@ -49,6 +50,8 @@ def _apply_reasoning_defaults(overrides: dict[str, Any]) -> None:
     enabled = os.getenv("OPENROUTER_ENABLE_REASONING", "1").strip().lower() not in {"0", "false", "no", "off"}
     if not enabled:
         return
+
+    overrides.setdefault("reasoning_effort", DEFAULT_REASONING_EFFORT)
 
     extra_body = overrides.get("extra_body")
     if not isinstance(extra_body, dict):
