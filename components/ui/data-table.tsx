@@ -34,6 +34,10 @@ const DIRECTION_TEXT: Record<Direction, string> = {
  *
  * Vertical scrolling lives on `.table-scroll` so the sticky header works;
  * `minWidth` drives horizontal scroll rather than squashing columns.
+ *
+ * On a phone that horizontal scroll used to take the instrument name with it,
+ * leaving a screen of anonymous figures. `stickyFirst` pins the first column
+ * below 900px so the row keeps its identity while the numbers move.
  */
 export function DataTable<T>({
     columns,
@@ -42,6 +46,7 @@ export function DataTable<T>({
     caption,
     minWidth = 760,
     maxHeight,
+    stickyFirst = true,
 }: {
     columns: Column<T>[]
     rows: T[]
@@ -50,10 +55,16 @@ export function DataTable<T>({
     caption: string
     minWidth?: number
     maxHeight?: number | string
+    /**
+     * Freeze the first column while scrolling sideways. On by default because
+     * every table in the app leads with the row's identity; turn it off for one
+     * that leads with a figure, where a pinned number explains nothing.
+     */
+    stickyFirst?: boolean
 }) {
     return (
         <div className="table-scroll" style={maxHeight ? { maxHeight } : undefined}>
-            <table className="data-table" style={{ minWidth }}>
+            <table className="data-table" data-sticky-first={stickyFirst || undefined} style={{ minWidth }}>
                 <caption className="sr-only">{caption}</caption>
                 <thead>
                     <tr>
