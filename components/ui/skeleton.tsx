@@ -15,7 +15,7 @@ export function Skeleton({ className, delay = 0 }: { className?: string; delay?:
     return (
         <div
             aria-hidden
-            className={cn('archive-skeleton rounded-lg bg-white/[0.03]', className)}
+            className={cn('archive-skeleton rounded-lg bg-surface-soft', className)}
             style={delay ? ({ '--skeleton-delay': `${delay}ms` } as CSSProperties) : undefined}
         />
     )
