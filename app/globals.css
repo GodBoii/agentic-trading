@@ -1,63 +1,203 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* ─────────────────────────────────────────────────────────────
-     DESIGN TOKENS
-     ───────────────────────────────────────────────────────────── */
-  --bg: #000000;
-  --bg-raised: #050505;
-  --bg-card: #0A0A0C;
-  --ink-primary: #FFFFFF;
-  --ink-secondary: rgba(255, 255, 255, 0.55);
-  --ink-tertiary: rgba(255, 255, 255, 0.30);
-  --hairline: rgba(255, 255, 255, 0.07);
-  --hairline-strong: rgba(255, 255, 255, 0.14);
+/* =====================================================================
+   COLOUR — one palette, two themes
 
-  /* ── Tonal channels ──
-     Single source of truth. Every tonal colour is declared once as an
-     "R G B" channel triplet so it can be consumed three ways:
-       CSS solid      → var(--dash-positive)
-       CSS w/ alpha   → rgb(var(--dash-positive-rgb) / 0.25)
-       Tailwind       → text-positive, border-positive/25  (see tailwind.config.ts)
-     Never hard-code these values again. */
-  --accent-rgb: 0 229 255;
-  --dash-positive-rgb: 52 211 153;
-  --dash-negative-rgb: 248 113 113;
-  --dash-warning-rgb: 251 191 36;
+   The base is a warm neutral ramp (a low-saturation 30° hue running through
+   every grey) and the accent is a cool steel blue. Warm ground against a
+   cool accent is what stops the interface reading as a default dark
+   template, and it keeps the accent clear of the three colours that already
+   carry meaning here: green for profit, red for loss, amber for a condition
+   needing attention.
 
-  /* Accent + status (auth/dashboard pages) */
+   Two rules make theming possible without touching every component.
+
+   Every tonal colour is declared once as an "R G B" channel triplet, so it
+   can be consumed as var(--dash-positive), as
+   rgb(var(--dash-positive-rgb) / 0.25), or through Tailwind (text-positive,
+   border-positive/25 — see tailwind.config.ts).
+
+   Every translucent overlay goes through a --fill-* token instead of a
+   literal white rgba(). A hardcoded white wash is invisible on paper, which
+   is how a dark-only app breaks the moment it gains a light theme. The
+   fills invert polarity per theme; call sites never have to know which
+   theme is active.
+
+   --ink-rgb is the theme's foreground channel and --paper-rgb its
+   background channel, so an overlay can be written against either end.
+   ===================================================================== */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink-rgb: 246 242 236;
+  --paper-rgb: 12 11 10;
+
+  --accent-rgb: 110 159 212;
+  --dash-positive-rgb: 76 183 130;
+  --dash-negative-rgb: 224 104 94;
+  --dash-warning-rgb: 216 164 78;
+
+  /* Structure. Canvas, panel, inset: one warm ramp where each step is a real
+     elevation change rather than a decorative tint. */
+  --dash-canvas: #0C0B0A;
+  --dash-panel: #141210;
+  --dash-panel-inset: #100F0D;
+  /* The surface a floating layer paints on: tooltips, menus, dialogs. One
+     step above the panel so a popover reads as detached. */
+  --dash-pop: #1C1917;
+
+  --dash-text: #F6F2EC;
+  --dash-text-secondary: rgb(var(--ink-rgb) / 0.58);
+  --dash-text-muted: rgb(var(--ink-rgb) / 0.34);
+  --dash-border: rgb(var(--ink-rgb) / 0.08);
+  --dash-border-strong: rgb(var(--ink-rgb) / 0.17);
+
+  /* Translucent fills, quietest first. */
+  --fill-subtle: rgb(var(--ink-rgb) / 0.028);
+  --fill-soft: rgb(var(--ink-rgb) / 0.05);
+  --fill-strong: rgb(var(--ink-rgb) / 0.09);
+  --fill-hover: rgb(var(--ink-rgb) / 0.045);
+  --fill-track: rgb(var(--ink-rgb) / 0.07);
+
+  /* The one committing action per screen. Inverted against the canvas. The
+     foreground is also published as a channel triplet, because anything drawn
+     *on* a filled button (a spinner ring, a divider) needs it with alpha. */
+  --solid-bg: #F6F2EC;
+  --solid-bg-hover: #FFFFFF;
+  --solid-fg-rgb: 12 11 10;
+  --solid-fg: rgb(var(--solid-fg-rgb));
+
+  /* Shadows carry the ground's hue rather than neutral black, so a raised
+     surface looks lit by the same room as everything beneath it. */
+  --shadow-rgb: 6 4 2;
+  --shadow-panel: 0 18px 50px -30px rgb(var(--shadow-rgb) / 0.92);
+  --shadow-pop: 0 2px 6px 0 rgb(var(--shadow-rgb) / 0.4), 0 14px 44px -12px rgb(var(--shadow-rgb) / 0.55);
+  --shadow-solid: 0 6px 24px -10px rgb(var(--ink-rgb) / 0.3);
+
+  /* Ambient background geometry. */
+  --grid-line: rgb(var(--ink-rgb) / 0.028);
+  --spotlight: rgb(var(--accent-rgb) / 0.075);
+  --grain-opacity: 0.035;
+
+  /* Two effects depend on blend polarity, not just colour: the input-clear
+     streak and the card-tilt glare lighten on a dark field and darken on a
+     light one. */
+  --clear-glow-blend: screen;
+  --clear-glow-rgb: 255 255 255;
+  --clear-glow-alpha: 0.85;
+  --tilt-glare-blend: screen;
+  --tilt-glare-rgb: 255 255 255;
+
+  /* Marketing surface. Deliberately a shade off the product canvas: the
+     landing page is a different room, not a different palette. */
+  --site-canvas: #080807;
+  --site-canvas-raised: #100E0C;
+
+  /* Legacy aliases. Older selectors (.surface, the auth ambience) still read
+     these; they resolve to the same ramp, so nothing can drift. */
+  --bg: var(--dash-canvas);
+  --bg-raised: var(--dash-panel-inset);
+  --bg-card: var(--dash-panel);
+  --ink-primary: var(--dash-text);
+  --ink-secondary: var(--dash-text-secondary);
+  --ink-tertiary: var(--dash-text-muted);
+  --hairline: var(--dash-border);
+  --hairline-strong: var(--dash-border-strong);
+  --dash-surface: var(--fill-subtle);
+  --dash-surface-hover: var(--fill-hover);
+
   --accent: rgb(var(--accent-rgb));
   --accent-glow: rgb(var(--accent-rgb) / 0.45);
-  --profit: #00FF9D;
-  --loss: #FF5B5B;
-
-  /* Dashboard minimalist tokens */
-  --dash-canvas: #09090B;
-  /* Elevated panel — the default reading surface for data. */
-  --dash-panel: #0D0F12;
-  /* Inset surface, one step back from the panel: nested cells, code, wells. */
-  --dash-panel-inset: #0A0B0E;
-  --dash-surface: rgba(255, 255, 255, 0.025);
-  --dash-surface-hover: rgba(255, 255, 255, 0.04);
-  --dash-border: rgba(255, 255, 255, 0.06);
-  --dash-border-strong: rgba(255, 255, 255, 0.12);
-  --dash-text: #FAFAFA;
-  --dash-text-secondary: rgba(255, 255, 255, 0.50);
-  --dash-text-muted: rgba(255, 255, 255, 0.25);
   --dash-positive: rgb(var(--dash-positive-rgb));
   --dash-negative: rgb(var(--dash-negative-rgb));
   --dash-warning: rgb(var(--dash-warning-rgb));
+}
 
-  /* Typography */
-  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
-  --font-display: var(--font-neue), "Neue Montreal", "Inter Tight", system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), "Geist Mono", monospace;
-  --font-serif: var(--font-instrument-serif), "Instrument Serif", Georgia, serif;
-  --font-grotesk: var(--font-space), "Space Grotesk", system-ui, sans-serif;
-  --font-product-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
-  --font-product-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", monospace;
+/* ── Light ──
+   Not the dark theme with its numbers flipped. Paper needs a warmer, lower
+   contrast ground and noticeably darker semantic colours: the green and red
+   that read cleanly on charcoal fail WCAG AA against a light surface, so
+   each is taken down until it passes at 12px. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --ink-rgb: 26 23 20;
+  --paper-rgb: 245 242 236;
+
+  --accent-rgb: 47 98 147;
+  --dash-positive-rgb: 15 118 82;
+  --dash-negative-rgb: 187 55 45;
+  --dash-warning-rgb: 138 96 16;
+
+  --dash-canvas: #F1EDE6;
+  --dash-panel: #FCFAF6;
+  --dash-panel-inset: #F5F1EA;
+  --dash-pop: #FFFDF9;
+
+  --dash-text: #1A1714;
+  --dash-text-secondary: rgb(var(--ink-rgb) / 0.64);
+  --dash-text-muted: rgb(var(--ink-rgb) / 0.46);
+  --dash-border: rgb(var(--ink-rgb) / 0.11);
+  --dash-border-strong: rgb(var(--ink-rgb) / 0.22);
+
+  --fill-subtle: rgb(var(--ink-rgb) / 0.026);
+  --fill-soft: rgb(var(--ink-rgb) / 0.045);
+  --fill-strong: rgb(var(--ink-rgb) / 0.075);
+  --fill-hover: rgb(var(--ink-rgb) / 0.04);
+  --fill-track: rgb(var(--ink-rgb) / 0.09);
+
+  --solid-bg: #1F1B17;
+  --solid-bg-hover: #332C25;
+  --solid-fg-rgb: 250 247 241;
+  --solid-fg: rgb(var(--solid-fg-rgb));
+
+  --shadow-rgb: 62 48 30;
+  --shadow-panel: 0 14px 34px -26px rgb(var(--shadow-rgb) / 0.28);
+  --shadow-pop: 0 1px 2px 0 rgb(var(--shadow-rgb) / 0.1), 0 12px 32px -10px rgb(var(--shadow-rgb) / 0.18);
+  --shadow-solid: 0 6px 22px -10px rgb(var(--shadow-rgb) / 0.4);
+
+  --grid-line: rgb(var(--ink-rgb) / 0.045);
+  --spotlight: rgb(var(--accent-rgb) / 0.06);
+  --grain-opacity: 0.02;
+
+  --clear-glow-blend: multiply;
+  --clear-glow-rgb: 26 23 20;
+  --clear-glow-alpha: 0.32;
+  --tilt-glare-blend: multiply;
+  --tilt-glare-rgb: 62 48 30;
+
+  --site-canvas: #F5F1EA;
+  --site-canvas-raised: #FCFAF6;
+}
+
+:root {
+  /* ── Typography ──
+     Three roles: headline, body, data. One system for the whole site.
+
+     There were seven Google families loaded before this (Inter, Inter Tight,
+     JetBrains Mono, Space Grotesk, Manrope, IBM Plex Mono, Instrument Serif),
+     and the marketing pages and the product shell used different ones for the
+     same roles — which is a large part of why the two halves of the site did
+     not look like one product. Four families now, and both halves share them.
+
+     Outfit for headlines: geometric, tight at display sizes, and not Inter.
+     Manrope for body and UI: neutral, high x-height, holds up at 11px in a
+     dense table. IBM Plex Mono for every figure, because tabular widths and a
+     slashed zero are not decoration in a trading interface. Instrument Serif
+     stays for the one editorial italic on the marketing surface. */
+  --font-sans: var(--font-body), "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-headline), "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-numeric), "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: var(--font-editorial), "Instrument Serif", Georgia, serif;
+  /* Aliases kept for selectors that still name the old roles. They resolve to
+     the same three families, so a stale class cannot reintroduce a font. */
+  --font-grotesk: var(--font-display);
+  --font-product-sans: var(--font-sans);
+  --font-product-mono: var(--font-mono);
 
   /* ── Motion: house curves ──
      Kept for the marketing surface's editorial easing. `--ease-in-out` is this
@@ -140,12 +280,12 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  background: var(--bg);
+  background: var(--dash-canvas);
 }
 
 body {
-  background: var(--bg);
-  color: var(--ink-primary);
+  background: var(--dash-canvas);
+  color: var(--dash-text);
   font-family: var(--font-sans);
   font-weight: 400;
   line-height: 1.5;
@@ -153,15 +293,57 @@ body {
   overflow-x: hidden;
 }
 
-::selection { background: var(--accent); color: #000; }
-::-moz-selection { background: var(--accent); color: #000; }
+/* Anchor targets clear the sticky chrome instead of landing underneath it. */
+:target { scroll-margin-top: 96px; }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* A tinted wash rather than a solid accent fill. A saturated block behind
+   selected text drops the text's own contrast below AA. */
+::selection { background: rgb(var(--accent-rgb) / 0.28); color: var(--dash-text); }
+::-moz-selection { background: rgb(var(--accent-rgb) / 0.28); color: var(--dash-text); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink-rgb) / 0.14);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--ink-rgb) / 0.26);
+  background-clip: content-box;
+}
 
-:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid rgb(var(--accent-rgb) / 0.75); outline-offset: 2px; }
+
+/* ── Skip to content ──
+   Off-screen until focused. Keyboard users otherwise tab the brand, three nav
+   links and the account menu on every route before reaching the data they
+   came for. */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: var(--z-modal);
+  /* `inline-flex`, not the anchor's default `inline`. A transform has no effect
+     on a non-replaced inline box, so without this the link never moves off
+     screen and sits permanently over the page. */
+  display: inline-flex;
+  align-items: center;
+  transform: translateY(-160%);
+  border-radius: 10px;
+  border: 1px solid var(--dash-border-strong);
+  background: var(--dash-pop);
+  box-shadow: var(--shadow-pop);
+  padding: 0.5rem 0.875rem;
+  color: var(--dash-text);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.skip-link:focus-visible { transform: translateY(0); }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
@@ -189,27 +371,50 @@ body {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  /* ────────── GRID + SPOTLIGHTS (auth/product pages) ────────── */
+  /* ────────── AMBIENT GEOMETRY (auth, marketing, error screens) ──────────
+     A ruled ground rather than a coloured wash. The rules are drawn from the
+     theme's foreground channel, so they survive the light theme where a white
+     hairline simply disappears. */
   .bg-grid {
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-    background-size: 64px 64px;
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 72px 72px;
   }
   .bg-grid-fine {
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 32px 32px;
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+  /* Masked so the ruling fades out instead of stopping on a hard edge. */
+  .bg-grid-fade {
+    -webkit-mask-image: radial-gradient(ellipse 92% 68% at 50% 0%, #000 8%, transparent 78%);
+    mask-image: radial-gradient(ellipse 92% 68% at 50% 0%, #000 8%, transparent 78%);
   }
   .bg-spotlight {
-    background: radial-gradient(ellipse 1200px 800px at 50% 0%, rgba(0, 229, 255, 0.08) 0%, rgba(0, 229, 255, 0.02) 30%, transparent 60%);
+    background: radial-gradient(ellipse 1100px 720px at 50% -6%, var(--spotlight) 0%, transparent 62%);
   }
   .bg-spotlight-bottom {
-    background: radial-gradient(ellipse 1000px 600px at 50% 100%, rgba(0, 229, 255, 0.06) 0%, transparent 60%);
+    background: radial-gradient(ellipse 900px 520px at 50% 106%, var(--spotlight) 0%, transparent 60%);
   }
 
-  .surface { background: var(--bg-card); border: 1px solid var(--hairline); }
+  /* ── Grain ──
+     A fixed, non-interactive noise film. Flat vector surfaces read as
+     unfinished at these sizes, and a trace of grain gives the panels a
+     material without costing an image request. The opacity is per theme,
+     because noise that reads as texture on charcoal reads as dirt on paper. */
+  .grain::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: var(--grain-opacity, 0.03);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .surface { background: var(--dash-panel); border: 1px solid var(--dash-border); }
 }
 
 /* =====================================================================
@@ -217,13 +422,12 @@ body {
    Clean, spatial, typographically confident.
    ===================================================================== */
 
-/* Product-only type system. The marketing surface intentionally keeps its
-   existing editorial typography. */
+/* The product shell no longer swaps the type system — it is the same three
+   families as the marketing surface now. What is left here is density: tighter
+   tracking than editorial copy wants, and slashed zeros on every figure so a
+   0 can never be misread as an O in an instrument name or an order id. */
 .product-shell {
-  --font-sans: var(--font-product-sans);
-  --font-display: var(--font-grotesk);
-  --font-mono: var(--font-product-mono);
-  font-family: var(--font-product-sans);
+  font-family: var(--font-sans);
   font-kerning: normal;
   letter-spacing: -0.012em;
 }
@@ -231,20 +435,15 @@ body {
 .product-shell h1,
 .product-shell h2,
 .product-shell h3 {
-  font-family: var(--font-grotesk);
+  font-family: var(--font-display);
   font-optical-sizing: auto;
 }
 
 .product-shell .font-mono,
 .product-shell code,
 .product-shell pre {
-  font-family: var(--font-product-mono);
+  font-family: var(--font-mono);
   letter-spacing: -0.01em;
-}
-
-.product-shell .font-display,
-.product-shell .dash-metric {
-  font-family: var(--font-grotesk);
 }
 
 .product-shell .nums {
@@ -257,7 +456,7 @@ body {
   overscroll-behavior-inline: contain;
   scroll-snap-type: inline proximity;
   scrollbar-width: thin;
-  scrollbar-color: var(--dash-border-strong) rgba(255, 255, 255, 0.04);
+  scrollbar-color: var(--dash-border-strong) var(--fill-soft);
 }
 
 .attachment-rail > * > * {
@@ -269,7 +468,7 @@ body {
 }
 
 .attachment-rail::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fill-soft);
   border-radius: 999px;
 }
 
@@ -331,7 +530,7 @@ body {
 .agent-markdown code {
   border: 1px solid var(--dash-border);
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--fill-soft);
   padding: 0.12rem 0.35rem;
   color: var(--dash-text);
   font-size: 0.78em;
@@ -394,7 +593,7 @@ body {
     font-family: var(--font-mono);
     font-size: 0.875rem;
     color: var(--dash-text);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fill-subtle);
     border: 1px solid var(--dash-border);
     border-radius: 8px;
     transition:
@@ -407,8 +606,9 @@ body {
   }
   .dash-input:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.08);
+    border-color: rgb(var(--accent-rgb) / 0.7);
+    /* 0.16 rather than 0.08: at 8% the ring is invisible against paper. */
+    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.16);
   }
   .dash-input:disabled {
     opacity: 0.4;
@@ -477,7 +677,7 @@ body {
     width: 36px;
     height: 20px;
     border-radius: 9999px;
-    background: rgba(255,255,255,0.08);
+    background: var(--fill-strong);
     border: 1px solid var(--dash-border);
     cursor: pointer;
     flex-shrink: 0;
@@ -529,7 +729,7 @@ body {
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--dash-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--fill-subtle);
   font-family: var(--font-mono);
   font-size: 0.625rem;
   font-weight: 500;
@@ -543,11 +743,36 @@ body {
    Header/body/footer are optional slots. Radius stays on the panel so
    nested tables and grids clip correctly. */
 .panel {
+  position: relative;
   background: var(--dash-panel);
   border: 1px solid var(--dash-border);
+  /* Radius by level: 14px on a container, 10px on things nested inside one,
+     8px on controls. One radius everywhere flattens the hierarchy. */
   border-radius: 14px;
   overflow: hidden;
+  box-shadow: var(--shadow-panel);
 }
+/* A hairline of the foreground colour along the top edge. One pixel of
+   simulated edge light is what separates a panel from a coloured rectangle,
+   and it costs no compositing layer. Dropped in the light theme, where the
+   drop shadow already does the separating. */
+.panel::before {
+  content: "";
+  position: absolute;
+  inset-inline: 1px;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--ink-rgb) / 0.07) 18%,
+    rgb(var(--ink-rgb) / 0.07) 82%,
+    transparent
+  );
+}
+[data-theme="light"] .panel::before { display: none; }
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -560,6 +785,65 @@ body {
 .panel-footer {
   padding: 0.75rem 1.25rem;
   border-top: 1px solid var(--dash-border);
+  background: var(--fill-subtle);
+}
+
+/* ── Tinted surface ──
+   A semantic wash laid over the panel colour rather than instead of it, so the
+   surface keeps its elevation while carrying state. Written as a gradient
+   because `background-color` can hold only one value: the colour stays the
+   panel's, and the tint rides on top. Replaces hand-mixed hexes like `#0D1510`,
+   which were blended against the dark canvas and read as smudges on paper. */
+.tint-positive,
+.tint-negative,
+.tint-warning,
+.tint-accent {
+  background-color: var(--dash-panel);
+  background-repeat: no-repeat;
+}
+.tint-positive {
+  background-image: linear-gradient(
+    0deg,
+    rgb(var(--dash-positive-rgb) / 0.09),
+    rgb(var(--dash-positive-rgb) / 0.09)
+  );
+}
+.tint-negative {
+  background-image: linear-gradient(
+    0deg,
+    rgb(var(--dash-negative-rgb) / 0.09),
+    rgb(var(--dash-negative-rgb) / 0.09)
+  );
+}
+.tint-warning {
+  background-image: linear-gradient(
+    0deg,
+    rgb(var(--dash-warning-rgb) / 0.1),
+    rgb(var(--dash-warning-rgb) / 0.1)
+  );
+}
+.tint-accent {
+  background-image: linear-gradient(0deg, rgb(var(--accent-rgb) / 0.09), rgb(var(--accent-rgb) / 0.09));
+}
+
+/* Quiet variant: no frame, no shadow. For a region that groups content
+   without needing to look elevated. A card should exist only where elevation
+   communicates hierarchy; this is what the other cases use instead. */
+.panel-flat {
+  box-shadow: none;
+  background: var(--fill-subtle);
+}
+.panel-flat::before { display: none; }
+
+/* ── Popover surface ──
+   Menus, tooltips and dialogs sit one step above the panel ramp and carry the
+   tinted drop shadow, so a floating layer reads as floating rather than as a
+   panel that happens to overlap. */
+.pop-surface {
+  background: var(--dash-pop);
+  border: 1px solid var(--dash-border-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow-pop);
 }
 
 /* Phone widths. 1.25rem each side costs 40px of a 360px viewport, which is
@@ -608,9 +892,19 @@ body {
 /* ── Data table ──
    Sticky header, tabular figures, right-alignable columns. Keeps ~6
    utility classes off every single <th>/<td>. */
+/* Wide tables scroll horizontally on a phone, and without an affordance there
+   is nothing on screen to say so: the last visible column just looks clipped.
+   Fading the trailing edge reads as "there is more this way". Dropped above
+   the width where the columns fit. */
 .table-scroll {
   overflow: auto;
   overscroll-behavior: contain;
+}
+@media (max-width: 900px) {
+  .table-scroll {
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
 }
 .data-table {
   width: 100%;
@@ -645,9 +939,57 @@ body {
 }
 .data-table tbody tr:first-child td { border-top: 0; }
 .data-table tbody tr { transition: background-color var(--duration-fast) var(--ease-smooth-out); }
-.data-table tbody tr:hover td { background: rgba(255, 255, 255, 0.016); }
+.data-table tbody tr:hover td { background: var(--fill-subtle); }
 .data-table [data-align="right"] { text-align: right; }
 .data-table [data-align="center"] { text-align: center; }
+
+/* ── Frozen identity column ──
+   On a phone these tables scroll sideways, and the first column is the only one
+   that says *which* instrument a row is about. Letting it scroll away turns the
+   remaining columns into anonymous numbers. Pinning it keeps the name in view
+   while the figures move under the thumb.
+
+   The z-index ladder matters: the header row is 1, the pinned body cell is 2 so
+   it passes over the scrolling cells, and the pinned header cell is 3 so it
+   holds the corner. Each pinned cell repaints the panel background, because a
+   sticky cell with a transparent background shows the row sliding beneath it. */
+.data-table[data-sticky-first] thead th:first-child,
+.data-table[data-sticky-first] tbody td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--dash-panel);
+}
+.data-table[data-sticky-first] tbody td:first-child { z-index: 2; }
+.data-table[data-sticky-first] thead th:first-child { z-index: 3; }
+/* Drawn as a shadow rather than a border, so it does not add a column of width
+   and cannot double up with the row's own top border. */
+.data-table[data-sticky-first] thead th:first-child::after,
+.data-table[data-sticky-first] tbody td:first-child::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 1px;
+  background: var(--dash-border);
+}
+/* The hover tint has to be repainted on the pinned cell too: it sets its own
+   opaque background, so the row's tint would stop at the frozen column. */
+.data-table[data-sticky-first] tbody tr:hover td:first-child {
+  background: linear-gradient(0deg, var(--fill-subtle), var(--fill-subtle)), var(--dash-panel);
+}
+
+/* Above the width where every column fits there is nothing to scroll, and a
+   pinned column would only add a stray hairline. */
+@media (min-width: 900px) {
+  .data-table[data-sticky-first] thead th:first-child,
+  .data-table[data-sticky-first] tbody td:first-child {
+    position: static;
+    background: none;
+  }
+  .data-table[data-sticky-first] thead th:first-child { background: var(--dash-panel); }
+  .data-table[data-sticky-first] thead th:first-child::after,
+  .data-table[data-sticky-first] tbody td:first-child::after { display: none; }
+}
 /* Emphasized figure inside a cell. */
 .data-table td strong {
   display: block;
@@ -685,7 +1027,7 @@ body {
 .meter {
   height: 3px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--fill-track);
   overflow: hidden;
 }
 .meter-fill {
@@ -818,6 +1160,13 @@ body {
   border-radius: 999px;
   animation: archive-spin 650ms var(--ease-linear) infinite;
 }
+/* On a filled button the page foreground is the background, so the default ring
+   vanishes into the surface it sits on. This draws it in the button's own
+   foreground instead, which inverts with the theme. */
+.archive-spinner[data-tone="inverted"] {
+  border-color: rgb(var(--solid-fg-rgb) / 0.3);
+  border-top-color: var(--solid-fg);
+}
 .archive-skeleton {
   position: relative;
   overflow: hidden;
@@ -827,7 +1176,7 @@ body {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.045), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--ink-rgb) / 0.06), transparent);
   /* A sweeping highlight is linear motion — an eased sweep reads as a
      stutter at each end of the travel. The delay lets a group of
      placeholders stagger; it has to be a custom property because an
@@ -854,9 +1203,11 @@ body {
    *resting* state (opacity, transform, stroke-dashoffset), which a duration
    of 0.01ms does not.
 
-   Theme note: this product is dark-only, so the four recipes that carry
-   colour tokens (shimmer text, tabs, tooltip, input clear) are tuned to the
-   dark surface rather than shipping the reference light values.
+   Theme note: the four recipes that carry colour (shimmer text, tabs,
+   tooltip, input clear) read from the palette at the top of this file rather
+   than from literals, so both themes get correct values out of one block.
+   The two that also depend on blend polarity — the input-clear streak and the
+   card-tilt glare — take their blend mode from the theme as well.
    ===================================================================== */
 
 :root {
@@ -973,9 +1324,10 @@ body {
   --clear-blur: var(--blur-small);
   --glow-delay: 50ms;
   --glow-peak-at: 0.15;
-  /* Dark surface: the streak lightens (screen blend) rather than darkens, so
-     the alpha has to be far higher than the reference light-mode value. */
-  --glow-opacity: 0.85;
+  /* Polarity comes from the theme: the streak lightens on a dark field
+     (screen) and darkens on paper (multiply), and a screen blend needs a far
+     higher alpha than a multiply one to register at all. */
+  --glow-opacity: var(--clear-glow-alpha);
   --glow-spread: 1.5;
 
   /* 14 · Skeleton loader and reveal */
@@ -988,8 +1340,8 @@ body {
 
   /* 15 · Shimmer text */
   --shimmer-dur: 2000ms;
-  --shimmer-base: rgba(255, 255, 255, 0.30);
-  --shimmer-highlight: rgba(255, 255, 255, 0.95);
+  --shimmer-base: rgb(var(--ink-rgb) / 0.34);
+  --shimmer-highlight: rgb(var(--ink-rgb) / 0.96);
   --shimmer-band: 400%;
   --shimmer-ease: var(--ease-linear);
 
@@ -998,8 +1350,8 @@ body {
   --tabs-ease: var(--ease-smooth-out);
   --tabs-text-muted: var(--dash-text-muted);
   --tabs-text-active: var(--dash-text);
-  --tabs-bar-bg: rgba(255, 255, 255, 0.02);
-  --tabs-pill-bg: rgba(255, 255, 255, 0.055);
+  --tabs-bar-bg: var(--fill-subtle);
+  --tabs-pill-bg: var(--fill-strong);
 
   /* 17 · Tooltip */
   --tt-in-dur: var(--duration-quick);
@@ -1008,7 +1360,7 @@ body {
   --tt-delay: var(--duration-micro);
   --tt-in-ease: var(--ease-out);
   --tt-out-ease: var(--ease-out);
-  --tt-bg: #15171C;
+  --tt-bg: var(--dash-pop);
   --tt-fg: var(--dash-text);
 
   /* 18 · Texts reveal */
@@ -1560,15 +1912,16 @@ body {
   -webkit-text-fill-color: transparent;
 }
 .t-clear.has-value .t-clear-placeholder { opacity: 0; }
-/* JS writes a stack of radial-gradient layers here, one per word.
-   Dark surface: `screen` so the streak lightens instead of vanishing. */
+/* JS writes a stack of radial-gradient layers here, one per word, painted in
+   `--clear-glow-rgb`. The blend mode is themed so the streak lightens on a
+   dark field and darkens on paper. */
 .t-clear-glow {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
   z-index: 3;
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--clear-glow-blend, screen);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1703,6 +2056,12 @@ body {
   background: var(--tabs-bar-bg);
   max-width: 100%;
 }
+/* Fill variant: options share the rail's width evenly instead of shrink-
+   wrapping their labels. For a settings row where the control should occupy the
+   full column, not sit as a short pill in the corner of it. */
+.t-tabs-fill { display: flex; width: 100%; }
+.t-tabs-fill > .t-tab { flex: 1 1 0; justify-content: center; padding-inline: 0.5rem; }
+
 .t-tab {
   position: relative;
   z-index: 1;
@@ -1807,10 +2166,7 @@ body {
   text-transform: none;
   width: max-content;
   max-width: 240px;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.4),
-    0 2px 6px 0 rgba(0, 0, 0, 0.35),
-    0 12px 42px 0 rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-pop);
   opacity: 0;
   pointer-events: none;
   /* This rule owns the LEAVE state; transition-delay stays unset so
@@ -1900,19 +2256,24 @@ body {
 .t-tilt-card.is-tilting {
   transition: transform var(--tilt-follow) var(--tilt-follow-ease);
 }
+/* The glare is light on a dark card and shade on a light one, so the gradient
+   colour and the blend mode both come from the theme. A white `screen` glare
+   over paper composites to nothing at all. */
 .t-tilt-glare {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--tilt-glare-blend, screen);
   background:
     radial-gradient(circle 95px at var(--tilt-gx, 50%) var(--tilt-gy, 50%),
-      rgba(255,255,255,0.48), rgba(255,255,255,0.06) 52%, rgba(255,255,255,0) 84%),
+      rgb(var(--tilt-glare-rgb, 255 255 255) / 0.48),
+      rgb(var(--tilt-glare-rgb, 255 255 255) / 0.06) 52%, transparent 84%),
     radial-gradient(circle 200px at var(--tilt-gx, 50%) var(--tilt-gy, 50%),
-      rgba(255,255,255,0.22), rgba(255,255,255,0.04) 58%, rgba(255,255,255,0) 78%),
+      rgb(var(--tilt-glare-rgb, 255 255 255) / 0.22),
+      rgb(var(--tilt-glare-rgb, 255 255 255) / 0.04) 58%, transparent 78%),
     radial-gradient(circle 360px at var(--tilt-gx, 50%) var(--tilt-gy, 50%),
-      rgba(255,255,255,0.10), rgba(255,255,255,0) 88%);
+      rgb(var(--tilt-glare-rgb, 255 255 255) / 0.1), transparent 88%);
   transition: opacity var(--tilt-glare-fade) var(--tilt-glare-ease);
 }
 .t-tilt.is-hover .t-tilt-glare { opacity: var(--tilt-glare-opacity); }
@@ -2026,7 +2387,7 @@ body {
 }
 .t-acc-head:hover,
 .t-acc-head:focus-visible {
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--fill-subtle);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2459,4 +2820,310 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .t-press, .t-lift, .t-stale { transition: none !important; }
   .t-press:active:not(:disabled), .t-lift:hover { transform: none !important; }
+}
+
+/* =====================================================================
+   THEME SWITCHING
+   ===================================================================== */
+
+/* The swap is a colour change, so it fades. No blur, no transform: the motion
+   rules are explicit that blur belongs to a swap or a slide, never to a colour
+   change. Scoped to the properties that actually differ and held at 150ms,
+   because a longer cross-fade across a page of panels reads as the interface
+   hesitating.
+
+   `[data-theme-ready]` is written by the pre-hydration script after the first
+   paint, so the initial render lands instantly instead of tweening in from
+   whichever theme the stylesheet defaults to. */
+[data-theme-ready] body,
+[data-theme-ready] .panel,
+[data-theme-ready] .panel-footer,
+[data-theme-ready] .cell-grid,
+[data-theme-ready] .cell-grid > *,
+[data-theme-ready] .pop-surface,
+[data-theme-ready] .data-table thead th {
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme-ready] body,
+  [data-theme-ready] .panel,
+  [data-theme-ready] .cell-grid > *,
+  [data-theme-ready] .pop-surface { transition: none !important; }
+}
+
+/* =====================================================================
+   POINTER AND TOUCH
+   ===================================================================== */
+
+/* Coarse pointers get no cursor-tracked effects. The card tilt is the sharper
+   problem: `touch-action: none` on a full-width landing card swallows the
+   vertical swipe, so the section could not be scrolled past on a phone. */
+@media (hover: none), (pointer: coarse) {
+  .t-tilt { touch-action: auto; }
+  .t-tilt-card { transform: none !important; transition: none !important; }
+  .t-tilt-glare { opacity: 0 !important; }
+}
+
+/* Small controls stay small visually and grow their hit area instead. A 28px
+   icon button is comfortable under a mouse and a miss under a thumb. */
+@media (pointer: coarse) {
+  .t-tap { position: relative; }
+  .t-tap::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .t-tab { height: 34px; }
+  .t-tabs-pill { height: 34px; }
+}
+
+/* =====================================================================
+   PRODUCT CHROME
+   ===================================================================== */
+
+/* ── Appearance glyph ──
+   All three glyphs ship in the markup and CSS shows the live one, selected from
+   the attribute the pre-hydration script writes on `<html>`.
+
+   This is a hydration fix as much as a styling one. Choosing the glyph in React
+   means the server renders one icon (it cannot know the stored preference) and
+   the client immediately renders another, which React reports as a mismatch and
+   the user sees as a flicker. Selecting in CSS gives identical HTML on both sides
+   and the correct icon in the first frame.
+
+   The `:not([data-theme-choice])` rule covers the no-JavaScript case, where the
+   attribute never gets written at all. */
+.theme-glyph { display: none; }
+html:not([data-theme-choice]) .theme-glyph[data-for="system"],
+[data-theme-choice="system"] .theme-glyph[data-for="system"],
+[data-theme-choice="light"] .theme-glyph[data-for="light"],
+[data-theme-choice="dark"] .theme-glyph[data-for="dark"] {
+  display: inline-flex;
+}
+
+/* ── Identity tile ──
+   A rounded square, not a circle. Circular avatars everywhere is one of the
+   most recognisable generic-template tells, and a squircle gives two initials
+   more room at 28px. */
+.identity-tile {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 9px;
+  border: 1px solid var(--dash-border-strong);
+  background:
+    linear-gradient(150deg, rgb(var(--accent-rgb) / 0.22), rgb(var(--accent-rgb) / 0.05) 62%),
+    var(--dash-panel-inset);
+  color: var(--dash-text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* ── Menu row ──
+   One row of the account menu. Full-width hit target, a leading icon slot that
+   stays aligned whether or not a row has an icon, and an inset focus ring so
+   the outline is never clipped by the menu's own overflow. */
+.menu-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 9px;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  color: var(--dash-text-secondary);
+  text-align: left;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.menu-row:hover,
+.menu-row:focus-visible {
+  background: var(--fill-hover);
+  color: var(--dash-text);
+}
+.menu-row:focus-visible {
+  outline: 1px solid rgb(var(--accent-rgb) / 0.75);
+  outline-offset: -1px;
+}
+.menu-row[data-tone="danger"] { color: rgb(var(--dash-negative-rgb) / 0.92); }
+.menu-row[data-tone="danger"]:hover {
+  background: rgb(var(--dash-negative-rgb) / 0.08);
+  color: var(--dash-negative);
+}
+.menu-group + .menu-group {
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--dash-border);
+}
+
+/* ── Section head ──
+   The page title block shared by Portfolio, Agent and Trades. One rule, so the
+   three cannot drift apart — which is how they ended up with three different
+   eyebrow, heading and lede spacings. */
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 900px) {
+  .section-head {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.625rem, 1.2rem + 1.6vw, 2.125rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  color: var(--dash-text);
+}
+.section-lede {
+  margin-top: 0.625rem;
+  max-width: 58ch;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+  color: var(--dash-text-muted);
+}
+
+/* ── Inline figure row ──
+   Reads a set of related numbers as one line of accounting rather than as a
+   grid of little boxes. The capital control uses it: that panel previously
+   nested a bordered card inside a padded well inside a panel in order to show
+   three figures. */
+.figure-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+}
+.figure-row > div { min-width: 0; }
+.figure-row dt {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-text-muted);
+  white-space: nowrap;
+}
+.figure-row dd {
+  margin-top: 0.1875rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--dash-text);
+}
+
+/* ── Key/value line ──
+   A label and its value on one row with a dotted leader between them, so the
+   eye can cross a long gap without needing a table to do it. */
+.kv-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+}
+.kv-line > span:first-child { color: var(--dash-text-muted); white-space: nowrap; }
+.kv-line > i {
+  flex: 1 1 auto;
+  min-width: 1rem;
+  height: 1px;
+  align-self: center;
+  background: repeating-linear-gradient(90deg, var(--dash-border) 0 2px, transparent 2px 5px);
+}
+.kv-line > span:last-child {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-text-secondary);
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   LEGAL PROSE
+   The privacy policy and terms are the only long-form reading in the app, and
+   they were styled element by element with a colour utility on every heading,
+   list and emphasis — sixty hardcoded values across two files. One block here
+   instead, so the two documents cannot drift and both follow the theme.
+
+   Measure is capped at 68 characters. These pages are read, not scanned, and a
+   full-width paragraph at 15px loses the line on the way back.
+   ===================================================================== */
+
+.legal-prose {
+  color: var(--dash-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+.legal-prose > section + section {
+  margin-top: 2.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--dash-border);
+}
+.legal-prose h2 {
+  margin-bottom: 0.875rem;
+  color: var(--dash-text);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.legal-prose h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--dash-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.legal-prose h3:first-of-type { margin-top: 1rem; }
+.legal-prose p { max-width: 68ch; }
+.legal-prose p + p { margin-top: 0.875rem; }
+.legal-prose ul {
+  margin-top: 0.875rem;
+  max-width: 68ch;
+  padding-left: 1.15rem;
+  list-style: disc;
+}
+.legal-prose li + li { margin-top: 0.5rem; }
+.legal-prose li::marker { color: var(--dash-text-muted); }
+.legal-prose strong { color: var(--dash-text); font-weight: 600; }
+.legal-prose a {
+  color: var(--dash-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--dash-border-strong);
+  transition: text-decoration-color var(--duration-quick) var(--ease-out);
+}
+.legal-prose a:hover { text-decoration-color: rgb(var(--accent-rgb) / 0.8); }
+
+/* The section number sits in the margin at reading widths, so the heading text
+   itself starts on the same left edge as the paragraph under it. */
+@media (min-width: 900px) {
+  .legal-prose > section { position: relative; }
+  .legal-prose > section > h2::before {
+    content: attr(data-index);
+    position: absolute;
+    left: -3.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: var(--dash-text-muted);
+  }
 }
