@@ -141,6 +141,8 @@ class PipelineConfig:
     quote_request_retries: int = 3
     historical_circuit_breaker_threshold: int = 12
     historical_circuit_breaker_cooldown_seconds: int = 300
+    historical_rate_limit_cooldown_base_seconds: float = 30.0
+    historical_rate_limit_cooldown_max_seconds: float = 300.0
     stage1_max_missing_ohlc_ratio: float = 0.20
     stage1_max_fetch_failure_ratio: float = 0.10
     stage2_max_fetch_failure_ratio: float = 0.10
