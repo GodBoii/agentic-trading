@@ -49,10 +49,8 @@ function TradesPageContent() {
         <>
             <Reveal immediate as="header" className="mb-6">
                 <p className="dash-label mb-2">History</p>
-                <h1 className="text-[28px] font-medium leading-none tracking-[-0.04em] text-ink-primary sm:text-[34px]">
-                    Trades
-                </h1>
-                <p className="mt-2.5 max-w-xl text-[12px] leading-relaxed text-ink-tertiary">
+                <h1 className="section-title">Trades</h1>
+                <p className="section-lede">
                     Every archived agent run, grouped by trading day. Open a run for its decision and the full event
                     log, charts included.
                 </p>
