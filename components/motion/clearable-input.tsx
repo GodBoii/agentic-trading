@@ -102,6 +102,13 @@ export function ClearableInput({
         const width = host.clientWidth || 280
         const padLeft = parseFloat(styles.paddingLeft) || 12
         const spread = motionNum('--glow-spread', 1.5)
+        /**
+         * The streak's colour is themed, so it is read rather than hardcoded.
+         * A white streak under a `multiply` blend on paper composites to
+         * nothing; the light theme paints ink and darkens instead.
+         */
+        const glowChannels =
+            getComputedStyle(document.documentElement).getPropertyValue('--clear-glow-rgb').trim() || '255 255 255'
 
         const layers: string[] = []
         let x = 0
@@ -121,7 +128,7 @@ export function ClearableInput({
                 blobs.forEach(([dx, widthMultiplier, height, alpha]) => {
                     const left = (((centre + dx) / width) * 100).toFixed(2)
                     layers.push(
-                        `radial-gradient(ellipse ${Math.max(halfWidth * widthMultiplier, 2).toFixed(1)}px ${height}px at ${left}% 100%, rgba(255,255,255,${alpha}), transparent)`,
+                        `radial-gradient(ellipse ${Math.max(halfWidth * widthMultiplier, 2).toFixed(1)}px ${height}px at ${left}% 100%, rgb(${glowChannels} / ${alpha}), transparent)`,
                     )
                 })
             }
@@ -220,7 +227,7 @@ export function ClearableInput({
         <div
             ref={wrap}
             className={cn(
-                't-clear relative flex items-center rounded-xl border border-line bg-white/[0.03]',
+                't-clear relative flex items-center rounded-xl border border-line bg-surface',
                 hasValue && 'has-value',
                 clearing && 'is-clearing',
                 className,
@@ -260,7 +267,7 @@ export function ClearableInput({
                     }}
                     onClick={clear}
                     aria-label={clearLabel}
-                    className="t-clear-btn t-press relative z-[4] mr-1.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-md text-ink-tertiary transition-colors duration-150 hover:bg-white/[0.06] hover:text-ink-primary"
+                    className="t-clear-btn t-press t-tap relative z-[4] mr-1.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-md text-ink-tertiary transition-colors duration-quick hover:bg-surface-strong hover:text-ink-primary"
                 >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden>
                         <path d="M6 6l12 12M18 6L6 18" />
