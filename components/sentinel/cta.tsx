@@ -30,9 +30,9 @@ export function PrimaryCta({
         <Link
             href={href}
             className={cn(
-                'group t-press inline-flex items-center justify-center gap-1.5 rounded-lg bg-white px-6 py-3 text-sm font-medium text-[#030303]',
-                'transition-[background-color,box-shadow] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'hover:bg-white/90 hover:shadow-[0_8px_36px_-12px_rgba(255,255,255,0.45)]',
+                'group t-press inline-flex items-center justify-center gap-1.5 rounded-lg bg-solid px-6 py-3 text-sm font-medium text-solid-fg',
+                'transition-[background-color,box-shadow] duration-fast ease-smooth',
+                'hover:bg-solid-hover hover:shadow-solid',
                 className,
             )}
         >
@@ -55,9 +55,9 @@ export function SecondaryCta({
         <Link
             href={href}
             className={cn(
-                'group t-press inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.12] px-6 py-3 text-sm font-medium text-white/70',
-                'transition-[color,border-color,background-color] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'hover:border-white/25 hover:bg-white/[0.03] hover:text-white',
+                'group t-press inline-flex items-center justify-center gap-1.5 rounded-lg border border-line-strong px-6 py-3 text-sm font-medium text-ink-secondary',
+                'transition-[color,border-color,background-color] duration-fast ease-smooth',
+                'hover:border-line-strong hover:bg-surface-hover hover:text-ink-primary',
                 className,
             )}
         >
