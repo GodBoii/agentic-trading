@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>28 Aug trading forensic review</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#overview" aria-label="Forensic review overview">
+      <span class="brand-mark">T/28</span>
+      <span><strong>Trading forensic review</strong><small>28 Aug 2026 · NSE cash</small></span>
+    </a>
+    <nav aria-label="Report sections">
+      <a href="#overview">Overview</a>
+      <a href="#trades">Trades</a>
+      <a href="#runs">All runs</a>
+      <a href="#chart-audit">Chart audit</a>
+      <a href="#fixes">Fix order</a>
+    </nav>
+    <span class="source-state" id="source-state">Loading evidence…</span>
+  </header>
+
+  <main>
+    <section class="report-head" id="overview">
+      <div>
+        <p class="eyebrow">Post-market incident review / evidence frozen after close</p>
+        <h1>Every filled trade lost. The charts were not the main failure.</h1>
+        <p class="lede">The system admitted five positions. Three entered near the signal, KIMS filled eight minutes later, and Jindal Stainless filled roughly 103 minutes late. All five closed red.</p>
+      </div>
+      <div class="verdict-stamp" aria-label="Incident severity high">
+        <span>Finding</span>
+        <strong>Execution<br>control</strong>
+        <small>High severity</small>
+      </div>
+    </section>
+
+    <section class="metric-strip" aria-label="Session summary" id="summary-metrics"></section>
+
+    <section class="briefing-grid">
+      <article class="briefing primary">
+        <span class="finding-number">01</span>
+        <p class="eyebrow">Confirmed execution defect</p>
+        <h2>Pending entries had no useful expiry</h2>
+        <p>Jindal Stainless was signalled at 11:30, but its limit entry first became marketable around 13:13. It stopped the next minute. The setup was never re-approved at fill time.</p>
+        <div class="evidence-line"><span>Signal → fill</span><strong>~103 min</strong><span>Loss</span><strong>₹12.60</strong></div>
+      </article>
+      <article class="briefing">
+        <span class="finding-number">02</span>
+        <p class="eyebrow">Entry quality</p>
+        <h2>Momentum was bought or sold after extension</h2>
+        <p>Piramal was bought 0.61% above its event snapshot and stopped near the original signal price. Jindal had 5m RSI 19; Mphasis had 1m RSI 28.8 when they were shorted.</p>
+      </article>
+      <article class="briefing">
+        <span class="finding-number">03</span>
+        <p class="eyebrow">Protection reconciliation</p>
+        <h2>One exit does not match the requested bracket</h2>
+        <p>KIMS requested a ₹776 stop and ₹766.50 target. Finalized Dhan candles never reached ₹776 after entry, yet the position closed at ₹773.50 for a loss. The order-leg ledger is missing after rollover.</p>
+      </article>
+      <article class="briefing">
+        <span class="finding-number">04</span>
+        <p class="eyebrow">Chart verdict</p>
+        <h2>Closes mostly match; live extremes do not always</h2>
+        <p>43 of 53 chart inputs closely match finalized Dhan candles. Four have an OHLC outlier above 0.5%. Live seed bars overwrite overlapping historical bars, so highs, lows, opens, and volume can change.</p>
+      </article>
+    </section>
+
+    <section class="section" id="trades">
+      <div class="section-head">
+        <div><p class="eyebrow">Broker-confirmed positions</p><h2>The five losing trades</h2></div>
+        <p>Gross realized P&amp;L from Dhan positions. Charges are not included.</p>
+      </div>
+      <div class="trade-grid" id="trade-grid"></div>
+    </section>
+
+    <section class="section" id="runs">
+      <div class="section-head">
+        <div><p class="eyebrow">Intra Finder → stock agent</p><h2>All 53 dispatched runs</h2></div>
+        <p>Includes trades, intentional skips, blocked placements, tool failures, and model failures.</p>
+      </div>
+      <div class="run-controls" aria-label="Run filters">
+        <label class="search"><span>Search</span><input id="run-search" type="search" placeholder="Stock, event, or reason"></label>
+        <div class="segmented" id="run-filters" role="group" aria-label="Filter runs">
+          <button type="button" data-filter="all" aria-pressed="true">All <span>53</span></button>
+          <button type="button" data-filter="trade" aria-pressed="false">Trades <span>5</span></button>
+          <button type="button" data-filter="no-trade" aria-pressed="false">No fill <span>39</span></button>
+          <button type="button" data-filter="error" aria-pressed="false">Errors <span>9</span></button>
+        </div>
+      </div>
+      <div class="run-list" id="run-list"></div>
+      <p class="empty" id="run-empty" hidden>No runs match this filter.</p>
+    </section>
+
+    <section class="section" id="chart-audit">
+      <div class="section-head">
+        <div><p class="eyebrow">Live seed bars vs finalized broker history</p><h2>Chart and data audit</h2></div>
+        <p>This checks the chart input against Dhan's finalized 1m history. It is not an independent exchange-tape comparison.</p>
+      </div>
+      <div class="audit-summary">
+        <article><strong>43</strong><span>close match</span><p>Low normalized close error and no large OHLC outlier.</p></article>
+        <article><strong>6</strong><span>review</span><p>Moderate intrabar difference. Directional shape usually remains intact.</p></article>
+        <article class="warn"><strong>4</strong><span>material outlier</span><p>At least one OHLC value differs by more than 0.5%.</p></article>
+        <article><strong>37</strong><span>partial 5m charts</span><p>The chart labels the last candle as partial, but the model can still trade from it.</p></article>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Stock</th><th>Verdict</th><th>Overlap</th><th>Max OHLC Δ</th><th>Mean close Δ</th><th>Mean volume error</th></tr></thead>
+          <tbody id="audit-table"></tbody>
+        </table>
+      </div>
+      <aside class="method-note">
+        <strong>What is actually wrong in the chart path</strong>
+        <p>The stock agent fetches Dhan history, then <code>merge_recent_bars</code> replaces every overlapping timestamp with Intra Finder's live aggregate. The two feeds have different open/high/low/volume values in some minutes. The first live bar after gateway startup can also carry zero incremental volume. Price closes are generally close, but derived VWAP, ATR, volume impulse, candle patterns, and support levels can move.</p>
+      </aside>
+    </section>
+
+    <section class="section" id="fixes">
+      <div class="section-head">
+        <div><p class="eyebrow">Recommended implementation order</p><h2>Fix the controls before changing the model</h2></div>
+      </div>
+      <ol class="fix-list">
+        <li><span>P0</span><div><h3>Expire unfilled entry legs</h3><p>Cancel pending limits after one completed 1m bar or a strict 2–3 minute TTL. Re-run freshness, direction, and risk checks before any later fill.</p></div></li>
+        <li><span>P0</span><div><h3>Persist the complete super-order lifecycle</h3><p>Store entry, target, stop, trigger, update, and exchange timestamps before day rollover. Alert when the realized exit differs from the requested protection geometry.</p></div></li>
+        <li><span>P1</span><div><h3>Gate extension and opposing evidence</h3><p>Reject entries that drift more than 0.25 ATR from the event reference. Do not short when 5m RSI is deeply oversold or buy when an opposing engulfing candle is still active without a fresh confirmation.</p></div></li>
+        <li><span>P1</span><div><h3>Separate completed bars from developing bars</h3><p>Supply completed 5m and 15m indicators as the decision contract. Keep the live 1m chart for execution timing, not setup confirmation.</p></div></li>
+        <li><span>P1</span><div><h3>Reconcile live bars instead of overwriting history</h3><p>Use finalized broker bars through the last closed minute. Append only the current developing minute from the feed and log differences above a tick-aware tolerance.</p></div></li>
+        <li><span>P2</span><div><h3>Reduce evidence that is not decision-bound</h3><p>TPO, market profile, and OHLCV “liquidity” charts are cited inconsistently. Keep them only if a named rule consumes them; otherwise they add visual load without a measurable gate.</p></div></li>
+      </ol>
+    </section>
+  </main>
+
+  <dialog id="chart-dialog">
+    <button class="dialog-close" type="button" aria-label="Close chart">Close</button>
+    <img alt="Expanded agent chart">
+    <p></p>
+  </dialog>
+
+  <template id="run-template">
+    <article class="run-card">
+      <button class="run-summary" type="button" aria-expanded="false">
+        <span class="run-index"></span><span class="run-time"></span><span class="run-name"></span><span class="run-direction"></span><span class="run-score"></span><span class="run-status"></span><span class="run-chevron">＋</span>
+      </button>
+      <div class="run-detail" hidden></div>
+    </article>
+  </template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
