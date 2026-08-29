@@ -27,8 +27,8 @@ export interface ToastMessage {
  * the height of the page to get there.
  */
 const TONE_SURFACE: Record<ToastTone, string> = {
-    success: 'border-positive/25 bg-[#0F1713] text-positive',
-    error: 'border-negative/25 bg-[#191111] text-negative',
+    success: 'tint-positive border-positive/25 text-positive',
+    error: 'tint-negative border-negative/25 text-negative',
     neutral: 'border-line bg-panel text-ink-secondary',
 }
 
@@ -72,7 +72,10 @@ export function Toast({
             aria-live="polite"
             data-from="top"
             className={cn(
-                't-toast fixed right-5 top-[68px] z-[var(--z-toast)] flex max-w-[calc(100vw-2.5rem)] items-center gap-2.5 rounded-xl border px-3.5 py-3 text-[12px] shadow-[0_22px_60px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl',
+                // Inset from the right on desktop; full width less the gutters
+                // on a phone, where a 300px card pinned to one edge leaves the
+                // message wrapping in a column half the screen wide.
+                't-toast fixed inset-x-4 top-[68px] z-[var(--z-toast)] flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-[12px] shadow-pop backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:max-w-[380px]',
                 TONE_SURFACE[shown.tone],
                 open && 'is-open',
             )}
