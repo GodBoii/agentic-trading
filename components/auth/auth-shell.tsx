@@ -9,18 +9,30 @@ import { Reveal } from '@/components/motion/reveal'
 /**
  * Shared chrome for the sign-in and sign-up screens.
  *
- * The two pages previously duplicated the entire frame — ambient background,
+ * The two pages previously duplicated the whole frame — ambient background,
  * brand header, back link, eyebrow, headline, card, footer link — along with
  * eleven separate `framer-motion` wrappers whose delays (0.1, 0.15, 0.2, 0.25,
  * 0.5) were transcribed by hand in both files.
  *
- * Motion (recipe 18, texts reveal). The whole block above the card is one
- * staggered reveal at 40ms per line, and the card itself follows as the last
- * line. The entrance now completes in roughly 620ms rather than the previous
- * 1.3s, and it uses the same rhythm as every other heading in the product.
+ * Two things changed in the composition itself.
  *
- * `immediate`, because an auth screen is entirely above the fold — waiting on
- * an intersection callback here would only add latency.
+ * The blurred colour blobs are gone. Two 500px radial smudges bleeding off
+ * opposite corners is the single most recognisable generated-page decoration
+ * there is, and they were doing no work: nothing on this screen needs
+ * atmosphere, and the accent they carried competed with the field focus ring,
+ * which is the only signal here that matters.
+ *
+ * The headline came down from 52px to 34px. A display size that large inside a
+ * 28rem column wraps two words per line and reads as a poster rather than as a
+ * page title, which is the "overlarge heading in a narrow column" failure. What
+ * is left is a ruled ground that fades out, a trace of grain, and the form.
+ *
+ * Motion (recipe 18, texts reveal). The whole block above the card is one
+ * staggered reveal at 40ms per line, and the card follows as the last line. The
+ * entrance completes in roughly 620ms rather than the previous 1.3s, and it uses
+ * the same rhythm as every other heading in the product. `immediate`, because an
+ * auth screen is entirely above the fold; waiting on an intersection callback
+ * here would only add latency.
  */
 export function AuthShell({
     eyebrow,
@@ -38,26 +50,22 @@ export function AuthShell({
     footer: ReactNode
 }) {
     return (
-        <div className="relative min-h-screen w-full overflow-hidden bg-[#050505]">
-            {/* Static ambience. Deliberately unanimated: a drifting gradient
-                behind a form competes with the field focus states, which are
-                the only motion that matters on this screen. */}
-            <div className="absolute inset-0 bg-grid-fine opacity-50" />
-            <div className="absolute inset-0 bg-spotlight" />
-            <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-accent/[0.06] blur-[120px]" />
-            <div className="pointer-events-none absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-success/[0.04] blur-[120px]" />
+        <div className="grain relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-canvas text-ink-primary">
+            {/* Static ambience, deliberately unanimated: a drifting gradient
+                behind a form competes with the field focus states. */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-grid-fine bg-grid-fade" />
 
-            <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
-                <Link href="/" className="group flex items-center gap-2.5">
+            <header className="relative z-[2] mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+                <Link href="/" className="group t-press flex items-center gap-2.5">
                     <BrandMark
-                        className="h-8 w-8 transition-transform duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+                        className="h-7 w-7 transition-transform duration-fast ease-smooth group-hover:scale-105"
                         priority
                     />
-                    <span className="text-[15px] font-medium tracking-[-0.02em] text-white">PolyCognition</span>
+                    <span className="text-[14px] font-medium tracking-[-0.02em]">PolyCognition</span>
                 </Link>
                 <Link
                     href="/"
-                    className="group inline-flex items-center gap-1.5 text-[12px] tracking-[-0.01em] text-white/50 transition-colors duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-white"
+                    className="group inline-flex items-center gap-1.5 text-[12px] tracking-[-0.01em] text-ink-secondary transition-colors duration-fast ease-smooth hover:text-ink-primary"
                 >
                     {/* Mirrored so the chevron opens backwards, toward home. */}
                     <span className="rotate-180">
@@ -67,19 +75,21 @@ export function AuthShell({
                 </Link>
             </header>
 
-            <main className="relative z-10 flex items-center justify-center px-6 py-12 sm:py-20">
-                <Reveal immediate className="w-full max-w-md">
-                    <div className="mb-6 inline-flex items-center gap-2">{eyebrow}</div>
+            <main className="relative z-[2] flex flex-1 items-center px-5 py-10 sm:px-8 sm:py-16">
+                <Reveal immediate className="mx-auto w-full max-w-[26rem]">
+                    <div className="mb-5 inline-flex items-center gap-2">{eyebrow}</div>
 
-                    <h1 className="mb-3 font-display text-[44px] leading-[0.95] tracking-[-0.035em] text-white sm:text-[52px]">
+                    <h1 className="font-display text-[30px] leading-[1.05] tracking-[-0.035em] text-ink-primary sm:text-[34px]">
                         {title}
                     </h1>
 
-                    <p className="mb-10 text-[14px] text-ink-secondary">{subtitle}</p>
+                    <p className="mt-3 text-[13.5px] leading-relaxed text-ink-secondary">{subtitle}</p>
 
-                    <div className="surface rounded-2xl p-7 sm:p-8">{children}</div>
+                    <div className="mt-8 rounded-2xl border border-line bg-panel p-6 shadow-panel sm:p-7">
+                        {children}
+                    </div>
 
-                    <p className="mt-8 text-center text-[13px] text-ink-secondary">{footer}</p>
+                    <p className="mt-6 text-[13px] text-ink-secondary">{footer}</p>
                 </Reveal>
             </main>
         </div>
@@ -90,11 +100,13 @@ export function AuthShell({
 export function AuthDivider() {
     return (
         <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
+            <div className="absolute inset-0 flex items-center" aria-hidden>
                 <div className="w-full border-t border-line" />
             </div>
             <div className="relative flex justify-center">
-                <span className="bg-[#0E0E10] px-3 font-mono text-[10px] uppercase tracking-[0.22em] text-ink-tertiary">
+                {/* Matches the card, not the canvas: the label sits on the panel
+                    it interrupts, so a mismatched swatch here reads as a hole. */}
+                <span className="bg-panel px-3 font-mono text-[10px] uppercase tracking-[0.22em] text-ink-tertiary">
                     or
                 </span>
             </div>
