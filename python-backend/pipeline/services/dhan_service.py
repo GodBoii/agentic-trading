@@ -68,6 +68,10 @@ class DhanService:
         self.historical_failure_signature: Optional[str] = None
         self.historical_consecutive_failures = 0
         self.historical_circuit_open_until = 0.0
+        self.historical_rate_limit_until = 0.0
+        self.historical_rate_limit_next_delay_seconds = (
+            self.config.historical_rate_limit_cooldown_base_seconds
+        )
 
         root_env = dotenv_values(config.root_dir / ".env")
         backend_env = dotenv_values(config.backend_dir / ".env")
@@ -934,6 +938,55 @@ class DhanService:
         self._acquire_shared_data_slot()
         self._acquire_local_data_slot()
 
+    def _update_historical_rate_limit_cooldown(self, resp: Any) -> None:
+        success = isinstance(resp, dict) and str(resp.get("status") or "").lower() == "success"
+        rate_limited = self._is_rate_limited(resp)
+        if not success and not rate_limited:
+            return
+        base_delay = float(
+            getattr(self.config, "historical_rate_limit_cooldown_base_seconds", 30.0)
+        )
+        maximum_delay = float(
+            getattr(self.config, "historical_rate_limit_cooldown_max_seconds", 300.0)
+        )
+        with self.rate_condition:
+            if success:
+                self.historical_rate_limit_until = 0.0
+                self.historical_rate_limit_next_delay_seconds = base_delay
+                self.rate_condition.notify_all()
+                return
+            now = time.monotonic()
+            if now < float(getattr(self, "historical_rate_limit_until", 0.0)):
+                return
+            delay = float(
+                getattr(self, "historical_rate_limit_next_delay_seconds", base_delay)
+            )
+            self.historical_rate_limit_until = now + delay
+            self.historical_rate_limit_next_delay_seconds = min(maximum_delay, delay * 2)
+
+    def _historical_rate_limit_response_if_open(self) -> Optional[Dict[str, Any]]:
+        rate_condition = getattr(self, "rate_condition", None)
+        if rate_condition is None:
+            return None
+        with rate_condition:
+            remaining = float(
+                getattr(self, "historical_rate_limit_until", 0.0)
+            ) - time.monotonic()
+        if remaining <= 0:
+            return None
+        return {
+            "status": "failure",
+            "remarks": {
+                "error_code": "LOCAL-RATE-LIMIT-COOLDOWN",
+                "error_type": "Historical_Rate_Limit_Cooldown",
+                "error_message": (
+                    "Historical API requests are paused after a Dhan rate-limit response; "
+                    f"retry available in {max(1, int(remaining))} seconds."
+                ),
+            },
+            "data": "",
+        }
+
     def _acquire_local_data_slot(self) -> None:
         with self.rate_condition:
             while True:
@@ -1083,6 +1136,9 @@ class DhanService:
         return code, error_type, message
 
     def _historical_circuit_response_if_open(self) -> Optional[Dict[str, Any]]:
+        rate_limit_response = self._historical_rate_limit_response_if_open()
+        if rate_limit_response:
+            return rate_limit_response
         with self.historical_circuit_condition:
             remaining = self.historical_circuit_open_until - time.monotonic()
             if remaining <= 0:
@@ -1105,6 +1161,7 @@ class DhanService:
             }
 
     def _record_historical_response(self, resp: Any) -> None:
+        self._update_historical_rate_limit_cooldown(resp)
         success = isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success"
         with self.historical_circuit_condition:
             if success:
@@ -1166,6 +1223,9 @@ class DhanService:
                 if circuit_response:
                     return circuit_response
                 self.acquire_data_slot()
+                circuit_response = self._historical_circuit_response_if_open()
+                if circuit_response:
+                    return circuit_response
                 resp = self._historical_client().historical_daily_data(
                     security_id=str(security_id),
                     exchange_segment=exchange_segment,
@@ -1183,7 +1243,7 @@ class DhanService:
                 if isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success":
                     return resp
 
-                if self._is_rate_limited(resp):
+                if self._is_rate_limited(resp) and attempt < retries - 1:
                     time.sleep(self._compute_rate_limit_delay(attempt))
                     continue
                 break
@@ -1238,6 +1298,9 @@ class DhanService:
                 if circuit_response:
                     return circuit_response
                 self.acquire_data_slot()
+                circuit_response = self._historical_circuit_response_if_open()
+                if circuit_response:
+                    return circuit_response
                 resp = self._historical_client().intraday_minute_data(
                     security_id=str(security_id),
                     exchange_segment=exchange_segment,
@@ -1256,7 +1319,7 @@ class DhanService:
                 if isinstance(resp, dict) and str(resp.get("status", "")).lower() == "success":
                     return resp
 
-                if self._is_rate_limited(resp):
+                if self._is_rate_limited(resp) and attempt < retries - 1:
                     time.sleep(self._compute_rate_limit_delay(attempt))
                     continue
                 break
