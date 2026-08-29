@@ -111,7 +111,7 @@ export function AgentRoster({ slots, onOpen }: { slots: AgentSlot[]; onOpen: (ra
                                                 ? 'bg-negative'
                                                 : milestone.reached
                                                   ? 'bg-positive'
-                                                  : 'bg-white/[0.08]',
+                                                  : 'bg-surface-track',
                                         )}
                                     />
                                 ))}
