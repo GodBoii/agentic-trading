@@ -58,7 +58,7 @@ export function Checkbox({
                 't-check t-press grid flex-shrink-0 place-items-center rounded-[5px] border',
                 checked
                     ? 'border-accent/60 bg-accent/[0.16] text-accent'
-                    : 'border-line-strong bg-white/[0.03] text-transparent',
+                    : 'border-line-strong bg-surface text-transparent',
                 disabled && 'cursor-not-allowed opacity-40',
                 className,
             )}
