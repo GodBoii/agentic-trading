@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -10,6 +10,17 @@ export interface TabItem<T extends string> {
     label: string
     /** Row count shown beside the label. Renders even when zero. */
     count?: number
+    /**
+     * Leading glyph. Decorative: the label is always present, so the icon adds
+     * scanning speed rather than carrying meaning on its own.
+     */
+    icon?: ReactNode
+    /**
+     * Hide the label below `sm`, keeping the icon. Only safe on options whose
+     * icon is unambiguous, so it is opt-in per item rather than a mode of the
+     * whole rail — an icon-only "Trade sizing" tab would be a guess.
+     */
+    compact?: boolean
 }
 
 /**
@@ -175,12 +186,33 @@ export function SegmentedTabs<T extends string>({
                         onKeyDown={(event) => railKeyDown(event, index, items, onChange, buttons)}
                         className="t-tab"
                     >
-                        {item.label}
-                        {item.count !== undefined && <span className="t-tab-count">{item.count}</span>}
+                        <TabFace item={item} />
                     </button>
                 )
             })}
         </div>
+    )
+}
+
+/**
+ * The inside of an option, shared by both controls so the pill measures the
+ * same content in either.
+ *
+ * A `compact` item keeps its label in the accessibility tree and hides it
+ * visually below `sm`; `sr-only` rather than `hidden`, or the option would
+ * announce as an unlabelled button on a phone.
+ */
+function TabFace<T extends string>({ item }: { item: TabItem<T> }) {
+    return (
+        <>
+            {item.icon && (
+                <span aria-hidden className="flex-shrink-0">
+                    {item.icon}
+                </span>
+            )}
+            <span className={item.compact ? 'sr-only sm:not-sr-only' : undefined}>{item.label}</span>
+            {item.count !== undefined && <span className="t-tab-count">{item.count}</span>}
+        </>
     )
 }
 
@@ -246,7 +278,7 @@ export function SegmentedChoice<T extends string>({
                         onKeyDown={(event) => railKeyDown(event, index, items, onChange, buttons, true)}
                         className="t-tab"
                     >
-                        {item.label}
+                        <TabFace item={item} />
                     </button>
                 )
             })}
