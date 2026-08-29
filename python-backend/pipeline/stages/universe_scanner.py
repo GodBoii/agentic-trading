@@ -61,6 +61,19 @@ class UniverseScanner:
             flush=True,
         )
 
+    def _require_data_access(self) -> None:
+        profile = self.dhan.fetch_user_profile()
+        if str(profile.get("status") or "").strip().lower() != "success":
+            raise RuntimeError(f"Dhan profile check failed: {profile.get('remarks')}")
+        data = profile.get("data")
+        if isinstance(data, dict) and isinstance(data.get("data"), dict):
+            data = data["data"]
+        if (
+            not isinstance(data, dict)
+            or str(data.get("dataPlan") or "").strip().lower() != "active"
+        ):
+            raise RuntimeError("Dhan Data API subscription is not active.")
+
     @staticmethod
     def _text(value: Any) -> str:
         if value is None or pd.isna(value):
@@ -595,6 +608,7 @@ class UniverseScanner:
         self._log(
             "Starting Stage 1 historical universe build. Live quotes are not used in this stage."
         )
+        self._require_data_access()
         self._log("Downloading and validating Dhan's detailed instrument master.")
         master_path, master_meta = self._download_master(market_date)
         try:
@@ -696,6 +710,13 @@ class UniverseScanner:
         degraded_reasons = []
         if master_meta.get("degraded"):
             degraded_reasons.append("stale_master_fallback")
+        fetch_failure_ratio = (
+            self.failure_counts["historical_fetch_failed"] / history_total
+            if history_total
+            else 1.0
+        )
+        if fetch_failure_ratio > self.config.stage1_max_fetch_failure_ratio:
+            degraded_reasons.append("historical_fetch_failure_ratio")
         status = "degraded" if degraded_reasons else "completed"
         summary = {
             "status": status,
@@ -708,6 +729,7 @@ class UniverseScanner:
             "asm_gsm_excluded": int(self.failure_counts["asm_gsm"]),
             "insufficient_history_count": int(self.failure_counts["insufficient_history"]),
             "historical_fetch_failed": int(self.failure_counts["historical_fetch_failed"]),
+            "historical_fetch_failure_ratio": round(fetch_failure_ratio, 6),
             "stage1_passed": len(stock_rows),
             "venue_selections": dict(Counter(row["exchange"] for row in stock_rows)),
             "exclusion_reason_counts": dict(self.failure_counts),
