@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta
 from threading import Event, RLock
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 import sys
 import types
 
@@ -107,6 +108,27 @@ class IntraFinderIndicatorFlowTests(unittest.TestCase):
         self.assertEqual(len(captured[0][0]), 2)
         self.assertEqual(captured[0][1], "LONG")
         self.assertEqual(captured[0][2], 82.0)
+
+    def test_indicator_activity_does_not_speculatively_fetch_history(self) -> None:
+        finder = self.finder()
+        finder.signal_cache = SimpleNamespace(prewarm=Mock())
+        now = datetime.fromisoformat("2026-08-03T10:00:01+05:30")
+        state = finder.states[1]
+
+        finder._queue_indicator_evidence(
+            1,
+            state,
+            [self.evidence("EMA_BULLISH_CROSS", "LONG", now)],
+            now,
+        )
+        finder._reschedule_readiness_evaluation(
+            1,
+            state,
+            list(state["pending_indicator_events"]),
+            now,
+        )
+
+        finder.signal_cache.prewarm.assert_not_called()
 
     def test_mixed_indicator_directions_are_preserved_for_agent_reasoning(self) -> None:
         now = datetime.fromisoformat("2026-08-03T10:00:01+05:30")
