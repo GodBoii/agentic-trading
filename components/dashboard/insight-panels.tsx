@@ -15,7 +15,11 @@ export function CapitalPanel({ funds, analytics }: Pick<PortfolioState, 'funds' 
             <PanelHeader
                 titleId="capital-title"
                 label="Funds"
-                title="Capital deployment"
+                // "Fund deployment", not "Capital deployment": the Agent screen
+                // owns "Capital per trade", and two panels using "capital" for
+                // unrelated things is how a reader conflates a balance breakdown
+                // with a per-trade limit.
+                title="Fund deployment"
                 actions={
                     <span className="nums font-mono text-[11px] text-ink-secondary">
                         {percent(analytics.marginUse)} of limit
