@@ -24,7 +24,11 @@ export function EmptyState({
     title,
     detail,
     action,
-    minHeight = 320,
+    /**
+     * 240, down from 320. An empty table already reads as empty; the extra
+     * 80px of nothing just pushed the page footer off a phone screen.
+     */
+    minHeight = 240,
     className,
 }: {
     title: string
