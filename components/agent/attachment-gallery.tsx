@@ -67,7 +67,7 @@ export function AttachmentGallery({ attachments }: { attachments?: AgentAttachme
                                         href={href || undefined}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="group flex items-center gap-3 px-3.5 py-3 transition-colors duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.025]"
+                                        className="group flex items-center gap-3 px-3.5 py-3 transition-colors duration-fast ease-smooth hover:bg-surface-hover"
                                     >
                                         <Document size={15} className="flex-shrink-0 text-ink-tertiary" />
                                         <span className="min-w-0 flex-1">
