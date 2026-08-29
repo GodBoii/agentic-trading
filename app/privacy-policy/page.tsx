@@ -1,171 +1,146 @@
-import Link from 'next/link'
-import BrandMark from '@/components/brand-mark'
+import { Clause, LegalShell } from '@/components/legal/legal-shell'
 
 export const metadata = {
-    title: 'Privacy Policy — PolyCognition',
+    title: 'Privacy policy',
     description: 'How PolyCognition collects, uses, and protects your data.',
 }
 
+/**
+ * The frame, prose styling and footer come from `LegalShell`. This file is the
+ * content only, which is the point: the wording is what changes here, and it
+ * should be editable without touching a single class name.
+ */
 export default function PrivacyPolicyPage() {
     return (
-        <div className="min-h-screen bg-[#030303] text-[#F8F8F8] antialiased">
-            {/* Minimal header */}
-            <header className="border-b border-white/[0.05] px-5 py-5 sm:px-8">
-                <div className="mx-auto flex max-w-4xl items-center gap-2.5">
-                    <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
-                        <BrandMark className="h-7 w-7" />
-                        <span className="font-grotesk text-sm font-semibold text-white">PolyCognition</span>
-                    </Link>
-                </div>
-            </header>
+        <LegalShell
+            title="Privacy policy"
+            updated="24 August 2026"
+            sibling={{ href: '/terms-of-service', label: 'Terms of service' }}
+        >
+            <Clause index={1} heading="Introduction">
+                <p>
+                    PolyCognition operates an AI trading agent platform for Indian equity markets. This policy explains
+                    what we collect, why we collect it, how long we keep it, and what you can ask us to do with it.
+                </p>
+                <p>
+                    Using the platform means accepting the practices described here. If you do not accept them, please
+                    stop using it.
+                </p>
+            </Clause>
 
-            <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8 sm:py-24">
-                <h1 className="font-grotesk text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                    Privacy Policy
-                </h1>
-                <p className="mt-3 text-sm text-white/40">Last updated: August 24, 2026</p>
+            <Clause index={2} heading="Information we collect">
+                <h3>What you give us</h3>
+                <ul>
+                    <li>Account details: name, email address and password.</li>
+                    <li>
+                        Broker connection: when you link a Dhan trading account we receive an access token that lets our
+                        agents operate inside that account. We never receive or store your Dhan password.
+                    </li>
+                    <li>The capital limit and risk parameters you configure.</li>
+                    <li>Anything you send us directly, such as support email.</li>
+                </ul>
 
-                <div className="mt-12 space-y-10 text-[15px] leading-relaxed text-white/60">
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">1. Introduction</h2>
-                        <p>
-                            PolyCognition (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;us&rdquo;) operates an AI-powered trading
-                            agent platform for Indian equity markets. This Privacy Policy explains how we collect, use,
-                            store, and protect your personal information when you use our website and services.
-                        </p>
-                        <p className="mt-3">
-                            By using PolyCognition, you consent to the data practices described in this policy. If you do
-                            not agree, please discontinue use of the platform.
-                        </p>
-                    </section>
+                <h3>What we record automatically</h3>
+                <ul>
+                    <li>Usage: pages opened, features used, timestamps and session length.</li>
+                    <li>Device: browser, operating system and screen size.</li>
+                    <li>IP address and the approximate location it resolves to.</li>
+                    <li>The full activity log our agents produce while acting on your behalf.</li>
+                </ul>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">2. Information We Collect</h2>
+            <Clause index={3} heading="How we use it">
+                <ul>
+                    <li>To run the platform and its trading agents.</li>
+                    <li>
+                        To place orders through your connected Dhan account, within the parameters you have configured.
+                    </li>
+                    <li>To improve the scanning, signal and risk logic.</li>
+                    <li>To send account notifications: order confirmations, alerts and system status.</li>
+                    <li>To detect and stop fraud, unauthorised access and other security incidents.</li>
+                    <li>To meet legal and regulatory obligations.</li>
+                </ul>
+            </Clause>
 
-                        <h3 className="mb-2 text-sm font-semibold text-white/70">2.1 Information You Provide</h3>
-                        <ul className="list-disc space-y-2 pl-5">
-                            <li>Account registration data: name, email address, and password.</li>
-                            <li>Broker connection details: when you link your Dhan trading account, we receive an access token that allows our agents to operate within your account. We do not store your Dhan password.</li>
-                            <li>Trading preferences and risk parameters you configure.</li>
-                            <li>Communications you send to us (support emails, feedback).</li>
-                        </ul>
+            <Clause index={4} heading="Sharing and third parties">
+                <p>We do not sell personal information. We share data with:</p>
+                <ul>
+                    <li>
+                        <strong>Dhan.</strong> Order instructions and account queries go to Dhan through their API,
+                        because that is how a trade reaches the exchange.
+                    </li>
+                    <li>
+                        <strong>Supabase.</strong> Authentication, the database and backend services run on
+                        Supabase-hosted infrastructure, so your account record lives there.
+                    </li>
+                    <li>
+                        <strong>Analytics.</strong> Anonymised usage data may be shared with analytics services.
+                    </li>
+                    <li>
+                        <strong>Legal requests.</strong> We disclose information where a law, regulation, court order or
+                        government request requires it.
+                    </li>
+                </ul>
+            </Clause>
 
-                        <h3 className="mb-2 mt-6 text-sm font-semibold text-white/70">2.2 Information Collected Automatically</h3>
-                        <ul className="list-disc space-y-2 pl-5">
-                            <li>Usage data: pages visited, features used, timestamps, and session duration.</li>
-                            <li>Device information: browser type, operating system, screen resolution.</li>
-                            <li>IP address and approximate geographic location.</li>
-                            <li>Trading activity logs generated by our AI agents on your behalf.</li>
-                        </ul>
-                    </section>
+            <Clause index={5} heading="Security">
+                <p>
+                    Traffic is encrypted in transit with TLS, sensitive credentials are encrypted at rest, and access is
+                    controlled by role. Broker access tokens are never exposed to client-side code.
+                </p>
+                <p>
+                    No transmission or storage method is completely secure. We work to protect your data but cannot
+                    guarantee it against every possible attack.
+                </p>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">3. How We Use Your Information</h2>
-                        <ul className="list-disc space-y-2 pl-5">
-                            <li>To provide and maintain the PolyCognition platform and its trading agents.</li>
-                            <li>To execute trades through your connected Dhan broker account according to your configured parameters.</li>
-                            <li>To improve our AI models, scanning algorithms, and risk management systems.</li>
-                            <li>To send you account-related notifications (trade confirmations, alerts, system status).</li>
-                            <li>To detect and prevent fraud, unauthorized access, and other security incidents.</li>
-                            <li>To comply with legal obligations and regulatory requirements.</li>
-                        </ul>
-                    </section>
+            <Clause index={6} heading="Cookies and local storage">
+                <p>
+                    We use cookies and browser storage for your authentication session and to remember preferences such
+                    as your appearance setting. These are required for the platform to work. We use no third-party
+                    advertising cookies.
+                </p>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">4. Data Sharing and Third Parties</h2>
-                        <p>We do not sell your personal information. We may share data with:</p>
-                        <ul className="mt-3 list-disc space-y-2 pl-5">
-                            <li><strong className="text-white/80">Dhan (broker):</strong> Trade instructions and account queries are sent to Dhan via their API to execute your trading strategy.</li>
-                            <li><strong className="text-white/80">Supabase:</strong> We use Supabase for authentication, database, and backend services. Your account data is stored in Supabase-hosted infrastructure.</li>
-                            <li><strong className="text-white/80">Analytics providers:</strong> Anonymized usage data may be shared with analytics services to improve the platform.</li>
-                            <li><strong className="text-white/80">Legal compliance:</strong> We may disclose information if required by law, regulation, court order, or governmental request.</li>
-                        </ul>
-                    </section>
+            <Clause index={7} heading="Retention">
+                <p>
+                    Account data is kept while the account is active. Trading logs and activity history are kept for at
+                    least five years to meet financial record-keeping requirements. You can ask us to delete your account
+                    and its data, subject to those retention obligations.
+                </p>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">5. Data Security</h2>
-                        <p>
-                            We implement industry-standard security measures including encryption in transit (TLS),
-                            encrypted storage for sensitive credentials, and role-based access controls. Broker access
-                            tokens are stored encrypted and are never exposed in client-side code.
-                        </p>
-                        <p className="mt-3">
-                            No method of transmission or storage is 100% secure. While we strive to protect your data,
-                            we cannot guarantee absolute security.
-                        </p>
-                    </section>
+            <Clause index={8} heading="Your rights">
+                <p>Depending on where you live, you may be able to:</p>
+                <ul>
+                    <li>See the personal data we hold about you.</li>
+                    <li>Have inaccurate data corrected.</li>
+                    <li>Have your data deleted, within the retention limits above.</li>
+                    <li>Object to or restrict some processing.</li>
+                    <li>Withdraw consent where processing relies on it.</li>
+                </ul>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">6. Cookies and Local Storage</h2>
-                        <p>
-                            We use cookies and browser local storage for authentication session management and to
-                            remember your preferences. These are essential for the platform to function. We do not use
-                            third-party advertising cookies.
-                        </p>
-                    </section>
+            <Clause index={9} heading="Age">
+                <p>
+                    PolyCognition is not for anyone under 18, and we do not knowingly collect data from minors. If you
+                    believe a minor has given us personal data, contact us and we will delete it.
+                </p>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">7. Data Retention</h2>
-                        <p>
-                            We retain your account data for as long as your account is active. Trading logs and activity
-                            history are retained for a minimum of 5 years to comply with financial record-keeping
-                            requirements. You may request deletion of your account and associated data by contacting us,
-                            subject to our legal obligations.
-                        </p>
-                    </section>
+            <Clause index={10} heading="Changes">
+                <p>
+                    We may update this policy. Changes appear on this page with a new date at the top. Continuing to use
+                    the platform after a change means accepting the revised policy.
+                </p>
+            </Clause>
 
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">8. Your Rights</h2>
-                        <p>Depending on your jurisdiction, you may have the right to:</p>
-                        <ul className="mt-3 list-disc space-y-2 pl-5">
-                            <li>Access the personal data we hold about you.</li>
-                            <li>Request correction of inaccurate data.</li>
-                            <li>Request deletion of your data (subject to legal retention requirements).</li>
-                            <li>Object to or restrict certain processing of your data.</li>
-                            <li>Withdraw consent where processing is based on consent.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">9. Children&apos;s Privacy</h2>
-                        <p>
-                            PolyCognition is not intended for use by individuals under the age of 18. We do not
-                            knowingly collect personal information from minors. If you believe a minor has provided us
-                            with personal data, please contact us so we can delete it.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">10. Changes to This Policy</h2>
-                        <p>
-                            We may update this Privacy Policy from time to time. Changes will be posted on this page
-                            with an updated &ldquo;Last updated&rdquo; date. Continued use of the platform after changes
-                            constitutes acceptance of the revised policy.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="mb-4 font-grotesk text-lg font-semibold text-white/90">11. Contact Us</h2>
-                        <p>
-                            If you have questions about this Privacy Policy or our data practices, contact us at:
-                        </p>
-                        <p className="mt-3 text-white/80">
-                            Email: privacy@polycognition.com
-                        </p>
-                    </section>
-                </div>
-            </main>
-
-            {/* Minimal footer */}
-            <footer className="border-t border-white/[0.05] bg-[#030303] px-5 py-8 sm:px-8">
-                <div className="mx-auto flex max-w-4xl items-center justify-between text-[12px] text-white/30">
-                    <span>© 2026 PolyCognition</span>
-                    <div className="flex gap-4">
-                        <Link href="/terms-of-service" className="transition-colors hover:text-white/60">Terms of Service</Link>
-                        <Link href="/" className="transition-colors hover:text-white/60">Home</Link>
-                    </div>
-                </div>
-            </footer>
-        </div>
+            <Clause index={11} heading="Contact">
+                <p>
+                    Questions about this policy or our data practices go to{' '}
+                    <a href="mailto:privacy@polycognition.com">privacy@polycognition.com</a>.
+                </p>
+            </Clause>
+        </LegalShell>
     )
 }
