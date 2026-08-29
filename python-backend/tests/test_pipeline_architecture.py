@@ -18,6 +18,7 @@ from pipeline.config import PipelineConfig
 from pipeline.models import UniverseRecord, VenueIdentity
 from pipeline.services.dhan_credentials import DhanCredentialStore, generate_totp
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.storage_service import StorageService
 from pipeline.runtime.run_dhan_auth_manager import DhanAuthManager
 from pipeline.stages.intra_finder import IntraFinder, subscription_batches
 from pipeline.stages.indicator_event_engine import IndicatorEventEngine
@@ -288,6 +289,29 @@ class UniverseScannerTests(unittest.TestCase):
         self.assertEqual(result["ISIN"].tolist(), ["INE1"])
         self.assertEqual(scanner.failure_counts["asm_gsm"], 1)
         self.assertEqual(scanner.failure_counts["unsupported_series"], 1)
+
+    def test_scanner_requires_active_data_plan(self) -> None:
+        scanner = self._scanner()
+        scanner.dhan = SimpleNamespace(
+            fetch_user_profile=lambda: {
+                "status": "success",
+                "data": {"dataPlan": "Deactive"},
+            }
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "subscription is not active"):
+            scanner._require_data_access()
+
+    def test_universe_failure_ratio_uses_historical_fetch_failures(self) -> None:
+        payload = {
+            "stage": "universe_scanner",
+            "summary": {
+                "unique_isins_scanned": 100,
+                "historical_fetch_failed": 25,
+            },
+        }
+
+        self.assertEqual(StorageService.stage_snapshot_failure_ratio(payload), 0.25)
 
     def test_more_liquid_bse_venue_is_selected(self) -> None:
         scanner = self._scanner()
