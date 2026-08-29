@@ -10,7 +10,7 @@ export type BadgeSize = 'sm' | 'md' | 'lg'
  * `!important`, which is how badge sizing ends up inconsistent per screen.
  */
 const BADGE_TONE: Record<Tone, string> = {
-    neutral: 'border-line bg-white/[0.03] text-ink-secondary',
+    neutral: 'border-line bg-surface text-ink-secondary',
     positive: 'border-positive/25 bg-positive/[0.06] text-positive',
     negative: 'border-negative/25 bg-negative/[0.06] text-negative',
     warning: 'border-warning/25 bg-warning/[0.06] text-warning',
@@ -53,8 +53,11 @@ export function Badge({
     return (
         <span
             className={cn(
-                'inline-flex max-w-full items-center gap-1 truncate rounded-full border font-mono font-medium uppercase tracking-[0.08em]',
-                'transition-[color,background-color,border-color] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
+                // Radius 6px, not a pill. Pill badges beside every proper noun
+                // is a template tell, and a squared badge also lines up with the
+                // 8px controls it sits next to.
+                'inline-flex max-w-full items-center gap-1 truncate rounded-md border font-mono font-medium uppercase tracking-[0.08em]',
+                'transition-[color,background-color,border-color] duration-fast ease-smooth',
                 BADGE_TONE[tone],
                 BADGE_SIZE[size],
                 className,
