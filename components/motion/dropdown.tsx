@@ -31,6 +31,8 @@ export function Dropdown({
     className,
     id,
     role = 'menu',
+    ariaLabel,
+    ariaLabelledBy,
 }: {
     open: boolean
     origin?: DropdownOrigin
@@ -38,6 +40,12 @@ export function Dropdown({
     className?: string
     id?: string
     role?: 'menu' | 'listbox' | 'dialog' | 'none'
+    /**
+     * Required in practice for `role="dialog"`: an unnamed dialog is announced
+     * only as "dialog", so the user is told a surface opened but not what it is.
+     */
+    ariaLabel?: string
+    ariaLabelledBy?: string
 }) {
     const [present, setPresent] = useState(open)
     const [closing, setClosing] = useState(false)
@@ -72,6 +80,8 @@ export function Dropdown({
         <div
             id={id}
             role={role === 'none' ? undefined : role}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
             data-origin={origin}
             className={cn('t-dropdown', open && !closing && 'is-open', closing && 'is-closing', className)}
         >
