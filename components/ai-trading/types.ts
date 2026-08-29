@@ -105,12 +105,6 @@ export interface TradeSession {
 }
 
 /**
- * Views inside the Agent section. Trade history now lives at its own route
- * (`/dashboard/trades`) rather than being a third mode of this page.
- */
-export type AgentView = 'live' | 'sizing'
-
-/**
  * Live stream health. Previously a bare `string` compared with
  * `connectionState.includes('live')`, which silently matched nothing for
  * several of the states the socket actually sets.
