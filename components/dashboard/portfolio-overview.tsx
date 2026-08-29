@@ -163,8 +163,13 @@ export default function PortfolioOverview() {
                                     : 'Nothing open'
                             }
                         />
+                        {/* "Margin utilized", not "Dhan charges". It is
+                            `funds.utilizedAmount`, which is also the "Utilized"
+                            segment of the fund-deployment bar below — two names
+                            for one number on one screen reads as two different
+                            figures. */}
                         <StatTile
-                            label="Dhan charges"
+                            label="Margin utilized"
                             value={funds ? money(funds.utilizedAmount) : '—'}
                             trailing={funds ? percent(analytics.marginUse) : undefined}
                             meter={
