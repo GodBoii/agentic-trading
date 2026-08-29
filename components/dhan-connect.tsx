@@ -181,11 +181,15 @@ export default function DhanConnect() {
                     closedSize={{ width: '100%', height: 48 }}
                     openSize={{ width: '100%', height: 48 }}
                     className={cn(
-                        'border shadow-[0_18px_50px_-30px_rgba(0,0,0,0.9)]',
+                        // A tinted wash over the panel colour rather than a
+                        // literal hex per state. The previous `#0D1510` and
+                        // `#151206` were mixed by hand against the dark canvas
+                        // and would have read as two muddy smudges on paper.
+                        'border shadow-panel',
                         connection && !tokenExpired
-                            ? 'border-positive/20 bg-[#0D1510]'
+                            ? 'tint-positive border-positive/25'
                             : tokenExpired
-                              ? 'border-warning/25 bg-[#151206]'
+                              ? 'tint-warning border-warning/30'
                               : 'border-line bg-panel',
                     )}
                     label="Dhan broker connection"
@@ -205,7 +209,7 @@ export default function DhanConnect() {
                                 <img
                                     src={LOGO_URL}
                                     alt=""
-                                    className="h-[19px] w-auto shrink-0 opacity-90 transition-transform duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]"
+                                    className="h-[19px] w-auto shrink-0 opacity-90 transition-transform duration-fast ease-smooth group-hover:scale-[1.04]"
                                 />
                                 {connection ? (
                                     <>
@@ -238,10 +242,10 @@ export default function DhanConnect() {
                                         setError(null)
                                         setDisconnectOpen(true)
                                     }}
-                                    className="flex flex-shrink-0 items-center border-l border-white/[0.07] px-3.5 text-[10px] text-ink-tertiary transition-colors duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.03] hover:text-negative"
+                                    className="flex flex-shrink-0 items-center border-l border-line px-3.5 text-[10px] text-ink-tertiary transition-colors duration-fast ease-smooth hover:bg-surface-hover hover:text-negative"
                                     aria-label="Log out of Dhan"
                                 >
-                                    Logout
+                                    Log out
                                 </button>
                             )}
                         </div>
@@ -276,10 +280,10 @@ export default function DhanConnect() {
                             </div>
                             <Button
                                 type="submit"
-                                variant="solid"
+                                variant="positive"
                                 size="sm"
                                 disabled={isLoading || !clientId.trim()}
-                                className="h-9 flex-shrink-0 rounded-xl px-4 !bg-positive !text-[#061109] hover:!bg-[#44df84]"
+                                className="h-9 flex-shrink-0 rounded-xl px-4"
                                 swapLabel
                             >
                                 {isLoading ? 'Connecting' : connection ? 'Reconnect' : 'Connect'}
@@ -287,7 +291,7 @@ export default function DhanConnect() {
                             <button
                                 type="button"
                                 onClick={closeConnect}
-                                className="t-press grid h-9 w-8 flex-shrink-0 place-items-center rounded-lg text-ink-tertiary transition-colors duration-[250ms] hover:bg-white/[0.04] hover:text-ink-primary"
+                                className="t-press t-tap grid h-9 w-8 flex-shrink-0 place-items-center rounded-lg text-ink-tertiary transition-colors duration-fast hover:bg-surface-hover hover:text-ink-primary"
                                 aria-label="Cancel"
                             >
                                 <Close size={14} />
@@ -328,12 +332,7 @@ export default function DhanConnect() {
                         <Button onClick={() => setDisconnectOpen(false)} disabled={isLoading}>
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleDisconnect}
-                            disabled={isLoading}
-                            className="!bg-negative !text-[#180606] hover:!bg-negative/90"
-                            swapLabel
-                        >
+                        <Button variant="danger" onClick={handleDisconnect} disabled={isLoading} swapLabel>
                             {isLoading ? 'Logging out' : 'Log out'}
                         </Button>
                     </div>
