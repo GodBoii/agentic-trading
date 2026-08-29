@@ -36,7 +36,7 @@ export function PriceLadder({ plan, className }: { plan: DecisionPlan; className
 
     return (
         <div className={className}>
-            <div className="relative h-1.5 w-full rounded-full bg-white/[0.05]">
+            <div className="relative h-1.5 w-full rounded-full bg-surface-track">
                 {stop !== undefined && (
                     <span
                         aria-hidden
