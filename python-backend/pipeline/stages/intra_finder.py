@@ -28,7 +28,6 @@ from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.market_calendar_service import MarketCalendarService
 from pipeline.services.process_memory_service import release_unused_process_memory
-from pipeline.services.signal_data_cache import SignalDataCacheService
 from pipeline.services.storage_service import StorageService
 from pipeline.stages.indicator_event_engine import IndicatorEventEngine
 from pipeline.stages.trade_readiness import evaluate_trade_readiness, fresh_indicator_events
@@ -58,11 +57,6 @@ class IntraFinder:
         self.historical_dhan = DhanService(self.config, prefer_gateway=True)
         self.market_time = MarketTimeService(self.config)
         self.market_calendar = MarketCalendarService(self.config)
-        self.signal_cache = SignalDataCacheService(
-            self.config,
-            self.historical_dhan,
-            self.market_time,
-        )
         self.universe_payload: Dict[str, Any] = {}
         self.universe_version = ""
         self.stocks_by_security_id: Dict[int, Dict[str, Any]] = {}
@@ -95,7 +89,6 @@ class IntraFinder:
         self.io_futures: set[Future] = set()
         self.recovery_executor = ThreadPoolExecutor(max_workers=4)
         self.recovery_futures: set[Future] = set()
-        self.signal_cache_futures: Dict[int, Future] = {}
         self.opening_range_recovery_started = False
         self.opening_range_recovery_requested = 0
         self.opening_range_recovery_completed = 0
@@ -1310,7 +1303,6 @@ class IntraFinder:
     ) -> None:
         if not events:
             return
-        self._schedule_signal_cache(security_id)
         pending = state.setdefault("pending_indicator_events", [])
         existing = {
             (str(item.get("event_type")), str(item.get("bar_start"))) for item in pending
@@ -1334,47 +1326,6 @@ class IntraFinder:
                 (deadline.timestamp(), security_id, generation),
             )
         state["state"] = "EVENT_PENDING"
-
-    def _schedule_signal_cache(self, security_id: int, *, force: bool = False) -> None:
-        signal_cache = getattr(self, "signal_cache", None)
-        recovery_executor = getattr(self, "recovery_executor", None)
-        if signal_cache is None or recovery_executor is None:
-            return
-        futures = getattr(self, "signal_cache_futures", None)
-        if not isinstance(futures, dict):
-            futures = {}
-            self.signal_cache_futures = futures
-        existing = futures.get(int(security_id))
-        if existing is not None and not existing.done():
-            return
-        stock = self.stocks_by_security_id.get(int(security_id))
-        if not stock:
-            return
-        future = recovery_executor.submit(
-            signal_cache.prewarm,
-            dict(stock),
-            force=force,
-        )
-        futures[int(security_id)] = future
-        recovery_futures = getattr(self, "recovery_futures", None)
-        if isinstance(recovery_futures, set):
-            recovery_futures.add(future)
-
-        def completed(done: Future) -> None:
-            if isinstance(recovery_futures, set):
-                recovery_futures.discard(done)
-            current = futures.get(int(security_id))
-            if current is done:
-                futures.pop(int(security_id), None)
-            try:
-                done.result()
-            except Exception as exc:
-                self._log(
-                    f"Signal cache prewarm failed for {security_id}: "
-                    f"{type(exc).__name__}: {exc}"
-                )
-
-        future.add_done_callback(completed)
 
     def _indicator_safety_gates(
         self,
@@ -1458,7 +1409,6 @@ class IntraFinder:
         events: List[Dict[str, Any]],
         now: datetime,
     ) -> None:
-        self._schedule_signal_cache(security_id)
         deadline = now + timedelta(seconds=self.readiness_reevaluation_seconds)
         generation = int(state.get("pending_indicator_generation") or 0) + 1
         state["pending_indicator_generation"] = generation
@@ -2527,9 +2477,6 @@ class IntraFinder:
         for future in self.recovery_futures:
             future.cancel()
         self.recovery_futures.clear()
-        signal_cache_futures = getattr(self, "signal_cache_futures", None)
-        if isinstance(signal_cache_futures, dict):
-            signal_cache_futures.clear()
         self.coverage_verification_future = None
         self.opening_range_recovery_started = False
         self.last_global_packet_at = None
