@@ -31,9 +31,9 @@ export function AuthField({
             <input
                 id={id}
                 className={cn(
-                    'w-full rounded-lg border border-line bg-[#0a0a0c] px-4 py-3 text-[14px] text-white outline-none placeholder:text-ink-tertiary',
-                    'transition-[border-color,background-color,box-shadow] duration-[150ms] ease-out',
-                    'focus:border-accent/50 focus:bg-[#0c0c0e] focus:shadow-[0_0_0_3px_rgb(var(--accent-rgb)/0.08)]',
+                    'w-full rounded-lg border border-line bg-panel-inset px-4 py-3 text-[14px] text-ink-primary outline-none placeholder:text-ink-tertiary',
+                    'transition-[border-color,background-color,box-shadow] duration-quick ease-out',
+                    'focus:border-accent/70 focus:shadow-[0_0_0_3px_rgb(var(--accent-rgb)/0.16)]',
                     className,
                 )}
                 {...rest}
@@ -70,9 +70,12 @@ export function AuthSubmit({
             type="submit"
             disabled={pending}
             className={cn(
-                'group t-press mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3.5 text-[14px] font-medium text-black',
-                'transition-[background-color,box-shadow,opacity] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'hover:shadow-[0_0_32px_rgba(255,255,255,0.18)]',
+                // 10px radius, not a pill: it matches the fields directly above
+                // it, and a stadium-shaped submit under square inputs is the
+                // detail that makes a form look assembled from two kits.
+                'group t-press mt-2 inline-flex items-center justify-center gap-2 rounded-[10px] bg-solid px-5 py-3.5 text-[14px] font-medium text-solid-fg',
+                'transition-[background-color,box-shadow,opacity] duration-fast ease-smooth',
+                'hover:bg-solid-hover hover:shadow-solid',
                 'disabled:cursor-not-allowed disabled:opacity-50',
             )}
         >
@@ -80,7 +83,7 @@ export function AuthSubmit({
             <IconSwap
                 showB={pending}
                 a={<LearnMoreChevron size={15} />}
-                b={<Spinner size={13} className="!border-black/25 !border-t-black" />}
+                b={<Spinner size={13} tone="inverted" />}
             />
         </button>
     )
@@ -102,9 +105,9 @@ export function GoogleButton({
             onClick={onClick}
             disabled={disabled}
             className={cn(
-                't-press inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-white/[0.02] px-5 py-3 text-[14px] font-medium text-white backdrop-blur-sm',
-                'transition-[background-color,border-color,opacity] duration-[250ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'hover:border-white/20 hover:bg-white/[0.06] disabled:opacity-50',
+                't-press inline-flex w-full items-center justify-center gap-2.5 rounded-[10px] border border-line bg-surface px-5 py-3 text-[14px] font-medium text-ink-primary',
+                'transition-[background-color,border-color,opacity] duration-fast ease-smooth',
+                'hover:border-line-strong hover:bg-surface-hover disabled:opacity-50',
             )}
         >
             <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
