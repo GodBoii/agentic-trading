@@ -188,7 +188,16 @@ export function Modal({
             onKeyDown={onKeyDown}
         >
             <div
-                className={cn('t-modal-scrim absolute inset-0 bg-black/70 backdrop-blur-sm', shown && 'is-open')}
+                /**
+                 * The scrim is drawn from the theme's background channel, not
+                 * from black. On paper a 70% black veil turns the page into a
+                 * lightbox; darkening with the canvas colour instead reads as
+                 * the page receding.
+                 */
+                className={cn(
+                    't-modal-scrim absolute inset-0 bg-[rgb(var(--paper-rgb)/0.72)] backdrop-blur-sm',
+                    shown && 'is-open',
+                )}
                 onClick={onClose}
                 aria-hidden
             />
@@ -200,7 +209,7 @@ export function Modal({
                 aria-describedby={describedBy}
                 tabIndex={-1}
                 className={cn(
-                    't-modal relative w-full max-w-sm rounded-2xl border border-line bg-panel shadow-[0_28px_80px_-24px_rgba(0,0,0,0.9)] outline-none',
+                    't-modal relative w-full max-w-sm rounded-2xl border border-line-strong bg-pop shadow-pop outline-none',
                     shown && 'is-open',
                     !shown && 'is-closing',
                     className,
