@@ -28,7 +28,7 @@ const TONE_COLOR: Record<SegmentTone, string> = {
     positive: 'var(--dash-positive)',
     negative: 'var(--dash-negative)',
     warning: 'var(--dash-warning)',
-    neutral: 'rgba(255,255,255,0.22)',
+    neutral: 'rgb(var(--ink-rgb) / 0.28)',
 }
 
 /**
