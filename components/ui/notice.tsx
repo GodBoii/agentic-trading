@@ -10,7 +10,7 @@ export type NoticeTone = 'danger' | 'warning' | 'neutral'
 const TONE: Record<NoticeTone, { wrap: string; icon: string }> = {
     danger: { wrap: 'border-danger/25 bg-danger/[0.05] text-danger', icon: 'text-danger' },
     warning: { wrap: 'border-warning/25 bg-warning/[0.05] text-warning', icon: 'text-warning' },
-    neutral: { wrap: 'border-line bg-white/[0.02] text-ink-secondary', icon: 'text-ink-tertiary' },
+    neutral: { wrap: 'border-line bg-surface text-ink-secondary', icon: 'text-ink-tertiary' },
 }
 
 /**
