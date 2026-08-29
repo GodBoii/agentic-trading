@@ -100,17 +100,16 @@ export default function SignUpPage() {
 
     if (success) {
         return (
-            <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050505]">
-                <div className="absolute inset-0 bg-grid-fine opacity-50" />
-                <div className="absolute inset-0 bg-spotlight" />
+            <div className="grain relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-canvas">
+                <div aria-hidden className="pointer-events-none absolute inset-0 bg-grid-fine bg-grid-fade" />
 
                 <Reveal immediate className="relative z-10 w-full max-w-md px-6">
-                    <div className="surface rounded-2xl p-10 text-center">
+                    <div className="rounded-2xl border border-line bg-panel p-8 text-center shadow-panel sm:p-10">
                         {/* The check draws itself as the panel lands, so the
                             outcome reads as earned rather than pre-printed. */}
                         <SuccessBadge size={64} className="mx-auto mb-6" />
-                        <h1 className="mb-3 font-display text-[32px] tracking-[-0.025em] text-white">
-                            Account <span className="font-serif-italic text-white/80">created.</span>
+                        <h1 className="mb-3 font-display text-[28px] tracking-[-0.03em] text-ink-primary sm:text-[32px]">
+                            Account <span className="font-serif-italic text-ink-secondary">created.</span>
                         </h1>
                         <p className="text-[14px] leading-relaxed text-ink-secondary">
                             Check your email to verify your account. Redirecting to sign in…
@@ -138,7 +137,7 @@ export default function SignUpPage() {
             }
             title={
                 <>
-                    Deploy your <span className="font-serif-italic text-white/80">first agent.</span>
+                    Deploy your <span className="font-serif-italic text-ink-secondary">first agent.</span>
                 </>
             }
             subtitle="Create your account to begin autonomous trading in under 60 seconds."
@@ -147,7 +146,7 @@ export default function SignUpPage() {
                     Already have an account?{' '}
                     <Link
                         href="/login"
-                        className="text-white underline-offset-4 transition-colors duration-[250ms] hover:text-accent hover:underline"
+                        className="font-medium text-ink-primary underline-offset-4 transition-colors duration-fast hover:text-accent hover:underline"
                     >
                         Sign in
                     </Link>
