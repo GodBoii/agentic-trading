@@ -96,14 +96,14 @@ export default function LoginPage() {
                         <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-success opacity-60" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
                     </span>
-                    <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/60">
+                    <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-secondary">
                         Secure session
                     </span>
                 </>
             }
             title={
                 <>
-                    Welcome <span className="font-serif-italic text-white/80">back.</span>
+                    Welcome <span className="font-serif-italic text-ink-secondary">back.</span>
                 </>
             }
             subtitle="Sign in to access your autonomous trading intelligence."
@@ -112,7 +112,7 @@ export default function LoginPage() {
                     New to PolyCognition?{' '}
                     <Link
                         href="/signup"
-                        className="text-white underline-offset-4 transition-colors duration-[250ms] hover:text-accent hover:underline"
+                        className="font-medium text-ink-primary underline-offset-4 transition-colors duration-fast hover:text-accent hover:underline"
                     >
                         Create an account
                     </Link>
