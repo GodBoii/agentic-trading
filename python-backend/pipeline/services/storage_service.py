@@ -103,10 +103,10 @@ class StorageService:
         if stage == "universe_scanner":
             try:
                 scanned = int(summary.get("unique_isins_scanned") or 0)
-                passed = int(summary.get("stage1_passed") or 0)
+                failed = int(summary.get("historical_fetch_failed") or 0)
             except (TypeError, ValueError):
                 return None
-            return 0.0 if scanned > 0 and passed >= 0 else 1.0
+            return min(1.0, failed / scanned) if scanned > 0 else 1.0
         if stage == "intra_finder":
             try:
                 expected = int(summary.get("expected_instruments") or 0)
