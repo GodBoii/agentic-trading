@@ -65,15 +65,13 @@ function DashboardContent() {
         <>
             <Toast toast={toast} onDismiss={dismiss} />
 
-            <header className="mb-7 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+            <header className="section-head">
                 <Reveal immediate>
                     {/* Non-breaking space holds the line so the heading does not shift. */}
                     <p className="dash-label mb-2">{today || '\u00A0'}</p>
-                    <h1 className="text-[28px] font-medium leading-none tracking-[-0.04em] text-ink-primary sm:text-[34px]">
-                        Portfolio
-                    </h1>
-                    <p className="mt-2.5 text-[12px] text-ink-tertiary">
-                        Balances, positions and order flow from your connected Dhan account.
+                    <h1 className="section-title">Portfolio</h1>
+                    <p className="section-lede">
+                        Balances, positions and order flow, read straight from your connected Dhan account.
                     </p>
                 </Reveal>
                 <DhanConnect />
@@ -81,7 +79,7 @@ function DashboardContent() {
 
             <PortfolioOverview />
 
-            <footer className="mt-8 flex flex-col justify-between gap-2 border-t border-line pt-5 text-[10px] text-ink-tertiary sm:flex-row">
+            <footer className="mt-10 flex flex-col justify-between gap-2 border-t border-line pt-5 text-[10px] text-ink-tertiary sm:flex-row">
                 <p>Figures are read directly from Dhan and are not recalculated here.</p>
                 <p>Investments in securities markets are subject to market risks.</p>
             </footer>
