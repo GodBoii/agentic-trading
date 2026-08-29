@@ -3,7 +3,9 @@ import json
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
+from threading import Condition
 from types import SimpleNamespace
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from pipeline.services.dhan_service import DhanService
@@ -374,6 +376,87 @@ class DhanResilienceTests(unittest.TestCase):
         self.assertEqual(service._normalized_error_code(response), "805")
         self.assertTrue(service._is_rate_limited(response))
 
+    def test_historical_rate_limit_opens_one_shared_adaptive_cooldown(self):
+        service = object.__new__(DhanService)
+        service.config = SimpleNamespace(
+            historical_rate_limit_cooldown_base_seconds=30.0,
+            historical_rate_limit_cooldown_max_seconds=300.0,
+        )
+        service.rate_condition = Condition()
+        service.historical_rate_limit_until = 0.0
+        service.historical_rate_limit_next_delay_seconds = 30.0
+        response = {
+            "status": "failure",
+            "remarks": {"error_code": "DH-904", "error_type": "Rate_Limit"},
+        }
+
+        with patch("pipeline.services.dhan_service.time.monotonic", return_value=100.0):
+            service._update_historical_rate_limit_cooldown(response)
+            service._update_historical_rate_limit_cooldown(response)
+            blocked = service._historical_rate_limit_response_if_open()
+        self.assertEqual(service.historical_rate_limit_until, 130.0)
+        self.assertEqual(service.historical_rate_limit_next_delay_seconds, 60.0)
+        self.assertEqual(blocked["remarks"]["error_code"], "LOCAL-RATE-LIMIT-COOLDOWN")
+
+        with patch("pipeline.services.dhan_service.time.monotonic", return_value=131.0):
+            service._update_historical_rate_limit_cooldown(response)
+        self.assertEqual(service.historical_rate_limit_until, 191.0)
+        self.assertEqual(service.historical_rate_limit_next_delay_seconds, 120.0)
+
+        service._update_historical_rate_limit_cooldown({"status": "success"})
+        self.assertEqual(service.historical_rate_limit_until, 0.0)
+        self.assertEqual(service.historical_rate_limit_next_delay_seconds, 30.0)
+
+    def test_historical_rate_limit_stops_request_local_retries(self):
+        service = object.__new__(DhanService)
+        service.gateway_url = None
+        service.config = SimpleNamespace(
+            market_open_hour=9,
+            market_open_minute=15,
+            historical_rate_limit_cooldown_base_seconds=30.0,
+            historical_rate_limit_cooldown_max_seconds=300.0,
+            historical_circuit_breaker_threshold=12,
+            historical_circuit_breaker_cooldown_seconds=300,
+        )
+        service.rate_condition = Condition()
+        service.historical_circuit_condition = Condition()
+        service.historical_failure_signature = None
+        service.historical_consecutive_failures = 0
+        service.historical_circuit_open_until = 0.0
+        service.historical_rate_limit_until = 0.0
+        service.historical_rate_limit_next_delay_seconds = 30.0
+        service.reload_credentials_if_changed = lambda: False
+        service._market_now = lambda: datetime(
+            2026, 7, 27, 10, 0, tzinfo=ZoneInfo("Asia/Kolkata")
+        )
+        service._normalize_historical_instruments = lambda _items: ["EQUITY"]
+        service.acquire_data_slot = lambda: None
+        service._compute_rate_limit_delay = lambda _attempt: 0.0
+        client = SimpleNamespace(calls=0)
+
+        def rate_limited(**_payload):
+            client.calls += 1
+            return {
+                "status": "failure",
+                "remarks": {"error_code": "DH-904", "error_type": "Rate_Limit"},
+            }
+
+        client.intraday_minute_data = rate_limited
+        service._historical_client = lambda: client
+
+        response = service.fetch_intraday_history(
+            500180,
+            retries=3,
+            exchange_segment="BSE_EQ",
+            instrument_candidates=["EQUITY"],
+        )
+
+        self.assertEqual(client.calls, 1)
+        self.assertEqual(
+            response["remarks"]["error_code"],
+            "LOCAL-RATE-LIMIT-COOLDOWN",
+        )
+
     def test_intraday_request_uses_full_market_datetime(self):
         service = object.__new__(DhanService)
         service.gateway_url = None
@@ -448,8 +531,6 @@ class DhanResilienceTests(unittest.TestCase):
             historical_circuit_breaker_threshold=2,
             historical_circuit_breaker_cooldown_seconds=300,
         )
-        from threading import Condition
-
         service.historical_circuit_condition = Condition()
         service.historical_failure_signature = None
         service.historical_consecutive_failures = 0
