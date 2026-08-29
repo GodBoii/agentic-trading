@@ -660,11 +660,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             },
         )
         exchange_segment = str(candidate_packet.get("exchange_segment") or "").upper()
+        recent_bars = candidate_packet.get("chart_seed_bars") or []
         intraday_frame = self.signal_cache.load_frame(
             market_date=str(candidate_packet["market_date"]),
             exchange_segment=exchange_segment,
             security_id=security_id,
-            recent_bars=candidate_packet.get("chart_seed_bars") or [],
+            recent_bars=recent_bars,
         )
         # Full-session seed bars are chart transport, not model or session evidence.
         candidate_packet.pop("chart_seed_bars", None)
@@ -683,6 +684,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                     raise RuntimeError(f"stock_agent_auth_invalid::{remarks}")
                 raise RuntimeError(f"stock_agent_intraday_history_failed::{security_id}::{remarks}")
             intraday_frame = self.dhan.intraday_response_to_df(intraday_resp)
+            intraday_frame = self.signal_cache.merge_recent_bars(intraday_frame, recent_bars)
 
         intraday_frame_fetched_at = self.market_time.now()
         artifact_identity = self._slugify(
@@ -703,7 +705,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         isolated_dhan = DhanService(self.config, prefer_gateway=False)
         margin_budget = self._resolve_margin_budget(trade_config, candidate_packet)
         market_data_toolkit = StockMarketDataToolkit(
-            dhan=isolated_dhan,
+            dhan=self.dhan,
             market_time=self.market_time,
             security_id=security_id,
             symbol=str(candidate_packet.get("symbol") or ""),
