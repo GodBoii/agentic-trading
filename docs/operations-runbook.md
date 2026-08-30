@@ -4,7 +4,8 @@
 
 1. Configure the five scanner secret values described in
    `docs/dhan-authentication.md`.
-2. Keep `INTRA_FINDER_SHADOW_MODE=1`.
+2. Confirm the intended small-capital mode. Compose currently defaults to
+   `INTRA_FINDER_SHADOW_MODE=0`; set it to `1` for a non-dispatching session.
 3. Validate Compose:
 
    ```powershell
@@ -37,13 +38,31 @@
 - Auth manager becomes healthy.
 - Gateway becomes healthy.
 - AI trading gateway becomes healthy before Intra-Finder is allowed to start.
-- Universe Scanner runs at or after 08:40 IST.
-- Intra-Finder starts immediately, reports `WAITING_FOR_UNIVERSE` while the
-  daily scan is running, and subscribes only after today's successful universe
-  exists.
-- One-minute indicator calculations begin after the first completed candle.
-- EMA and RSI need enough completed candles before their first event can appear.
-- Aggregated indicator events appear in `results/stage2/YYYY-MM-DD/setup-events.jsonl`.
+- Universe Scanner runs at or after 07:30 IST and refreshes the broad tradable
+  universe and cached profiles.
+- Intra-Finder accepts a completed last-known-good universe up to four calendar
+  days old, so market-open monitoring does not wait for profile refresh.
+- Opening activity ranks begin after live trades arrive. Opening-drive setups
+  can arm after fifteen seconds and do not require a completed candle.
+- Named setup events appear in `results/stage2/YYYY-MM-DD/setup-events.jsonl`.
+
+## Calendar and scheduling
+
+- Every backend service uses `Asia/Calcutta`, with `Asia/Kolkata` as the timezone alias.
+- Universe Scanner runs once on an NSE cash-market trading day at or after 07:30 IST.
+- Starting or restarting it after 07:30 runs the missing daily build immediately.
+- A completed schema-3 artifact prevents a second heavy run that day.
+- A failed build retries after the configured degraded interval.
+- Intra-Finder connects five minutes before the calendar's market open and
+  releases session memory after the calendar's market close.
+- Saturdays and Sundays stop before any calendar API, history scan or live feed.
+- Only the NSE `CM` cash-market holiday list is used. Commodity, currency and
+  clearing holidays cannot close the equity system by mistake.
+- If NSE sync fails, a cached calendar for the current year remains usable. If
+  the current year is not covered, `MARKET_CALENDAR_FAIL_CLOSED=1` keeps every
+  trading process closed.
+- `MARKET_FORCE_OPEN` and `MARKET_FORCE_CLOSED` are emergency operator overrides.
+  Do not use `MARKET_FORCE_OPEN` for an untested special-session timetable.
 
 Check the Stage 2 readiness endpoint:
 
@@ -71,25 +90,25 @@ feed.
 `CONNECTION_WARMING_UP` protects the first thirty seconds after a real
 reconnection.
 
-`INSUFFICIENT_COMPLETED_BARS` means the current Intra-Finder process has not
-yet accumulated the configured number of completed one-minute bars. Opening
-range recovery reconstructs 09:15-09:30, but it does not seed the complete
-current-day indicator history. A late intraday restart therefore fails closed
-until the warm-up requirement is met; do not bypass this gate during a live
-session.
+`AGENT_DISPATCH_CAPACITY` or `AGENT_CAPACITY` means three new-entry analysis
+slots are already occupied. The event is not queued because its market evidence
+is short-lived.
+
+`CORPORATE_ACTION_GAP_UNTRUSTED` means an ex-date action made the previous-close
+gap unsafe. Live-only volatility setups remain available.
 
 `global_packet_idle` means no instrument produced a packet within the aggregate
 idle deadline. This causes a controlled reconnect and resubscription.
 
-## Shadow-to-live checklist
+## Detector-to-live checklist
 
 Before changing shadow mode to `0`:
 
 - Replay several complete sessions.
-- Review indicator and candlestick events against their completed one-minute candles.
-- Confirm repeated states do not create repeated events.
-- Confirm multiple events within sixty seconds become one agent request.
-- Confirm every `ENTRY_READY` event starts its agent immediately, with no waiting queue or concurrency cap.
+- Review activity ranks and named setups against the recorded price path.
+- Confirm opening events use seconds of current data rather than old evidence.
+- Confirm repeated qualifying states do not create repeated setup instances.
+- Confirm expired events and a fourth concurrent agent are rejected.
 - Confirm NSE and BSE venue propagation in every event.
 - Confirm duplicate events remain suppressed after restart.
 - Check observed disk growth.
@@ -111,4 +130,4 @@ Market monitoring must remain healthy even when a user cannot be routed. Check `
 
 The browser endpoint `GET /api/ai-trading/config` returns a plain status such as `automatic_balance`, `manual_amount`, `amount_missing_or_invalid`, `amount_timestamp_unavailable`, or `amount_stale`. Event dispatch diagnostics additionally use `available_balance_unavailable`, `price_above_trading_amount`, `price_unavailable`, `user_depth_unavailable`, and `user_slippage_too_high`.
 
-Saving with `POST /api/ai-trading/config` persists either automatic mode (blank field) or a manual amount and arms continuous event routing for that user; it does not launch a batch. Intra-Finder shadow mode remains the Compose default (`INTRA_FINDER_SHADOW_MODE=1`), and `EXECUTIONER_ALLOW_LIVE_ORDERS=0` must remain unchanged during validation.
+Saving with `POST /api/ai-trading/config` persists either automatic mode (blank field) or a manual amount and arms continuous event routing for that user; it does not launch a batch. Intra-Finder currently defaults to live event dispatch (`INTRA_FINDER_SHADOW_MODE=0`). Order permission remains separately controlled by `EXECUTIONER_ALLOW_LIVE_ORDERS`, the shared placement gate and the three-trade limit.
