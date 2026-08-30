@@ -60,6 +60,7 @@ class MarketCalendarService:
 
     NSE_HOLIDAY_URL = "https://www.nseindia.com/api/holiday-master?type=trading"
     NSE_HOME_URL = "https://www.nseindia.com"
+    CACHE_SCHEMA_VERSION = 2
 
     def __init__(self, config: PipelineConfig):
         self.config = config
@@ -67,6 +68,7 @@ class MarketCalendarService:
         self.sync_enabled = self._env_bool("MARKET_CALENDAR_NSE_SYNC_ENABLED", True)
         self.sync_timeout_seconds = float(os.getenv("MARKET_CALENDAR_NSE_TIMEOUT_SECONDS", "8"))
         self.cache_ttl_seconds = int(os.getenv("MARKET_CALENDAR_CACHE_TTL_SECONDS", str(12 * 60 * 60)))
+        self.fail_closed = self._env_bool("MARKET_CALENDAR_FAIL_CLOSED", True)
 
     def session_status(self) -> MarketSessionStatus:
         now = self.market_time.now()
@@ -126,6 +128,14 @@ class MarketCalendarService:
 
         cache = self._load_or_refresh_nse_cache()
         holidays = self._holiday_dates_from_cache(cache)
+        covered_years = self._covered_years(cache)
+        if self.fail_closed and candidate.year not in covered_years:
+            return {
+                "is_trading_day": False,
+                "reason": "market_calendar_year_unavailable",
+                "source": "fail_closed",
+                "external_status": self._cache_metadata(cache),
+            }
         if candidate.isoformat() in holidays:
             return {
                 "is_trading_day": False,
@@ -166,11 +176,13 @@ class MarketCalendarService:
             raw_payload = response.json()
             cache = {
                 "stage": "market_calendar_cache",
+                "schema_version": self.CACHE_SCHEMA_VERSION,
                 "source": "nse_holiday_master",
                 "source_url": self.NSE_HOLIDAY_URL,
                 "generated_at_utc": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
                 "status": "success",
                 "holiday_dates": sorted(self._extract_dates(raw_payload)),
+                "calendar_segment": "CM",
                 "raw_group_count": self._count_holiday_groups(raw_payload),
             }
             StorageService.save_snapshot(self.config.market_calendar_cache_path, cache)
@@ -213,6 +225,12 @@ class MarketCalendarService:
         return payload
 
     def _cache_is_stale(self, payload: Dict[str, Any]) -> bool:
+        try:
+            schema_version = int(payload.get("schema_version") or 0)
+        except (TypeError, ValueError):
+            return True
+        if schema_version != self.CACHE_SCHEMA_VERSION:
+            return True
         generated_at = payload.get("generated_at_utc")
         if not generated_at:
             return True
@@ -242,18 +260,30 @@ class MarketCalendarService:
             "source": payload.get("source"),
             "generated_at_utc": payload.get("generated_at_utc"),
             "holiday_count": len(payload.get("holiday_dates") or []),
+            "calendar_segment": payload.get("calendar_segment"),
             "last_sync_error": payload.get("last_sync_error"),
         }
 
     def _extract_dates(self, payload: Any) -> Set[str]:
         dates: Set[str] = set()
-        for value in self._walk_values(payload):
+        cash_market = payload.get("CM") if isinstance(payload, dict) else None
+        values = cash_market if isinstance(cash_market, list) else []
+        for value in self._walk_values(values):
             if not isinstance(value, str):
                 continue
             parsed = self._parse_date(value)
             if parsed:
                 dates.add(parsed)
         return dates
+
+    def _covered_years(self, payload: Optional[Dict[str, Any]]) -> Set[int]:
+        years: Set[int] = set()
+        for value in self._holiday_dates_from_cache(payload):
+            try:
+                years.add(date.fromisoformat(value).year)
+            except ValueError:
+                continue
+        return years
 
     def _walk_values(self, value: Any) -> Iterable[Any]:
         if isinstance(value, dict):
@@ -284,6 +314,7 @@ class MarketCalendarService:
     def _empty_cache(self, status: str) -> Dict[str, Any]:
         return {
             "stage": "market_calendar_cache",
+            "schema_version": self.CACHE_SCHEMA_VERSION,
             "source": "local_weekday_fallback",
             "source_url": None,
             "generated_at_utc": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
