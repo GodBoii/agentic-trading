@@ -20,6 +20,11 @@ from pipeline.config import PipelineConfig
 from pipeline.contracts import UNIVERSE_BASELINE_SCHEMA_VERSION
 from pipeline.models import UniverseRecord, VenueIdentity
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.corporate_action_service import (
+    CorporateActionService,
+    action_for_stock,
+    action_index,
+)
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
 
@@ -50,6 +55,7 @@ class UniverseScanner:
         self.config = config or PipelineConfig()
         self.dhan = DhanService(self.config)
         self.market_time = MarketTimeService(self.config)
+        self.corporate_actions = CorporateActionService(self.config)
         self.exclusions: List[Dict[str, Any]] = []
         self.failure_counts: Counter[str] = Counter()
 
@@ -319,60 +325,95 @@ class UniverseScanner:
             frame, error = self._daily_frame(venue)
             comparison = {**venue, "isin": isin, "error": error}
             if frame is not None and not frame.empty:
-                comparison.update(self._venue_metrics(frame))
+                metrics = self._venue_metrics(frame)
+                comparison.update(metrics)
+                valid.append((row, venue, frame, metrics))
             comparisons.append(comparison)
-            if error is None and frame is not None:
-                valid.append((row, venue, frame, self._venue_metrics(frame)))
-
-        if not valid:
-            reasons = [str(item.get("error") or "unknown") for item in comparisons]
-            reason = "INSUFFICIENT_HISTORY" if reasons and all(r == "insufficient_history" for r in reasons) else "HISTORICAL_FETCH_FAILED"
-            return None, comparisons, {"reason": reason, "isin": isin, "venues": comparisons}
-
-        valid.sort(
-            key=lambda item: (
-                float(item[3]["median_daily_value_20_cr"]),
-                float(item[3]["active_session_ratio"]),
-                float(item[3]["median_volume_20"]),
-            ),
-            reverse=True,
-        )
-        selected = valid[0]
         previous_segment = previous_segments.get(isin)
-        previous = next((item for item in valid if item[1]["exchange_segment"] == previous_segment), None)
-        if previous and previous is not selected:
-            challenger_value = float(selected[3]["median_daily_value_20_cr"])
-            previous_value = float(previous[3]["median_daily_value_20_cr"])
-            if challenger_value < previous_value * self.config.stage1_venue_switch_ratio:
-                selected = previous
-                reason = "venue_hysteresis_kept_previous"
-            else:
-                reason = "higher_median_traded_value"
-        else:
+        if valid:
+            valid.sort(
+                key=lambda item: (
+                    float(item[3]["median_daily_value_20_cr"]),
+                    float(item[3]["active_session_ratio"]),
+                    float(item[3]["median_volume_20"]),
+                ),
+                reverse=True,
+            )
+            selected = valid[0]
+            previous = next(
+                (item for item in valid if item[1]["exchange_segment"] == previous_segment),
+                None,
+            )
             reason = "higher_median_traded_value"
-
-        row, venue, frame, metrics = selected
-        passed = (
-            self.config.stage1_min_price <= metrics["previous_close"] <= self.config.stage1_max_price
-            and metrics["adv_20_cr"] >= self.config.stage1_min_adv_cr
-            and metrics["atr_percent"] >= self.config.stage1_min_atr_percent
-            and metrics["active_session_ratio"] >= self.config.stage1_min_active_session_ratio
-        )
-        if not passed:
-            if not self.config.stage1_min_price <= metrics["previous_close"] <= self.config.stage1_max_price:
-                filter_reason = "PRICE_RANGE"
-            elif metrics["adv_20_cr"] < self.config.stage1_min_adv_cr:
-                filter_reason = "ADV_20"
-            elif metrics["atr_percent"] < self.config.stage1_min_atr_percent:
-                filter_reason = "ATR_PERCENT"
-            else:
-                filter_reason = "INACTIVE_SESSIONS"
-            return None, comparisons, {
-                "reason": filter_reason,
-                "isin": isin,
-                "selected_venue": venue,
-                "historical": metrics,
+            if previous and previous is not selected:
+                challenger_value = float(selected[3]["median_daily_value_20_cr"])
+                previous_value = float(previous[3]["median_daily_value_20_cr"])
+                if challenger_value < previous_value * self.config.stage1_venue_switch_ratio:
+                    selected = previous
+                    reason = "venue_hysteresis_kept_previous"
+            row, venue, _frame, metrics = selected
+            metrics = {
+                **metrics,
+                "status": (
+                    "ready"
+                    if int(metrics.get("valid_sessions") or 0) >= self.config.stage1_min_valid_sessions
+                    else "partial"
+                ),
             }
+            if metrics["status"] == "partial":
+                self.failure_counts["insufficient_history"] += 1
+        else:
+            # Historical profiles improve ranking but are not a prerequisite for
+            # observing a broker-tradable equity. Prefer the prior venue, then NSE.
+            rows = [item for _, item in group.iterrows()]
+            row = next(
+                (
+                    item
+                    for item in rows
+                    if f"{self._text(item.get('EXCH_ID'))}_EQ" == previous_segment
+                ),
+                None,
+            )
+            if row is None:
+                row = sorted(
+                    rows,
+                    key=lambda item: 0 if self._text(item.get("EXCH_ID")) == "NSE" else 1,
+                )[0]
+            venue = self._row_to_venue(row)
+            metrics = {
+                "status": "unavailable",
+                "previous_close": None,
+                "last_close_date": None,
+                "valid_sessions": 0,
+                "active_session_ratio": 0.0,
+                "adv_20_cr": 0.0,
+                "median_daily_value_20_cr": 0.0,
+                "median_volume_20": 0,
+                "avg_volume_20": 0,
+                "atr_14": 0.0,
+                "atr_percent": 0.0,
+            }
+            reason = "previous_or_nse_venue_without_history"
+            errors = [str(item.get("error") or "") for item in comparisons]
+            if errors and all(error == "insufficient_history" for error in errors):
+                self.failure_counts["insufficient_history"] += 1
+            else:
+                self.failure_counts["historical_fetch_failed"] += 1
+
+        if self.config.stage1_apply_opportunity_filters:
+            passed = (
+                self.config.stage1_min_price <= float(metrics["previous_close"] or 0.0) <= self.config.stage1_max_price
+                and float(metrics["adv_20_cr"] or 0.0) >= self.config.stage1_min_adv_cr
+                and float(metrics["atr_percent"] or 0.0) >= self.config.stage1_min_atr_percent
+                and float(metrics["active_session_ratio"] or 0.0) >= self.config.stage1_min_active_session_ratio
+            )
+            if not passed:
+                return None, comparisons, {
+                    "reason": "LEGACY_OPPORTUNITY_FILTER",
+                    "isin": isin,
+                    "selected_venue": venue,
+                    "historical": metrics,
+                }
 
         identity = VenueIdentity(
             exchange=venue["exchange"],
@@ -417,6 +458,22 @@ class UniverseScanner:
     def _intraday_baseline(self, record: UniverseRecord) -> Dict[str, Any]:
         if os.getenv("UNIVERSE_SCANNER_BUILD_INTRADAY_BASELINES", "1").strip().lower() in {"0", "false", "no"}:
             return {"status": "disabled"}
+        cache_path = (
+            self.config.results_dir
+            / "reference"
+            / "intraday-baselines"
+            / record.selected_venue.exchange_segment
+            / f"{record.selected_venue.security_id}.json"
+        )
+        cached = StorageService.load_snapshot(cache_path)
+        if cached and cached.get("status") == "ready":
+            try:
+                generated = datetime.fromisoformat(str(cached["generated_at_utc"]).replace("Z", "+00:00"))
+                age = datetime.now(timezone.utc) - generated.astimezone(timezone.utc)
+                if age.days < self.config.stage1_intraday_baseline_cache_days:
+                    return {**cached, "schema_version": self.BASELINE_SCHEMA_VERSION}
+            except (KeyError, TypeError, ValueError):
+                pass
         try:
             response = self.dhan.fetch_intraday_history(
                 record.selected_venue.security_id,
@@ -465,8 +522,9 @@ class UniverseScanner:
                 record.selected_venue.security_id,
                 {},
             )
-            return {
+            result = {
                 "status": "ready",
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
                 "timezone": str(self.market_time.tz),
                 "schema_version": self.BASELINE_SCHEMA_VERSION,
                 "interval_minutes": 5,
@@ -481,6 +539,8 @@ class UniverseScanner:
                 },
                 "captured_live_liquidity": captured,
             }
+            StorageService.save_snapshot(cache_path, result)
+            return result
         except Exception:
             return {"status": "unavailable"}
 
@@ -605,6 +665,8 @@ class UniverseScanner:
     def run(self, max_isins: Optional[int] = None) -> Dict[str, Any]:
         started = time.time()
         market_date = self.market_time.market_date_str()
+        corporate_action_payload = self.corporate_actions.actions_for_date(market_date)
+        corporate_actions = action_index(corporate_action_payload)
         self._log(
             "Starting Stage 1 historical universe build. Live quotes are not used in this stage."
         )
@@ -705,6 +767,8 @@ class UniverseScanner:
                     )
 
         stock_rows = [record.as_dict() for record in records]
+        for stock in stock_rows:
+            stock["corporate_action"] = action_for_stock(corporate_actions, stock)
         stock_rows.sort(key=lambda item: float(item["historical"]["adv_20_cr"]), reverse=True)
         version = f"{market_date}-{checksum[:12]}-b2"
         degraded_reasons = []
@@ -715,8 +779,9 @@ class UniverseScanner:
             if history_total
             else 1.0
         )
-        if fetch_failure_ratio > self.config.stage1_max_fetch_failure_ratio:
-            degraded_reasons.append("historical_fetch_failure_ratio")
+        # Historical profiles are optional ranking context in the full-universe
+        # architecture. Master/reference corruption still degrades publication;
+        # per-stock history failures remain visible without removing instruments.
         status = "degraded" if degraded_reasons else "completed"
         summary = {
             "status": status,
@@ -730,6 +795,18 @@ class UniverseScanner:
             "insufficient_history_count": int(self.failure_counts["insufficient_history"]),
             "historical_fetch_failed": int(self.failure_counts["historical_fetch_failed"]),
             "historical_fetch_failure_ratio": round(fetch_failure_ratio, 6),
+            "historical_profiles_ready": sum(
+                (row.get("historical") or {}).get("status") == "ready" for row in stock_rows
+            ),
+            "historical_profiles_unavailable": sum(
+                (row.get("historical") or {}).get("status") != "ready" for row in stock_rows
+            ),
+            "opportunity_filters_applied": self.config.stage1_apply_opportunity_filters,
+            "corporate_actions": {
+                "status": corporate_action_payload.get("status"),
+                "matched_stocks": sum(bool(row.get("corporate_action")) for row in stock_rows),
+                "source_errors": corporate_action_payload.get("source_errors") or [],
+            },
             "stage1_passed": len(stock_rows),
             "venue_selections": dict(Counter(row["exchange"] for row in stock_rows)),
             "exclusion_reason_counts": dict(self.failure_counts),
@@ -746,6 +823,11 @@ class UniverseScanner:
             ),
             "elapsed_seconds": round(time.time() - started, 2),
             "filters": {
+                "mode": (
+                    "legacy_opportunity_filters"
+                    if self.config.stage1_apply_opportunity_filters
+                    else "tradable_universe_only"
+                ),
                 "price": [self.config.stage1_min_price, self.config.stage1_max_price],
                 "adv_20_cr_min": self.config.stage1_min_adv_cr,
                 "atr_percent_min": self.config.stage1_min_atr_percent,
