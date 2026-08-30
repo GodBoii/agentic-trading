@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import unittest
+import sys
+import types
+import tempfile
+from pathlib import Path
 from datetime import datetime, timedelta
 from threading import Event, RLock
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
-import sys
-import types
 
 if "dhanhq" not in sys.modules:
     fake_dhan = types.ModuleType("dhanhq")
-    fake_dhan.MarketFeed = type(
-        "MarketFeed", (), {"NSE": "NSE", "BSE": "BSE", "Full": "Full"}
-    )
+    fake_dhan.MarketFeed = type("MarketFeed", (), {"NSE": "NSE", "BSE": "BSE", "Full": "Full"})
     fake_dhan.DhanContext = type("DhanContext", (), {})
     fake_dhan.HistoricalData = type("HistoricalData", (), {})
     fake_dhan.OptionChain = type("OptionChain", (), {})
@@ -21,192 +20,298 @@ if "dhanhq" not in sys.modules:
     sys.modules["dhanhq"] = fake_dhan
 
 from pipeline.config import PipelineConfig
-from pipeline.stages.indicator_event_engine import IndicatorEventEngine
+from pipeline.stages.activity_ranker import ActivityRanker
+from pipeline.stages.activity_ranker import RankingResult
 from pipeline.stages.intra_finder import IntraFinder
+from pipeline.stages.live_state import LiveStockState
+from pipeline.stages.setups import SetupEngine
+from pipeline.stages.setups.base import SetupSignal
+from pipeline.services.storage_service import StorageService
 
 
-class IntraFinderIndicatorFlowTests(unittest.TestCase):
-    def finder(self) -> IntraFinder:
+IST = datetime.fromisoformat("2026-08-28T09:15:30+05:30").tzinfo
+
+
+def state(security_id: int, *, volume: float, volatility: float, value: float) -> LiveStockState:
+    now = datetime.fromisoformat("2026-08-28T10:00:00+05:30")
+    item = LiveStockState("NSE_EQ", security_id, f"S{security_id}", f"INE{security_id}")
+    item.latest_price = 100.0
+    item.last_packet_at = now.isoformat()
+    item.last_trade_at = now.isoformat()
+    item.depth = [{} for _ in range(5)]
+    item.spread_percent = 0.03
+    item.volume_pace = volume
+    item.realized_volatility_percent = volatility
+    item.traded_value_5m = value
+    item.refresh_derived = lambda _now: None
+    return item
+
+
+class ActivityRankerTests(unittest.TestCase):
+    def test_rank_requires_both_volume_and_movement(self) -> None:
+        now = datetime.fromisoformat("2026-08-28T10:00:00+05:30")
+        balanced = state(1, volume=2.0, volatility=2.0, value=20_000_000)
+        volume_only = state(2, volume=5.0, volatility=0.2, value=30_000_000)
+        movement_only = state(3, volume=0.2, volatility=5.0, value=10_000_000)
+        ranker = ActivityRanker(hot_size=1, reserve_size=1)
+
+        result = ranker.rank({item.key: item for item in (balanced, volume_only, movement_only)}, now)
+
+        self.assertEqual(result.ranked[0].security_id, 1)
+        self.assertTrue(balanced.is_hot)
+        self.assertFalse(volume_only.is_hot)
+        self.assertFalse(movement_only.is_hot)
+
+    def test_missing_personal_baseline_uses_turnover_pace(self) -> None:
+        now = datetime.fromisoformat("2026-08-28T10:00:00+05:30")
+        item = LiveStockState("NSE_EQ", 1, "TEST", "INE1", adv_20_cr=20.0)
+        item.latest_price = 100.0
+        item.cumulative_value = 10_000_000.0
+
+        item.refresh_derived(now)
+
+        self.assertIsNotNone(item.volume_pace)
+        self.assertGreater(item.volume_pace, 0.0)
+
+
+class SetupEngineTests(unittest.TestCase):
+    def test_opening_setup_can_trigger_without_completed_minute_bars(self) -> None:
+        start = datetime.fromisoformat("2026-08-28T09:15:00+05:30")
+        item = LiveStockState("NSE_EQ", 1, "TEST", "INE1", historical_atr_percent=2.0)
+        item.is_hot = True
+        item.first_packet_at = start.isoformat()
+        item.session_open = 100.0
+        item.session_high = 100.6
+        item.session_low = 100.0
+        item.latest_price = 100.6
+        item.volume_percentile = 90.0
+        item.volatility_percentile = 90.0
+        item.relative_strength_percentile = 90.0
+        item.trend_efficiency = 0.9
+        for second, price in ((0, 100.0), (10, 100.2), (20, 100.4), (30, 100.6)):
+            item.price_samples.append(((start + timedelta(seconds=second)).timestamp(), price))
+        engine = SetupEngine()
+
+        self.assertEqual(engine.evaluate(item, start + timedelta(seconds=30)), [])
+        signals = engine.evaluate(item, start + timedelta(seconds=39))
+
+        self.assertEqual(len(item.minute_bars), 0)
+        self.assertEqual(len(signals), 1)
+        self.assertEqual(signals[0].family, "OPENING_DRIVE")
+        self.assertEqual(signals[0].direction, "LONG")
+
+        item.volume_percentile = 0.0
+        self.assertEqual(engine.evaluate(item, start + timedelta(seconds=40)), [])
+        item.volume_percentile = 90.0
+        self.assertEqual(engine.evaluate(item, start + timedelta(seconds=50)), [])
+
+
+class IntraFinderFlowTests(unittest.TestCase):
+    def test_recent_completed_universe_is_accepted_as_opening_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = PipelineConfig(
+                stage1_latest_path=root / "latest.json",
+                stage2_results_dir=root / "stage2",
+                stage1_universe_fallback_max_age_days=4,
+            )
+            StorageService.save_snapshot(
+                config.stage1_latest_path,
+                {
+                    "stage": "universe_scanner",
+                    "summary": {
+                        "status": "completed",
+                        "market_date": "2026-08-28",
+                        "universe_version": "v1",
+                    },
+                    "stocks": [
+                        {
+                            "isin": "INE1",
+                            "exchange_segment": "NSE_EQ",
+                            "security_id": 1,
+                            "symbol": "TEST",
+                        }
+                    ],
+                },
+            )
+            finder = IntraFinder.__new__(IntraFinder)
+            finder.config = config
+            finder.market_time = SimpleNamespace(market_date_str=lambda: "2026-08-30")
+            finder.universe_version = ""
+            finder.universe_source_date = ""
+            finder.universe_payload = {}
+            finder.stocks = {}
+            finder.states = {}
+            finder._restore_runtime_state = lambda _date: None
+            finder._load_event_state = lambda _date: None
+
+            stocks = finder.load_universe()
+
+            self.assertEqual(len(stocks), 1)
+            self.assertEqual(finder.universe_source_date, "2026-08-28")
+
+    def test_packet_identity_includes_exchange_segment(self) -> None:
         finder = IntraFinder.__new__(IntraFinder)
-        finder.config = PipelineConfig()
-        finder.indicator_aggregation_seconds = 60
-        finder.stock_agent_cooldown_seconds = 1200
-        finder.pending_indicator_deadlines = []
-        finder.agent_threads = set()
+        finder.stocks = {
+            ("NSE_EQ", 10): {"security_id": 10},
+            ("BSE_EQ", 10): {"security_id": 10},
+        }
+        finder.security_index = {10: [("NSE_EQ", 10), ("BSE_EQ", 10)]}
+
+        self.assertEqual(finder._packet_key({"exchange_segment": 1, "security_id": 10}), ("NSE_EQ", 10))
+        self.assertEqual(finder._packet_key({"exchange_segment": 4, "security_id": 10}), ("BSE_EQ", 10))
+        self.assertIsNone(finder._packet_key({"security_id": 10}))
+
+    def test_dispatch_is_bounded_to_three_live_threads(self) -> None:
+        finder = IntraFinder.__new__(IntraFinder)
+        finder.config = PipelineConfig(intra_finder_max_dispatch_concurrency=3)
         finder.dispatch_lock = RLock()
+        finder.agent_threads = set()
         finder.events_triggered = 0
-        finder.agent_dispatch_successes = 0
-        finder.agent_dispatch_failures = 0
-        finder.indicator_events_detected = 0
-        finder.indicator_aggregates_formed = 0
-        finder.readiness_evaluations = 0
-        finder.readiness_passed = 0
-        finder.readiness_rechecks = 0
-        finder.readiness_threshold = 75.0
-        finder.readiness_direction_margin = 10.0
-        finder.readiness_min_completed_bars = 45
-        finder.readiness_min_room_atr = 0.55
-        finder.readiness_max_last_trade_age_seconds = 90
-        finder.readiness_observation_seconds = 600
-        finder.readiness_reevaluation_seconds = 60
-        finder.readiness_min_confirmation_seconds = 300
-        finder.readiness_max_entry_drift_atr = 0.80
-        finder.shadow_mode = True
         finder.events_suppressed = 0
+        finder.agent_dispatch_failures = 0
         finder.gate_failure_counts = __import__("collections").Counter()
-        finder.event_state = {"events": {}, "last_stock_event_at": {}}
-        state = {"security_id": 1, "latest_features": {}}
-        state.update(IndicatorEventEngine.state_fields())
-        finder.states = {1: state}
-        finder.stocks_by_security_id = {1: {"security_id": 1, "symbol": "TEST"}}
-        finder._log = lambda message: None
-        return finder
-
-    @staticmethod
-    def evidence(event_type: str, direction: str, at: datetime):
-        return {
-            "event_type": event_type,
-            "direction": direction,
-            "detected_at": at.isoformat(),
-            "bar_start": (at - timedelta(minutes=1)).replace(second=0, microsecond=0).isoformat(),
-        }
-
-    def test_events_for_one_stock_are_merged_before_one_emit(self) -> None:
-        finder = self.finder()
-        now = datetime.fromisoformat("2026-08-03T10:00:01+05:30")
-        state = finder.states[1]
-        finder._queue_indicator_evidence(
-            1,
-            state,
-            [
-                self.evidence("EMA_BULLISH_CROSS", "LONG", now),
-                self.evidence("BULLISH_ENGULFING", "LONG", now),
-            ],
-            now,
-        )
-        captured = []
-        finder._indicator_safety_gates = lambda *args: ([], 0.01)
-
-        def create_event(stock, local_state, features, events, direction, readiness, score, emitted_at):
-            captured.append((events, direction, readiness["score"], score))
-            return {"event_id": "one-event"}
-
-        finder._create_indicator_event = create_event
-        self.assertEqual(finder._flush_due_indicator_events(now + timedelta(seconds=30)), [])
-        with patch(
-            "pipeline.stages.intra_finder.evaluate_trade_readiness",
-            return_value={
-                "ready": True,
-                "direction": "LONG",
-                "score": 82.0,
-                "components": {},
-                "failures": [],
-            },
-        ):
-            emitted = finder._flush_due_indicator_events(now + timedelta(seconds=61))
-        self.assertEqual(len(emitted), 1)
-        self.assertEqual(len(captured[0][0]), 2)
-        self.assertEqual(captured[0][1], "LONG")
-        self.assertEqual(captured[0][2], 82.0)
-
-    def test_indicator_activity_does_not_speculatively_fetch_history(self) -> None:
-        finder = self.finder()
-        finder.signal_cache = SimpleNamespace(prewarm=Mock())
-        now = datetime.fromisoformat("2026-08-03T10:00:01+05:30")
-        state = finder.states[1]
-
-        finder._queue_indicator_evidence(
-            1,
-            state,
-            [self.evidence("EMA_BULLISH_CROSS", "LONG", now)],
-            now,
-        )
-        finder._reschedule_readiness_evaluation(
-            1,
-            state,
-            list(state["pending_indicator_events"]),
-            now,
-        )
-
-        finder.signal_cache.prewarm.assert_not_called()
-
-    def test_mixed_indicator_directions_are_preserved_for_agent_reasoning(self) -> None:
-        now = datetime.fromisoformat("2026-08-03T10:00:01+05:30")
-        events = [
-            self.evidence("RSI_EXITED_OVERSOLD", "LONG", now),
-            self.evidence("SHOOTING_STAR", "SHORT", now),
-        ]
-        self.assertEqual(IntraFinder._indicator_direction(events), "MIXED")
-
-    def test_basic_safety_gates_do_not_require_rvol_or_predictive_score(self) -> None:
-        finder = self.finder()
-        now = datetime.fromisoformat("2026-08-03T10:05:00+05:30")
-        finder._estimated_slippage = lambda *args, **kwargs: 0.01
-        state = finder.states[1]
-        features = {
-            "received_at": now.isoformat(),
-            "last_price": 100.0,
-            "depth": [{} for _ in range(5)],
-            "spread_percent": 0.03,
-            "connection_warm": True,
-            "upper_circuit": 120.0,
-            "lower_circuit": 80.0,
-            "relative_volume": None,
-        }
-        failures, slippage = finder._indicator_safety_gates(
-            state, features, "NEUTRAL", now
-        )
-        self.assertEqual(failures, [])
-        self.assertEqual(slippage, 0.01)
-
-    def test_weak_evidence_is_rejected_before_agent_readiness(self) -> None:
-        finder = self.finder()
-        self.assertTrue(
-            finder._weak_indicator_evidence_only(
-                [
-                    {"event_type": "DOJI"},
-                    {"event_type": "VOLUME_SURGE"},
-                ]
-            )
-        )
-        self.assertFalse(
-            finder._weak_indicator_evidence_only(
-                [
-                    {"event_type": "DOJI"},
-                    {"event_type": "EMA_BULLISH_CROSS"},
-                ]
-            )
-        )
-
-    def test_each_agent_event_starts_immediately_without_a_waiting_queue(self) -> None:
-        finder = self.finder()
-        both_started = Event()
         release = Event()
-        started: list[str] = []
+        started = Event()
+        calls: list[str] = []
 
         def post(event):
-            started.append(event["event_id"])
-            if len(started) == 2:
-                both_started.set()
+            calls.append(event["event_id"])
+            if len(calls) == 3:
+                started.set()
             release.wait(2)
 
         finder._post_agent_event = post
-        finder._dispatch_event({"event_id": "first"})
-        finder._dispatch_event({"event_id": "second"})
-
-        self.assertTrue(both_started.wait(2))
-        self.assertCountEqual(started, ["first", "second"])
-        self.assertEqual(finder.events_triggered, 2)
-        self.assertEqual(len(finder.agent_threads), 2)
-        self.assertFalse(hasattr(finder, "pending_agent_events"))
-
-        threads = list(finder.agent_threads)
+        for index in range(3):
+            self.assertTrue(finder._dispatch_event({"event_id": str(index)}))
+        self.assertTrue(started.wait(2))
+        self.assertFalse(finder._dispatch_event({"event_id": "fourth"}))
+        self.assertEqual(finder.events_triggered, 3)
         release.set()
-        for thread in threads:
+        for thread in list(finder.agent_threads):
             thread.join(timeout=2)
-        self.assertEqual(finder.agent_dispatch_successes, 2)
-        self.assertEqual(finder.agent_dispatch_failures, 0)
-        self.assertEqual(finder.agent_threads, set())
+
+    def test_one_share_depth_probe_uses_percent_units(self) -> None:
+        depth = [
+            {
+                "bid_price": 99.9,
+                "ask_price": 100.1,
+                "bid_quantity": 100,
+                "ask_quantity": 100,
+            }
+        ]
+        slippage = IntraFinder._estimated_slippage(
+            depth,
+            direction="LONG",
+            reference_price=100.0,
+            trade_amount=100.0,
+        )
+        self.assertAlmostEqual(slippage, 0.1)
+
+    def test_trigger_packet_preserves_agent_event_contract(self) -> None:
+        now = datetime.fromisoformat("2026-08-28T10:00:00+05:30")
+        stock = {
+            "isin": "INE1",
+            "exchange_segment": "NSE_EQ",
+            "security_id": 1,
+            "symbol": "TEST",
+            "display_name": "Test Limited",
+            "instrument": "EQUITY",
+        }
+        live = LiveStockState.from_stock(stock)
+        finder = IntraFinder.__new__(IntraFinder)
+        finder.config = PipelineConfig()
+        finder.market_time = SimpleNamespace(
+            now=lambda: now,
+            market_date_str=lambda: "2026-08-28",
+        )
+        finder.stocks = {live.key: stock}
+        finder.states = {live.key: live}
+        finder.security_index = {1: [live.key]}
+        finder.universe_version = "v2"
+        finder.universe_source_date = "2026-08-28"
+        finder.detector_mode = "cross_sectional_setups_v2"
+        finder.event_state = {"events": {}}
+        finder.packet_count = 0
+        finder.last_global_packet_at = None
+        finder.received_keys = set()
+        finder.full_packet_keys = set()
+        finder.coverage_milestones_logged = set()
+        finder.raw_buffer = []
+        finder.derived_buffer = []
+        finder.record_all_raw = False
+        finder.record_hot_raw = False
+        finder.last_rank_at = 0.0
+        finder.last_rank_duration_ms = 0.0
+        finder.candidates_seen = 0
+        finder.events_formed = 0
+        finder.events_suppressed = 0
+        finder.events_triggered = 0
+        finder.shadow_mode = True
+        finder.connected_at = now - timedelta(minutes=1)
+        finder.gate_failure_counts = __import__("collections").Counter()
+        finder._log = lambda _message: None
+        finder._flush_if_due = lambda: None
+        finder._save_status_if_due = lambda: None
+        finder._submit_io = lambda *_args: None
+        finder._load_context = lambda _path: None
+
+        class Ranker:
+            @staticmethod
+            def rank(states, _now):
+                item = next(iter(states.values()))
+                item.is_hot = True
+                item.activity_rank = 1
+                item.hotness = 95.0
+                item.volume_percentile = 95.0
+                item.volatility_percentile = 95.0
+                return RankingResult([item], [item], 1)
+
+        finder.ranker = Ranker()
+        signal = SetupSignal(
+            family="VOLATILITY_IGNITION",
+            direction="LONG",
+            armed_at=now - timedelta(seconds=5),
+            triggered_at=now,
+            expires_at=now + timedelta(seconds=30),
+            trigger_level=100.0,
+            trigger_price=100.0,
+            invalidation_price=99.5,
+            reason="test trigger",
+            diagnostics={"price": 100.0},
+        )
+        finder.setup_engine = SimpleNamespace(evaluate=lambda _state, _now: [signal])
+        packet = {
+            "exchange_segment": 1,
+            "security_id": 1,
+            "LTP": 100.0,
+            "LTT": "10:00:00",
+            "volume": 10_000,
+            "avg_price": 99.8,
+            "close": 99.0,
+            "open": 99.5,
+            "high": 100.0,
+            "low": 99.5,
+            "depth": [
+                {
+                    "bid_price": 99.99,
+                    "ask_price": 100.01,
+                    "bid_quantity": 1000,
+                    "ask_quantity": 1000,
+                    "bid_orders": 10,
+                    "ask_orders": 10,
+                }
+                for _ in range(5)
+            ],
+        }
+
+        event = finder.process_packet(packet, received_at=now)
+
+        self.assertEqual(event["setup_type"], "VOLATILITY_IGNITION")
+        self.assertEqual(event["setup_state"], "TRIGGERED")
+        self.assertEqual(event["expires_at"], signal.expires_at.isoformat())
+        self.assertEqual(event["activity"]["rank"], 1)
+        self.assertEqual(event["exchange_segment"], "NSE_EQ")
 
 
 if __name__ == "__main__":
