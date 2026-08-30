@@ -17,6 +17,8 @@ class PipelineConfig:
     bse_list_path: Path = backend_dir / "BSE_LIST.json"
     security_master_path: Path = root_dir / "security_id_list.csv"
     security_master_reference_dir: Path = results_dir / "reference" / "security-master"
+    corporate_actions_dir: Path = results_dir / "reference" / "corporate-actions"
+    corporate_actions_latest_path: Path = results_dir / "reference" / "corporate-actions" / "latest.json"
     stage1_results_dir: Path = results_dir / "stage1"
     stage2_results_dir: Path = results_dir / "stage2"
     nifty_results_dir: Path = results_dir / "nifty-50-market-depth"
@@ -62,6 +64,9 @@ class PipelineConfig:
     stage1_min_active_session_ratio: float = 0.90
     stage1_venue_switch_ratio: float = 1.20
     stage1_master_max_age_hours: int = 30
+    stage1_apply_opportunity_filters: bool = False
+    stage1_universe_fallback_max_age_days: int = 4
+    stage1_intraday_baseline_cache_days: int = 7
 
     stage2_history_days: int = 15
     stage2_min_rvol: float = 1.3
@@ -120,9 +125,18 @@ class PipelineConfig:
     intra_finder_max_slippage_percent: float = 0.20
     intra_finder_raw_retention_days: int = 7
     intra_finder_derived_retention_days: int = 90
-    intra_finder_flush_seconds: int = 30
-    intra_finder_status_seconds: int = 30
-    intra_finder_shadow_mode: bool = True
+    intra_finder_flush_seconds: int = 300
+    intra_finder_status_seconds: int = 60
+    intra_finder_shadow_mode: bool = False
+    intra_finder_hot_set_size: int = 60
+    intra_finder_hot_reserve_size: int = 100
+    intra_finder_setup_rank_limit: int = 10
+    intra_finder_hot_hysteresis_seconds: int = 60
+    intra_finder_open_rank_interval_seconds: int = 1
+    intra_finder_rank_interval_seconds: int = 5
+    intra_finder_max_dispatch_concurrency: int = 3
+    intra_finder_record_all_raw_packets: bool = False
+    intra_finder_record_hot_raw_packets: bool = True
     regime_history_days: int = 5
     regime_opening_range_minutes: int = 15
     regime_min_minutes_after_open: int = 30
@@ -160,7 +174,7 @@ class PipelineConfig:
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
     regime_schedule_times: tuple[str, ...] = ("09:15", "09:45", "12:30")
-    stage1_schedule_time: str = "08:40"
+    stage1_schedule_time: str = "07:30"
     stage2_first_run_time: str = "09:32"
     new_entry_cutoff_time: str = "15:00"
     protect_positions_time: str = "15:20"
