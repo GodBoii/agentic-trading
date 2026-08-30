@@ -73,7 +73,7 @@ services:
         - CMD
         - python
         - -c
-        - "import json,os,sys; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; session=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); artifact_ok=s.get('status')=='completed' and s.get('market_date')==session.market_date and int(s.get('baseline_schema_version') or 0)>=2; sys.exit(0 if (not session.is_trading_day or session.is_before_open or artifact_ok) else 1)"
+        - "import json,os,sys; from pathlib import Path; os.environ['MARKET_CALENDAR_NSE_SYNC_ENABLED']='0'; from pipeline.config import PipelineConfig; from pipeline.services.market_calendar_service import MarketCalendarService; session=MarketCalendarService(PipelineConfig()).session_status(); p=Path('/app/python-backend/results/stage1/latest.json'); d=json.loads(p.read_text()) if p.exists() else {}; s=d.get('summary',{}); artifact_ok=s.get('status')=='completed' and s.get('market_date')==session.market_date and int(s.get('baseline_schema_version') or 0)>=3; sys.exit(0 if (not session.is_trading_day or session.is_before_open or artifact_ok) else 1)"
       interval: 30s
       timeout: 5s
       retries: 120
@@ -87,13 +87,10 @@ services:
       AI_TRADING_EVENT_URL: http://ai-trading-agents:8020/ai-trading/event
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
       INTRA_FINDER_HEALTH_PORT: "8040"
-      INTRA_FINDER_SHADOW_MODE: "${INTRA_FINDER_SHADOW_MODE:-1}"
+      INTRA_FINDER_SHADOW_MODE: "${INTRA_FINDER_SHADOW_MODE:-0}"
       INTRA_FINDER_PROGRESS_LOG_SECONDS: "60"
-      INTRA_FINDER_INDICATOR_AGGREGATION_SECONDS: "${INTRA_FINDER_INDICATOR_AGGREGATION_SECONDS:-60}"
-      INTRA_FINDER_INDICATOR_EVENT_COOLDOWN_SECONDS: "${INTRA_FINDER_INDICATOR_EVENT_COOLDOWN_SECONDS:-600}"
-      INTRA_FINDER_STOCK_AGENT_COOLDOWN_SECONDS: "${INTRA_FINDER_STOCK_AGENT_COOLDOWN_SECONDS:-1200}"
-      INTRA_FINDER_INDICATOR_VOLUME_SURGE_RATIO: "${INTRA_FINDER_INDICATOR_VOLUME_SURGE_RATIO:-1.8}"
-      INTRA_FINDER_INDICATOR_MAX_EVENT_LAG_SECONDS: "${INTRA_FINDER_INDICATOR_MAX_EVENT_LAG_SECONDS:-60}"
+      INTRA_FINDER_RECORD_ALL_RAW_PACKETS: "${INTRA_FINDER_RECORD_ALL_RAW_PACKETS:-0}"
+      INTRA_FINDER_RECORD_HOT_RAW_PACKETS: "${INTRA_FINDER_RECORD_HOT_RAW_PACKETS:-1}"
     depends_on:
       dhan-auth-manager:
         condition: service_healthy
