@@ -101,6 +101,10 @@ class StorageService:
 
         stage = str(payload.get("stage") or "")
         if stage == "universe_scanner":
+            if summary.get("opportunity_filters_applied") is False:
+                # Historical profiles are optional in the broad-universe
+                # contract; master/reference validity determines usability.
+                return 0.0
             try:
                 scanned = int(summary.get("unique_isins_scanned") or 0)
                 failed = int(summary.get("historical_fetch_failed") or 0)
