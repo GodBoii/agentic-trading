@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Lock
@@ -43,6 +43,12 @@ class _ImmediateThread:
     def start(self) -> None:
         self.names.append(self.name)
         self.target(*self.args)
+
+
+class _AliveThread:
+    @staticmethod
+    def is_alive() -> bool:
+        return True
 
 
 def _event(event_id: str):
@@ -128,6 +134,29 @@ class AIOrchestratorAdmissionTests(unittest.TestCase):
         self.assertTrue(result["blocked"])
         self.assertEqual(result["status_code"], "DH-905_INVALID_IP")
         self.assertEqual(_ImmediateThread.names, [])
+
+    def test_expired_event_never_starts_agent(self) -> None:
+        orchestrator = self.orchestrator()
+        event = _event("expired")
+        event["expires_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+
+        result = orchestrator.submit_intra_finder_event(event)
+
+        self.assertFalse(result["accepted"])
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["status_code"], "EVENT_EXPIRED")
+        self.assertEqual(_ImmediateThread.names, [])
+
+    def test_fourth_concurrent_event_is_not_queued(self) -> None:
+        orchestrator = self.orchestrator()
+        orchestrator.config = types.SimpleNamespace(stock_agent_max_concurrent_trades=3)
+        orchestrator.event_threads = {_AliveThread(), _AliveThread(), _AliveThread()}
+
+        result = orchestrator.submit_intra_finder_event(_event("fourth"))
+
+        self.assertFalse(result["accepted"])
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["status_code"], "AGENT_CAPACITY")
 
     def test_successful_verification_restores_user_disabled_by_old_guard(self) -> None:
         with (
