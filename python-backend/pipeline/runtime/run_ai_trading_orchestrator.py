@@ -13,7 +13,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Lock, Thread
+from threading import Lock, Thread, current_thread
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -284,6 +284,7 @@ class AITradingOrchestrator:
         )
         self.event_state = self.storage.load_snapshot(self.event_state_path) or {"events": {}}
         self.event_lock = Lock()
+        self.event_threads: set[Thread] = set()
         with self.event_lock:
             if self._compact_event_state_locked():
                 self.storage.save_snapshot(self.event_state_path, self.event_state)
@@ -573,6 +574,22 @@ class AITradingOrchestrator:
         if missing:
             raise ValueError(f"invalid_intra_finder_event_missing:{','.join(missing)}")
         event_id = str(event["event_id"])
+        expires_at = event.get("expires_at")
+        if expires_at:
+            try:
+                expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+                if expiry.tzinfo is None:
+                    expiry = expiry.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid_intra_finder_event_expiry") from exc
+            if datetime.now(timezone.utc) >= expiry.astimezone(timezone.utc):
+                return {
+                    "accepted": False,
+                    "duplicate": False,
+                    "blocked": True,
+                    "event_id": event_id,
+                    "status_code": "EVENT_EXPIRED",
+                }
         gate = getattr(self, "order_placement_gate", None)
         if gate is not None:
             order_state = gate.refresh_from_store()
@@ -608,15 +625,43 @@ class AITradingOrchestrator:
                 self.event_state.setdefault("events", {}).pop(event_id, None)
                 raise
         thread = Thread(
-            target=self._run_intra_finder_event,
+            target=self._run_intra_finder_event_thread,
             args=(dict(event),),
             name=f"stock-agent-{event_id[:12]}",
             daemon=True,
         )
+        with self.event_lock:
+            self.event_threads = {
+                thread
+                for thread in getattr(self, "event_threads", set())
+                if getattr(thread, "is_alive", lambda: False)()
+            }
+            configured_limit = int(
+                getattr(getattr(self, "config", None), "stock_agent_max_concurrent_trades", 3)
+            )
+            if len(self.event_threads) >= configured_limit:
+                self.event_state.setdefault("events", {})[event_id].update(
+                    {
+                        "status": "blocked",
+                        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                        "status_code": "AGENT_CAPACITY",
+                        "reason": "The three live trade-analysis slots are occupied.",
+                    }
+                )
+                self.storage.save_snapshot(self.event_state_path, self.event_state)
+                return {
+                    "accepted": False,
+                    "duplicate": False,
+                    "blocked": True,
+                    "event_id": event_id,
+                    "status_code": "AGENT_CAPACITY",
+                }
+            self.event_threads.add(thread)
         try:
             thread.start()
         except Exception as exc:
             with self.event_lock:
+                self.event_threads.discard(thread)
                 existing = dict((self.event_state.get("events") or {}).get(event_id) or {})
                 existing.update(
                     {
@@ -633,6 +678,13 @@ class AITradingOrchestrator:
             "duplicate": False,
             "event_id": event_id,
         }
+
+    def _run_intra_finder_event_thread(self, event: Dict[str, Any]) -> None:
+        try:
+            self._run_intra_finder_event(event)
+        finally:
+            with self.event_lock:
+                self.event_threads.discard(current_thread())
 
     def save_user_config(self, request: Dict[str, Any]) -> Dict[str, Any]:
         user_id = str(request.get("user_id") or "").strip()
