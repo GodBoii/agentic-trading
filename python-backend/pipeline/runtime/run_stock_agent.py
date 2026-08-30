@@ -190,6 +190,15 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         market_date = self.market_time.market_date_str()
         if str(event.get("market_date") or "") != market_date:
             raise RuntimeError("stale_intra_finder_event")
+        if event.get("expires_at"):
+            try:
+                expires_at = datetime.fromisoformat(str(event["expires_at"]).replace("Z", "+00:00"))
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError) as exc:
+                raise RuntimeError("invalid_intra_finder_event_expiry") from exc
+            if datetime.now(timezone.utc) >= expires_at.astimezone(timezone.utc):
+                raise RuntimeError("expired_intra_finder_event")
         if str(event.get("exchange_segment") or "").upper() not in {"NSE_EQ", "BSE_EQ"}:
             raise RuntimeError("event_missing_valid_exchange_segment")
 
