@@ -29,7 +29,7 @@ class ClosedMarketMemoryLifecycleTests(TestCase):
                         "summary": {
                             "status": "completed",
                             "market_date": "2026-08-24",
-                            "baseline_schema_version": 2,
+                            "baseline_schema_version": 3,
                         }
                     }
                 ),
