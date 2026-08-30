@@ -1,138 +1,111 @@
 # Stage 2: Intra-Finder
 
-## The simple idea
+## Purpose
 
-Intra-Finder watches every Stage 1 survivor and asks:
+Intra-Finder watches the complete Stage 1 equity universe and answers:
 
-> Has a technical observation matured into a liquid, confirmed, well-located intraday opportunity that deserves an AI-agent review?
+1. Which stocks have unusual participation and realized movement now?
+2. Has one of those stocks formed a fresh named momentum or mean-reversion setup?
 
-One-minute events now open a watch instead of immediately calling an agent. Intra-Finder evaluates completed five- and fifteen-minute structure, support/resistance location, target room, participation, persistent depth, spread, slippage and confirmation. Only an `ENTRY_READY` result crosses the configured readiness threshold and reaches the agent.
+Historical data describes normal behavior. Live Full Packet data supplies the
+trigger. There is no fixed bar warm-up, indicator-event aggregation, readiness
+score or periodic recheck queue.
 
-There is no fixed top 30. The output count is determined by independently qualified setups.
+## Live state
 
-## Why completed candles are important
+Each instrument uses the composite `(exchange_segment, security_id)` key and a
+typed, bounded state containing:
 
-Events are calculated only when a one-minute candle has closed. A changing, unfinished candle can temporarily look like a doji, engulfing candle or EMA cross and then look completely different at the close. Waiting for the next minute's first tick prevents this form of look-ahead and repainting.
+- LTP, LTT, cumulative volume and session average trade price
+- day and opening-range OHLC
+- five-level depth, spread and persistent imbalance
+- one-second price and traded-value samples
+- completed one-minute bars
+- historical ADV, ATR and same-time volume/range baselines
+- activity percentiles, rank and setup state
 
-Each candle stores open, high, low, close, minute volume and session VWAP. The engine keeps 420 completed candles per stock, which covers one normal cash-market session and supports slower five- and fifteen-minute reasoning.
+Packet updates are constant-time. Ranking runs once per second from 09:15 to
+09:30 and once every five seconds afterward.
 
-## Events detected
+## Activity ranking
 
-The first version recognizes:
+The ranker first removes stale, incomplete, circuit-bound or wide-spread states.
+It then calculates real cross-sectional percentile ranks for:
 
-- EMA 9 crossing above or below EMA 21.
-- RSI 14 entering or leaving the oversold level of 30.
-- RSI 14 entering or leaving the overbought level of 70.
-- Doji, hammer and shooting-star candles.
-- Bullish and bearish engulfing candles.
-- A candle close crossing session VWAP.
-- A candle close breaking the completed 09:15-09:30 opening range.
-- One-minute volume at least 1.8 times the median of recent one-minute volume. A surge receives a direction only when the completed candle has a meaningful body and closes near the corresponding end of its range.
+- time-of-day volume pace, with ADV turnover fallback
+- five-minute realized volatility
+- five-minute traded value
 
-Entering RSI oversold or overbought is neutral evidence because it may represent continuing momentum. Exiting an extreme can support a reversal, but does not create a setup on its own.
+`hotness = min(volume percentile, volatility percentile)`. Both participation
+and movement are therefore required. Traded value and spread break ties.
 
-## Transition-only behavior
+The first 60 stocks form the hot working set. Ranks 61 to 100 provide short
+hysteresis so boundary movement does not repeatedly create and destroy setup
+state. Setup detection and agent admission run only for the top 10 ranks.
 
-Intra-Finder emits a cross only when the relationship changes. It does not send `price above EMA` on every packet. RSI events fire when a threshold is crossed, not for every candle that remains beyond it.
+## Setup families
 
-Each event type also has a default ten-minute cooldown per stock. This prevents repeated doji candles or noisy VWAP crossings from producing a new AI request every minute.
+Production detectors are explicit state machines:
 
-If an inactive stock receives no new tick for several minutes, its last candle closes late from the detector's point of view. The candle is retained for indicator history, but an event more than 60 seconds late is not emitted as a current opportunity.
+- `OPENING_DRIVE`
+- `GAP_REJECTION`
+- `OPENING_RANGE_ACCEPTANCE`
+- `VOLATILITY_IGNITION`
+- `VWAP_REVERSION`
 
-## Event aggregation
+Opening-drive detection can trigger after seconds of live observation without a
+completed minute bar. Opening-range setups become available after 09:30. Gap
+setups are disabled on deterministic corporate-action ex-dates.
 
-The first new event opens a 60-second observation window. Related events are collected, then the stock enters `FORMING` while the readiness model waits for completed five-minute confirmation. A watch can be reevaluated every 60 seconds for up to ten minutes. Short-lived evidence expires sooner: volume after three minutes and VWAP/candlestick/RSI evidence after five minutes.
+Every setup follows `IDLE -> ARMED -> TRIGGERED` and resets when its qualifying
+condition fails. Holding periods are 5 to 8 seconds, not five-minute waiting
+windows. Triggered events expire after 30 to 45 seconds. The same setup family
+on the same stock cannot re-arm for five minutes after a trigger.
 
-The combined direction is:
+## Agent contract and controls
 
-- `LONG` when all directional evidence is bullish.
-- `SHORT` when all directional evidence is bearish.
-- `MIXED` when bullish and bearish evidence conflict.
-- `NEUTRAL` when the evidence has no directional claim.
-
-Mixed and neutral observations are not dispatched. Conflicting structural transitions, conflicting recent price action and repeated signal churn are explicit rejection reasons.
-
-## Hard gates and readiness scoring
-
-Operational hard gates run first:
-
-- The live packet is fresh and complete enough to trust.
-- Five bid and ask levels are present.
-- Spread and estimated slippage are within configured limits.
-- The feed has finished warming after a reconnect.
-- The stock is not unusably close to a circuit condition.
-- It is before the new-entry cutoff, initially 15:00 IST.
-- The same stock is not inside its default 20-minute agent cooldown.
-
-The readiness model then scores five independent areas. Weak clues cannot compensate for a failed hard requirement.
-
-| Component | Maximum | Meaning |
-|---|---:|---|
-| Five-/fifteen-minute structure | 30 | VWAP side, slower EMA alignment and directional progress |
-| Location and target room | 25 | Nearby supportive level, opposing level and ATR-normalized room |
-| Confirmation | 20 | Setup-family confirmation on completed five-minute candles |
-| Participation | 15 | Time-of-day RVOL, volume acceleration, recent five-minute volume and trade freshness |
-| Execution quality | 10 | Spread, slippage and persistent—not single-packet—depth support |
-
-Default admission requires a score of 75, at least a ten-point advantage over the opposite direction, enough target room, adequate structure and participation, and a confirmed setup family. The score is not a win probability.
-
-Candlestick names have deliberately small weights. A doji or volume surge alone is discarded. A hammer, shooting star or engulfing candle requires meaningful location and additional confirmation. A pattern-only reversal needs supporting RSI-exit or directional-volume evidence.
-
-A bearish stock reaching support is not automatically shorted or bought. It remains under observation until price either confirms acceptance below support or produces a confirmed reversal. This protects the system from both shorting directly into support and guessing a reversal too early.
-
-## Agent dispatch controls
-
-Event IDs are deterministic from the market date, stock venue, first evidence time and event types. Repeated packets and restarts therefore cannot create the same job twice.
-
-Every confirmed signal is dispatched immediately. Intra-Finder starts an independent dispatch thread for it, and the AI gateway immediately starts a dedicated stock-agent thread after accepting it. There is no configured worker limit, waiting queue, queue capacity or queue expiry. A deterministic event ID prevents duplicate runs, and a stock-specific 20-minute cooldown prevents repeated agent spending on an equivalent setup.
-
-This deliberately permits simultaneous agent runs when several stocks qualify at once. The admission controls are therefore the Stage 2 evidence score, hard safety gates, duplicate suppression and cooldown—not delayed scheduling.
-
-## Shadow mode
-
-Shadow mode records exactly what would have been sent but does not call an agent:
+The existing workflow remains:
 
 ```text
-INTRA_FINDER_SHADOW_MODE=1
+deterministic trigger -> stock agent -> current risk and execution checks
 ```
 
-This remains the default in Docker Compose. Changing it to `0` enables agent requests; it does not by itself enable live orders. Live execution has a separate safety switch.
+Each event carries `armed_at`, `triggered_at`, `expires_at`, trigger level,
+invalidation, activity rank, percentiles, compact recent bars and five-level
+depth. Intra-Finder and the AI gateway both cap concurrent new agent work at
+three. The gateway and stock runner reject expired events.
 
-Useful configuration values are:
+The three-active-trade gate, fresh funds check, current LTP check and protected
+order workflow remain downstream.
+
+## Recording
+
+Full-universe one-second numeric summaries are retained for baseline research.
+Raw JSON packets default to hot stocks only. This avoids multiplying the old
+hundreds-of-megabytes partial-session archive by the larger universe.
+
+Defaults:
 
 ```text
-INTRA_FINDER_INDICATOR_AGGREGATION_SECONDS=60
-INTRA_FINDER_INDICATOR_EVENT_COOLDOWN_SECONDS=600
-INTRA_FINDER_STOCK_AGENT_COOLDOWN_SECONDS=1200
-INTRA_FINDER_INDICATOR_VOLUME_SURGE_RATIO=1.8
-INTRA_FINDER_INDICATOR_MAX_EVENT_LAG_SECONDS=60
-INTRA_FINDER_READINESS_SCORE_THRESHOLD=75
-INTRA_FINDER_READINESS_DIRECTION_MARGIN=10
-INTRA_FINDER_READINESS_MIN_COMPLETED_BARS=45
-INTRA_FINDER_READINESS_MIN_ROOM_ATR=0.55
-INTRA_FINDER_READINESS_MAX_LAST_TRADE_AGE_SECONDS=90
-INTRA_FINDER_READINESS_OBSERVATION_SECONDS=600
-INTRA_FINDER_READINESS_REEVALUATION_SECONDS=60
-INTRA_FINDER_READINESS_MIN_CONFIRMATION_SECONDS=300
-INTRA_FINDER_READINESS_MAX_ENTRY_DRIFT_ATR=0.80
+INTRA_FINDER_SHADOW_MODE=0
+INTRA_FINDER_RECORD_ALL_RAW_PACKETS=0
+INTRA_FINDER_RECORD_HOT_RAW_PACKETS=1
 ```
 
-## WebSocket and recovery behavior
+The shadow switch remains available for incident response and offline testing,
+but Docker starts the requested small-capital live path by default.
 
-One Dhan WebSocket can monitor thousands of instruments, while one subscription message contains at most 100. For 250 stocks, Intra-Finder sends batches of 100, 100 and 50 on the same connection.
+## Recovery and health
 
-The service preserves its minute bars, current candle, indicator snapshot, pending aggregate, cooldowns and idempotency state in its runtime checkpoint. After reconnection it resubscribes to the complete Stage 1 universe. After a process restart it restores the compatible checkpoint before detecting new events.
+Current-session compact state is checkpointed. A restart restores recent price,
+value, depth, bars, opening range and setup state. If an after-09:30 restart has
+no opening range, background recovery is rate-limited to 100 queued instruments
+at a time and never blocks packet processing.
 
-The health endpoint at `http://localhost:8040/health` reports detector mode, requested/observed coverage, packet age, reconnects, raw observations, readiness evaluations, successful readiness events, rechecks, pending watches and shadow state.
+Health and status expose feed coverage, eligible rank population, hot count,
+rank duration, candidate count, events, dispatch concurrency, gate failures and
+raw capture scope.
 
-Raw packets are retained for seven days. Normalized one-second observations are retained for ninety days. Setup-event records and decisions are retained long-term.
-
-## What this system cannot know directly
-
-Five-level depth and indicators do not reveal the identity or true intention of a bank, operator, hedge fund or investor. They also cannot show every hidden order, another trader's exact stop-loss, or guarantee that a pattern will work. The watcher notices observable changes; the AI agent evaluates whether those changes form a sensible, executable trade.
-
-# User affordability boundary
-
-Intra-Finder never reads a user's trading amount when building or monitoring the global universe. Its common depth-capacity probe is one share only. Each accepted event carries the five raw depth levels needed by the downstream gateway to calculate a user's whole-share quantity and user-sized slippage.
-
-For each configured user, downstream routing first resolves an effective amount: a fresh manual value when supplied, otherwise current available broker balance. It then requires `current price <= effective amount`, at least one whole share, sufficient five-level depth for `floor(effective amount / price)` shares, and acceptable estimated slippage. This user-specific pass can admit affordable events beyond a small fixed shortlist without altering the global Stage 1 universe. A failure suppresses only that user's agent dispatch. It does not suppress the global event or another user's route.
+The old indicator engine and trade-readiness model remain importable only for
+historical replay compatibility. The live scanner does not import or execute
+them.
