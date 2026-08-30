@@ -30,6 +30,7 @@ class UniverseRecord:
     alternate_venues: List[Dict[str, Any]] = field(default_factory=list)
     historical: Dict[str, Any] = field(default_factory=dict)
     intraday_baselines: Dict[str, Any] = field(default_factory=dict)
+    corporate_action: Optional[Dict[str, Any]] = None
     surveillance: Dict[str, Any] = field(default_factory=dict)
     tradability: Dict[str, Any] = field(default_factory=dict)
 
