@@ -132,9 +132,29 @@ class IntraFinder:
                 )
             ),
         )
-        self.activity_ranker = ActivityRanker(self.market_time)
+                self.activity_ranker = ActivityRanker(self.market_time)
         self.setups = {}
         self.last_rank_time = 0.0
+            ),
+            event_cooldown_seconds=max(
+                0,
+                int(
+                    os.getenv(
+                        "INTRA_FINDER_INDICATOR_EVENT_COOLDOWN_SECONDS",
+                        str(self.config.intra_finder_indicator_event_cooldown_seconds),
+                    )
+                ),
+            ),
+            max_event_lag_seconds=max(
+                0,
+                int(
+                    os.getenv(
+                        "INTRA_FINDER_INDICATOR_MAX_EVENT_LAG_SECONDS",
+                        str(self.config.intra_finder_indicator_max_event_lag_seconds),
+                    )
+                ),
+            ),
+        )
         self.pending_indicator_deadlines: List[Tuple[float, int, int]] = []
         self.indicator_events_detected = 0
         self.indicator_aggregates_formed = 0
@@ -341,7 +361,7 @@ class IntraFinder:
                 self.event_state = loaded_event_state
         return stocks
 
-    def _new_state(self, stock: Dict[str, Any]) -> LiveStockState:
+        def _new_state(self, stock: Dict[str, Any]) -> LiveStockState:
         adv = float(stock.get("historical", {}).get("adv") or 0.0)
         atr = float(stock.get("historical", {}).get("atr") or 0.0)
         baselines = stock.get("intraday_baselines", {}).get("volumes", {})
@@ -359,7 +379,7 @@ class IntraFinder:
         self.setups[state.security_id] = [MomentumSetup(), MeanReversionSetup()]
         return state
 
-    @staticmethod
+        @staticmethod
     def _state_checkpoint_fields() -> Tuple[str, ...]:
         return ()
 
@@ -841,7 +861,10 @@ class IntraFinder:
             "depth_sample_count_30s": len(imbalances),
         }
 
-    def process_packet(
+    @staticmethod
+    @staticmethod
+    @staticmethod
+        def process_packet(
         self,
         packet: Dict[str, Any],
         *,
@@ -904,7 +927,7 @@ class IntraFinder:
                         contract["exchange_segment"] = state.exchange_segment
                         contract["market_date"] = self.market_time.market_date_str()
                         setup.dispatched = True
-                        self._dispatch_event(contract)
+                        self._post_agent_event(contract)
                         return contract
 
         self._flush_if_due()
@@ -954,16 +977,24 @@ class IntraFinder:
         return compact
 
     def _dispatch_event(self, event: Dict[str, Any]) -> None:
-        """Dispatch event via bounded thread pool."""
-        executor = getattr(self, "dispatch_executor", None)
-        if executor is None:
-            from concurrent.futures import ThreadPoolExecutor
-            self.dispatch_executor = ThreadPoolExecutor(max_workers=4)
-            executor = self.dispatch_executor
-        
-        executor.submit(self._post_agent_event_immediately, event)
+        """Start one independent dispatch thread immediately for every signal."""
+        event_id = str(event.get("event_id") or uuid.uuid4().hex[:12])
+        thread = Thread(
+            target=self._post_agent_event_immediately,
+            args=(event,),
+            name=f"intra-agent-dispatch-{event_id[:12]}",
+            daemon=True,
+        )
         with self.dispatch_lock:
+            self.agent_threads.add(thread)
             self.events_triggered += 1
+        try:
+            thread.start()
+        except Exception:
+            with self.dispatch_lock:
+                self.agent_threads.discard(thread)
+                self.agent_dispatch_failures += 1
+            raise
 
     def _post_agent_event_immediately(self, event: Dict[str, Any]) -> None:
         try:
