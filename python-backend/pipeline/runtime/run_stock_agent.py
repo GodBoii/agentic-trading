@@ -15,6 +15,7 @@ from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.order_placement_gate import OrderPlacementGate
 from pipeline.services.trading_amount_service import TradingAmountService
+from pipeline.services.user_dhan_credentials import UserDhanCredentials
 from pipeline.stock import StockAgent, StockDecisionContextBuilder
 from pipeline.stock.toolkits import (
     StockAccountToolkit,
@@ -29,6 +30,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
     def __init__(self, config: Optional[PipelineConfig] = None) -> None:
         super().__init__(config, initialize_agent=False)
         self.execution_helper = ExecutionerRunner(self.config, initialize_agent=False)
+        self.user_dhan = UserDhanCredentials(self.config)
         self.order_placement_gate = OrderPlacementGate(
             self.dhan,
             self.config.order_placement_state_path,
@@ -202,10 +204,11 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         if str(event.get("exchange_segment") or "").upper() not in {"NSE_EQ", "BSE_EQ"}:
             raise RuntimeError("event_missing_valid_exchange_segment")
 
-        account_context = self._build_account_context()
         normalized_user_id = str(user_id or "").strip()
         if not normalized_user_id:
             raise RuntimeError("user_id_required_for_agent_session")
+        user_dhan = self.user_dhan.service(normalized_user_id)
+        account_context = self._build_account_context(user_dhan)
         trade_config = dict(trade_config or {})
         trade_config["trade_mode"] = str(trade_config.get("trade_mode") or "auto").lower()
         trade_config["trade_amount"] = TradingAmountService.parse(trade_config.get("trade_amount"))
@@ -266,6 +269,16 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
     def resolve_user_trade_config(self, user: Dict[str, Any]) -> Dict[str, Any]:
         """Resolve a manual amount or fetch current balance for automatic mode."""
         user_id = str(user.get("user_id") or "")
+        try:
+            user_dhan = self.user_dhan.require_order_access(user_id)
+        except Exception as exc:
+            return {
+                "user_id": user_id,
+                "eligible": False,
+                "status_code": "dhan_authorization_or_ip_unavailable",
+                "message": "Reconnect Dhan and whitelist this backend's static IP before enabling live orders.",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
         mode = str(user.get("trade_mode") or ("manual" if user.get("trade_amount") not in (None, "") else "auto")).lower()
         if mode == "manual":
             amount = TradingAmountService.parse(user.get("trade_amount"))
@@ -277,7 +290,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                     "message": "This account's manual amount is invalid. Save a positive amount or leave it blank for automatic sizing.",
                 }
             try:
-                account_context = self._build_sizing_account_context()
+                account_context = self._build_sizing_account_context(user_dhan)
                 capacity = self._account_margin_capacity(account_context)
                 available = self._account_available_balance(account_context)
             except Exception as exc:
@@ -310,7 +323,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "max_concurrent_trades": max_concurrent_trades,
             }
         try:
-            account_context = self._build_sizing_account_context()
+            account_context = self._build_sizing_account_context(user_dhan)
             effective = self._with_effective_trade_amount({"trade_mode": "auto"}, account_context) or {}
             amount = TradingAmountService.parse(effective.get("trade_amount"))
         except Exception as exc:
@@ -366,8 +379,8 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         copied["margin_slot_count"] = slots
         return copied
 
-    def _build_sizing_account_context(self) -> Dict[str, Any]:
-        fund_limits = self.dhan.fetch_fund_limits()
+    def _build_sizing_account_context(self, dhan: DhanService) -> Dict[str, Any]:
+        fund_limits = dhan.fetch_fund_limits()
         raw_data = fund_limits.get("data") if isinstance(fund_limits, dict) else {}
         if isinstance(raw_data, dict) and isinstance(raw_data.get("data"), dict):
             raw_data = raw_data["data"]
@@ -419,7 +432,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         direction = str(event.get("direction") or "LONG").upper()
         side = "SELL" if direction == "SHORT" else "BUY"
         margin_check = (
-            self._calculate_one_share_margin(event, side, price)
+            self._calculate_one_share_margin(event, side, price, self.user_dhan.service(user_id))
             if amount is not None and price > 0
             else {"status": "failure", "total_margin": None}
         )
@@ -536,10 +549,16 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 filtered.append(enriched)
         return filtered
 
-    def _calculate_one_share_margin(self, stock: Dict[str, Any], side: str, reference_price: float) -> Dict[str, Any]:
+    def _calculate_one_share_margin(
+        self,
+        stock: Dict[str, Any],
+        side: str,
+        reference_price: float,
+        dhan: Optional[DhanService] = None,
+    ) -> Dict[str, Any]:
         security_id = int(stock.get("security_id") or 0)
         try:
-            response = self.execution_helper.dhan.calculate_margin_requirement(
+            response = (dhan or self.execution_helper.dhan).calculate_margin_requirement(
                 security_id=security_id,
                 exchange_segment=str(stock.get("exchange_segment") or "").upper(),
                 transaction_type=side,
@@ -711,7 +730,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         selected_stock = self.execution_helper._normalize_selected_stock(
             {"rank": index + 1, "candidate": candidate_packet}
         )
-        isolated_dhan = DhanService(self.config, prefer_gateway=False)
+        isolated_dhan = self.user_dhan.service(str(trade_config.get("user_id") or ""))
         margin_budget = self._resolve_margin_budget(trade_config, candidate_packet)
         market_data_toolkit = StockMarketDataToolkit(
             dhan=self.dhan,
