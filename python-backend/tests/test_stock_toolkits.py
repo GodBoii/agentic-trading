@@ -196,6 +196,30 @@ class FreshStateDhan(FakeStockDhan):
 
 
 class StockToolkitTests(unittest.TestCase):
+    def test_detector_direction_cannot_be_reversed_by_agent(self):
+        toolkit = StockExecutionToolkit(
+            FakeStockDhan(),
+            111,
+            500,
+            allowed_side="BUY",
+        )
+
+        sizing = toolkit.estimate_intraday_quantity(
+            side="SELL",
+            reference_price=100,
+            stop_loss_price=101,
+        )
+        placement = toolkit.place_protected_intraday_order(
+            side="SELL",
+            quantity=1,
+            entry_price=100,
+            target_price=99,
+            stop_loss_price=101,
+        )
+
+        self.assertIn("side_conflicts_with_detector_direction", sizing)
+        self.assertIn("side_conflicts_with_detector_direction", placement)
+
     def test_depth_monitor_awaits_async_disconnect_fallback(self):
         class AsyncDisconnectFeed:
             def __init__(self):
