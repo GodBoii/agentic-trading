@@ -9,7 +9,7 @@
 - Explicit opening drive, gap rejection, opening-range acceptance, volatility
   ignition and VWAP reversion setup families.
 - Five-minute per-stock, per-family re-arm interval.
-- Three concurrent new-entry agents and the existing three-active-trade gate.
+- Configured concurrent new-entry agents and active-trade gate.
 - Live event dispatch by default, with the shadow switch retained.
 
 ## August 28 causal replay
