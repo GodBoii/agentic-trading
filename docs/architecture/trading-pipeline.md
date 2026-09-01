@@ -52,8 +52,8 @@ snapshot, never half-written JSON.
 
 The requested small-capital environment starts Intra-Finder with
 `INTRA_FINDER_SHADOW_MODE=0`. The shadow switch remains available. Agent work is
-bounded to three concurrent runs, events expire, and live order placement stays
-separately protected by `EXECUTIONER_ALLOW_LIVE_ORDERS`, the shared three-trade
+bounded by configuration, events expire, and live order placement stays
+separately protected by `EXECUTIONER_ALLOW_LIVE_ORDERS`, the shared trade-slot
 gate and fresh broker checks.
 
 # Per-user trading amount (dynamic Stage 2 routing)
