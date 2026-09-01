@@ -19,9 +19,16 @@ def main() -> int:
         int(summary.get("baseline_schema_version") or 0)
         >= UniverseScanner.BASELINE_SCHEMA_VERSION
     )
+    force_rebuild = os.getenv("UNIVERSE_SCANNER_FORCE_REBUILD", "0").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
 
     try:
-        if complete and not baseline_current:
+        if complete and force_rebuild:
+            print("Universe Scanner force rebuild requested.", flush=True)
+            max_isins = os.getenv("UNIVERSE_SCANNER_MAX_ISINS")
+            result = UniverseScanner(config).run(int(max_isins) if max_isins else None)
+        elif complete and not baseline_current:
             print(
                 "Universe Scanner upgrading intraday baselines to the current schema.",
                 flush=True,
