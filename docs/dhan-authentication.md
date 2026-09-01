@@ -3,8 +3,33 @@
 ## Separate credential domains
 
 The backend scanner account and website-user trading accounts are different
-credential domains. `dhan-auth-manager` manages only the scanner account used by
-the backend containers. Existing website-user tokens remain in Supabase.
+credential domains. `dhan-auth-manager` manages only the scanner and paid data
+account used by the backend containers.
+
+For the small trusted user group, each website user enters their own Dhan Client
+ID, API key and API secret once. Next.js encrypts those values with
+`DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET` and stores them in the internal Convex
+`dhanCredentials` table. The browser never receives stored credentials.
+
+The user then completes Dhan's consent login. The callback stores the resulting
+encrypted 24-hour access token in the same Convex record. When it expires, the
+dashboard reuses the saved API credentials to start a fresh Dhan login. There is
+no Vercel cron and no PIN or TOTP storage.
+
+Portfolio routes and live execution use the signed-in user's Dhan access token.
+Market history, quotes, depth and scanner feeds continue to use the global paid
+data account. Before routing a user's order, the backend verifies that Dhan sees
+the backend's outbound IP as an allowed static IP for that user.
+
+Each user must create their Dhan API key with the production callback URL:
+
+```text
+https://<app-domain>/api/dhan/callback
+```
+
+Set the same `DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET` value in the Next.js
+deployment and the Python backend. Changing it makes existing encrypted records
+unreadable, so back it up with the other production secrets.
 
 ## Runtime credential file
 
