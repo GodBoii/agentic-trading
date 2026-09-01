@@ -651,7 +651,7 @@ class AITradingOrchestrator:
                 if getattr(thread, "is_alive", lambda: False)()
             }
             configured_limit = int(
-                getattr(getattr(self, "config", None), "stock_agent_max_concurrent_trades", 3)
+                getattr(getattr(self, "config", None), "stock_agent_max_concurrent_trades", 5)
             )
             if len(self.event_threads) >= configured_limit:
                 self.event_state.setdefault("events", {})[event_id].update(
@@ -659,7 +659,7 @@ class AITradingOrchestrator:
                         "status": "blocked",
                         "finished_at_utc": datetime.now(timezone.utc).isoformat(),
                         "status_code": "AGENT_CAPACITY",
-                        "reason": "The three live trade-analysis slots are occupied.",
+                        "reason": f"The {configured_limit} live trade-analysis slots are occupied.",
                     }
                 )
                 self.storage.save_snapshot(self.event_state_path, self.event_state)
