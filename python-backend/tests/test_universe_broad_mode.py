@@ -4,6 +4,8 @@ import unittest
 import sys
 import types
 from collections import Counter
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -100,6 +102,53 @@ class BroadUniverseTests(unittest.TestCase):
         }
 
         self.assertTrue(StorageService.is_stage_snapshot_usable(payload, 0.10))
+
+    def test_profile_builder_waits_out_shared_historical_cooldown(self) -> None:
+        scanner = self.scanner()
+        scanner.dhan = SimpleNamespace(
+            historical_rate_limit_until=10.0,
+            historical_circuit_open_until=0.0,
+        )
+        with (
+            patch(
+                "pipeline.stages.universe_scanner.time.monotonic",
+                side_effect=[0.0, 11.0],
+            ),
+            patch("pipeline.stages.universe_scanner.time.sleep") as sleep,
+        ):
+            scanner._wait_for_historical_api()
+
+        sleep.assert_called_once_with(10.05)
+
+    def test_gateway_cooldown_is_retried_instead_of_becoming_missing_data(self) -> None:
+        scanner = self.scanner()
+        responses = iter(
+            [
+                {
+                    "status": "failure",
+                    "remarks": {
+                        "error_code": "LOCAL-RATE-LIMIT-COOLDOWN",
+                        "error_message": "retry available in 2 seconds",
+                    },
+                },
+                {"status": "success", "close": [100.0]},
+            ]
+        )
+        with patch("pipeline.stages.universe_scanner.time.sleep") as sleep:
+            result = scanner._fetch_history_resilient(lambda: next(responses))
+
+        self.assertEqual(result["status"], "success")
+        sleep.assert_called_once_with(2.25)
+
+    def test_non_retryable_history_failure_returns_immediately(self) -> None:
+        scanner = self.scanner()
+        response = {"status": "failure", "remarks": {"error_code": "BAD_REQUEST"}}
+        request = Mock(return_value=response)
+
+        result = scanner._fetch_history_resilient(request)
+
+        self.assertIs(result, response)
+        request.assert_called_once_with()
 
 
 if __name__ == "__main__":
