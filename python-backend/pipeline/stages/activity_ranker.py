@@ -52,7 +52,7 @@ class ActivityRanker:
         volume_values = sorted(float(state.volume_pace or 0.0) for state in eligible)
         volatility_values = sorted(state.realized_volatility_percent for state in eligible)
         traded_values = sorted(state.traded_value_5m for state in eligible)
-        returns = [state.return_percent(300, now.timestamp()) for state in eligible]
+        returns = [state.return_5m_percent for state in eligible]
         market_return = float(median(returns)) if returns else 0.0
         relative_values = sorted(abs(value - market_return) for value in returns)
         for state, stock_return in zip(eligible, returns):
