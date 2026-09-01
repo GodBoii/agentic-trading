@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from pipeline.services.convex_service import ConvexService
@@ -168,6 +169,37 @@ class OrderPlacementGateTests(unittest.TestCase):
 
         clock[0] += timedelta(seconds=31)
         self.assertEqual(gate.active_trade_slots(set()), set())
+
+    def test_current_trade_slots_merge_positions_orders_and_reservations(self):
+        dhan = SimpleNamespace(
+            fetch_positions=lambda: {
+                "status": "success",
+                "data": [
+                    {"securityId": 111, "productType": "INTRADAY", "netQty": 2},
+                    {"securityId": 999, "productType": "CNC", "netQty": 5},
+                ],
+            },
+            fetch_order_book=lambda: {
+                "status": "success",
+                "data": [{"securityId": 222, "orderStatus": "PENDING"}],
+            },
+            fetch_super_orders=lambda: {
+                "status": "success",
+                "data": [
+                    {
+                        "securityId": 333,
+                        "orderStatus": "TRADED",
+                        "legDetails": [{"orderStatus": "TRANSIT"}],
+                    }
+                ],
+            },
+        )
+        gate = OrderPlacementGate(dhan, self.state_path, interval_seconds=21600)
+        gate.reserve_trade_slot(444)
+
+        slots = gate.current_active_trade_slots()
+
+        self.assertEqual(slots, {"111", "222", "333", "444"})
 
 
 if __name__ == "__main__":
