@@ -9,6 +9,7 @@
  */
 
 import type * as agentSessions from "../agentSessions.js";
+import type * as dhanCredentials from "../dhanCredentials.js";
 import type * as orderPlacementStates from "../orderPlacementStates.js";
 import type * as tradingConfigurations from "../tradingConfigurations.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agentSessions: typeof agentSessions;
+  dhanCredentials: typeof dhanCredentials;
   orderPlacementStates: typeof orderPlacementStates;
   tradingConfigurations: typeof tradingConfigurations;
 }>;
