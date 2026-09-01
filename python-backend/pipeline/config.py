@@ -174,7 +174,9 @@ class PipelineConfig:
     monitor_loop_interval_seconds: int = 600
     regime_loop_interval_seconds: int = 900
     regime_schedule_times: tuple[str, ...] = ("09:15", "09:45", "12:30")
-    stage1_schedule_time: str = "07:30"
+    stage1_schedule_time: str = "07:00"
+    stage1_premarket_start_cutoff_time: str = "07:30"
+    stage1_max_run_seconds: int = 5400
     stage2_first_run_time: str = "09:32"
     new_entry_cutoff_time: str = "15:00"
     protect_positions_time: str = "15:20"
