@@ -13,6 +13,17 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index('by_supabase_user_id', ['supabaseUserId']),
 
+  dhanCredentials: defineTable({
+    supabaseUserId: v.string(),
+    dhanClientId: v.string(),
+    encryptedApiKey: v.string(),
+    encryptedApiSecret: v.string(),
+    encryptedAccessToken: v.optional(v.string()),
+    tokenExpiresAt: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index('by_supabase_user_id', ['supabaseUserId']),
+
   orderPlacementStates: defineTable({
     broker: v.string(),
     allowed: v.boolean(),
