@@ -53,6 +53,14 @@ class ConvexService:
         return [dict(row) for row in (rows or [])]
 
     @classmethod
+    def get_dhan_credentials(cls, user_id: str) -> Optional[Dict[str, Any]]:
+        result = cls.client().query(
+            "dhanCredentials:get",
+            {"supabaseUserId": str(user_id)},
+        )
+        return dict(result) if result else None
+
+    @classmethod
     def upsert_trading_configuration(
         cls,
         user_id: str,
