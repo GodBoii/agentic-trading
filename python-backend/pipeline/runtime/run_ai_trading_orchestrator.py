@@ -583,13 +583,11 @@ class AITradingOrchestrator:
             except (TypeError, ValueError) as exc:
                 raise ValueError("invalid_intra_finder_event_expiry") from exc
             if datetime.now(timezone.utc) >= expiry.astimezone(timezone.utc):
-                return {
-                    "accepted": False,
-                    "duplicate": False,
-                    "blocked": True,
-                    "event_id": event_id,
-                    "status_code": "EVENT_EXPIRED",
-                }
+                return self._block_intra_finder_event(
+                    event_id,
+                    "EVENT_EXPIRED",
+                    "Event expired before agent admission.",
+                )
         gate = getattr(self, "order_placement_gate", None)
         if gate is not None:
             order_state = gate.refresh_from_store()
@@ -610,6 +608,22 @@ class AITradingOrchestrator:
                     "event_id": event_id,
                     "status_code": order_state.status_code,
                 }
+            load_slots = getattr(gate, "current_active_trade_slots", None)
+            if callable(load_slots):
+                active_slots = load_slots()
+                if active_slots is None:
+                    return self._block_intra_finder_event(
+                        event_id,
+                        "TRADE_CAPACITY_UNAVAILABLE",
+                        "Broker positions and active orders could not be verified.",
+                    )
+                if len(active_slots) >= self.config.stock_agent_max_concurrent_trades:
+                    return self._block_intra_finder_event(
+                        event_id,
+                        "MAX_ACTIVE_TRADES",
+                        "The configured live trade slots are occupied.",
+                        active_trade_count=len(active_slots),
+                    )
         with self.event_lock:
             existing = (self.event_state.get("events") or {}).get(event_id)
             if existing:
@@ -677,6 +691,33 @@ class AITradingOrchestrator:
             "accepted": True,
             "duplicate": False,
             "event_id": event_id,
+        }
+
+    def _block_intra_finder_event(
+        self,
+        event_id: str,
+        status_code: str,
+        reason: str,
+        **details: Any,
+    ) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.event_lock:
+            self.event_state.setdefault("events", {})[event_id] = {
+                "status": "blocked",
+                "accepted_at_utc": now,
+                "finished_at_utc": now,
+                "status_code": status_code,
+                "reason": reason,
+                **details,
+            }
+            self.storage.save_snapshot(self.event_state_path, self.event_state)
+        return {
+            "accepted": False,
+            "duplicate": False,
+            "blocked": True,
+            "event_id": event_id,
+            "status_code": status_code,
+            **details,
         }
 
     def _run_intra_finder_event_thread(self, event: Dict[str, Any]) -> None:
