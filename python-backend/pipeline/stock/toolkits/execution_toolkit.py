@@ -69,6 +69,7 @@ class StockExecutionToolkit(Toolkit):
         final_quote_max_age_seconds: float = 30.0,
         final_candle_max_age_seconds: float = 120.0,
         max_entry_drift_risk_fraction: float = 0.50,
+        allowed_side: Optional[str] = None,
     ) -> None:
         self.security_id = int(security_id)
         self.margin_budget = max(0.0, float(margin_budget))
@@ -87,6 +88,8 @@ class StockExecutionToolkit(Toolkit):
             0.0,
             float(max_entry_drift_risk_fraction),
         )
+        normalized_allowed_side = str(allowed_side or "").upper()
+        self.allowed_side = normalized_allowed_side if normalized_allowed_side in {"BUY", "SELL"} else None
         self.exchange_segment = str(exchange_segment or "BSE_EQ").upper()
         if self.exchange_segment not in {"NSE_EQ", "BSE_EQ"}:
             raise ValueError("StockExecutionToolkit requires NSE_EQ or BSE_EQ.")
@@ -133,6 +136,10 @@ class StockExecutionToolkit(Toolkit):
                 self._failure("valid_stop_loss_price_required_for_leveraged_sizing")
             )
         normalized_side = str(side or "").upper()
+        if self.allowed_side is not None and normalized_side != self.allowed_side:
+            return json_tool_result_markdown(
+                self._failure("side_conflicts_with_detector_direction")
+            )
         if (
             normalized_side == "BUY" and stop >= float(reference_price)
         ) or (
@@ -215,8 +222,12 @@ class StockExecutionToolkit(Toolkit):
             # Another event may have received DH-905 while this event waited.
             if self.coordinator.order_placement_blocked():
                 return json_tool_result_markdown(
-                    self._failure("execution_halted_order_placement_blocked")
-                )
+                self._failure("execution_halted_order_placement_blocked")
+            )
+        if self.allowed_side is not None and str(side or "").upper() != self.allowed_side:
+            return json_tool_result_markdown(
+                self._failure("side_conflicts_with_detector_direction")
+            )
             overlap_error = self._validate_no_existing_trade()
             if overlap_error:
                 return self._record_preflight_failure(
