@@ -35,12 +35,24 @@ def _artifact_complete(path: Path, market_date: str) -> bool:
     )
 
 
-def _run_heavy_scan() -> int:
-    completed = subprocess.run(
-        [sys.executable, "-m", "pipeline.runtime.run_universe_scanner_once"],
-        check=False,
-    )
-    return int(completed.returncode)
+def _run_heavy_scan(timeout_seconds: int) -> int:
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "pipeline.runtime.run_universe_scanner_once"],
+            check=False,
+            timeout=max(60, timeout_seconds),
+        )
+        return int(completed.returncode)
+    except subprocess.TimeoutExpired:
+        return 124
+
+
+def _should_defer_heavy_scan(
+    now_time: Any,
+    premarket_cutoff: Any,
+    session: Any,
+) -> bool:
+    return now_time >= premarket_cutoff and not bool(session.is_after_close)
 
 
 def main() -> None:
@@ -48,6 +60,7 @@ def main() -> None:
     market_time = MarketTimeService(config)
     market_calendar = MarketCalendarService(config)
     last_run_date = ""
+    last_deferred_log_at = 0.0
     retry_seconds = max(60, config.stage1_degraded_retry_interval_seconds)
     print("UNIVERSE SCANNER")
     print("Heavy scan work runs in an exit-after-run child process.", flush=True)
@@ -75,7 +88,22 @@ def main() -> None:
             time.sleep(30)
             continue
 
-        return_code = _run_heavy_scan()
+        premarket_cutoff = datetime.strptime(
+            config.stage1_premarket_start_cutoff_time,
+            "%H:%M",
+        ).time()
+        if _should_defer_heavy_scan(now.time(), premarket_cutoff, session):
+            if time.time() - last_deferred_log_at >= 1800:
+                print(
+                    "Universe Scanner deferred: premarket start cutoff passed; "
+                    "using the last-known-good live universe until after close.",
+                    flush=True,
+                )
+                last_deferred_log_at = time.time()
+            time.sleep(30)
+            continue
+
+        return_code = _run_heavy_scan(config.stage1_max_run_seconds)
         complete = return_code == 0 and _artifact_complete(daily_path, market_date)
         if complete:
             last_run_date = market_date
