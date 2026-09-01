@@ -72,10 +72,10 @@ deterministic trigger -> stock agent -> current risk and execution checks
 
 Each event carries `armed_at`, `triggered_at`, `expires_at`, trigger level,
 invalidation, activity rank, percentiles, compact recent bars and five-level
-depth. Intra-Finder and the AI gateway both cap concurrent new agent work at
-three. The gateway and stock runner reject expired events.
+depth. Intra-Finder and the AI gateway cap concurrent new agent work using their
+configured limits. The gateway and stock runner reject expired events.
 
-The three-active-trade gate, fresh funds check, current LTP check and protected
+The configured active-trade gate, fresh funds check, current LTP check and protected
 order workflow remain downstream.
 
 ## Recording
