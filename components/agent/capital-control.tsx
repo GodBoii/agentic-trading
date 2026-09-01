@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Notice } from '@/components/ui/notice'
@@ -115,21 +114,11 @@ export function CapitalControl() {
 
     useEffect(() => {
         const load = async () => {
-            const supabase = createClient()
             try {
-                const {
-                    data: { user },
-                } = await supabase.auth.getUser()
-                if (!user) throw new Error('Not authenticated')
-
-                const { data, error: keysError } = await supabase
-                    .from('user_trading_keys')
-                    .select('token_expiry')
-                    .eq('user_id', user.id)
-                    .single()
-                // PGRST116 is "no rows", which simply means no broker linked yet.
-                if (keysError && keysError.code !== 'PGRST116') throw keysError
-                setTradingKeys(data || null)
+                const connectionResponse = await fetch('/api/dhan/connection', { cache: 'no-store' })
+                const connection = await connectionResponse.json()
+                if (!connectionResponse.ok) throw new Error(connection.error || 'Could not check Dhan connection.')
+                setTradingKeys(connection.connected ? { token_expiry: connection.tokenExpiresAt } : null)
 
                 const response = await fetch('/api/ai-trading/config', { cache: 'no-store' })
                 if (!response.ok) throw new Error('Could not load your trading amount setting.')
