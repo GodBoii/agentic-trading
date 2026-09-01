@@ -1,5 +1,10 @@
 # Automated Market Day Supervisor
 
+> Retired: this legacy batch supervisor is disabled by default. The dedicated
+> Universe Scanner and continuous Intra-Finder now own scheduling and event
+> routing. `SESSION_SUPERVISOR_LEGACY_ENABLED=1` exists only for isolated
+> migration tests and must not be enabled beside the production services.
+
 ## Purpose
 
 This document explains the backend automation layer for the trading system. The goal is simple: the Python backend should keep working even when the frontend is closed or offline. The frontend remains a viewer and control surface for live agent status and past trade sessions, but market-day execution must not depend on a browser tab being open.
