@@ -31,6 +31,11 @@ interface OrderPlacementState {
   ordersAllowed?: boolean
 }
 
+interface DhanCredentialState {
+  encryptedAccessToken?: string
+  tokenExpiresAt?: string
+}
+
 function parseAmount(value: unknown): number | null {
   if (typeof value !== 'number' && typeof value !== 'string') return null
   const amount = Number(value)
@@ -114,13 +119,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Supabase remains the source for identity and broker-connection metadata.
-  const { data: brokerConnection, error: brokerError } = await supabase
-    .from('user_trading_keys')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (brokerError || !brokerConnection) {
+  const brokerConnection = await convexAdminQuery<DhanCredentialState | null>(
+    'dhanCredentials:get',
+    { supabaseUserId: user.id },
+  ).catch(() => null)
+  if (
+    !brokerConnection?.encryptedAccessToken
+    || !brokerConnection.tokenExpiresAt
+    || Date.parse(brokerConnection.tokenExpiresAt) <= Date.now()
+  ) {
     return NextResponse.json(
       { error: 'Connect a valid broker account before saving a trading amount.' },
       { status: 409 },
