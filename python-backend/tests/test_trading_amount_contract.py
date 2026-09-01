@@ -74,14 +74,15 @@ class TradingAmountContractTests(unittest.TestCase):
             users = AITradingStateService.configured_users(path, max_age_seconds=60)
         self.assertEqual({row["user_id"]: row["trade_amount"] for row in users}, {"small": 100.0, "large": 1000.0, "auto": None})
 
-    def test_auto_mode_resolves_current_available_balance(self):
+    def test_auto_mode_divides_current_available_balance_across_five_slots(self):
         runner = object.__new__(MultiStockAgentRunner)
-        runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
+        runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=5)
         runner._build_sizing_account_context = lambda: {"funds": {"data": {"availabelBalance": 1250.0}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertTrue(resolved["eligible"])
-        self.assertEqual(resolved["trade_amount"], 416.66)
+        self.assertEqual(resolved["trade_amount"], 250.0)
         self.assertEqual(resolved["amount_source"], "available_balance")
+        self.assertEqual(resolved["max_concurrent_trades"], 5)
 
     def test_auto_mode_fails_closed_when_balance_is_unavailable(self):
         runner = object.__new__(MultiStockAgentRunner)
