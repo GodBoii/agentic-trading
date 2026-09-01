@@ -1,7 +1,6 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,8 +14,9 @@ import { SkeletonReveal } from '@/components/motion/skeleton-reveal'
 import { StatusDot } from '@/components/ui/badge'
 
 type Connection = {
-    dhan_client_id: string
-    token_expiry: string | null
+    dhanClientId: string
+    tokenExpiresAt: string | null
+    authorized: boolean
 }
 
 const LOGO_URL = 'https://dhan.co/_next/static/media/Dhanlogo.8a85768d.svg'
@@ -50,6 +50,8 @@ const LOGO_URL = 'https://dhan.co/_next/static/media/Dhanlogo.8a85768d.svg'
  */
 export default function DhanConnect() {
     const [clientId, setClientId] = useState('')
+    const [apiKey, setApiKey] = useState('')
+    const [apiSecret, setApiSecret] = useState('')
     const [connection, setConnection] = useState<Connection | null>(null)
     const [connectOpen, setConnectOpen] = useState(false)
     const [disconnectOpen, setDisconnectOpen] = useState(false)
@@ -61,23 +63,16 @@ export default function DhanConnect() {
 
     useEffect(() => {
         const loadConnection = async () => {
-            const supabase = createClient()
-            const {
-                data: { user },
-            } = await supabase.auth.getUser()
-            if (!user) {
+            try {
+                const response = await fetch('/api/dhan/connection', { cache: 'no-store' })
+                const data = await response.json()
+                if (!response.ok) throw new Error(data.error || 'Unable to check Dhan connection')
+                if (response.ok && data.connected) setConnection(data)
+            } catch (connectionError) {
+                setError(connectionError instanceof Error ? connectionError.message : 'Unable to check Dhan connection')
+            } finally {
                 setIsChecking(false)
-                return
             }
-
-            const { data } = await supabase
-                .from('user_trading_keys')
-                .select('dhan_client_id, token_expiry')
-                .eq('user_id', user.id)
-                .maybeSingle()
-
-            if (data) setConnection(data)
-            setIsChecking(false)
         }
 
         void loadConnection()
@@ -98,7 +93,9 @@ export default function DhanConnect() {
     const openConnect = () => {
         setError(null)
         field.clear()
-        setClientId(connection?.dhan_client_id || '')
+        setClientId(connection?.dhanClientId || '')
+        setApiKey('')
+        setApiSecret('')
         setConnectOpen(true)
     }
 
@@ -109,23 +106,14 @@ export default function DhanConnect() {
         setConnectOpen(false)
     }
 
-    const handleConnect = async (event: FormEvent) => {
-        event.preventDefault()
-        const trimmed = clientId.trim()
-        if (!trimmed) {
-            setError('Enter your Dhan client ID.')
-            field.trigger()
-            return
-        }
-
+    const startDhanLogin = async (credentials?: { dhanClientId: string; apiKey: string; apiSecret: string }) => {
         setIsLoading(true)
         setError(null)
-
         try {
             const response = await fetch('/api/dhan/auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dhanClientId: trimmed }),
+                body: JSON.stringify(credentials || {}),
             })
             const data = await response.json()
             if (!response.ok) throw new Error(data.error || 'Failed to initiate connection')
@@ -135,6 +123,17 @@ export default function DhanConnect() {
             field.trigger()
             setIsLoading(false)
         }
+    }
+
+    const handleConnect = (event: FormEvent) => {
+        event.preventDefault()
+        const values = { dhanClientId: clientId.trim(), apiKey: apiKey.trim(), apiSecret: apiSecret.trim() }
+        if (!values.dhanClientId || !values.apiKey || !values.apiSecret) {
+            setError('Client ID, API key and API secret are required.')
+            field.trigger()
+            return
+        }
+        void startDhanLogin(values)
     }
 
     const handleDisconnect = async () => {
@@ -157,7 +156,7 @@ export default function DhanConnect() {
         }
     }
 
-    const tokenExpired = connection?.token_expiry ? new Date(connection.token_expiry) < new Date() : false
+    const tokenExpired = Boolean(connection && !connection.authorized)
 
     return (
         <SkeletonReveal
@@ -179,7 +178,7 @@ export default function DhanConnect() {
                 <Morph
                     open={connectOpen}
                     closedSize={{ width: '100%', height: 48 }}
-                    openSize={{ width: '100%', height: 48 }}
+                    openSize={{ width: '100%', height: 190 }}
                     className={cn(
                         // A tinted wash over the panel colour rather than a
                         // literal hex per state. The previous `#0D1510` and
@@ -199,9 +198,9 @@ export default function DhanConnect() {
                         <div className="flex h-full items-stretch">
                             <button
                                 type="button"
-                                onClick={openConnect}
+                                onClick={() => tokenExpired ? void startDhanLogin() : openConnect()}
                                 className="group flex min-w-0 flex-1 items-center gap-3 px-4 text-left outline-none"
-                                aria-label={connection ? 'Re-enter your Dhan client ID' : 'Connect to Dhan'}
+                                aria-label={tokenExpired ? 'Reauthorize Dhan' : connection ? 'Update Dhan API credentials' : 'Connect to Dhan'}
                             >
                                 {/* Third-party asset of unknown dimensions served
                                     from Dhan's CDN; next/image would add nothing. */}
@@ -219,7 +218,7 @@ export default function DhanConnect() {
                                                 {tokenExpired ? 'Session expired' : 'Dhan connected'}
                                             </span>
                                             <span className="block font-mono text-[8px] tracking-wide text-ink-tertiary">
-                                                ID {connection.dhan_client_id}
+                                                ID {connection.dhanClientId}
                                             </span>
                                         </span>
                                     </>
@@ -251,7 +250,8 @@ export default function DhanConnect() {
                         </div>
                     }
                     expanded={
-                        <form onSubmit={handleConnect} className="flex h-full items-center gap-1.5 p-1.5">
+                        <form onSubmit={handleConnect} className="flex h-full flex-col gap-2 p-3">
+                            <div className="flex items-center gap-2">
                             <span className="grid h-9 w-9 flex-shrink-0 place-items-center">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={LOGO_URL} alt="" className="h-[18px] w-auto opacity-80" />
@@ -278,15 +278,49 @@ export default function DhanConnect() {
                                     />
                                 </div>
                             </div>
+                            </div>
+                            <div>
+                                <label htmlFor="dhan-api-key" className="sr-only">Dhan API key</label>
+                                <input
+                                    id="dhan-api-key"
+                                    type="text"
+                                    value={apiKey}
+                                    onChange={(event) => {
+                                        setApiKey(event.target.value)
+                                        setError(null)
+                                    }}
+                                    placeholder="API key"
+                                    autoComplete="off"
+                                    disabled={isLoading}
+                                    className="h-9 w-full rounded-xl border border-line bg-surface px-3 font-mono text-[12px] text-ink-primary outline-none placeholder:text-ink-tertiary focus:border-line-strong"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="dhan-api-secret" className="sr-only">Dhan API secret</label>
+                                <input
+                                    id="dhan-api-secret"
+                                    type="password"
+                                    value={apiSecret}
+                                    onChange={(event) => {
+                                        setApiSecret(event.target.value)
+                                        setError(null)
+                                    }}
+                                    placeholder="API secret"
+                                    autoComplete="new-password"
+                                    disabled={isLoading}
+                                    className="h-9 w-full rounded-xl border border-line bg-surface px-3 font-mono text-[12px] text-ink-primary outline-none placeholder:text-ink-tertiary focus:border-line-strong"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
                             <Button
                                 type="submit"
                                 variant="positive"
                                 size="sm"
-                                disabled={isLoading || !clientId.trim()}
+                                disabled={isLoading || !clientId.trim() || !apiKey.trim() || !apiSecret.trim()}
                                 className="h-9 flex-shrink-0 rounded-xl px-4"
                                 swapLabel
                             >
-                                {isLoading ? 'Connecting' : connection ? 'Reconnect' : 'Connect'}
+                                {isLoading ? 'Connecting' : connection ? 'Update' : 'Connect'}
                             </Button>
                             <button
                                 type="button"
@@ -296,6 +330,7 @@ export default function DhanConnect() {
                             >
                                 <Close size={14} />
                             </button>
+                            </div>
                         </form>
                     }
                 />
