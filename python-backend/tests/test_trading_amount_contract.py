@@ -20,6 +20,14 @@ DEPTH = [
 
 
 class TradingAmountContractTests(unittest.TestCase):
+    @staticmethod
+    def user_dhan():
+        service = SimpleNamespace()
+        return SimpleNamespace(
+            require_order_access=lambda _user_id: service,
+            service=lambda _user_id: service,
+        )
+
     def test_missing_amount_selects_auto_while_invalid_manual_and_stale_fail_closed(self):
         now = datetime.now(timezone.utc)
         automatic = TradingAmountService.status({}, max_age_seconds=60, now=now)
@@ -45,6 +53,7 @@ class TradingAmountContractTests(unittest.TestCase):
             intra_finder_max_slippage_percent=1.0,
             stock_agent_max_leverage=5.0,
         )
+        runner.user_dhan = self.user_dhan()
         runner._calculate_one_share_margin = lambda *_args: {
             "status": "success",
             "total_margin": 100.0,
@@ -77,7 +86,8 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_auto_mode_divides_current_available_balance_across_five_slots(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=5)
-        runner._build_sizing_account_context = lambda: {"funds": {"data": {"availabelBalance": 1250.0}}}
+        runner.user_dhan = self.user_dhan()
+        runner._build_sizing_account_context = lambda _dhan: {"funds": {"data": {"availabelBalance": 1250.0}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertTrue(resolved["eligible"])
         self.assertEqual(resolved["trade_amount"], 250.0)
@@ -87,7 +97,8 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_auto_mode_fails_closed_when_balance_is_unavailable(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
-        runner._build_sizing_account_context = lambda: {"funds": {"data": {}}}
+        runner.user_dhan = self.user_dhan()
+        runner._build_sizing_account_context = lambda _dhan: {"funds": {"data": {}}}
         resolved = runner.resolve_user_trade_config({"user_id": "auto", "trade_mode": "auto"})
         self.assertFalse(resolved["eligible"])
         self.assertEqual(resolved["status_code"], "available_balance_unavailable")
@@ -95,7 +106,8 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_fixed_mode_derives_dynamic_trade_limit_from_account_capacity(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
-        runner._build_sizing_account_context = lambda: {
+        runner.user_dhan = self.user_dhan()
+        runner._build_sizing_account_context = lambda _dhan: {
             "funds": {
                 "data": {
                     "availabelBalance": 2000.0,
@@ -114,7 +126,7 @@ class TradingAmountContractTests(unittest.TestCase):
                 self.assertTrue(resolved["eligible"])
                 self.assertEqual(resolved["max_concurrent_trades"], slots)
 
-        runner._build_sizing_account_context = lambda: {
+        runner._build_sizing_account_context = lambda _dhan: {
             "funds": {
                 "data": {
                     "availabelBalance": 10000.0,
@@ -131,7 +143,8 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_fixed_mode_capacity_includes_margin_already_utilized(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(stock_agent_max_concurrent_trades=3)
-        runner._build_sizing_account_context = lambda: {
+        runner.user_dhan = self.user_dhan()
+        runner._build_sizing_account_context = lambda _dhan: {
             "funds": {
                 "data": {
                     "availabelBalance": 8500.0,
@@ -156,8 +169,9 @@ class TradingAmountContractTests(unittest.TestCase):
     def test_event_agent_session_carries_and_requires_user_id(self):
         runner = object.__new__(MultiStockAgentRunner)
         runner.config = SimpleNamespace(ai_trading_state_path=Path("unused-state.json"))
+        runner.user_dhan = self.user_dhan()
         runner.market_time = SimpleNamespace(market_date_str=lambda: "2026-08-12")
-        runner._build_account_context = lambda: {}
+        runner._build_account_context = lambda _dhan=None: {}
         runner._build_candidate_packet = lambda **kwargs: {"security_id": 1}
         runner._strip_monitor_context = lambda packet: None
         runner._is_placed_result = lambda result: False
