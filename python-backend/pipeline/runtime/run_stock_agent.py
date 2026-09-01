@@ -815,6 +815,13 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             max_entry_drift_risk_fraction=float(
                 self.config.stock_agent_max_entry_drift_risk_fraction
             ),
+            allowed_side=(
+                "BUY"
+                if str(candidate_packet.get("direction") or "").upper() == "LONG"
+                else "SELL"
+                if str(candidate_packet.get("direction") or "").upper() == "SHORT"
+                else None
+            ),
         )
         selected_stock_context = {
             "security_id": selected_stock.get("security_id"),
