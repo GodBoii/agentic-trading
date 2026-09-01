@@ -158,6 +158,21 @@ class AIOrchestratorAdmissionTests(unittest.TestCase):
         self.assertTrue(result["blocked"])
         self.assertEqual(result["status_code"], "AGENT_CAPACITY")
 
+    def test_full_live_trade_slots_block_before_agent_start(self) -> None:
+        orchestrator = self.orchestrator()
+        orchestrator.config = types.SimpleNamespace(stock_agent_max_concurrent_trades=3)
+        orchestrator.order_placement_gate = types.SimpleNamespace(
+            refresh_from_store=lambda: types.SimpleNamespace(allowed=True),
+            current_active_trade_slots=lambda: {"1", "2", "3"},
+        )
+
+        result = orchestrator.submit_intra_finder_event(_event("slots-full"))
+
+        self.assertFalse(result["accepted"])
+        self.assertEqual(result["status_code"], "MAX_ACTIVE_TRADES")
+        self.assertEqual(result["active_trade_count"], 3)
+        self.assertEqual(_ImmediateThread.names, [])
+
     def test_successful_verification_restores_user_disabled_by_old_guard(self) -> None:
         with (
             TemporaryDirectory() as directory,
