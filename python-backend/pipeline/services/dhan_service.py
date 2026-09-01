@@ -18,6 +18,7 @@ from dotenv import dotenv_values
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_credentials import (
     CredentialUnavailable,
+    DhanCredentials,
     DhanCredentialStore,
 )
 
@@ -52,7 +53,12 @@ class DhanService:
         "OPTCUR",
     }
 
-    def __init__(self, config: PipelineConfig, prefer_gateway: bool = True):
+    def __init__(
+        self,
+        config: PipelineConfig,
+        prefer_gateway: bool = True,
+        credentials: Optional[DhanCredentials] = None,
+    ):
         self.config = config
         self.request_times = deque()
         self.rate_limit_hits = deque()
@@ -97,11 +103,13 @@ class DhanService:
         self.credential_store = DhanCredentialStore(config)
         self.credential_mtime_ns = 0
         self.credential_version = 0
-        runtime_credentials = None
-        try:
-            runtime_credentials = self.credential_store.load(required=False)
-        except CredentialUnavailable:
-            runtime_credentials = None
+        self.fixed_credentials = credentials is not None
+        runtime_credentials = credentials
+        if runtime_credentials is None:
+            try:
+                runtime_credentials = self.credential_store.load(required=False)
+            except CredentialUnavailable:
+                runtime_credentials = None
         self.client_id, self.access_token, self.credential_source = self._select_credentials(
             runtime_credentials,
             env_client_id,
@@ -187,7 +195,7 @@ class DhanService:
     def reload_credentials_if_changed(self, *, force: bool = False) -> bool:
         # Some isolated tests and compatibility callers construct a lightweight
         # service without running __init__. They have no runtime credential store.
-        if not hasattr(self, "credential_store"):
+        if not hasattr(self, "credential_store") or getattr(self, "fixed_credentials", False):
             return False
         current_mtime = self.credential_store.mtime_ns()
         if not force and (current_mtime == 0 or current_mtime == self.credential_mtime_ns):
