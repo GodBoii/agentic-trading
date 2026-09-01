@@ -44,9 +44,9 @@ class ActivityRanker:
     ) -> RankingResult:
         eligible: List[LiveStockState] = []
         for state in states.values():
-            state.refresh_derived(now)
             state.exclusion_reason = self._exclusion_reason(state, now)
             if state.exclusion_reason is None:
+                state.refresh_derived(now)
                 eligible.append(state)
 
         volume_values = sorted(float(state.volume_pace or 0.0) for state in eligible)
