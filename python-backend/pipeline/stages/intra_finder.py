@@ -828,6 +828,19 @@ class IntraFinder:
         payload = StorageService.load_snapshot(path)
         if not isinstance(payload, dict):
             return None
+        summary = payload.get("summary") or {}
+        if str(summary.get("market_date") or "") != self.market_time.market_date_str():
+            return None
+        generated_at = payload.get("generated_at_utc")
+        try:
+            generated = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
+            if generated.tzinfo is None:
+                generated = generated.replace(tzinfo=self.market_time.now().tzinfo)
+            age = (self.market_time.now() - generated.astimezone(self.market_time.now().tzinfo)).total_seconds()
+        except (TypeError, ValueError):
+            return None
+        if age < 0 or age > self.config.regime_source_max_staleness_seconds:
+            return None
         return {
             "stage": payload.get("stage"),
             "generated_at_utc": payload.get("generated_at_utc"),
