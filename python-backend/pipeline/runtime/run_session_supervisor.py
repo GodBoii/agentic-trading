@@ -531,6 +531,17 @@ class SessionSupervisor:
 
 
 def main() -> None:
+    if os.getenv("SESSION_SUPERVISOR_LEGACY_ENABLED", "0").strip().lower() not in {
+        "1", "true", "yes", "on"
+    }:
+        print(
+            "Legacy session supervisor is retired; Universe Scanner and "
+            "Intra-Finder own scheduling. Set SESSION_SUPERVISOR_LEGACY_ENABLED=1 "
+            "only for an isolated migration test.",
+            flush=True,
+        )
+        while True:
+            time.sleep(300)
     SessionSupervisor().run_forever()
 
 
