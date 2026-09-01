@@ -1,130 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { encryptDhanAccessToken, parseDhanExpiryIso } from '../_utils'
+import { getDhanAuthCredentials, saveDhanAccessToken } from '@/lib/dhan/user-credentials'
+import { parseDhanExpiryIso } from '../_utils'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+function field(value: unknown, name: string) {
+  if (typeof value !== 'object' || value === null || !(name in value)) return ''
+  const candidate = Reflect.get(value, name)
+  return typeof candidate === 'string' ? candidate.trim() : ''
+}
+
 export async function GET(request: NextRequest) {
-    console.log('[DhanCb] Starting Callback Request')
-    try {
-        // 1. Extract tokenId from query parameters
-        const { searchParams } = new URL(request.url)
-        const tokenId = searchParams.get('tokenId')
-        
-        console.log(`[DhanCb] TokenId received: ${tokenId ? 'YES' : 'NO'}`)
+  const tokenId = request.nextUrl.searchParams.get('tokenId')?.trim()
+  if (!tokenId) return NextResponse.redirect(new URL('/dashboard?error=missing_token', request.url))
 
-        if (!tokenId) {
-            console.error('[DhanCb] Missing tokenId')
-            return NextResponse.redirect(
-                new URL('/dashboard?error=missing_token', request.url)
-            )
-        }
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.redirect(new URL('/login?error=unauthorized_callback', request.url))
+  }
 
-        // 2. Verify user is authenticated
-        const supabase = await createClient()
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (authError || !user) {
-            console.error('[DhanCb] Auth Error:', authError)
-            return NextResponse.redirect(
-                new URL('/login?error=unauthorized_callback', request.url)
-            )
-        }
-        console.log(`[DhanCb] User Authenticated: ${user.id}`)
+  try {
+    const credentials = await getDhanAuthCredentials(user.id)
+    if (!credentials) return NextResponse.redirect(new URL('/dashboard?error=credentials_missing', request.url))
 
-        // 3. Get Dhan credentials from environment
-        const DHAN_APP_ID = process.env.DHAN_APP_ID
-        const DHAN_APP_SECRET = process.env.DHAN_APP_SECRET
-        
-        // Log existence only, not values
-        console.log(`[DhanCb] Env Vars Check - ID: ${!!DHAN_APP_ID}, Secret: ${!!DHAN_APP_SECRET}`)
-
-        if (!DHAN_APP_ID || !DHAN_APP_SECRET) {
-            console.error('[DhanCb] Missing Env Vars')
-            return NextResponse.redirect(
-                new URL('/dashboard?error=server_config_missing_vars', request.url)
-            )
-        }
-
-        // 4. Exchange tokenId for access token using correct Dhan v2.0 endpoint
-        const dhanTokenUrl = `https://auth.dhan.co/app/consumeApp-consent?tokenId=${tokenId}`
-        console.log('[DhanCb] Exchanging one-time token with Dhan')
-
-        const dhanResponse = await fetch(dhanTokenUrl, {
-            headers: {
-                'app_id': DHAN_APP_ID,
-                'app_secret': DHAN_APP_SECRET,
-                'User-Agent': 'TraderApp/1.0',
-            },
-        })
-        
-        console.log(`[DhanCb] Dhan Response Status: ${dhanResponse.status}`)
-
-        if (!dhanResponse.ok) {
-            const errorText = await dhanResponse.text()
-            console.error('[DhanCb] Token Exchange Failed:', errorText)
-            const safeError = encodeURIComponent(errorText.substring(0, 200))
-            return NextResponse.redirect(
-                new URL(`/dashboard?error=token_exchange_failed&details=${safeError}`, request.url)
-            )
-        }
-
-        const dhanData = await dhanResponse.json()
-        console.log('[DhanCb] Dhan Data Keys:', Object.keys(dhanData))
-
-        // Validate the response
-        if (!dhanData.accessToken || !dhanData.dhanClientId || !dhanData.expiryTime) {
-            console.error('[DhanCb] Invalid Response Structure:', dhanData)
-            return NextResponse.redirect(
-                new URL('/dashboard?error=invalid_response_structure', request.url)
-            )
-        }
-
-        // 5. Use Dhan's authoritative IST expiry timestamp.
-        const tokenExpiryIso = parseDhanExpiryIso(dhanData.expiryTime)
-        if (!tokenExpiryIso) {
-            console.error('[DhanCb] Invalid expiryTime from Dhan:', dhanData.expiryTime)
-            return NextResponse.redirect(
-                new URL('/dashboard?error=invalid_expiry_time', request.url)
-            )
-        }
-
-        // 6. Store credentials in Supabase using UPSERT
-        console.log('[DhanCb] Upserting to Supabase...')
-        const { error: dbError } = await supabase
-            .from('user_trading_keys')
-            .upsert({
-                user_id: user.id,
-                dhan_client_id: dhanData.dhanClientId,
-                dhan_access_token: encryptDhanAccessToken(dhanData.accessToken),
-                token_expiry: tokenExpiryIso,
-                is_trading_enabled: false, // Default to disabled for safety
-                updated_at: new Date().toISOString(),
-            }, {
-                onConflict: 'user_id',
-            })
-
-        if (dbError) {
-            console.error('[DhanCb] DB Insert Failed:', dbError)
-            const safeDbError = encodeURIComponent(dbError.message || 'Unknown database error')
-            return NextResponse.redirect(
-                new URL(`/dashboard?error=db_save_failed&details=${safeDbError}`, request.url)
-            )
-        }
-        
-        console.log('[DhanCb] Success! Redirecting...')
-
-        // 7. Redirect to dashboard with success flag
-        return NextResponse.redirect(
-            new URL('/dashboard?success=true', request.url)
-        )
-
-    } catch (error) {
-        console.error('[DhanCb] Unexpected Error:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        return NextResponse.redirect(
-            new URL(`/dashboard?error=unexpected&details=${encodeURIComponent(errorMessage)}`, request.url)
-        )
+    const response = await fetch(
+      `https://auth.dhan.co/app/consumeApp-consent?tokenId=${encodeURIComponent(tokenId)}`,
+      {
+        headers: { app_id: credentials.apiKey, app_secret: credentials.apiSecret },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8_000),
+      },
+    )
+    const payload: unknown = await response.json().catch(() => null)
+    const accessToken = field(payload, 'accessToken')
+    const clientId = field(payload, 'dhanClientId')
+    const expiresAt = parseDhanExpiryIso(field(payload, 'expiryTime'))
+    if (!response.ok || !accessToken || clientId !== credentials.clientId || !expiresAt) {
+      return NextResponse.redirect(new URL('/dashboard?error=token_exchange_failed', request.url))
     }
+
+    await saveDhanAccessToken(user.id, { accessToken, expiresAt })
+    // Remove the old Supabase copy after a successful Convex migration.
+    await supabase.from('user_trading_keys').delete().eq('user_id', user.id)
+    return NextResponse.redirect(new URL('/dashboard?success=true', request.url))
+  } catch (error) {
+    console.error('Dhan callback failed:', error)
+    return NextResponse.redirect(new URL('/dashboard?error=unexpected', request.url))
+  }
 }
