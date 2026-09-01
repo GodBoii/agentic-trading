@@ -75,6 +75,37 @@ class ActivityRankerTests(unittest.TestCase):
 
 
 class SetupEngineTests(unittest.TestCase):
+    def test_market_open_discards_preopen_bar_builder(self) -> None:
+        preopen = datetime.fromisoformat("2026-08-31T09:10:00+05:30")
+        market_open = datetime.fromisoformat("2026-08-31T09:15:00+05:30")
+        item = LiveStockState("NSE_EQ", 1, "TEST", "INE1")
+        depth = [{} for _ in range(5)]
+        features = {"spread_percent": 0.03}
+        item.apply_packet(
+            received_at=preopen,
+            price=100.0,
+            cumulative_volume=0.0,
+            vwap=100.0,
+            last_trade_at=preopen,
+            last_trade_quantity=1.0,
+            depth=depth,
+            depth_features=features,
+        )
+        item.apply_packet(
+            received_at=market_open,
+            price=101.0,
+            cumulative_volume=100.0,
+            vwap=101.0,
+            last_trade_at=market_open,
+            last_trade_quantity=10.0,
+            depth=depth,
+            depth_features=features,
+        )
+
+        self.assertEqual(list(item.minute_bars), [])
+        self.assertEqual(item.minute_builder.minute_start, market_open)
+        self.assertEqual(item.minute_builder.open, 101.0)
+
     def test_opening_setup_can_trigger_without_completed_minute_bars(self) -> None:
         start = datetime.fromisoformat("2026-08-28T09:15:00+05:30")
         item = LiveStockState("NSE_EQ", 1, "TEST", "INE1", historical_atr_percent=2.0)
@@ -107,6 +138,27 @@ class SetupEngineTests(unittest.TestCase):
 
 
 class IntraFinderFlowTests(unittest.TestCase):
+    def test_stale_prior_session_market_context_is_not_attached(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nifty.json"
+            StorageService.save_snapshot(
+                path,
+                {
+                    "stage": "nifty",
+                    "generated_at_utc": "2026-08-23T10:00:00+00:00",
+                    "summary": {"market_date": "2026-08-24"},
+                },
+            )
+            now = datetime.fromisoformat("2026-08-31T10:00:00+05:30")
+            finder = IntraFinder.__new__(IntraFinder)
+            finder.config = PipelineConfig()
+            finder.market_time = SimpleNamespace(
+                now=lambda: now,
+                market_date_str=lambda: "2026-08-31",
+            )
+
+            self.assertIsNone(finder._load_context(path))
+
     def test_recent_completed_universe_is_accepted_as_opening_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
