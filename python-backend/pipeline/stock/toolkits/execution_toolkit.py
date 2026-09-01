@@ -64,7 +64,7 @@ class StockExecutionToolkit(Toolkit):
         amount_source: str = "user_amount",
         max_leverage: float = 5.0,
         max_risk_fraction_per_slot: float = 0.02,
-        max_concurrent_trades: int = 3,
+        max_concurrent_trades: int = 5,
         final_state_loader: Optional[Callable[[], Dict[str, Any]]] = None,
         final_quote_max_age_seconds: float = 30.0,
         final_candle_max_age_seconds: float = 120.0,
@@ -218,16 +218,16 @@ class StockExecutionToolkit(Toolkit):
                 quantity=quantity,
                 reference_price=entry_price,
             )
-        with self.coordinator.placement_lock:
-            # Another event may have received DH-905 while this event waited.
-            if self.coordinator.order_placement_blocked():
-                return json_tool_result_markdown(
-                self._failure("execution_halted_order_placement_blocked")
-            )
         if self.allowed_side is not None and str(side or "").upper() != self.allowed_side:
             return json_tool_result_markdown(
                 self._failure("side_conflicts_with_detector_direction")
             )
+        with self.coordinator.placement_lock:
+            # Another event may have received DH-905 while this event waited.
+            if self.coordinator.order_placement_blocked():
+                return json_tool_result_markdown(
+                    self._failure("execution_halted_order_placement_blocked")
+                )
             overlap_error = self._validate_no_existing_trade()
             if overlap_error:
                 return self._record_preflight_failure(
