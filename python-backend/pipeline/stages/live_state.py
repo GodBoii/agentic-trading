@@ -121,6 +121,7 @@ class LiveStockState:
     volume_acceleration: Optional[float] = None
     trend_efficiency: float = 0.0
     traded_value_5m: float = 0.0
+    return_5m_percent: float = 0.0
     market_return_5m_percent: float = 0.0
     relative_strength_5m_percent: float = 0.0
     relative_strength_percentile: float = 0.0
@@ -179,6 +180,8 @@ class LiveStockState:
             self.price_samples.clear()
             self.value_samples.clear()
             self.depth_samples.clear()
+            self.minute_bars.clear()
+            self.minute_builder = None
             self.cumulative_value = cumulative_volume * price
             self.previous_cumulative_volume = cumulative_volume
             self.previous_price = None
@@ -263,16 +266,58 @@ class LiveStockState:
 
     def refresh_derived(self, now: datetime) -> None:
         now_ts = now.timestamp()
-        self.realized_volatility_percent = self.range_percent(300, now_ts)
+        five_first = five_last = one_first = one_last = one_previous = None
+        five_low = five_high = None
+        one_path = 0.0
+        for timestamp, value in self.price_samples:
+            if timestamp >= now_ts - 300:
+                five_first = value if five_first is None else five_first
+                five_last = value
+                five_low = value if five_low is None else min(five_low, value)
+                five_high = value if five_high is None else max(five_high, value)
+            if timestamp >= now_ts - 60:
+                one_first = value if one_first is None else one_first
+                one_last = value
+                if one_previous is not None:
+                    one_path += abs(value - one_previous)
+                one_previous = value
+        self.realized_volatility_percent = (
+            (five_high - five_low) / self.latest_price * 100.0
+            if five_high is not None and five_low is not None and self.latest_price > 0
+            else 0.0
+        )
+        self.return_5m_percent = (
+            (five_last - five_first) / five_first * 100.0
+            if five_first is not None and five_last is not None and five_first > 0
+            else 0.0
+        )
         expected_range = self._baseline_for_now(self.median_range_percent, now)
         self.range_pace = self.realized_volatility_percent / expected_range if expected_range else None
         expected_volume = self.expected_cumulative_volume(now)
         self.volume_pace = self.cumulative_volume / expected_volume if expected_volume else self._turnover_pace(now)
-        recent_value = self.value_change(30, now_ts)
-        prior_value = self.value_change(120, now_ts - 30.0)
+        windows = (
+            [now_ts - 30, now_ts, None, None],
+            [now_ts - 150, now_ts - 30, None, None],
+            [now_ts - 300, now_ts, None, None],
+        )
+        for timestamp, value in self.value_samples:
+            for window in windows:
+                if window[0] <= timestamp <= window[1]:
+                    window[2] = value if window[2] is None else window[2]
+                    window[3] = value
+        recent_value, prior_value, five_minute_value = (
+            max(0.0, window[3] - window[2])
+            if window[2] is not None and window[3] is not None
+            else 0.0
+            for window in windows
+        )
         self.volume_acceleration = min(8.0, recent_value / (prior_value / 4.0)) if recent_value > 0 and prior_value > 0 else None
-        self.trend_efficiency = self.efficiency(60, now_ts)
-        self.traded_value_5m = self.value_change(300, now_ts)
+        self.trend_efficiency = (
+            abs(one_last - one_first) / one_path
+            if one_first is not None and one_last is not None and one_path > 0
+            else 0.0
+        )
+        self.traded_value_5m = five_minute_value
 
     def expected_cumulative_volume(self, now: datetime) -> Optional[float]:
         if not self.median_cumulative_volume:
@@ -365,6 +410,7 @@ class LiveStockState:
             "range_pace": self.range_pace,
             "trend_efficiency": self.trend_efficiency,
             "traded_value_5m": self.traded_value_5m,
+            "return_5m_percent": self.return_5m_percent,
             "market_return_5m_percent": self.market_return_5m_percent,
             "relative_strength_5m_percent": self.relative_strength_5m_percent,
             "relative_strength_percentile": self.relative_strength_percentile,
@@ -446,3 +492,4 @@ def _tuples(values: Any, length: int) -> Iterable[tuple]:
     for value in values or []:
         if isinstance(value, (list, tuple)) and len(value) == length:
             yield tuple(float(item) for item in value)
+
