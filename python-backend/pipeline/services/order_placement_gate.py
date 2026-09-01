@@ -294,6 +294,69 @@ class OrderPlacementGate:
                     self._trade_slot_reservations.pop(security_id, None)
             return normalized_broker_ids | set(self._trade_slot_reservations)
 
+    def current_active_trade_slots(self) -> Optional[set[str]]:
+        """Read current broker positions/orders and merge recent reservations."""
+        try:
+            responses = (
+                self._dhan.fetch_positions(),
+                self._dhan.fetch_order_book(),
+                self._dhan.fetch_super_orders(),
+            )
+        except Exception:
+            return None
+        if not all(self._broker_response_succeeded(response) for response in responses):
+            return None
+        positions, orders, super_orders = responses
+        active: set[str] = set()
+        for row in self._broker_rows(positions):
+            if str(row.get("productType") or "").upper() != "INTRADAY":
+                continue
+            try:
+                if float(row.get("netQty") or 0.0) == 0:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            security_id = str(row.get("securityId") or row.get("security_id") or "")
+            if security_id:
+                active.add(security_id)
+        active_statuses = {
+            "PENDING", "TRANSIT", "PART_TRADED", "AMO_REQ_RECEIVED",
+            "AFTER_MARKET_ORDER", "TRADED_PENDING",
+        }
+        for row in [*self._broker_rows(orders), *self._broker_rows(super_orders)]:
+            row_active = str(row.get("orderStatus") or "").upper() in active_statuses
+            legs = row.get("legDetails")
+            row_active = row_active or isinstance(legs, list) and any(
+                isinstance(leg, dict)
+                and str(leg.get("orderStatus") or "").upper() in active_statuses
+                for leg in legs
+            )
+            if not row_active:
+                continue
+            security_id = str(row.get("securityId") or row.get("security_id") or "")
+            if security_id:
+                active.add(security_id)
+        return self.active_trade_slots(active)
+
+    @staticmethod
+    def _broker_response_succeeded(response: Any) -> bool:
+        if isinstance(response, list):
+            return True
+        return isinstance(response, dict) and str(response.get("status") or "").lower() == "success"
+
+    @staticmethod
+    def _broker_rows(response: Any) -> list[Dict[str, Any]]:
+        if isinstance(response, list):
+            return [row for row in response if isinstance(row, dict)]
+        if not isinstance(response, dict):
+            return []
+        data = response.get("data")
+        if isinstance(data, list):
+            return [row for row in data if isinstance(row, dict)]
+        if isinstance(data, dict) and isinstance(data.get("data"), list):
+            return [row for row in data["data"] if isinstance(row, dict)]
+        return []
+
     def start_periodic_verification(
         self,
         *,
