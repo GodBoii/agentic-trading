@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import re
 import tempfile
 import time
 from collections import Counter
@@ -241,12 +243,15 @@ class UniverseScanner:
                     == self.market_time.now().date()
                 ):
                     return cached, None if len(cached) >= self.config.stage1_min_valid_sessions else "insufficient_history"
-            response = self.dhan.fetch_daily_history(
-                int(venue["security_id"]),
-                days=self.config.stage1_history_days,
-                retries=3,
-                exchange_segment=str(venue["exchange_segment"]),
-                instrument_candidates=["EQUITY"],
+            self._wait_for_historical_api()
+            response = self._fetch_history_resilient(
+                lambda: self.dhan.fetch_daily_history(
+                    int(venue["security_id"]),
+                    days=self.config.stage1_history_days,
+                    retries=3,
+                    exchange_segment=str(venue["exchange_segment"]),
+                    instrument_candidates=["EQUITY"],
+                )
             )
             if not response or str(response.get("status") or "").lower() != "success":
                 return None, str((response or {}).get("remarks") or "historical_fetch_failed")
@@ -475,13 +480,16 @@ class UniverseScanner:
             except (KeyError, TypeError, ValueError):
                 pass
         try:
-            response = self.dhan.fetch_intraday_history(
-                record.selected_venue.security_id,
-                days=30,
-                interval=5,
-                retries=3,
-                exchange_segment=record.selected_venue.exchange_segment,
-                instrument_candidates=["EQUITY"],
+            self._wait_for_historical_api()
+            response = self._fetch_history_resilient(
+                lambda: self.dhan.fetch_intraday_history(
+                    record.selected_venue.security_id,
+                    days=30,
+                    interval=5,
+                    retries=3,
+                    exchange_segment=record.selected_venue.exchange_segment,
+                    instrument_candidates=["EQUITY"],
+                )
             )
             if not response or str(response.get("status") or "").lower() != "success":
                 return {"status": "unavailable"}
@@ -543,6 +551,49 @@ class UniverseScanner:
             return result
         except Exception:
             return {"status": "unavailable"}
+
+    def _wait_for_historical_api(self) -> None:
+        while True:
+            now = time.monotonic()
+            retry_at = max(
+                float(getattr(self.dhan, "historical_rate_limit_until", 0.0)),
+                float(getattr(self.dhan, "historical_circuit_open_until", 0.0)),
+            )
+            remaining = retry_at - now
+            if remaining <= 0:
+                return
+            time.sleep(min(30.0, remaining + 0.05))
+
+    def _fetch_history_resilient(self, request: Any) -> Optional[Dict[str, Any]]:
+        deadline = time.monotonic() + 10 * 60
+        response: Optional[Dict[str, Any]] = None
+        while time.monotonic() < deadline:
+            response = request()
+            if isinstance(response, dict) and str(response.get("status") or "").lower() == "success":
+                return response
+            retry_after = self._history_retry_after_seconds(response)
+            if retry_after is None:
+                return response
+            time.sleep(min(30.0, max(1.0, retry_after + 0.25)))
+        return response
+
+    @staticmethod
+    def _history_retry_after_seconds(response: Any) -> Optional[float]:
+        serialized = json.dumps(response, ensure_ascii=True, default=str).lower()
+        retryable = any(
+            marker in serialized
+            for marker in (
+                "local-rate-limit-cooldown",
+                "local-circuit-open",
+                "dh-805",
+                '"error_code": "805"',
+                "rate limit",
+            )
+        )
+        if not retryable:
+            return None
+        match = re.search(r"retry available in\s+(\d+)\s+seconds", serialized)
+        return float(match.group(1)) if match else 30.0
 
     def refresh_intraday_baselines(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Upgrade a valid daily universe without repeating the full master scan."""
@@ -770,7 +821,7 @@ class UniverseScanner:
         for stock in stock_rows:
             stock["corporate_action"] = action_for_stock(corporate_actions, stock)
         stock_rows.sort(key=lambda item: float(item["historical"]["adv_20_cr"]), reverse=True)
-        version = f"{market_date}-{checksum[:12]}-b2"
+        version = f"{market_date}-{checksum[:12]}-b{self.BASELINE_SCHEMA_VERSION}"
         degraded_reasons = []
         if master_meta.get("degraded"):
             degraded_reasons.append("stale_master_fallback")
