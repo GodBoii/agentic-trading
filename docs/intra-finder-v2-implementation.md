@@ -36,7 +36,8 @@ setups.
 
 ## Performance
 
-The final 4,000-stock rank benchmark completes in 90 ms on the development
-machine, below the 500 ms cross-machine regression bound.
+The 4,000-stock synthetic rank benchmark remains below the 500 ms regression
+bound. After moving stale-state rejection ahead of rolling-feature calculation,
+the September 1 live 3,535-stock rank measured 209 ms after warm-up.
 The live path performs no REST calls, Pandas operations, chart generation,
 agent HTTP waits or disk writes.
