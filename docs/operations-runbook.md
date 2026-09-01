@@ -49,8 +49,12 @@
 ## Calendar and scheduling
 
 - Every backend service uses `Asia/Calcutta`, with `Asia/Kolkata` as the timezone alias.
-- Universe Scanner runs once on an NSE cash-market trading day at or after 07:30 IST.
-- Starting or restarting it after 07:30 runs the missing daily build immediately.
+- Universe Scanner runs once on an NSE cash-market trading day at or after 07:00 IST.
+- A missing build may start only before the 07:30 premarket cutoff or after
+  market close. A restart during the live session uses the last-known-good
+  universe instead of competing with agents for Dhan historical capacity.
+- A heavy scan is terminated after 90 minutes and retried safely; publication
+  happens only after a complete atomic build.
 - A completed schema-3 artifact prevents a second heavy run that day.
 - A failed build retries after the configured degraded interval.
 - Intra-Finder connects five minutes before the calendar's market open and
