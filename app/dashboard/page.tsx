@@ -19,6 +19,7 @@ const CONNECT_ERRORS: Record<string, string> = {
     server_config: 'The Dhan connection is not configured on the server.',
     token_exchange_failed: 'Dhan could not complete the token exchange.',
     invalid_response: 'Dhan returned an invalid response.',
+    credentials_missing: 'Your saved Dhan API credentials are missing. Connect again.',
     db_save_failed: 'The connection could not be saved. Try again.',
     unexpected: 'An unexpected connection error occurred.',
 }
