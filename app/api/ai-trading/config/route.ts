@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { convexAdminMutation, convexAdminQuery } from '@/lib/convex/server'
+import { AUTO_TRADE_SLOTS } from '@/lib/trade-sizing'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const maxAgeMs = Number(process.env.TRADING_AMOUNT_MAX_AGE_SECONDS || 30 * 24 * 60 * 60) * 1000
-const autoSlots = 3
 const maxLeverage = 5
 
 interface TradingConfiguration {
@@ -58,7 +58,7 @@ function orderPlacementResponse(state: OrderPlacementState | null) {
 }
 
 function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPlacementState | null) {
-  const sizingPolicy = { auto_slots: autoSlots, max_leverage: maxLeverage }
+  const sizingPolicy = { auto_slots: AUTO_TRADE_SLOTS, max_leverage: maxLeverage }
   const configured = Boolean(entry?.enabled)
   const mode = entry?.tradeMode || 'auto'
   if (mode === 'auto') return {
@@ -67,8 +67,8 @@ function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPl
     trade_mode: 'auto',
     status_code: configured ? 'automatic_balance' : 'automatic_balance_not_saved',
     message: configured
-      ? `Automatic sizing is active. Available margin is split across ${autoSlots} trade slots.`
-      : `Save Auto to split available margin across ${autoSlots} trade slots.`,
+      ? `Automatic sizing is active. Available margin is split across ${AUTO_TRADE_SLOTS} trade slots.`
+      : `Save Auto to split available margin across ${AUTO_TRADE_SLOTS} trade slots.`,
     trade_amount: null,
     ...sizingPolicy,
     amount_updated_at_utc: entry?.amountUpdatedAt || null,
