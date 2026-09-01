@@ -308,10 +308,11 @@ class MultiStockAnalyzerRunner:
         affordable = [s for s in stocks if float(s.get("price") or 0) <= budget and float(s.get("price") or 0) > 0]
         return self._sort_by_stage2_score(affordable)
 
-    def _build_account_context(self) -> Dict[str, Any]:
-        holdings = self.dhan.fetch_holdings()
-        positions = self.dhan.fetch_positions()
-        fund_limits = self.dhan.fetch_fund_limits()
+    def _build_account_context(self, dhan: Optional[DhanService] = None) -> Dict[str, Any]:
+        account = dhan or self.dhan
+        holdings = account.fetch_holdings()
+        positions = account.fetch_positions()
+        fund_limits = account.fetch_fund_limits()
 
         holdings_rows = holdings.get("data") if isinstance(holdings.get("data"), list) else []
         positions_rows = positions.get("data") if isinstance(positions.get("data"), list) else []
