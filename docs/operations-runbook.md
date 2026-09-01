@@ -38,7 +38,7 @@
 - Auth manager becomes healthy.
 - Gateway becomes healthy.
 - AI trading gateway becomes healthy before Intra-Finder is allowed to start.
-- Universe Scanner runs at or after 07:30 IST and refreshes the broad tradable
+- Universe Scanner runs at or after 07:00 IST and refreshes the broad tradable
   universe and cached profiles.
 - Intra-Finder accepts a completed last-known-good universe up to four calendar
   days old, so market-open monitoring does not wait for profile refresh.
@@ -94,8 +94,8 @@ feed.
 `CONNECTION_WARMING_UP` protects the first thirty seconds after a real
 reconnection.
 
-`AGENT_DISPATCH_CAPACITY` or `AGENT_CAPACITY` means three new-entry analysis
-slots are already occupied. The event is not queued because its market evidence
+`AGENT_DISPATCH_CAPACITY` or `AGENT_CAPACITY` means the configured new-entry
+analysis slots are occupied. The event is not queued because its market evidence
 is short-lived.
 
 `CORPORATE_ACTION_GAP_UNTRUSTED` means an ex-date action made the previous-close
@@ -134,4 +134,4 @@ Market monitoring must remain healthy even when a user cannot be routed. Check `
 
 The browser endpoint `GET /api/ai-trading/config` returns a plain status such as `automatic_balance`, `manual_amount`, `amount_missing_or_invalid`, `amount_timestamp_unavailable`, or `amount_stale`. Event dispatch diagnostics additionally use `available_balance_unavailable`, `price_above_trading_amount`, `price_unavailable`, `user_depth_unavailable`, and `user_slippage_too_high`.
 
-Saving with `POST /api/ai-trading/config` persists either automatic mode (blank field) or a manual amount and arms continuous event routing for that user; it does not launch a batch. Intra-Finder currently defaults to live event dispatch (`INTRA_FINDER_SHADOW_MODE=0`). Order permission remains separately controlled by `EXECUTIONER_ALLOW_LIVE_ORDERS`, the shared placement gate and the three-trade limit.
+Saving with `POST /api/ai-trading/config` persists either automatic mode (blank field) or a manual amount and arms continuous event routing for that user; it does not launch a batch. Intra-Finder currently defaults to live event dispatch (`INTRA_FINDER_SHADOW_MODE=0`). Order permission remains separately controlled by `EXECUTIONER_ALLOW_LIVE_ORDERS`, the shared placement gate and `stock_agent_max_concurrent_trades`.
