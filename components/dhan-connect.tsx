@@ -19,7 +19,45 @@ type Connection = {
     authorized: boolean
 }
 
+type DhanSetup = {
+    staticIp: string | null
+    redirectUrl: string
+}
+
 const LOGO_URL = 'https://dhan.co/_next/static/media/Dhanlogo.8a85768d.svg'
+
+function CopyValue({ label, value, unavailable }: { label: string; value: string; unavailable?: boolean }) {
+    const [copied, setCopied] = useState(false)
+
+    const copy = async () => {
+        if (unavailable) return
+        try {
+            await navigator.clipboard.writeText(value)
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), 1400)
+        } catch {
+            setCopied(false)
+        }
+    }
+
+    return (
+        <div>
+            <p className="mb-1 text-[9px] font-medium uppercase tracking-wide text-ink-tertiary">{label}</p>
+            <div className="flex h-9 items-center rounded-xl border border-line bg-surface pl-3">
+                <code className="min-w-0 flex-1 truncate text-[10px] text-ink-secondary">{value}</code>
+                <button
+                    type="button"
+                    onClick={() => void copy()}
+                    disabled={unavailable}
+                    className="h-full flex-shrink-0 border-l border-line px-3 text-[10px] font-medium text-ink-secondary hover:bg-surface-hover hover:text-ink-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`Copy ${label}`}
+                >
+                    {copied ? 'Copied' : 'Copy'}
+                </button>
+            </div>
+        </div>
+    )
+}
 
 /**
  * Broker connection control.
@@ -53,6 +91,7 @@ export default function DhanConnect() {
     const [apiKey, setApiKey] = useState('')
     const [apiSecret, setApiSecret] = useState('')
     const [connection, setConnection] = useState<Connection | null>(null)
+    const [setup, setSetup] = useState<DhanSetup | null>(null)
     const [connectOpen, setConnectOpen] = useState(false)
     const [disconnectOpen, setDisconnectOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -67,6 +106,7 @@ export default function DhanConnect() {
                 const response = await fetch('/api/dhan/connection', { cache: 'no-store' })
                 const data = await response.json()
                 if (!response.ok) throw new Error(data.error || 'Unable to check Dhan connection')
+                setSetup({ staticIp: data.staticIp || null, redirectUrl: data.redirectUrl })
                 if (response.ok && data.connected) setConnection(data)
             } catch (connectionError) {
                 setError(connectionError instanceof Error ? connectionError.message : 'Unable to check Dhan connection')
@@ -178,7 +218,7 @@ export default function DhanConnect() {
                 <Morph
                     open={connectOpen}
                     closedSize={{ width: '100%', height: 48 }}
-                    openSize={{ width: '100%', height: 190 }}
+                    openSize={{ width: '100%', height: 292 }}
                     className={cn(
                         // A tinted wash over the panel colour rather than a
                         // literal hex per state. The previous `#0D1510` and
@@ -251,6 +291,16 @@ export default function DhanConnect() {
                     }
                     expanded={
                         <form onSubmit={handleConnect} className="flex h-full flex-col gap-2 p-3">
+                            <CopyValue
+                                label="Static IP for Dhan"
+                                value={setup?.staticIp || 'Waiting for backend IP'}
+                                unavailable={!setup?.staticIp}
+                            />
+                            <CopyValue
+                                label="Dhan redirect URL"
+                                value={setup?.redirectUrl || 'Loading redirect URL'}
+                                unavailable={!setup?.redirectUrl}
+                            />
                             <div className="flex items-center gap-2">
                             <span className="grid h-9 w-9 flex-shrink-0 place-items-center">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
