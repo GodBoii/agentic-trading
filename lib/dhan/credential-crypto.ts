@@ -6,7 +6,10 @@ export type DhanCredentialKind = 'api-key' | 'api-secret' | 'access-token'
 const PREFIX = 'enc:v2:'
 
 function key() {
-  const secret = process.env.DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET?.trim()
+  const secret = (
+    process.env.DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET
+    || process.env.DHAN_TOKEN_ENCRYPTION_KEY
+  )?.trim()
   if (!secret) throw new Error('DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET is not configured')
   return crypto.createHash('sha256').update(secret).digest()
 }

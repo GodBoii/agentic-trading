@@ -26,7 +26,11 @@ class UserDhanCredentials:
     def _decrypt(value: str, user_id: str, kind: str) -> str:
         if not value.startswith("enc:v2:"):
             raise RuntimeError("user_dhan_credential_not_encrypted")
-        secret = os.getenv("DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET", "").strip()
+        secret = (
+            os.getenv("DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET")
+            or os.getenv("DHAN_TOKEN_ENCRYPTION_KEY")
+            or ""
+        ).strip()
         if not secret:
             raise RuntimeError("DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET is not configured")
         parts = value.removeprefix("enc:v2:").split(".")
