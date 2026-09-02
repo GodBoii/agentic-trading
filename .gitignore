@@ -128,7 +128,6 @@ tmp_bse*
 *.xlsx
 *.pdf
 List_of_GSM_Securities_*.CSV
-security_id_list.csv
 mca21_data/
 python-backend/all_stocks_*.json
 
