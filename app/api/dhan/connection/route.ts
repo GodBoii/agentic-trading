@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getStoredDhanCredentials, removeDhanCredentials } from '@/lib/dhan/user-credentials'
-import { convexAdminMutation } from '@/lib/convex/server'
+import { convexAdminMutation, convexAdminQuery } from '@/lib/convex/server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -12,14 +12,33 @@ async function userId() {
   return error ? null : user?.id || null
 }
 
-export async function GET() {
+type OrderPlacementState = { detectedIp?: string }
+
+function callbackUrl(request: NextRequest) {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  try {
+    return new URL('/api/dhan/callback', configured || request.nextUrl.origin).toString()
+  } catch {
+    return new URL('/api/dhan/callback', request.nextUrl.origin).toString()
+  }
+}
+
+export async function GET(request: NextRequest) {
   const id = await userId()
   if (!id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    const credentials = await getStoredDhanCredentials(id)
-    if (!credentials) return NextResponse.json({ connected: false })
+    const [credentials, orderState] = await Promise.all([
+      getStoredDhanCredentials(id),
+      convexAdminQuery<OrderPlacementState | null>('orderPlacementStates:get', { broker: 'dhan' }),
+    ])
+    const setup = {
+      staticIp: orderState?.detectedIp || null,
+      redirectUrl: callbackUrl(request),
+    }
+    if (!credentials) return NextResponse.json({ connected: false, ...setup })
     return NextResponse.json({
       connected: true,
+      ...setup,
       dhanClientId: credentials.dhanClientId,
       tokenExpiresAt: credentials.tokenExpiresAt || null,
       authorized: Boolean(
