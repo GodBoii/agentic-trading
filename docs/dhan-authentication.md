@@ -27,6 +27,11 @@ Each user must create their Dhan API key with the production callback URL:
 https://<app-domain>/api/dhan/callback
 ```
 
+The connection panel reads the backend's latest detected outbound IP from the
+Convex `orderPlacementStates` record and shows both the IP and callback URL as
+copyable setup values. Users paste the IP into Dhan's static-IP settings and the
+callback URL into their Dhan API-key configuration.
+
 Set the same `DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET` value in the Next.js
 deployment and the Python backend. Changing it makes existing encrypted records
 unreadable, so back it up with the other production secrets.
