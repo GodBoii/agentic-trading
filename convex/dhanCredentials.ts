@@ -27,12 +27,15 @@ export const upsertAuth = internalMutation({
       dhanClientId: args.dhanClientId,
       encryptedApiKey: args.encryptedApiKey,
       encryptedApiSecret: args.encryptedApiSecret,
-      encryptedAccessToken: undefined,
-      tokenExpiresAt: undefined,
       updatedAt: args.updatedAt,
     }
     if (existing) {
-      await ctx.db.patch(existing._id, values)
+      await ctx.db.patch(existing._id, {
+        ...values,
+        ...(existing.dhanClientId === args.dhanClientId
+          ? {}
+          : { encryptedAccessToken: undefined, tokenExpiresAt: undefined }),
+      })
       return existing._id
     }
     return await ctx.db.insert('dhanCredentials', {
