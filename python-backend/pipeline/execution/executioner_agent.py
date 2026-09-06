@@ -64,7 +64,7 @@ class ExecutionerAgent:
                 "Your only job is to decide whether the supplied stock has a fresh intraday trade worth entering now, size it, place at most one protected entry order, and stop.",
                 "Target trades that can complete within 1 minute to 1 hour; faster clean completion is better, but never force a trade just to be active.",
                 "You are not a trade monitor, portfolio manager, recovery agent, or kill-switch agent.",
-                "You receive 3 price-only chart images for the selected stock:",
+                "You receive the selected stock's available chart bundle. Read each image title and date; older bundles can have fewer images:",
                 "  Current Day: 1m EXECUTION, 5m SETUP, 15m STRUCTURE",
                 "Use embedded prior-day levels and technical metadata for context; do not expect historical order-flow panels.",
                 "You also receive timing_context and fresh_market_snapshot. Always compare stock_analyzer_generated_at_utc with executioner_started_at_utc before deciding.",
@@ -138,7 +138,7 @@ class ExecutionerAgent:
         }
         lines = [
             "Make the final entry-only intraday execution decision for the supplied stock.",
-            "You receive 3 price-only chart images: Current Day 1m EXECUTION, 5m SETUP, then 15m STRUCTURE.",
+            "Read the available chart titles: current 1m, 5m, 15m, previous session, daily 1D history, and analytical evidence when present. Daily candles exclude the decision date. Use older bases and retests to assess entry location.",
             "Use the overlaid previous-day levels and technical metadata for S/R context.",
             "Before deciding, inspect timing_context.analysis_age_seconds and fresh_market_snapshot. The stock analyzer report and chart images can be older than the current quote/OHLC snapshot.",
             "Use the *_ist timing fields for market-session reasoning because this system trades Indian equities.",
