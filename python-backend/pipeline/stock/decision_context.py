@@ -39,6 +39,8 @@ class StockDecisionContextBuilder:
         market_evidence = dict(security_overview.get("market_evidence") or {})
 
         technical = dict(technical_data.get("readings") or {})
+        technical["chart_manifest"] = technical_data.get("chart_manifest")
+        technical["chart_evidence"] = technical_data.get("chart_evidence")
         chart_close = cls._number(technical.pop("latest_price", None))
         chart_vwap = cls._number(technical.get("vwap"))
         technical.pop("price_vs_vwap", None)
