@@ -59,3 +59,7 @@ https://openrouter.ai/docs/guides/features/response-caching
 https://openrouter.ai/docs/guides/overview/multimodal/overview
 https://openrouter.ai/docs/guides/overview/multimodal/image-understanding
 https://openrouter.ai/docs/quickstart
+
+## Backend server
+
+Since September 2, 2026, the Trader backend runs on the Ubuntu server in the office. Connect with `ssh ubuntu-server` to inspect containers, logs, and runtime status.
