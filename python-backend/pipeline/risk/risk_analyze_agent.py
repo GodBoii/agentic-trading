@@ -45,9 +45,9 @@ class RiskAnalyzeAgent:
                 "Use only the supplied facts and images.",
                 "",
                 "CHART IMAGE INTERPRETATION:",
-                "You receive 3 charts per stock (9 total for 3 stocks), in stock-report order:",
+                "You receive intraday 1m, 5m, 15m and daily 1D context when available for each stock, in stock-report order:",
                 "  For each stock: Current Day 1m EXECUTION, 5m SETUP, then 15m STRUCTURE.",
-                "Each image is price-only and uses a candle-focused viewport; prior-day levels are overlaid or identified as off-screen.",
+                "Intraday images use candle-focused viewports. Daily context adds completed historical sessions and volume; check older bases and retests before accepting entry location. Read image titles for dates and coverage.",
                 "Use technical metadata for exact levels, RSI, ATR, volume, and pattern detections.",
                 "",
                 capital_line,
@@ -87,8 +87,8 @@ class RiskAnalyzeAgent:
 
         lines = [
             "Compare the three supplied intraday stock candidates and select the single best one for the execution layer.",
-            "You receive 3 charts per stock (9 total), in stock-report order. For each stock: Current Day 1m EXECUTION, 5m SETUP, Current Day 15m STRUCTURE.",
-            "Each image is price-only and candle-focused; use the supplied technical metadata for numeric indicators.",
+            "Charts are in stock-report order. For each stock: current 1m, 5m, 15m, then daily 1D context if available. Read titles and coverage; historical bundles may lack daily context.",
+            "Use the supplied technical metadata for numeric indicators. Daily context includes completed sessions and volume.",
             "Evaluate position concentration and available funds independently.",
             "If current open positions, holdings overlap, or risk concentration make the setup unsuitable, say so clearly.",
             "If a regime report is supplied, use it only to describe backdrop; do not treat it as standalone permission or prohibition.",
