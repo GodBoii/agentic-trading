@@ -4,6 +4,7 @@ import math
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -14,12 +15,20 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 class CandlestickChartService:
     """Generates professional candlestick chart images optimized for LLM vision analysis.
 
-    Produces four neutral price charts and four dedicated evidence charts.
+    Produces intraday price charts, daily context and dedicated evidence charts.
     Every chart is derived from OHLCV; order-flow data is never synthesized.
     """
 
     CURRENT_DAY_TIMEFRAMES: List[int] = [1, 5, 15]
     PREVIOUS_DAY_TIMEFRAMES: List[int] = [15]
+    DAILY_MAX_CANDLES = 250
+    # Stock runners use threads, while pyplot keeps process-wide current figures.
+    _render_lock = Lock()
+    REQUIRED_AGENT_CHARTS = (
+        "current_1m", "current_5m", "current_15m", "previous_15m",
+        "daily_1d", "volume_participation", "momentum_volatility",
+        "price_structure_liquidity", "tpo_profile",
+    )
 
     # Color palette — carefully chosen for LLM visual clarity
     COLORS = {
@@ -70,10 +79,32 @@ class CandlestickChartService:
         market_date: str,
         output_dir: Path,
         signal_time_ist: Optional[str] = None,
+        daily_frame: Optional[pd.DataFrame] = None,
     ) -> Dict[str, Any]:
         """Build the full chart set with technical metadata for LLM consumption."""
+        with self._render_lock:
+            return self._build_intraday_chart_set(
+                frame, display_name, market_date, output_dir, signal_time_ist, daily_frame
+            )
+
+    def _build_intraday_chart_set(
+        self,
+        frame: pd.DataFrame,
+        display_name: str,
+        market_date: str,
+        output_dir: Path,
+        signal_time_ist: Optional[str],
+        daily_frame: Optional[pd.DataFrame],
+    ) -> Dict[str, Any]:
         output_dir.mkdir(parents=True, exist_ok=True)
         local_frame = self._to_market_frame(frame)
+        # Replay inputs can contain later sessions. Never use them as evidence.
+        local_frame = local_frame.loc[local_frame["timestamp"].dt.date <= date.fromisoformat(market_date)]
+        minute_of_day = local_frame["timestamp"].dt.hour * 60 + local_frame["timestamp"].dt.minute
+        local_frame = local_frame.loc[
+            (minute_of_day >= self.market_open[0] * 60 + self.market_open[1])
+            & (minute_of_day < self.market_close[0] * 60 + self.market_close[1])
+        ].drop_duplicates("timestamp", keep="last")
 
         today_frame = self._day_frame(local_frame, market_date)
         if today_frame.empty:
@@ -112,6 +143,9 @@ class CandlestickChartService:
 
             # Compute all indicators and zones
             enriched = self._compute_full_indicators(resampled)
+            warm = self._compute_warm_indicators(self._resample_all_sessions(local_frame, timeframe))
+            for column in ("ema9", "ema21", "rsi", "atr", "bb_upper", "bb_lower"):
+                enriched[column] = warm[column].reindex(enriched.index)
             sr_levels = self._detect_support_resistance(enriched, prev_day_levels)
             sd_zones = self._detect_supply_demand_zones(enriched)
             patterns = self._detect_candlestick_patterns(enriched)
@@ -131,6 +165,7 @@ class CandlestickChartService:
                 patterns=patterns,
                 prev_day_levels=prev_day_levels,
                 signal_time_ist=signal_time_ist,
+                data_as_of=data_as_of,
             )
             key = f"current_{tf_label}"
             charts[key] = {
@@ -141,10 +176,11 @@ class CandlestickChartService:
                 "date": market_date,
                 "path": str(path),
                 "candles": int(len(resampled)),
+                "visible_candles": min(len(resampled), 90 if timeframe in (1, 5) else 64),
                 "data_as_of_ist": data_as_of.isoformat(),
                 "last_candle_start_ist": resampled.index[-1].isoformat(),
                 "last_candle_complete": bool(
-                    datetime.now(self.resolved_timezone)
+                    data_as_of
                     >= resampled.index[-1].to_pydatetime() + timedelta(minutes=timeframe)
                 ),
             }
@@ -160,6 +196,7 @@ class CandlestickChartService:
                         "data_as_of_ist": data_as_of.isoformat(),
                         "last_candle_start_ist": resampled.index[-1].isoformat(),
                         "last_candle_complete": charts[key]["last_candle_complete"],
+                        "indicator_warmup_uses_prior_sessions": True,
                     }
                 )
 
@@ -199,6 +236,25 @@ class CandlestickChartService:
                     "candles": int(len(resampled)),
                 }
                 chart_paths_ordered.append(str(path))
+
+        if daily_frame is not None:
+            daily = self.prepare_daily_frame(daily_frame, market_date)
+            path = output_dir / f"{self._slugify(display_name)}-{market_date}-daily-1d.png"
+            daily_metadata = self._render_daily_chart(
+                daily, display_name, path, float(today_frame["close"].iloc[-1]), data_as_of
+            )
+            charts["daily_1d"] = {
+                "timeframe_minutes": 1440,
+                "label": "1d",
+                "day_type": "historical",
+                "chart_type": "daily_context",
+                "date": market_date,
+                "path": str(path),
+                "candles": len(daily),
+                "last_candle_complete": True,
+                "metadata": daily_metadata,
+            }
+            chart_paths_ordered.append(str(path))
 
         analytical_specs = [
             (
@@ -254,9 +310,107 @@ class CandlestickChartService:
             "chart_count": len(charts),
             "charts": charts,
             "chart_paths_ordered": chart_paths_ordered,
-            "chart_contract_version": "stock-evidence-v5",
+            "chart_contract_version": "stock-evidence-v6",
             "signal_time_ist": signal_time_ist,
             "technical_metadata": technical_metadata,
+        }
+
+    def prepare_daily_frame(self, frame: pd.DataFrame, market_date: str) -> pd.DataFrame:
+        """Validate real daily bars and exclude the decision date and future dates."""
+        columns = ["open", "high", "low", "close", "volume"]
+        if frame.empty or not {"timestamp", *columns}.issubset(frame.columns):
+            raise ValueError("Daily OHLCV history is missing.")
+        daily = self._to_market_frame(frame)
+        daily = daily.loc[daily["timestamp"].dt.date < date.fromisoformat(market_date)].copy()
+        daily[columns] = daily[columns].apply(pd.to_numeric, errors="coerce")
+        invalid = (
+            ~np.isfinite(daily[columns]).all(axis=1)
+            | (daily[["open", "high", "low", "close"]] <= 0).any(axis=1)
+            | (daily["volume"] < 0)
+            | (daily["high"] < daily[["open", "close", "low"]].max(axis=1))
+            | (daily["low"] > daily[["open", "close", "high"]].min(axis=1))
+        )
+        if invalid.any():
+            raise ValueError("Daily history contains invalid OHLCV bars.")
+        daily["timestamp"] = daily["timestamp"].dt.normalize()
+        daily = daily.drop_duplicates("timestamp", keep="last").set_index("timestamp")
+        if daily.empty:
+            raise ValueError("No completed daily candles precede the decision date.")
+        return daily.tail(self.DAILY_MAX_CANDLES)
+
+    def _render_daily_chart(
+        self, frame: pd.DataFrame, display_name: str, output_path: Path,
+        current_price: float, data_as_of: pd.Timestamp,
+    ) -> Dict[str, Any]:
+        """Show long-range price geometry without claiming inferred zones are orders."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+
+        fig, axes = plt.subplots(
+            2, 1, figsize=(18, 10), sharex=True,
+            gridspec_kw={"height_ratios": [4, 1]},
+        )
+        fig.patch.set_facecolor(self.COLORS["bg"])
+        for axis in axes:
+            self._style_evidence_axis(axis)
+        try:
+            for index, row in enumerate(frame.itertuples()):
+                color = self.COLORS["candle_up" if row.close >= row.open else "candle_down"]
+                axes[0].vlines(index, row.low, row.high, color=color, linewidth=0.9, zorder=3)
+                if row.close == row.open:
+                    axes[0].hlines(row.close, index - 0.34, index + 0.34, color=color, zorder=4)
+                else:
+                    axes[0].add_patch(Rectangle(
+                        (index - 0.34, min(row.open, row.close)), 0.68,
+                        abs(row.close - row.open), facecolor=color, edgecolor=color,
+                        linewidth=0.5, zorder=4,
+                    ))
+                axes[1].bar(index, row.volume, width=0.68, color=color, alpha=0.7)
+            low = min(float(frame["low"].min()), current_price)
+            high = max(float(frame["high"].max()), current_price)
+            padding = max((high - low) * 0.05, current_price * 0.001)
+            axes[0].set_ylim(low - padding, high + padding)
+            axes[0].axhline(current_price, color=self.COLORS["text"], linestyle=":", linewidth=1)
+            axes[0].text(
+                0.99, current_price, f"CURRENT INTRADAY {current_price:.2f}",
+                transform=axes[0].get_yaxis_transform(), ha="right", va="bottom",
+                color=self.COLORS["text"], fontsize=9, zorder=6,
+                bbox={"facecolor": self.COLORS["bg"], "edgecolor": "none", "alpha": 0.9},
+            )
+            start, end = frame.index[0].date().isoformat(), frame.index[-1].date().isoformat()
+            axes[0].set_title(
+                f"{display_name} | 1D | {len(frame)} COMPLETED SESSIONS | {start} to {end}",
+                color=self.COLORS["text"], fontsize=14, fontweight="bold", pad=14,
+            )
+            axes[0].set_ylabel("Price (INR)", color=self.COLORS["text_dim"])
+            axes[1].set_ylabel("Daily volume", color=self.COLORS["text_dim"])
+            ticks = np.unique(np.linspace(0, len(frame) - 1, min(12, len(frame)), dtype=int))
+            axes[1].set_xticks(ticks)
+            axes[1].set_xticklabels([frame.index[i].strftime("%d %b %y") for i in ticks], rotation=30, ha="right")
+            axes[1].set_xlim(-1, len(frame) + 1)
+            axes[1].set_xlabel("Session date (IST). Current session excluded from daily candles.", color=self.COLORS["text_dim"])
+            fig.suptitle(
+                f"Historical context | Current price through {data_as_of.strftime('%Y-%m-%d %H:%M IST')} | "
+                "Vendor OHLCV; corporate-action adjustment unverified",
+                color=self.COLORS["text_dim"], fontsize=10,
+            )
+            fig.tight_layout(rect=(0, 0, 1, 0.96))
+            fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
+        finally:
+            plt.close(fig)
+        return {
+            "source": "dhan_daily_ohlcv", "timeframe": "1d",
+            "completed_sessions": len(frame), "display_limit": self.DAILY_MAX_CANDLES,
+            "history_coverage": "limited" if len(frame) < 60 else "available",
+            "first_session": start, "last_session": end,
+            "current_session_included": False,
+            "current_price": current_price, "current_price_as_of_ist": data_as_of.isoformat(),
+            "last_completed_close": float(frame["close"].iloc[-1]),
+            "visible_high": float(frame["high"].max()), "visible_low": float(frame["low"].min()),
+            "corporate_action_adjustment": "unverified_vendor_prices",
+            "zones": "Interpret bases and retests from price; no order-book inference.",
         }
 
     # ─── INDICATOR COMPUTATION ─────────────────────────────────────────────
@@ -585,6 +739,7 @@ class CandlestickChartService:
         patterns: List[Dict[str, Any]],
         prev_day_levels: Dict[str, float],
         signal_time_ist: Optional[str] = None,
+        data_as_of: Optional[pd.Timestamp] = None,
     ) -> None:
         """Render one uncluttered price chart for a specific decision role.
 
@@ -787,33 +942,6 @@ class CandlestickChartService:
                 )
             )
 
-        market_day = date.fromisoformat(market_date)
-        signal_at = self._parse_signal_time(signal_time_ist)
-        if signal_at is not None and signal_at.date() == market_day:
-            naive_signal = signal_at.replace(tzinfo=None)
-            nearest = min(
-                range(candle_count),
-                key=lambda index: abs((timestamps[index] - naive_signal).total_seconds()),
-            )
-            ax_price.axvline(
-                nearest,
-                color=colors["rsi_line"],
-                linestyle="--",
-                linewidth=1.1,
-                alpha=0.85,
-                zorder=4,
-            )
-            ax_price.text(
-                nearest,
-                y_max - y_padding * 0.15,
-                "SIGNAL",
-                color=colors["rsi_line"],
-                fontsize=8,
-                ha="center",
-                va="top",
-                fontweight="bold",
-            )
-
         ax_price.axhline(
             latest_close,
             color=colors["text"],
@@ -853,21 +981,19 @@ class CandlestickChartService:
         ax_price.set_xlim(-0.9, x_right)
         ax_price.set_ylim(y_min, y_max)
 
-        latest_vwap = self._latest_finite(plot_frame, "vwap")
-        latest_atr = self._latest_finite(plot_frame, "atr")
-        market_day = date.fromisoformat(market_date)
+        latest_vwap_value = self._latest_series_value(plot_frame["vwap"])
+        latest_atr_value = self._latest_series_value(plot_frame["atr"])
+        vwap_label = f"INR {latest_vwap_value:.2f}" if latest_vwap_value is not None else "N/A"
+        atr_label = f"INR {latest_atr_value:.2f}" if latest_atr_value is not None else "N/A"
         last_start = pd.Timestamp(timestamps[-1]).to_pydatetime().replace(
             tzinfo=self.resolved_timezone
         )
-        is_complete = (
-            datetime.now(self.resolved_timezone)
-            >= last_start + timedelta(minutes=timeframe_minutes)
-        ) or market_day < datetime.now(self.resolved_timezone).date()
+        is_complete = data_as_of is None or data_as_of >= last_start + timedelta(minutes=timeframe_minutes)
         partial_marker = "" if is_complete else " | PARTIAL LAST CANDLE"
         ax_price.set_title(
             (
                 f"{title} | LAST ₹{latest_close:.2f} | "
-                f"VWAP ₹{latest_vwap:.2f} | ATR(14) ₹{latest_atr:.2f}"
+                f"VWAP {vwap_label} | ATR(14) {atr_label}"
                 f"{partial_marker}"
             ),
             color=colors["text"],
@@ -1064,10 +1190,8 @@ class CandlestickChartService:
         )
 
         completed_five = five.copy()
-        now = datetime.now(self.resolved_timezone)
         completed_mask = [
-            now >= value.to_pydatetime() + timedelta(minutes=5)
-            or current_day < now.date()
+            data_as_of >= value.to_pydatetime() + timedelta(minutes=5)
             for value in completed_five.index
         ]
         completed_volumes = completed_five.loc[completed_mask, "volume"]
@@ -1192,27 +1316,6 @@ class CandlestickChartService:
             fontsize=9,
         )
         signal_at = self._parse_signal_time(signal_time_ist)
-        if signal_at is not None and signal_at.date() == current_day:
-            naive_signal = signal_at.replace(tzinfo=None)
-            for axis in axes:
-                axis.axvline(
-                    naive_signal,
-                    color=self.COLORS["rsi_line"],
-                    linestyle="--",
-                    linewidth=1.0,
-                    alpha=0.85,
-                )
-            axes[0].text(
-                naive_signal,
-                0.96,
-                "SIGNAL",
-                transform=axes[0].get_xaxis_transform(),
-                color=self.COLORS["rsi_line"],
-                fontsize=8,
-                ha="center",
-                va="top",
-                fontweight="bold",
-            )
         plt.setp(axes[2].get_xticklabels(), rotation=30, ha="right")
         fig.tight_layout()
         fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=self.COLORS["bg"])
@@ -1411,8 +1514,7 @@ class CandlestickChartService:
         sweep_references = references + pools
         sweeps: List[Dict[str, Any]] = []
         completed_limit = len(frame)
-        now = datetime.now(self.resolved_timezone)
-        if date.fromisoformat(market_date) == now.date() and frame.index[-1].to_pydatetime() + timedelta(minutes=5) > now:
+        if frame.index[-1].to_pydatetime() + timedelta(minutes=5) > data_as_of:
             completed_limit -= 1
         for reference in sweep_references:
             price = float(reference["price"])
@@ -1574,6 +1676,13 @@ class CandlestickChartService:
             f"PREVIOUS {previous_market_date}",
             self.COLORS["ema21"],
         )
+        profiles = [profile for profile in (current_profile, previous_profile) if profile]
+        if profiles:
+            low = min(float(profile["rows"].min()) for profile in profiles)
+            high = max(float(profile["rows"].max()) for profile in profiles)
+            pad = max((high - low) * 0.04, 0.05)
+            for axis in axes:
+                axis.set_ylim(low - pad, high + pad)
         fig.suptitle(
             f"{display_name} | TPO MARKET PROFILE — TIME AT PRICE, NOT VOLUME AT PRICE",
             color=self.COLORS["text"],
@@ -1587,6 +1696,9 @@ class CandlestickChartService:
             "source": "dhan_historical_ohlcv",
             "profile_type": "tpo_time_at_price",
             "volume_at_price": False,
+            "shared_price_axis": True,
+            "bracket_alignment": "30 minutes from market open",
+            "construction": "OHLC range coverage per bracket; intrabracket gaps are not observed trades",
             "current": self._profile_metadata(current_profile),
             "previous": self._profile_metadata(previous_profile),
         }
@@ -1622,6 +1734,12 @@ class CandlestickChartService:
         if frame.empty:
             return frame
         enriched = frame.copy()
+        enriched["ema9"] = enriched["close"].ewm(span=9, adjust=False, min_periods=9).mean()
+        enriched["ema21"] = enriched["close"].ewm(span=21, adjust=False, min_periods=21).mean()
+        middle = enriched["close"].rolling(20).mean()
+        deviation = enriched["close"].rolling(20).std()
+        enriched["bb_upper"] = middle + 2 * deviation
+        enriched["bb_lower"] = middle - 2 * deviation
         delta = enriched["close"].diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
@@ -1629,6 +1747,8 @@ class CandlestickChartService:
         avg_loss = loss.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
         rs = avg_gain / avg_loss.replace(0, np.nan)
         enriched["rsi"] = 100 - (100 / (1 + rs))
+        enriched.loc[(avg_loss == 0) & (avg_gain > 0), "rsi"] = 100.0
+        enriched.loc[(avg_loss == 0) & (avg_gain == 0), "rsi"] = 50.0
         true_range = pd.concat(
             [
                 enriched["high"] - enriched["low"],
@@ -1656,7 +1776,11 @@ class CandlestickChartService:
         )
         counts = np.zeros(len(rows), dtype=int)
         letters: List[List[str]] = [[] for _ in rows]
-        brackets = list(frame.groupby(frame.index.floor("30min"), sort=True))
+        session_start = frame.index.min().normalize() + pd.Timedelta(
+            hours=self.market_open[0], minutes=self.market_open[1]
+        )
+        bracket_ids = (frame.index - session_start) // pd.Timedelta(minutes=30)
+        brackets = list(frame.groupby(bracket_ids, sort=True))
         alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
         for bracket_index, (_, bracket) in enumerate(brackets):
             bracket_low = float(bracket["low"].min())
