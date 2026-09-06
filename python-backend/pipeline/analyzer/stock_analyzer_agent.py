@@ -78,7 +78,7 @@ class StockAnalyzerAgent:
             "Focus on trade quality, risk, expected duration, and whether the setup is worth sending to execution.",
             "",
             "CHART VISUAL LEGEND",
-            "Each image is a price-only chart. Green candles close above open, red candles close below open, and wicks show high/low extremes. Candles are intentionally drawn above the overlays.",
+            "The intraday candlestick images are price-only; the daily image also has volume, and the analytical images have dedicated evidence panels. Green candles close above open, red candles close below open, and wicks show high/low extremes. Candles are intentionally drawn above the overlays.",
             "VWAP (orange thick line): cumulative sum(typical_price * volume) / cumulative volume. Institutions often use VWAP as an execution benchmark; price above VWAP suggests buyers control the intraday auction, while price below suggests sellers control it. VWAP can mislead during low-volume drifts or late-session mean reversion.",
             "EMA9 (cyan): exponential moving average of the last 9 periods. EMA = close * k + prior_EMA * (1-k), k = 2/(period+1). EMA9 reacts quickly and shows short-term momentum, but whipsaws in chop.",
             "EMA21 (magenta): same EMA formula using 21 periods. It is a slower intraday trend baseline. EMA9 above EMA21 supports bullish momentum; EMA9 below EMA21 supports bearish momentum. Crossovers are less reliable in sideways markets.",
@@ -95,6 +95,8 @@ class StockAnalyzerAgent:
             "",
             "CHART IMAGE ORDER",
             "Current day: 1m EXECUTION, 5m SETUP, 15m STRUCTURE.",
+            "Read daily 1D context before deciding: locate current price relative to older bases, swing highs/lows, gaps, and repeated retests. Daily candles are completed sessions only, capped at 250; the current intraday price is a separate reference. Use the stated date range and do not assume older unseen zones are absent. Vendor corporate-action adjustment is unverified; a historical gap is not automatically a supply/demand zone.",
+            "Chart metadata identifies coverage and indicator basis. Current intraday EMA/RSI/ATR use prior-session warmup; VWAP resets each session. Treat developing last bars as provisional. OHLCV-derived zones and sweeps are hypotheses, not evidence of resting institutional orders.",
             "Use prior-session levels embedded in the current charts and technical_metadata for gap, breakout, continuation, or reversal context.",
             "",
             "OUTPUT FORMAT",
@@ -111,7 +113,12 @@ class StockAnalyzerAgent:
     def _build_prompt(self, candidate_packet: Dict[str, Any]) -> str:
         regime_enabled = bool(candidate_packet.get("regime_analysis_enabled", True))
         regime_report = str(candidate_packet.get("regime_report") or "").strip()
-        technical_metadata = (candidate_packet.get("chart_artifacts") or {}).get("technical_metadata") or {}
+        artifacts = candidate_packet.get("chart_artifacts") or {}
+        technical_metadata = dict(artifacts.get("technical_metadata") or {})
+        technical_metadata["chart_evidence"] = {
+            key: info["metadata"] for key, info in (artifacts.get("charts") or {}).items()
+            if isinstance(info, dict) and info.get("metadata")
+        }
         timing_context = candidate_packet.get("timing_context") or {}
         market_session = timing_context.get("market_session") or {}
         stock = candidate_packet.get("stock") or {}
@@ -126,8 +133,8 @@ class StockAnalyzerAgent:
         lines = [
             "Analyze the supplied intraday stock candidate.",
             "Your downstream reader is this stock's executioner agent, so be precise, concrete, and usable.",
-            "Chart images are provided in order: current day 1m EXECUTION, 5m SETUP, 15m STRUCTURE, previous-session 15m, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO profile.",
-            "Each image is price-only; use technical_metadata for RSI, ATR, volume, patterns, and exact levels.",
+            "Chart images are provided in order: current day 1m EXECUTION, 5m SETUP, 15m STRUCTURE, previous-session 15m, daily 1D historical context, volume/participation, momentum/volatility, OHLCV-derived price-structure liquidity, and current/previous TPO profile.",
+            "Use technical_metadata and chart_artifacts.charts metadata for exact readings and image coverage.",
             "Cross-reference the technical snapshot with what you see on charts.",
             "Intra-Finder selected the stock for inspection. It supplies no trade recommendation.",
             "Independently decide whether the objective evidence is continuation, reversal, noise, or contradictory.",
