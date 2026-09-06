@@ -1,0 +1,249 @@
+{
+  "market_date": "2026-08-24",
+  "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+  "charts_built_at_ist": "2026-09-06T13:19:05.702817+05:30",
+  "previous_market_date": "2026-08-21",
+  "chart_count": 9,
+  "charts": {
+    "current_1m": {
+      "timeframe_minutes": 1,
+      "label": "1m",
+      "day_type": "current",
+      "chart_type": "price",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-current-1m.png",
+      "candles": 143,
+      "visible_candles": 90,
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "last_candle_start_ist": "2026-08-24T11:37:00+05:30",
+      "last_candle_complete": false
+    },
+    "current_5m": {
+      "timeframe_minutes": 5,
+      "label": "5m",
+      "day_type": "current",
+      "chart_type": "price",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-current-5m.png",
+      "candles": 29,
+      "visible_candles": 29,
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "last_candle_start_ist": "2026-08-24T11:35:00+05:30",
+      "last_candle_complete": false
+    },
+    "current_15m": {
+      "timeframe_minutes": 15,
+      "label": "15m",
+      "day_type": "current",
+      "chart_type": "price",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-current-15m.png",
+      "candles": 10,
+      "visible_candles": 10,
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "last_candle_start_ist": "2026-08-24T11:30:00+05:30",
+      "last_candle_complete": false
+    },
+    "previous_15m": {
+      "timeframe_minutes": 15,
+      "label": "15m",
+      "day_type": "previous",
+      "chart_type": "price",
+      "date": "2026-08-21",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-21-previous-15m.png",
+      "candles": 25
+    },
+    "daily_1d": {
+      "timeframe_minutes": 1440,
+      "label": "1d",
+      "day_type": "historical",
+      "chart_type": "daily_context",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-daily-1d.png",
+      "candles": 36,
+      "last_candle_complete": true,
+      "metadata": {
+        "source": "dhan_daily_ohlcv",
+        "timeframe": "1d",
+        "completed_sessions": 36,
+        "display_limit": 250,
+        "history_coverage": "limited",
+        "first_session": "2026-07-03",
+        "last_session": "2026-08-21",
+        "current_session_included": false,
+        "current_price": 273.5,
+        "current_price_as_of_ist": "2026-08-24T11:37:00+05:30",
+        "last_completed_close": 276.0,
+        "visible_high": 341.5,
+        "visible_low": 236.1,
+        "corporate_action_adjustment": "unverified_vendor_prices",
+        "zones": "Interpret bases and retests from price; no order-book inference."
+      }
+    },
+    "volume_participation": {
+      "chart_type": "volume_participation",
+      "day_type": "analytical",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-volume-participation.png",
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "metadata": {
+        "source": "dhan_historical_ohlcv",
+        "baseline_completed_sessions": 15,
+        "time_of_day_rvol": 0.503,
+        "completed_5m_participation_impulse_3bar": 0.217,
+        "cumulative_volume_percentile_band": "25th-75th",
+        "five_minute_expected_volume_baseline": "same-time median",
+        "signal_time_ist": "2026-08-24T11:36:00+05:30",
+        "trade_side_inference": false
+      }
+    },
+    "momentum_volatility": {
+      "chart_type": "momentum_volatility",
+      "day_type": "analytical",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-momentum-volatility.png",
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "metadata": {
+        "source": "dhan_historical_ohlcv",
+        "indicator_warmup_uses_prior_sessions": true,
+        "latest": {
+          "1": {
+            "rsi": 9.355098732221037,
+            "atr": 0.07827343104675467,
+            "atr_percent": 0.028619170401007196
+          },
+          "5": {
+            "rsi": 28.669422963444447,
+            "atr": 0.41972378820306566,
+            "atr_percent": 0.15346390793530737
+          },
+          "15": {
+            "rsi": 37.52633800625054,
+            "atr": 0.938008963185264,
+            "atr_percent": 0.34296488599095576
+          }
+        }
+      }
+    },
+    "price_structure_liquidity": {
+      "chart_type": "price_structure_liquidity",
+      "day_type": "analytical",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-price-structure-liquidity.png",
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "metadata": {
+        "source": "dhan_historical_ohlcv",
+        "order_book_data": false,
+        "equal_high_low_pools": 2,
+        "confirmed_sweeps": 3,
+        "sweep_requires_completed_candle": true
+      }
+    },
+    "tpo_profile": {
+      "chart_type": "tpo_profile",
+      "day_type": "analytical",
+      "date": "2026-08-24",
+      "path": "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-tpo-profile.png",
+      "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+      "metadata": {
+        "source": "dhan_historical_ohlcv",
+        "profile_type": "tpo_time_at_price",
+        "volume_at_price": false,
+        "shared_price_axis": true,
+        "bracket_alignment": "30 minutes from market open",
+        "construction": "OHLC range coverage per bracket; intrabracket gaps are not observed trades",
+        "current": {
+          "status": "available",
+          "row_size": 0.1,
+          "poc": 275.2,
+          "vah": 279.2,
+          "val": 275.2,
+          "initial_balance_high": 279.95,
+          "initial_balance_low": 275.2,
+          "brackets": 5
+        },
+        "previous": {
+          "status": "available",
+          "row_size": 0.1,
+          "poc": 275.8,
+          "vah": 276.5,
+          "val": 272.7,
+          "initial_balance_high": 273.45,
+          "initial_balance_low": 270.15,
+          "brackets": 13
+        }
+      }
+    }
+  },
+  "chart_paths_ordered": [
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-current-1m.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-current-5m.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-current-15m.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-21-previous-15m.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-daily-1d.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-volume-participation.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-momentum-volatility.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-price-structure-liquidity.png",
+    "..\\artifacts\\chart-audit-2026-09-06\\firstsource-solutions-bse-2026-08-24-tpo-profile.png"
+  ],
+  "chart_contract_version": "stock-evidence-v6",
+  "signal_time_ist": "2026-08-24T11:36:00+05:30",
+  "technical_metadata": {
+    "latest_price": 273.5,
+    "vwap": 276.35,
+    "ema9": 274.34,
+    "ema21": 274.91,
+    "rsi": 28.7,
+    "bb_upper": 276.28,
+    "bb_lower": 273.69,
+    "atr": 0.42,
+    "ema_state": "bearish_cross",
+    "price_vs_vwap": "below",
+    "support_levels": [
+      270.15,
+      275.2
+    ],
+    "resistance_levels": [
+      276.55,
+      278.5
+    ],
+    "demand_zones": [],
+    "supply_zones": [],
+    "prev_day": {
+      "prev_high": 276.55,
+      "prev_low": 270.15,
+      "prev_close": 276.0
+    },
+    "patterns_detected": [
+      {
+        "pattern": "Bull Engulf",
+        "bias": "bullish",
+        "at_price": 275.55
+      },
+      {
+        "pattern": "Bear Engulf",
+        "bias": "bearish",
+        "at_price": 275.2
+      },
+      {
+        "pattern": "Bear Engulf",
+        "bias": "bearish",
+        "at_price": 275.0
+      },
+      {
+        "pattern": "Bull Engulf",
+        "bias": "bullish",
+        "at_price": 275.0
+      },
+      {
+        "pattern": "Doji",
+        "bias": "neutral",
+        "at_price": 274.0
+      }
+    ],
+    "data_as_of_ist": "2026-08-24T11:37:00+05:30",
+    "last_candle_start_ist": "2026-08-24T11:35:00+05:30",
+    "last_candle_complete": false,
+    "indicator_warmup_uses_prior_sessions": true
+  }
+}
