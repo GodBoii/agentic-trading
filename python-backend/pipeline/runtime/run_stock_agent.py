@@ -749,8 +749,9 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             security_id=security_id,
             margin_budget=margin_budget,
         )
-        context_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="stock-context")
+        context_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="stock-context")
         context_futures = {
+            "daily_history": context_executor.submit(self._fetch_daily_chart_history, candidate_packet),
             "security_overview": context_executor.submit(
                 self._safe_initial_context_component,
                 "security_overview",
@@ -774,6 +775,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 market_date=candidate_packet["market_date"],
                 output_dir=artifacts_dir,
                 signal_time_ist=candidate_packet.get("created_at"),
+                daily_frame=context_futures["daily_history"].result(),
             )
             security_overview = context_futures["security_overview"].result()
             current_stock_state = context_futures["current_stock_state"].result()
@@ -781,10 +783,11 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         finally:
             context_executor.shutdown(wait=True, cancel_futures=True)
         chart_bundle["history_cache_used"] = cache_used
-        if int(chart_bundle.get("chart_count") or 0) != 8:
+        missing_charts = set(self.charting.REQUIRED_AGENT_CHARTS) - set(chart_bundle.get("charts") or {})
+        if missing_charts:
             raise RuntimeError(
                 f"stock_agent_chart_contract_incomplete::{security_id}::"
-                f"{chart_bundle.get('chart_count')} charts"
+                f"missing {sorted(missing_charts)}"
             )
         candidate_packet["chart_artifacts"] = chart_bundle
         chart_paths = chart_bundle.get("chart_paths_ordered", [])
@@ -913,7 +916,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "type": "stock_agent_input",
                 "message": (
                     f"Analyze {candidate_packet.get('display_name') or candidate_packet.get('symbol')} "
-                    "using the eight attached evidence charts, the initial decision snapshot, "
+                    f"using the {len(cloud_image_urls)} attached evidence charts, the initial decision snapshot, "
                     "and the two protected-execution tools."
                 ),
                 "input": stock_packet,
@@ -980,6 +983,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 ordered_items.append((key, info))
         for key, info in ordered_items:
             analytical_titles = {
+                "daily_1d": "Daily Historical Context",
                 "volume_participation": "Volume and Participation",
                 "momentum_volatility": "Momentum and Volatility",
                 "price_structure_liquidity": "Price-Structure Liquidity",
