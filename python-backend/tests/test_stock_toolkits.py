@@ -300,7 +300,7 @@ class StockToolkitTests(unittest.TestCase):
             bundle["technical_metadata"]["data_as_of_ist"],
             bundle["data_as_of_ist"],
         )
-        self.assertEqual(bundle["chart_contract_version"], "stock-evidence-v5")
+        self.assertEqual(bundle["chart_contract_version"], "stock-evidence-v6")
         self.assertEqual(
             list(bundle["charts"]),
             [
@@ -317,7 +317,7 @@ class StockToolkitTests(unittest.TestCase):
         self.assertEqual(bundle["chart_count"], 8)
         self.assertNotIn("cvd_direction", bundle["technical_metadata"])
 
-    def test_volume_chart_uses_same_time_baselines_and_signal_marker(self):
+    def test_volume_chart_preserves_signal_timestamp_as_metadata_only(self):
         market_tz = ZoneInfo("Asia/Kolkata")
         rows = []
         for day in (20, 21, 22, 23):
