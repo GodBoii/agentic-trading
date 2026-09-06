@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+
 from pipeline.analyzer import StockAnalyzerAgent
 from pipeline.config import PipelineConfig
 from pipeline.services.ai_trading_state_service import AITradingStateService
@@ -412,6 +414,7 @@ class MultiStockAnalyzerRunner:
             display_name=candidate_packet["display_name"],
             market_date=candidate_packet["market_date"],
             output_dir=artifacts_dir,
+            daily_frame=self._fetch_daily_chart_history(candidate_packet),
         )
         candidate_packet["chart_artifacts"] = chart_bundle
 
@@ -429,6 +432,29 @@ class MultiStockAnalyzerRunner:
             "candidate": candidate_packet,
             "analysis": analysis,
         }
+
+    def _fetch_daily_chart_history(self, candidate_packet: Dict[str, Any]) -> pd.DataFrame:
+        """Fetch a full year of daily context through the shared rate-limited gateway.
+
+        Stage 1 only requests 60 calendar days, so its cache is too short for this
+        chart. A separate daily endpoint request avoids synthesizing daily bars
+        from a partial intraday history window.
+        """
+        security_id = int(candidate_packet["security_id"])
+        response = self.dhan.fetch_daily_history(
+            security_id,
+            days=400,
+            exchange_segment=str(candidate_packet.get("exchange_segment") or "").upper(),
+            instrument_candidates=[candidate_packet.get("instrument"), "EQUITY"],
+        )
+        if not response or str(response.get("status") or "").lower() != "success":
+            if self.dhan.is_auth_invalid(response):
+                raise RuntimeError(f"stock_agent_auth_invalid::daily_history::{security_id}")
+            raise RuntimeError(f"stock_daily_history_failed::{security_id}")
+        frame = self.dhan.daily_response_to_df(response)
+        if frame.empty:
+            raise RuntimeError(f"stock_daily_history_empty::{security_id}")
+        return frame
 
     def _build_candidate_packet(
         self,
