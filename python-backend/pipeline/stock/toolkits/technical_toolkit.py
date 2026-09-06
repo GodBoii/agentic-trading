@@ -38,9 +38,10 @@ class StockTechnicalToolkit(Toolkit):
         last_candle_complete = metadata.pop("last_candle_complete", None)
         data_age_seconds = self._age_seconds(data_as_of)
 
-        if candle_count < 15:
+        warm_indicators = metadata.get("indicator_warmup_uses_prior_sessions", False)
+        if candle_count < 15 and not warm_indicators:
             metadata.pop("rsi", None)
-        if candle_count < 20:
+        if candle_count < 20 and not warm_indicators:
             metadata.pop("bb_upper", None)
             metadata.pop("bb_lower", None)
 
@@ -54,6 +55,14 @@ class StockTechnicalToolkit(Toolkit):
             "last_candle_start_ist": last_candle_start,
             "last_candle_complete": last_candle_complete,
             "readings": metadata,
+            "chart_manifest": [
+                {"key": key, "timeframe": info.get("label"), "candles": info.get("candles")}
+                for key, info in charts.items()
+            ],
+            "chart_evidence": {
+                key: info["metadata"] for key, info in charts.items()
+                if isinstance(info, dict) and info.get("metadata")
+            },
         }
         return self._without_empty(payload)
 
