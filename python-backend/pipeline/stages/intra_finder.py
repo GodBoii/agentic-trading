@@ -10,10 +10,11 @@ import shutil
 import time
 import uuid
 from collections import Counter, defaultdict
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
+from queue import Empty, SimpleQueue
 from threading import RLock, Thread, current_thread
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -23,6 +24,7 @@ import requests
 from pipeline.config import PipelineConfig
 from pipeline.models import SetupEvent
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.feed_receiver import FeedReceiver
 from pipeline.services.market_calendar_service import MarketCalendarService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.process_memory_service import release_unused_process_memory
@@ -82,13 +84,20 @@ class IntraFinder:
         self.raw_buffer: List[Dict[str, Any]] = []
         self.derived_buffer: List[Dict[str, Any]] = []
         self.last_flush = time.time()
+        self.last_checkpoint = self.last_flush
+        self.recording_row_limit = max(100, int(os.getenv("INTRA_FINDER_RECORDING_ROW_LIMIT", "25000")))
         self.last_status_save = 0.0
         self.last_progress_log = 0.0
         self.progress_log_seconds = max(10, int(os.getenv("INTRA_FINDER_PROGRESS_LOG_SECONDS", "60")))
         self.io_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="intra-io")
         self.io_futures: set[Future] = set()
+        self.io_pending_limit = max(1, int(os.getenv("INTRA_FINDER_IO_PENDING_LIMIT", "8")))
+        self.persistence_error: Optional[str] = None
+        self.ingress_delay_ms = 0.0
+        self.max_ingress_delay_ms = 0.0
         self.recovery_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="intra-recovery")
         self.recovery_futures: set[Future] = set()
+        self.recovery_results: SimpleQueue = SimpleQueue()
         self.coverage_verification_future: Optional[Future] = None
         self.opening_recovery_requested: set[InstrumentKey] = set()
         self.opening_range_recovery_completed = 0
@@ -196,6 +205,11 @@ class IntraFinder:
             market_date = self.market_time.market_date_str()
             self._restore_runtime_state(market_date)
             self._load_event_state(market_date)
+            restored_states = [state for state in self.states.values() if state.price_samples]
+            if restored_states:
+                now = self.market_time.now()
+                for state in restored_states:
+                    state.refresh_derived(now)
         return stocks
 
     def _load_event_state(self, market_date: str) -> None:
@@ -217,12 +231,7 @@ class IntraFinder:
         state_rows: Dict[str, Any] = {}
         with self.state_lock:
             for key, state in self.states.items():
-                payload = state.checkpoint()
-                if not state.is_hot:
-                    payload["price_samples"] = payload["price_samples"][-30:]
-                    payload["value_samples"] = payload["value_samples"][-30:]
-                    payload["depth_samples"] = payload["depth_samples"][-10:]
-                    payload["minute_bars"] = payload["minute_bars"][-20:]
+                payload = state.checkpoint(compact=not state.is_hot)
                 state_rows[self._key_text(key)] = payload
         return {
             "schema_version": self.RUNTIME_STATE_SCHEMA_VERSION,
@@ -395,8 +404,11 @@ class IntraFinder:
         packet: Dict[str, Any],
         *,
         received_at: Optional[datetime] = None,
+        allow_signals: bool = True,
+        decision_at: Optional[datetime] = None,
     ) -> Optional[Dict[str, Any]]:
         received_at = received_at or self.market_time.now()
+        self._apply_recovery_results()
         key = self._packet_key(packet)
         state = self.states.get(key) if key else None
         stock = self.stocks.get(key) if key else None
@@ -447,19 +459,20 @@ class IntraFinder:
         self._record_observation(state, packet, received_at)
         emitted: Optional[Dict[str, Any]] = None
         if (
-            state.is_hot
+            allow_signals
+            and state.is_hot
             and state.activity_rank is not None
             and state.activity_rank <= self.config.intra_finder_setup_rank_limit
         ):
             signals = self.setup_engine.evaluate(state, received_at)
             self.candidates_seen += len(signals)
             for signal in sorted(signals, key=_signal_priority):
-                failures, slippage = self._safety_gates(state, signal, received_at)
+                failures, slippage = self._safety_gates(state, signal, decision_at or received_at)
                 if failures:
                     self.gate_failure_counts.update(failures)
                     self.events_suppressed += 1
                     continue
-                emitted = self._create_event(stock, state, signal, slippage, received_at)
+                emitted = self._create_event(stock, state, signal, slippage, decision_at or received_at)
                 if emitted is not None:
                     break
         self._flush_if_due()
@@ -772,6 +785,32 @@ class IntraFinder:
             state.opening_range_source = "historical_recovery"
         self.opening_range_recovery_completed += 1
 
+    def _apply_recovery_results(self) -> None:
+        results = getattr(self, "recovery_results", None)
+        if results is None:
+            return
+        while True:
+            try:
+                generation, kind, future = results.get_nowait()
+            except Empty:
+                return
+            if kind == "opening_range":
+                if generation != (self.universe_version, self.market_time.market_date_str()):
+                    try:
+                        key, _, _, _ = future.result()
+                        self.opening_recovery_requested.discard(key)
+                    except Exception as exc:
+                        self._log(f"Discarded recovery failed: {type(exc).__name__}.")
+                    continue
+                self._apply_opening_range_recovery(future)
+            else:
+                if generation != self.connection_generation:
+                    continue
+                try:
+                    self.quote_verified_keys.update(future.result())
+                except Exception as exc:
+                    self._log(f"Coverage verification failed: {type(exc).__name__}.")
+
     def _start_opening_range_recovery(self) -> None:
         if self.market_time.now().time() < dt_time(9, 30):
             return
@@ -788,7 +827,10 @@ class IntraFinder:
             self.opening_recovery_requested.add(key)
             future = self.recovery_executor.submit(self._fetch_opening_range, stock)
             self.recovery_futures.add(future)
-            future.add_done_callback(self._apply_opening_range_recovery)
+            generation = (self.universe_version, self.market_time.market_date_str())
+            future.add_done_callback(
+                lambda completed, generation=generation: self.recovery_results.put((generation, "opening_range", completed))
+            )
 
     def _verify_unobserved(self, keys: List[InstrumentKey]) -> set[InstrumentKey]:
         verified: set[InstrumentKey] = set()
@@ -816,13 +858,10 @@ class IntraFinder:
         future = self.recovery_executor.submit(self._verify_unobserved, missing)
         self.coverage_verification_future = future
 
-        def apply(completed: Future) -> None:
-            try:
-                self.quote_verified_keys.update(completed.result())
-            except Exception:
-                return
-
-        future.add_done_callback(apply)
+        generation = self.connection_generation
+        future.add_done_callback(
+            lambda completed: self.recovery_results.put((generation, "coverage", completed))
+        )
 
     def _load_context(self, path: Path) -> Optional[Dict[str, Any]]:
         payload = StorageService.load_snapshot(path)
@@ -856,14 +895,28 @@ class IntraFinder:
         pd.DataFrame(rows).to_parquet(path, index=False, compression="zstd")
 
     def _submit_io(self, function: Any, *args: Any) -> None:
-        self.io_futures = {future for future in self.io_futures if not future.done()}
+        self._check_io()
+        if len(self.io_futures) >= self.io_pending_limit:
+            wait(self.io_futures, return_when=FIRST_COMPLETED)
+            self._check_io()
         self.io_futures.add(self.io_executor.submit(function, *args))
+
+    def _check_io(self) -> None:
+        for future in list(self.io_futures):
+            if not future.done():
+                continue
+            try:
+                future.result()
+            except Exception as exc:
+                self.persistence_error = type(exc).__name__
+                raise RuntimeError("Intra-Finder persistence failed") from exc
+            self.io_futures.remove(future)
 
     def _persist_buffers(
         self,
         raw: List[Dict[str, Any]],
         derived: List[Dict[str, Any]],
-        checkpoint: Dict[str, Any],
+        checkpoint: Optional[Dict[str, Any]],
         market_date: str,
     ) -> None:
         base = self.config.stage2_results_dir / market_date
@@ -877,7 +930,8 @@ class IntraFinder:
                 grouped[hour].append(row)
             for hour, hour_rows in grouped.items():
                 self._write_parquet(base / directory_name / f"hour={hour}", prefix, hour_rows)
-        StorageService.save_snapshot(self.config.stage2_runtime_state_path(market_date), checkpoint)
+        if checkpoint is not None:
+            StorageService.save_snapshot(self.config.stage2_runtime_state_path(market_date), checkpoint)
 
     def flush(
         self,
@@ -888,19 +942,27 @@ class IntraFinder:
         if not self.raw_buffer and not self.derived_buffer and not force_checkpoint:
             return
         raw, derived = self.raw_buffer, self.derived_buffer
-        self.raw_buffer, self.derived_buffer = [], []
         market_date = checkpoint_market_date or self.market_time.market_date_str()
+        checkpoint_due = force_checkpoint or time.time() - self.last_checkpoint >= self.config.intra_finder_flush_seconds
         self._submit_io(
             self._persist_buffers,
             raw,
             derived,
-            self._runtime_state_payload(market_date),
+            self._runtime_state_payload(market_date) if checkpoint_due else None,
             market_date,
         )
+        self.raw_buffer, self.derived_buffer = [], []
         self.last_flush = time.time()
+        if checkpoint_due:
+            self.last_checkpoint = self.last_flush
 
     def _flush_if_due(self) -> None:
-        if time.time() - self.last_flush >= self.config.intra_finder_flush_seconds:
+        if (
+            time.time() - self.last_flush >= self.config.intra_finder_flush_seconds
+            or len(self.raw_buffer) >= self.recording_row_limit
+            or len(self.derived_buffer) >= self.recording_row_limit
+        ):
+            self._check_io()
             self.flush()
 
     def _save_status_if_due(self, *, force: bool = False) -> None:
@@ -971,6 +1033,10 @@ class IntraFinder:
             "rank_eligible": self.last_ranking.eligible_count,
             "hot_instruments": len(self.last_ranking.hot),
             "rank_duration_ms": round(self.last_rank_duration_ms, 3),
+            "ingress_delay_ms": round(self.ingress_delay_ms, 3),
+            "max_ingress_delay_ms": round(self.max_ingress_delay_ms, 3),
+            "persistence_pending": len(self.io_futures),
+            "persistence_error": self.persistence_error,
             "candidates_seen": self.candidates_seen,
             "events_formed": self.events_formed,
             "events_triggered": self.events_triggered,
@@ -981,6 +1047,7 @@ class IntraFinder:
             "gate_failure_counts": dict(self.gate_failure_counts),
             "shadow_mode": self.shadow_mode,
             "raw_capture_scope": "all" if self.record_all_raw else "hot_only" if self.record_hot_raw else "disabled",
+            **self._queue_metrics(),
         }
         payload = StorageService.build_payload("intra_finder", summary, "stocks", stock_rows)
         self._submit_io(self._persist_status, payload)
@@ -1023,6 +1090,10 @@ class IntraFinder:
             healthy, reason = self.connection_state in {"CONNECTED", "WAITING_FOR_START"}, "preopen"
         elif session.is_after_close:
             healthy, reason = True, "session_ended"
+        elif getattr(self, "persistence_error", None):
+            healthy, reason = False, "persistence_failed"
+        elif getattr(self, "ingress_delay_ms", 0) > self.config.intra_finder_data_stale_seconds * 1000:
+            healthy, reason = False, "feed_processing_delayed"
         elif self.connection_state != "CONNECTED":
             healthy, reason = False, "feed_disconnected"
         elif age is None or age > self.config.intra_finder_global_idle_seconds:
@@ -1046,6 +1117,19 @@ class IntraFinder:
             "shadow_mode": self.shadow_mode,
             "detector_mode": self.detector_mode,
             "agent_dispatch_active": len(self.agent_threads),
+            **self._queue_metrics(),
+        }
+
+    def _queue_metrics(self) -> Dict[str, Any]:
+        receiver = getattr(getattr(self, "current_feed", None), "_trader_receiver", None)
+        return {
+            "ingress_queue_depth": receiver.queue.qsize() if receiver else 0,
+            "ingress_queue_high_water": receiver.high_water if receiver else 0,
+            "ingress_queue_full_waits": receiver.full_waits if receiver else 0,
+            "ingress_delay_ms": round(getattr(self, "ingress_delay_ms", 0), 3),
+            "max_ingress_delay_ms": round(getattr(self, "max_ingress_delay_ms", 0), 3),
+            "persistence_pending": len(getattr(self, "io_futures", ())),
+            "persistence_error": getattr(self, "persistence_error", None),
         }
 
     def enforce_retention(self) -> None:
@@ -1081,6 +1165,9 @@ class IntraFinder:
             else self.config.intra_finder_global_idle_seconds
         )
         try:
+            receiver = getattr(feed, "_trader_receiver", None)
+            if receiver is not None:
+                return receiver.get(timeout=max(10, timeout))
             return feed.loop.run_until_complete(
                 asyncio.wait_for(feed.get_instrument_data(), timeout=max(10, timeout))
             )
@@ -1091,6 +1178,12 @@ class IntraFinder:
     def _close_feed(feed: Any) -> None:
         if feed is None:
             return
+        receiver = getattr(feed, "_trader_receiver", None)
+        if receiver is not None:
+            receiver.stop()
+        loop = getattr(feed, "loop", None)
+        if loop is not None and loop.is_closed():
+            return
         for name in ("disconnect", "close_connection"):
             try:
                 method = getattr(feed, name, None)
@@ -1099,9 +1192,23 @@ class IntraFinder:
                 result = method()
                 if asyncio.iscoroutine(result):
                     feed.loop.run_until_complete(result)
+                if receiver is not None and loop is not None:
+                    loop.close()
                 return
             except Exception:
+                if "result" in locals() and asyncio.iscoroutine(result):
+                    result.close()
                 continue
+
+    def _drain_and_close_feed(self, feed: Any) -> None:
+        receiver = getattr(feed, "_trader_receiver", None)
+        try:
+            if receiver is not None:
+                receiver.stop()
+                for item in receiver.drain():
+                    self.process_packet(item.packet, received_at=item.received_at, allow_signals=False)
+        finally:
+            self._close_feed(feed)
 
     def _mark_session_ended(self, market_date: str) -> None:
         self.session_state = "SESSION_ENDED"
@@ -1202,10 +1309,19 @@ class IntraFinder:
                 self.connection_state = "CONNECTED"
                 self.session_state = "PREOPEN" if session.is_before_open else "LIVE"
                 self.last_connection_error = None
+                receiver = FeedReceiver(
+                    feed, self.market_time.now,
+                    capacity=max(1, int(os.getenv("INTRA_FINDER_INGRESS_CAPACITY", "8192"))),
+                )
+                feed._trader_receiver = receiver
+                receiver.start()
                 last_session_check = time.monotonic()
+                last_credential_check = time.monotonic()
                 while True:
-                    if self.dhan.reload_credentials_if_changed() or self.dhan.credential_version != credential_version:
-                        raise RuntimeError("credential_rotated")
+                    if time.monotonic() - last_credential_check >= 1:
+                        if self.dhan.reload_credentials_if_changed() or self.dhan.credential_version != credential_version:
+                            raise RuntimeError("credential_rotated")
+                        last_credential_check = time.monotonic()
                     if time.monotonic() - last_session_check >= 30:
                         current = self.market_calendar.session_status()
                         if current.is_after_close:
@@ -1216,11 +1332,16 @@ class IntraFinder:
                         self._start_opening_range_recovery()
                         self._start_coverage_verification()
                         last_session_check = time.monotonic()
-                    packet = self._get_feed_data(feed)
-                    if isinstance(packet, dict):
-                        self.process_packet(packet)
+                    item = self._get_feed_data(feed)
+                    self.ingress_delay_ms = max(0, (time.monotonic() - item.received_monotonic) * 1000)
+                    self.max_ingress_delay_ms = max(self.max_ingress_delay_ms, self.ingress_delay_ms)
+                    self.process_packet(
+                        item.packet, received_at=item.received_at,
+                        allow_signals=self.ingress_delay_ms <= self.config.intra_finder_data_stale_seconds * 1000,
+                        decision_at=self.market_time.now(),
+                    )
             except SessionEnded:
-                self._close_feed(feed)
+                self._drain_and_close_feed(feed)
                 self.current_feed = None
                 self._finalize_and_release_session(self.market_calendar.session_status().market_date)
                 time.sleep(300)
@@ -1240,18 +1361,22 @@ class IntraFinder:
         self.connection_state = "RECONNECTING"
         self.last_connection_error = type(exc).__name__
         self._log(f"Reconnecting after {type(exc).__name__}.")
+        self._drain_and_close_feed(feed)
+        self.current_feed = None
         self.flush()
         self._save_status_if_due(force=True)
-        self._close_feed(feed)
-        self.current_feed = None
         time.sleep(5)
 
     def close(self) -> None:
-        self._close_feed(self.current_feed)
-        self.flush(force_checkpoint=True)
-        self._save_status_if_due(force=True)
-        self.recovery_executor.shutdown(wait=False, cancel_futures=True)
-        self.io_executor.shutdown(wait=True, cancel_futures=False)
+        try:
+            self._drain_and_close_feed(self.current_feed)
+            self.current_feed = None
+            self.flush(force_checkpoint=True)
+            self._save_status_if_due(force=True)
+        finally:
+            self.recovery_executor.shutdown(wait=False, cancel_futures=True)
+            self.io_executor.shutdown(wait=True, cancel_futures=False)
+        self._check_io()
 
 
 def _signal_priority(signal: SetupSignal) -> int:
