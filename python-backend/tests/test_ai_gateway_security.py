@@ -138,7 +138,11 @@ class AIGatewaySecurityTests(unittest.TestCase):
                 verifier.verify("expired-token")
 
     def test_backend_toggle_is_authoritative_for_enable_and_disable(self) -> None:
-        with TemporaryDirectory() as temporary_directory:
+        with TemporaryDirectory() as temporary_directory, patch(
+            "pipeline.services.ai_trading_state_service.ConvexService.configured", return_value=False
+        ), patch(
+            "pipeline.services.ai_trading_state_service.ConvexService.required", return_value=False
+        ):
             root = Path(temporary_directory)
             orchestrator = AITradingOrchestrator.__new__(AITradingOrchestrator)
             orchestrator.config = SimpleNamespace(
