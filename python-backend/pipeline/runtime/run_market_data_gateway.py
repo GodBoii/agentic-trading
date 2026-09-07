@@ -1,20 +1,26 @@
 import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import BoundedSemaphore
 from typing import Any, Callable, Dict, Optional
 
 from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.inflight_reads import InflightReads
 
 
 class MarketDataGatewayHandler(BaseHTTPRequestHandler):
     dhan: DhanService
+    inflight = InflightReads()
+    request_slots = BoundedSemaphore(32)
 
     def log_message(self, format: str, *args: Any) -> None:  # pragma: no cover - stdlib hook
         print(f"gateway | {self.address_string()} | {format % args}")
 
     def _read_json(self) -> Dict[str, Any]:
         content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length > 1_048_576:
+            raise ValueError("Gateway request body exceeds 1 MiB")
         if content_length <= 0:
             return {}
 
@@ -90,6 +96,12 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
 
         if path not in routes:
             raise KeyError(f"Unknown route: {path}")
+        if path in {"/v1/daily-history", "/v1/intraday-history"}:
+            self.dhan.reload_credentials_if_changed()
+            key = (path, self.dhan.client_id, self.dhan.credential_version,
+                   self.dhan._market_now().date().isoformat(),
+                   json.dumps(payload, sort_keys=True, separators=(",", ":")))
+            return {"ok": True, "data": self.inflight.run(key, lambda: routes[path](payload))}
         return {"ok": True, "data": routes[path](payload)}
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib signature
@@ -115,8 +127,14 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
             )
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib signature
+        if not self.request_slots.acquire(blocking=False):
+            self._write_json(HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": "gateway_busy"})
+            return
         try:
+            self.connection.settimeout(15)
             payload = self._read_json()
+            if not isinstance(payload, dict):
+                raise ValueError("Gateway request body must be an object")
             response = self._dispatch(payload)
             self._write_json(HTTPStatus.OK, response)
         except KeyError as exc:
@@ -128,6 +146,8 @@ class MarketDataGatewayHandler(BaseHTTPRequestHandler):
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"ok": False, "error": str(exc)},
             )
+        finally:
+            self.request_slots.release()
 
 
 def main() -> None:
