@@ -608,22 +608,6 @@ class AITradingOrchestrator:
                     "event_id": event_id,
                     "status_code": order_state.status_code,
                 }
-            load_slots = getattr(gate, "current_active_trade_slots", None)
-            if callable(load_slots):
-                active_slots = load_slots()
-                if active_slots is None:
-                    return self._block_intra_finder_event(
-                        event_id,
-                        "TRADE_CAPACITY_UNAVAILABLE",
-                        "Broker positions and active orders could not be verified.",
-                    )
-                if len(active_slots) >= self.config.stock_agent_max_concurrent_trades:
-                    return self._block_intra_finder_event(
-                        event_id,
-                        "MAX_ACTIVE_TRADES",
-                        "The configured live trade slots are occupied.",
-                        active_trade_count=len(active_slots),
-                    )
         with self.event_lock:
             existing = (self.event_state.get("events") or {}).get(event_id)
             if existing:
@@ -645,13 +629,10 @@ class AITradingOrchestrator:
             daemon=True,
         )
         with self.event_lock:
-            self.event_threads = {
-                thread
-                for thread in getattr(self, "event_threads", set())
-                if getattr(thread, "is_alive", lambda: False)()
-            }
+            if not hasattr(self, "event_threads"):
+                self.event_threads = set()
             configured_limit = int(
-                getattr(getattr(self, "config", None), "stock_agent_max_concurrent_trades", 5)
+                getattr(getattr(self, "config", None), "stock_agent_max_concurrent_events", 10)
             )
             if len(self.event_threads) >= configured_limit:
                 self.event_state.setdefault("events", {})[event_id].update(
@@ -659,7 +640,7 @@ class AITradingOrchestrator:
                         "status": "blocked",
                         "finished_at_utc": datetime.now(timezone.utc).isoformat(),
                         "status_code": "AGENT_CAPACITY",
-                        "reason": f"The {configured_limit} live trade-analysis slots are occupied.",
+                        "reason": f"The {configured_limit} concurrent event workers are occupied.",
                     }
                 )
                 self.storage.save_snapshot(self.event_state_path, self.event_state)
