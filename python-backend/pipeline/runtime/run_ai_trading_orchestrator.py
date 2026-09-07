@@ -11,6 +11,8 @@ import socket
 import struct
 import time
 import uuid
+from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread, current_thread
@@ -23,6 +25,7 @@ from pipeline.config import PipelineConfig
 from pipeline.runtime.run_stock_agent import MultiStockAgentRunner
 from pipeline.services.ai_trading_state_service import AITradingStateService
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.concurrent_work import bounded_results
 from pipeline.services.market_calendar_service import MarketCalendarService
 from pipeline.services.order_placement_gate import (
     DH905_INVALID_IP,
@@ -40,6 +43,7 @@ class WebSocketBroadcaster:
 
     def __init__(self) -> None:
         self.clients: dict[socket.socket, str] = {}
+        self.send_locks: dict[socket.socket, Any] = {}
         self.lock = Lock()
 
     def accept(self, handler: BaseHTTPRequestHandler, user_id: str) -> bool:
@@ -54,13 +58,16 @@ class WebSocketBroadcaster:
         handler.send_header("Connection", "Upgrade")
         handler.send_header("Sec-WebSocket-Accept", accept_key)
         handler.end_headers()
+        handler.request.settimeout(2.0)
         with self.lock:
             self.clients[handler.request] = user_id
+            self.send_locks[handler.request] = Lock()
         return True
 
     def remove(self, client: socket.socket) -> None:
         with self.lock:
             self.clients.pop(client, None)
+            self.send_locks.pop(client, None)
         try:
             client.close()
         except Exception:
@@ -70,24 +77,29 @@ class WebSocketBroadcaster:
         if not user_id:
             return
         message = json.dumps(payload, ensure_ascii=True, default=str)
+        frame = self._frame(message)
         with self.lock:
             clients = [client for client, client_user_id in self.clients.items() if client_user_id == user_id]
-        stale: list[socket.socket] = []
         for client in clients:
-            try:
-                client.sendall(self._frame(message))
-            except Exception:
-                stale.append(client)
-        for client in stale:
-            self.remove(client)
+            self._send_frame(client, frame)
 
     def send_one(self, client: socket.socket, payload: Dict[str, Any]) -> bool:
+        return self._send_frame(client, self._frame(json.dumps(payload, ensure_ascii=True, default=str)))
+
+    def _send_frame(self, client: socket.socket, frame: bytes) -> bool:
+        with self.lock:
+            send_lock = self.send_locks.setdefault(client, Lock())
+        if not send_lock.acquire(timeout=2.0):
+            self.remove(client)
+            return False
         try:
-            client.sendall(self._frame(json.dumps(payload, ensure_ascii=True, default=str)))
+            client.sendall(frame)
             return True
         except Exception:
             self.remove(client)
             return False
+        finally:
+            send_lock.release()
 
     def _frame(self, message: str) -> bytes:
         body = message.encode("utf-8")
@@ -462,6 +474,11 @@ class AITradingOrchestrator:
         )
 
     def _release_closed_market_memory(self, session_key: str) -> None:
+        from pipeline.services.chart_workers import close_chart_workers
+        with self.event_lock:
+            if any(thread.is_alive() for thread in getattr(self, "event_threads", ())):
+                return
+        close_chart_workers()
         with self.stock_agent_lock:
             self.stock_agent = None
         with self.event_lock:
@@ -768,6 +785,47 @@ class AITradingOrchestrator:
         status = TradingAmountService.status(entry, max_age_seconds=max_age)
         return {"user_id": user_id, "trade_mode": status.get("trade_mode"), "trade_amount": entry.get("trade_amount"), "amount_updated_at_utc": entry.get("amount_updated_at_utc"), "enabled": bool(entry.get("enabled")), **status}
 
+    def _run_event_for_user(self, event: Dict[str, Any], user: Dict[str, Any], stock_agent: MultiStockAgentRunner) -> Dict[str, Any]:
+        gate = getattr(self, "order_placement_gate", None)
+        if gate is not None and not gate.allowed:
+            return {"user_id": user.get("user_id"), "eligible": False, "status_code": gate.state.status_code}
+        event = deepcopy(event)
+        event_id = str(event["event_id"])
+        user_id = str(user.get("user_id") or "").strip()
+        if not user_id:
+            return {"eligible": False, "status_code": "user_id_missing"}
+        self._broadcast_event(
+            {
+                "type": "intra_finder_event_accepted",
+                "event": event,
+                "request_id": event_id,
+            },
+            user_id=user_id,
+        )
+        resolved = stock_agent.resolve_user_trade_config(user)
+        if not resolved.get("eligible"):
+            return resolved
+        routed = stock_agent.prepare_user_event(event, resolved)
+        if not routed.get("eligible"):
+            return routed
+        result = stock_agent.run_event(
+            routed["event"],
+            user_id=user_id,
+            trade_config={
+                "trade_mode": resolved["trade_mode"],
+                "trade_amount": resolved["trade_amount"],
+                "amount_source": resolved["amount_source"],
+                "account_margin_capacity": resolved.get("account_margin_capacity"),
+                "max_concurrent_trades": resolved["max_concurrent_trades"],
+                "regime_analysis_enabled": False,
+            },
+            event_callback=lambda payload, scoped_user_id=user_id: self._broadcast_event(
+                {**payload, "request_id": event_id},
+                user_id=scoped_user_id,
+            ),
+        )
+        return {"user_id": user_id, "eligible": True, "result": result}
+
     def _run_intra_finder_event(self, event: Dict[str, Any]) -> None:
         event_id = str(event["event_id"])
         gate = getattr(self, "order_placement_gate", None)
@@ -802,47 +860,22 @@ class AITradingOrchestrator:
             stock_agent = self._get_stock_agent()
             max_age = float(os.getenv("TRADING_AMOUNT_MAX_AGE_SECONDS", str(30 * 24 * 60 * 60)))
             users = AITradingStateService.configured_users(self.config.ai_trading_state_path, max_age_seconds=max_age)
-            for user in users:
-                if gate is not None and not gate.allowed:
-                    break
-                user_id = str(user.get("user_id") or "").strip()
-                if not user_id:
-                    continue
-                self._broadcast_event(
-                    {
-                        "type": "intra_finder_event_accepted",
-                        "event": event,
-                        "request_id": event_id,
-                    },
-                    user_id=user_id,
-                )
-                resolved = stock_agent.resolve_user_trade_config(user)
-                if not resolved.get("eligible"):
-                    user_results.append(resolved)
-                    continue
-                routed = stock_agent.prepare_user_event(event, resolved)
-                if not routed.get("eligible"):
-                    user_results.append(routed)
-                    continue
-                result = stock_agent.run_event(
-                    routed["event"],
-                    user_id=user_id,
-                    trade_config={
-                        "trade_mode": resolved["trade_mode"],
-                        "trade_amount": resolved["trade_amount"],
-                        "amount_source": resolved["amount_source"],
-                        "account_margin_capacity": resolved.get("account_margin_capacity"),
-                        "max_concurrent_trades": resolved["max_concurrent_trades"],
-                        "regime_analysis_enabled": False,
-                    },
-                    event_callback=lambda payload, scoped_user_id=user_id: self._broadcast_event(
-                        {**payload, "request_id": event_id},
-                        user_id=scoped_user_id,
-                    ),
-                )
-                user_results.append({"user_id": user_id, "eligible": True, "result": result})
-            status = "completed"
-            error = None
+            def run_user(user: Dict[str, Any]) -> Dict[str, Any]:
+                try:
+                    return self._run_event_for_user(event, user, stock_agent)
+                except Exception as exc:
+                    return {"user_id": user.get("user_id"), "eligible": False,
+                            "status_code": "account_run_failed", "error": f"{type(exc).__name__}: {exc}"}
+
+            workers = max(1, min(4, int(os.getenv("ACCOUNT_EVENT_WORKERS", "2"))))
+            with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="account-event") as executor:
+                indexed = list(enumerate(users))
+                completed = bounded_results(executor, lambda item: run_user(item[1]), indexed, limit=workers)
+                by_index = {item[0]: result for item, result in completed}
+            user_results = [by_index[index] for index in range(len(users))]
+            failed = [row for row in user_results if row.get("status_code") == "account_run_failed"]
+            status = "failed" if failed else "completed"
+            error = "One or more account runs failed" if failed else None
         except Exception as exc:
             status = "failed"
             error = f"{type(exc).__name__}: {exc}"
