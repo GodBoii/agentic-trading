@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable, Dict, List, Optional
 
 from pipeline.config import PipelineConfig
@@ -15,6 +17,12 @@ from pipeline.services.cloud_persistence_service import CloudPersistenceService
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.order_placement_gate import OrderPlacementGate
 from pipeline.services.trading_amount_service import TradingAmountService
+from pipeline.services.trade_capacity import (
+    account_capital,
+    available_balance,
+    effective_trade_slot_limit,
+    trade_slot_limit,
+)
 from pipeline.services.user_dhan_credentials import UserDhanCredentials
 from pipeline.stock import StockAgent, StockDecisionContextBuilder
 from pipeline.stock.toolkits import (
@@ -31,6 +39,8 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         super().__init__(config, initialize_agent=False)
         self.execution_helper = ExecutionerRunner(self.config, initialize_agent=False)
         self.user_dhan = UserDhanCredentials(self.config)
+        self._coordinators_lock = Lock()
+        self._account_coordinators: Dict[str, StockExecutionCoordinator] = {}
         self.order_placement_gate = OrderPlacementGate(
             self.dhan,
             self.config.order_placement_state_path,
@@ -301,7 +311,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                     "message": "Fixed sizing is paused because account margin could not be loaded.",
                     "error": f"{type(exc).__name__}: {exc}",
                 }
-            max_concurrent_trades = int(capacity // amount) if capacity > 0 else 0
+            max_concurrent_trades = effective_trade_slot_limit(capacity, amount)
             if max_concurrent_trades < 1:
                 return {
                     "user_id": user_id,
@@ -349,7 +359,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             "trade_amount": amount,
             "account_available_balance": effective.get("account_available_balance"),
             "account_margin_capacity": effective.get("account_margin_capacity"),
-            "max_concurrent_trades": int(self.config.stock_agent_max_concurrent_trades),
+            "max_concurrent_trades": effective["margin_slot_count"],
         }
 
     def _with_effective_trade_amount(
@@ -368,15 +378,16 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         copied = dict(resolved)
         available = self._account_available_balance(account_context)
         capacity = self._account_margin_capacity(account_context)
-        slots = max(1, int(self.config.stock_agent_max_concurrent_trades))
+        slots = trade_slot_limit(capacity)
         copied["trade_amount"] = (
             int((capacity * 100) // slots) / 100.0
-            if capacity > 0
+            if capacity > 0 and slots > 0 and available > 0
             else None
         )
         copied["account_available_balance"] = available
         copied["account_margin_capacity"] = capacity
         copied["margin_slot_count"] = slots
+        copied["max_concurrent_trades"] = slots
         return copied
 
     def _build_sizing_account_context(self, dhan: DhanService) -> Dict[str, Any]:
@@ -400,49 +411,43 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
 
     @classmethod
     def _account_available_balance(cls, account_context: Dict[str, Any]) -> float:
-        funds = cls._account_fund_data(account_context)
-        for key in ("availabelBalance", "availableBalance", "withdrawableBalance"):
-            try:
-                value = float(funds.get(key) or 0.0)
-            except (TypeError, ValueError):
-                continue
-            if value > 0:
-                return value
-        return 0.0
+        return available_balance(cls._account_fund_data(account_context))
 
     @classmethod
     def _account_margin_capacity(cls, account_context: Dict[str, Any]) -> float:
-        funds = cls._account_fund_data(account_context)
-        available = cls._account_available_balance(account_context)
-        try:
-            utilized = max(0.0, float(funds.get("utilizedAmount") or 0.0))
-        except (TypeError, ValueError):
-            utilized = 0.0
-        try:
-            start_of_day = max(0.0, float(funds.get("sodLimit") or 0.0))
-        except (TypeError, ValueError):
-            start_of_day = 0.0
-        return max(available, available + utilized, start_of_day)
+        return account_capital(cls._account_fund_data(account_context))
 
     def prepare_user_event(self, event: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
         """Apply dynamic, user-specific Stage 2 eligibility without changing Stage 1."""
         user_id = str(user.get("user_id") or "")
         amount = TradingAmountService.parse(user.get("trade_amount"))
         price = self._reference_price(event)
-        direction = str(event.get("direction") or "LONG").upper()
-        side = "SELL" if direction == "SHORT" else "BUY"
-        margin_check = (
-            self._calculate_one_share_margin(event, side, price, self.user_dhan.service(user_id))
-            if amount is not None and price > 0
-            else {"status": "failure", "total_margin": None}
-        )
-        margin_per_share = margin_check.get("total_margin")
+        # Admission accepts either executable side. The detector's opinion does
+        # not determine affordability or become an execution constraint.
         quantity = 0
-        if amount is not None and price > 0 and margin_per_share:
-            quantity = min(
-                int(float(amount) // float(margin_per_share)),
-                int((float(amount) * float(self.config.stock_agent_max_leverage)) // price),
-            )
+        margin_per_share = None
+        slippage = None
+        if amount is not None and price > 0:
+            user_dhan = self.user_dhan.service(user_id)
+            with ThreadPoolExecutor(max_workers=2, thread_name_prefix="entry-margin") as executor:
+                checks = list(executor.map(
+                    lambda side: self._calculate_one_share_margin(event, side, price, user_dhan),
+                    ("BUY", "SELL"),
+                ))
+            for side, check in zip(("BUY", "SELL"), checks):
+                margin = check.get("total_margin")
+                if not margin or margin <= 0:
+                    continue
+                shares = min(int(amount // margin), int(amount * self.config.stock_agent_max_leverage // price))
+                if shares < 1:
+                    continue
+                estimate = TradingAmountService.estimated_slippage(
+                    event.get("five_level_depth") or [],
+                    direction="LONG" if side == "BUY" else "SHORT", price=price, quantity=shares,
+                )
+                quantity, margin_per_share, slippage = shares, margin, estimate
+                if estimate is not None and estimate <= self.config.intra_finder_max_slippage_percent:
+                    break
         base = {
             "user_id": user_id,
             "trade_mode": user.get("trade_mode"),
@@ -456,8 +461,6 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             return {**base, "eligible": False, "status_code": "price_unavailable", "message": "Agent dispatch paused for this user because the current stock price is unavailable."}
         if quantity < 1:
             return {**base, "eligible": False, "status_code": "margin_allocation_too_small", "message": "The assigned margin slot cannot support one share at Dhan's current margin."}
-        depth = event.get("five_level_depth") or []
-        slippage = TradingAmountService.estimated_slippage(depth, direction=direction if direction in {"LONG", "SHORT"} else "LONG", price=price, quantity=quantity)
         if slippage is None:
             return {**base, "requested_quantity": quantity, "eligible": False, "status_code": "user_depth_unavailable", "message": "Agent dispatch paused for this user because five-level depth cannot fill the requested quantity."}
         if slippage > self.config.intra_finder_max_slippage_percent:
@@ -616,9 +619,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         )
         results: Dict[int, Dict[str, Any]] = {}
         failures: List[Dict[str, Any]] = []
-        execution_coordinator = StockExecutionCoordinator(
-            order_placement_gate=self.order_placement_gate,
-        )
+        user_id = str(trade_config.get("user_id") or (run_context or {}).get("user_id") or "")
+        with self._coordinators_lock:
+            execution_coordinator = self._account_coordinators.setdefault(
+                user_id,
+                StockExecutionCoordinator(order_placement_gate=self.order_placement_gate, account_scoped=True),
+            )
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
@@ -663,6 +669,35 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         raise RuntimeError(f"stock_agent_all_candidates_failed::{failures}")
 
     def _run_single_stock_agent(
+        self,
+        index: int,
+        candidate_packet: Dict[str, Any],
+        trade_config: Dict[str, Any],
+        event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        run_context: Optional[Dict[str, Any]] = None,
+        execution_coordinator: Optional[StockExecutionCoordinator] = None,
+    ) -> Dict[str, Any]:
+        admission = StockExecutionToolkit(
+            self.user_dhan.service(str(trade_config.get("user_id") or "")),
+            security_id=int(candidate_packet["security_id"]),
+            margin_budget=self._resolve_margin_budget(trade_config, candidate_packet),
+            exchange_segment=candidate_packet.get("exchange_segment"),
+            coordinator=execution_coordinator,
+            amount_source=str(trade_config.get("amount_source") or "user_amount"),
+            balance_based_capacity=True,
+        )
+        error = admission.reserve_analysis_slot()
+        if error:
+            details = json.loads(error)
+            self._emit(event_callback, {"type": "stock_agent_admission_blocked", "security_id": candidate_packet["security_id"], **details})
+            return {"candidate": candidate_packet, "decision": {"action": "avoid", "execution_status": "blocked", **details}, "report_text": str(details.get("remarks") or "Account capacity unavailable.")}
+        try:
+            candidate_packet["account_admission"] = dict(admission.last_capacity)
+            return self._run_admitted_stock_agent(index, candidate_packet, trade_config, event_callback, run_context, admission.coordinator)
+        finally:
+            admission.release_analysis_slot()
+
+    def _run_admitted_stock_agent(
         self,
         index: int,
         candidate_packet: Dict[str, Any],
@@ -760,7 +795,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             "current_stock_state": context_executor.submit(
                 self._safe_initial_context_component,
                 "current_stock_state",
-                market_data_toolkit.current_stock_state_payload,
+                lambda: market_data_toolkit.current_stock_state_payload(force_refresh=cache_used),
             ),
             "account_overview": context_executor.submit(
                 self._safe_initial_context_component,
@@ -831,18 +866,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 trade_config.get("max_concurrent_trades")
                 or self.config.stock_agent_max_concurrent_trades
             ),
+            balance_based_capacity=True,
             final_state_loader=market_data_toolkit.current_stock_state_payload,
             final_quote_max_age_seconds=float(self.config.stock_agent_final_quote_max_age_seconds),
             final_candle_max_age_seconds=float(self.config.stock_agent_final_candle_max_age_seconds),
             max_entry_drift_risk_fraction=float(
                 self.config.stock_agent_max_entry_drift_risk_fraction
-            ),
-            allowed_side=(
-                "BUY"
-                if str(candidate_packet.get("direction") or "").upper() == "LONG"
-                else "SELL"
-                if str(candidate_packet.get("direction") or "").upper() == "SHORT"
-                else None
             ),
         )
         selected_stock_context = {
@@ -852,9 +881,6 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             "trade_amount": trade_config.get("trade_amount"),
             "trade_mode": trade_config.get("trade_mode"),
             "amount_source": trade_config.get("amount_source"),
-            "requested_quantity": candidate_packet.get("requested_quantity"),
-            "estimated_notional": candidate_packet.get("user_estimated_notional"),
-            "estimated_slippage_percent": candidate_packet.get("user_estimated_slippage_percent"),
         }
         timing_context = self._build_stock_agent_timing_context(candidate_packet)
         decision_context = StockDecisionContextBuilder.build(
@@ -868,6 +894,12 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             ),
             account_overview=account_overview,
         )
+        account_snapshot = decision_context.setdefault("account", {})
+        account_snapshot["max_concurrent_trades"] = effective_trade_slot_limit(
+            account_snapshot.get("account_margin_capacity", 0),
+            margin_budget if trade_config.get("amount_source") == "user_amount" else None,
+        )
+        account_snapshot["admission"] = candidate_packet.get("account_admission") or {}
         # The LLM receives exactly two functions. All read-only evidence is supplied once above.
         agent = StockAgent([execution_toolkit])
         stock_packet = {
