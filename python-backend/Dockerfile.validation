@@ -1,0 +1,8 @@
+FROM trader-latency-test:local
+RUN pip install --no-cache-dir pytest pytest-subtests
+COPY python-backend/pipeline /app/python-backend/pipeline
+COPY python-backend/tests /app/python-backend/tests
+COPY components/agent/capital-control.tsx /app/components/agent/capital-control.tsx
+COPY app/api/ai-trading/config/route.ts /app/app/api/ai-trading/config/route.ts
+COPY progress/non-ai-latency-implementation-2026-09-07.md /app/progress/non-ai-latency-implementation-2026-09-07.md
+CMD ["python", "-m", "pytest", "tests", "-q"]
