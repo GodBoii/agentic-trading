@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 from collections import deque
+from bisect import bisect_left, bisect_right
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, time as dt_time
+from functools import lru_cache
+from itertools import islice
+from operator import itemgetter
 from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
+from pipeline.stages.rolling_prices import RollingPrices
 
 
 InstrumentKey = Tuple[str, int]
@@ -114,6 +120,9 @@ class LiveStockState:
     last_depth_second: Optional[int] = None
     last_recorded_second: Optional[int] = None
     session_live_started: bool = False
+    _samples_ordered: bool = field(default=True, repr=False)
+    _rolling_prices: Optional[RollingPrices] = field(default=None, repr=False)
+    _price_signature: tuple = field(default=(), repr=False)
 
     volume_pace: Optional[float] = None
     realized_volatility_percent: float = 0.0
@@ -186,6 +195,8 @@ class LiveStockState:
             self.previous_cumulative_volume = cumulative_volume
             self.previous_price = None
             self.session_live_started = True
+            self._samples_ordered = True
+            self._rolling_prices = None
         self.first_packet_at = self.first_packet_at or stamp
         self.last_packet_at = stamp
         self.previous_price = None if starting_live_session else self.latest_price if self.latest_price > 0 else None
@@ -218,16 +229,33 @@ class LiveStockState:
         return self._update_bar(received_at, price, cumulative_volume, vwap)
 
     def _sample(self, timestamp: float, price: float) -> None:
+        if self.price_samples and timestamp < self.price_samples[-1][0]:
+            self._samples_ordered = False
         second = int(timestamp)
         sample = (timestamp, price)
         value_sample = (timestamp, self.cumulative_value)
-        if self.last_sample_second == second and self.price_samples:
+        replacing = self.last_sample_second == second and bool(self.price_samples)
+        if replacing:
             self.price_samples[-1] = sample
-            self.value_samples[-1] = value_sample
+            if self.value_samples:
+                self.value_samples[-1] = value_sample
+            else:
+                self.value_samples.append(value_sample)
         else:
             self.price_samples.append(sample)
             self.value_samples.append(value_sample)
             self.last_sample_second = second
+        rolling = self._rolling_prices
+        if rolling is not None:
+            if self._samples_ordered and timestamp >= rolling.now:
+                rolling.append(timestamp, price, replace=replacing)
+                self._price_signature = self._sample_signature()
+            else:
+                self._rolling_prices = None
+
+    def _sample_signature(self) -> tuple:
+        rows = self.price_samples
+        return (len(rows), rows[0], rows[-1]) if rows else ()
 
     def _set_depth(self, timestamp: float, depth: List[Dict[str, float]], features: Dict[str, Any]) -> None:
         self.depth = depth
@@ -266,21 +294,27 @@ class LiveStockState:
 
     def refresh_derived(self, now: datetime) -> None:
         now_ts = now.timestamp()
-        five_first = five_last = one_first = one_last = one_previous = None
-        five_low = five_high = None
-        one_path = 0.0
-        for timestamp, value in self.price_samples:
-            if timestamp >= now_ts - 300:
-                five_first = value if five_first is None else five_first
-                five_last = value
-                five_low = value if five_low is None else min(five_low, value)
-                five_high = value if five_high is None else max(five_high, value)
-            if timestamp >= now_ts - 60:
-                one_first = value if one_first is None else one_first
-                one_last = value
-                if one_previous is not None:
-                    one_path += abs(value - one_previous)
-                one_previous = value
+        rows = self.price_samples
+        if self._samples_ordered and (not rows or rows[-1][0] <= now_ts):
+            signature = self._sample_signature()
+            rolling = self._rolling_prices
+            if rolling is None or signature != self._price_signature or now_ts < rolling.now:
+                rolling = RollingPrices(rows, now_ts)
+                self._rolling_prices = rolling
+                self._price_signature = signature
+            rolling.expire(now_ts)
+            five, one = rolling.five.samples, rolling.one.samples
+            five_first, five_last = (five[0][1], five[-1][1]) if five else (None, None)
+            five_low, five_high = (rolling.five.ordered[0], rolling.five.ordered[-1]) if five else (None, None)
+            one_first, one_last = (one[0][1], one[-1][1]) if one else (None, None)
+            one_path = rolling.one.path
+        else:
+            five = [value for timestamp, value in rows if timestamp >= now_ts - 300]
+            one = [value for timestamp, value in rows if timestamp >= now_ts - 60]
+            five_first, five_last = (five[0], five[-1]) if five else (None, None)
+            five_low, five_high = (min(five), max(five)) if five else (None, None)
+            one_first, one_last = (one[0], one[-1]) if one else (None, None)
+            one_path = sum(abs(current - previous) for previous, current in zip(one, one[1:]))
         self.realized_volatility_percent = (
             (five_high - five_low) / self.latest_price * 100.0
             if five_high is not None and five_low is not None and self.latest_price > 0
@@ -295,22 +329,18 @@ class LiveStockState:
         self.range_pace = self.realized_volatility_percent / expected_range if expected_range else None
         expected_volume = self.expected_cumulative_volume(now)
         self.volume_pace = self.cumulative_volume / expected_volume if expected_volume else self._turnover_pace(now)
-        windows = (
-            [now_ts - 30, now_ts, None, None],
-            [now_ts - 150, now_ts - 30, None, None],
-            [now_ts - 300, now_ts, None, None],
-        )
-        for timestamp, value in self.value_samples:
-            for window in windows:
-                if window[0] <= timestamp <= window[1]:
-                    window[2] = value if window[2] is None else window[2]
-                    window[3] = value
-        recent_value, prior_value, five_minute_value = (
-            max(0.0, window[3] - window[2])
-            if window[2] is not None and window[3] is not None
-            else 0.0
-            for window in windows
-        )
+        values = self.value_samples
+        changes = []
+        for start, end in ((now_ts - 30, now_ts), (now_ts - 150, now_ts - 30), (now_ts - 300, now_ts)):
+            if self._samples_ordered:
+                left = bisect_left(values, start, key=itemgetter(0))
+                right = bisect_right(values, end, key=itemgetter(0))
+                change = values[right - 1][1] - values[left][1] if left < right else 0.0
+            else:
+                window = [value for timestamp, value in values if start <= timestamp <= end]
+                change = window[-1] - window[0] if window else 0.0
+            changes.append(max(0.0, change))
+        recent_value, prior_value, five_minute_value = changes
         self.volume_acceleration = min(8.0, recent_value / (prior_value / 4.0)) if recent_value > 0 and prior_value > 0 else None
         self.trend_efficiency = (
             abs(one_last - one_first) / one_path
@@ -324,22 +354,15 @@ class LiveStockState:
             return None
         session_start = now.replace(hour=9, minute=15, second=0, microsecond=0)
         elapsed = max(0.0, (now - session_start).total_seconds() / 60.0)
-        points: List[Tuple[float, float]] = []
-        for label, value in self.median_cumulative_volume.items():
-            try:
-                hour, minute = (int(part) for part in label.split(":", 1))
-            except (TypeError, ValueError):
-                continue
-            bucket_end = (hour * 60 + minute) - (9 * 60 + 15) + self.baseline_interval_minutes
-            points.append((float(bucket_end), float(value)))
-        points.sort()
-        previous_minute, previous_value = 0.0, 0.0
-        for point_minute, point_value in points:
-            if elapsed <= point_minute:
-                fraction = max(0.02, (elapsed - previous_minute) / max(1.0, point_minute - previous_minute))
-                return previous_value + max(0.0, point_value - previous_value) * min(1.0, fraction)
-            previous_minute, previous_value = point_minute, point_value
-        return previous_value or None
+        minutes, values = _volume_points(
+            tuple(self.median_cumulative_volume.items()), self.baseline_interval_minutes
+        )
+        index = bisect_left(minutes, elapsed)
+        if index == len(minutes):
+            return (values[-1] or None) if values else None
+        previous_minute, previous_value = (minutes[index - 1], values[index - 1]) if index else (0.0, 0.0)
+        fraction = max(0.02, (elapsed - previous_minute) / max(1.0, minutes[index] - previous_minute))
+        return previous_value + max(0.0, values[index] - previous_value) * min(1.0, fraction)
 
     def _turnover_pace(self, now: datetime) -> Optional[float]:
         if self.adv_20_cr <= 0:
@@ -432,7 +455,7 @@ class LiveStockState:
             "corporate_action": self.corporate_action,
         }
 
-    def checkpoint(self) -> Dict[str, Any]:
+    def checkpoint(self, *, compact: bool = False) -> Dict[str, Any]:
         return {
             "first_packet_at": self.first_packet_at,
             "last_packet_at": self.last_packet_at,
@@ -452,14 +475,15 @@ class LiveStockState:
             "opening_range_complete": self.opening_range_complete,
             "opening_range_source": self.opening_range_source,
             "session_live_started": self.session_live_started,
-            "price_samples": list(self.price_samples)[-300:],
-            "value_samples": list(self.value_samples)[-300:],
-            "depth_samples": list(self.depth_samples)[-60:],
-            "minute_bars": [asdict(bar) for bar in list(self.minute_bars)[-60:]],
-            "setup_state": self.setup_state,
+            "price_samples": _tail(self.price_samples, 30 if compact else 300),
+            "value_samples": _tail(self.value_samples, 30 if compact else 300),
+            "depth_samples": _tail(self.depth_samples, 10 if compact else 60),
+            "minute_bars": [asdict(bar) for bar in _tail(self.minute_bars, 20 if compact else 60)],
+            "setup_state": deepcopy(self.setup_state),
         }
 
     def restore(self, payload: Dict[str, Any]) -> None:
+        self._rolling_prices = None
         for name in (
             "first_packet_at", "last_packet_at", "last_trade_at", "last_trade_quantity",
             "latest_price", "previous_price", "cumulative_volume", "previous_cumulative_volume",
@@ -472,11 +496,33 @@ class LiveStockState:
                 setattr(self, name, payload[name])
         self.price_samples = deque(_tuples(payload.get("price_samples"), 2), maxlen=900)
         self.value_samples = deque(_tuples(payload.get("value_samples"), 2), maxlen=900)
+        self._samples_ordered = all(
+            previous[0] <= current[0]
+            for samples in (self.price_samples, self.value_samples)
+            for previous, current in zip(samples, islice(samples, 1, None))
+        )
         self.depth_samples = deque(_tuples(payload.get("depth_samples"), 3), maxlen=180)
         self.minute_bars = deque(
             (OHLCV(**row) for row in payload.get("minute_bars") or [] if isinstance(row, dict)),
             maxlen=420,
         )
+
+
+def _tail(values: Deque, count: int) -> list:
+    return list(reversed(list(islice(reversed(values), count))))
+
+
+@lru_cache(maxsize=8192)
+def _volume_points(items: tuple, interval: int) -> tuple[tuple, tuple]:
+    points = []
+    for label, value in items:
+        try:
+            hour, minute = (int(part) for part in label.split(":", 1))
+        except (TypeError, ValueError):
+            continue
+        points.append((float(hour * 60 + minute - 555 + interval), float(value)))
+    points.sort()
+    return tuple(point[0] for point in points), tuple(point[1] for point in points)
 
 
 def _number_map(values: Any) -> Dict[str, float]:
@@ -492,4 +538,3 @@ def _tuples(values: Any, length: int) -> Iterable[tuple]:
     for value in values or []:
         if isinstance(value, (list, tuple)) and len(value) == length:
             yield tuple(float(item) for item in value)
-
