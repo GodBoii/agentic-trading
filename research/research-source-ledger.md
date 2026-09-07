@@ -1,0 +1,24 @@
+# Claim and source ledger
+
+Access date: September 5, 2026. Canonical synthesis: report-source.md. Delivered artifact: trader-research-2026-09-05.md.
+
+| Claim family | Source and publisher | Date | Access and confidence |
+|---|---|---|---|
+| Events, admissions, completed analyses, trade attempts and statuses | Trader local results/stage2/{2026-08-31,2026-09-01}/setup-events.jsonl; results/agents/event-dispatch-state.json and event-decision-archive.ndjson | Recorded Aug 31 and Sep 1, 2026 | Read-only streaming JSON parsing; joined event IDs; high confidence for recorded values, not independently certified fills |
+| Newer scanner counts and mode | Trader Ubuntu /app/python-backend/results/stage2/{2026-09-02,2026-09-03,2026-09-04}/setup-events.jsonl and latest-state.json | Recorded Sep 2-4, 2026 | SSH/docker reads before authorization expired; high confidence for retrieved values; no completed new agent archive found in inspected path |
+| Recording coverage | One-second Parquet files under those daily Stage 2 paths | Recorded session dates | All file row counts and min/max timestamps measured; continuity not assumed |
+| Agent language, directions, token and latency metrics | Trader decision archive; agent_metadata.timeline, metrics, report_text and stock_packet.decision_context | Aug 31 and Sep 1, 2026 | All 199 completed records screened; case-study full reports and tool evidence read; no exhaustive visual chart audit |
+| Quote markouts | Local one-second Parquet, event and first order-call timestamps | Aug 31 and Sep 1, 2026 | Hypothetical bid/ask markouts, non-crossed quotes, exit within 5s tolerance; excludes missing rows; no fees, queue simulation or fill certification |
+| Code faults and corrected stale-context claim | Trader pipeline/stages/intra_finder.py, live_state.py, setups/base.py; stock/stock_agent.py, decision_context.py, toolkits/market_data_toolkit.py and execution_toolkit.py; runtime/run_stock_agent.py and run_ai_trading_orchestrator.py | Current checkout Sep 5, 2026 | Read-only source audit; selected runtime source hashes matched Ubuntu; defects are failure paths unless associated observations establish occurrence |
+| Feed connection limits and timestamp semantics | Dhan, https://dhanhq.co/docs/v2/live-market-feed/ | Current v2 docs, publication date unspecified | Directly opened primary source; high confidence for documented constraints; native ref turn5view0 |
+| Broker fill reconciliation fields | Dhan, https://dhanhq.co/docs/v2/order-update/ | Current v2 docs, publication date unspecified | Directly opened primary source; turn5view1; actual broker records not retrieved |
+| API rate limits | Dhan, https://dhanhq.co/docs/v2/ | Current v2 docs, publication date unspecified | Directly opened primary source; turn6view2 |
+| Historical candle capability | Dhan, https://dhanhq.co/docs/v2/historical-data/ | Current v2 docs, publication date unspecified | Directly opened primary source; turn6view3; does not recreate depth |
+| Prefix caching | OpenRouter, https://openrouter.ai/docs/guides/best-practices/prompt-caching | Current docs, publication date unspecified | Directly opened primary source; turn5view2; benchmark recommendation, no promised speedup |
+| Full response caching caveat | Agno, https://docs.agno.com/models/cache-response | Current docs, v2.2.2 example | Directly opened primary source; turn6view0; recommendation only, no assertion current Trader enables response cache |
+| Structured proposal output | OpenRouter, https://openrouter.ai/docs/guides/features/structured-outputs | Current docs, publication date unspecified | Directly opened primary source; turn6view1; conformance is not factual correctness |
+| Multiple testing and selection bias | David H. Bailey and Marcos Lopez de Prado, The Deflated Sharpe Ratio, https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf | July 31, 2014 version | Author-hosted original research; directly opened turn5view3; no universal sufficient session count asserted |
+
+Research scope was narrowed after discovery to the broken setup/agent contract, capacity, execution semantics, runtime correctness and evaluation validity. Primary-source follow-up reconciled feed time versus ingress time, prompt versus response caching, and scanner markouts versus strategy P&L. Stopped when consequential engineering conclusions had direct source support and remaining profitability evidence gaps were explicit. Ubuntu reauthentication and a delegated worker usage failure limited supplementary analyses; neither was treated as evidence of system failure.
+
+Verification: 33 report links; all local link targets exist. Funnel totals 505 and 225; 199 completed-report outcomes reconcile; total persisted events 2,259. Markdown structural review completed. No full visual rendering was performed. User's preexisting context.md modification remained the only working-tree change.
