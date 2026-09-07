@@ -38,6 +38,7 @@ class NiftyDepthMonitor:
         self.market_time = MarketTimeService(config)
         self.reference = MarketReferenceService(config)
         self.lock = threading.RLock()
+        self.snapshot_lock = threading.Lock()
         self.stop_event = threading.Event()
 
         self.enabled = self._env_bool("NIFTY_DEPTH_MONITOR_ENABLED", True)
@@ -877,6 +878,16 @@ class NiftyDepthMonitor:
         force: bool = False,
         stream_name: Optional[str] = None,
     ) -> None:
+        if not self.snapshot_lock.acquire(blocking=force):
+            return
+        try:
+            self._save_latest_serialized(status=status, force=force, stream_name=stream_name)
+        finally:
+            self.snapshot_lock.release()
+
+    def _save_latest_serialized(
+        self, *, status: str, force: bool, stream_name: Optional[str]
+    ) -> None:
         now = time.time()
         if not force and now - self.last_saved_at < self.latest_save_interval_seconds:
             return
@@ -910,13 +921,18 @@ class NiftyDepthMonitor:
                 "options_feed": self._build_options_snapshot(),
             }
             payload = self._json_safe(payload)
-            try:
-                StorageService.save_snapshot(self.latest_path, payload)
-                StorageService.save_snapshot(self._daily_dir() / "latest.json", payload)
-            except Exception as exc:
-                text = f"{type(exc).__name__}: {exc}"
+            daily_path = self._daily_dir() / "latest.json"
+        try:
+            StorageService.save_snapshot(self.latest_path, payload)
+            StorageService.save_snapshot(daily_path, payload)
+        except Exception as exc:
+            text = f"{type(exc).__name__}: {exc}"
+            with self.lock:
                 self.last_error_by_stream["snapshot_writer"] = text
-                print(f"NIFTY depth monitor snapshot write error: {text}")
+            print(f"NIFTY depth monitor snapshot write error: {text}")
+            return
+        with self.lock:
+            self.last_error_by_stream.pop("snapshot_writer", None)
             self.last_saved_at = now
 
     def _record_error(self, stream_name: str, exc: Exception) -> None:
