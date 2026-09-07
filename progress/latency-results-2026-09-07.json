@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-07",
+  "baseline_revision": "c9f3030",
+  "scope": "Local non-AI pipeline optimization and offline validation",
+  "rank_benchmark": {
+    "platform": "Windows 11",
+    "python": "3.13.3",
+    "stocks": 3500,
+    "timed_warmed_runs": 5,
+    "rows": [
+      {"samples": 3, "baseline_median_ms": 210.8888, "optimized_median_ms": 70.3975},
+      {"samples": 300, "baseline_median_ms": 549.2763, "optimized_median_ms": 92.66},
+      {"samples": 900, "baseline_median_ms": 907.803, "optimized_median_ms": 97.3807}
+    ]
+  },
+  "chart_benchmark": {
+    "chart_sets": 2,
+    "charts_per_set": 9,
+    "bytes_per_set": 1695753,
+    "warm_threads_pair_seconds": 10.2571,
+    "warm_spawned_processes_pair_seconds": 5.7068,
+    "pixel_equality_checked": false,
+    "application_process_route_windows_one_worker_passed": true,
+    "application_process_route_linux_two_workers_passed": true
+  },
+  "linux_replay": {
+    "cpu_quota": 2,
+    "memory_limit_gib": 4,
+    "stocks": 3500,
+    "retained_samples_per_stock": 900,
+    "input_duration_seconds": 60,
+    "input_packets_per_second": 3500,
+    "paced_input": true,
+    "rank_interval_seconds": 5,
+    "checkpoint_interval_seconds": 300,
+    "recording_row_limit": 25000,
+    "packets_processed": 210000,
+    "packets_recorded": 210000,
+    "ordered": true,
+    "preconnection_preparation_ms": 1086.8782,
+    "elapsed_with_final_drain_seconds": 61.2313,
+    "decoded_packet_queue_ms": {"p50": 0.43517, "p95": 153.0274, "p99": 320.1841, "max": 437.3738},
+    "queue_high_water": 1524,
+    "queue_full_waits": 0,
+    "peak_rss_mib": 1236.0977,
+    "persistence_error": null,
+    "p99_target_ms": 250,
+    "p99_target_met": false
+  },
+  "regression": {
+    "windows": {"passed": 225, "skipped": 6, "subtests_passed": 15},
+    "linux_with_redis": {"passed": 231, "skipped": 0, "subtests_passed": 15},
+    "compile_passed": true,
+    "diff_whitespace_check_passed": true,
+    "compose_validation_passed": true
+  },
+  "real_sdk_local_websocket": {
+    "decoded_full_packets": 20,
+    "subscription_batches": [100, 100, 50],
+    "queue_capacity": 2,
+    "pong_while_consumer_idle": true
+  },
+  "limitations": [
+    "No live broker traffic or broker orders",
+    "CPU quota does not emulate office-server hardware",
+    "Synthetic replay uses decoded packets, not a captured full market session",
+    "Replay excludes concurrent scanner misses, account preparation, chart generation and remote persistence",
+    "The 250 ms p99 target remains unmet",
+    "Redis production rollout requires coordinated callers and durable budget-state recovery"
+  ]
+}
