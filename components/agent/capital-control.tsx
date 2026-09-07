@@ -15,7 +15,7 @@ import { NumberFlow } from '@/components/motion/number-flow'
 import { SkeletonReveal } from '@/components/motion/skeleton-reveal'
 import { SuccessCheck } from '@/components/motion/success-check'
 import { formatDateTime, money } from '@/lib/format'
-import { autoSlotAmount, fixedSlotCount, parseSlotCount } from '@/lib/trade-sizing'
+import { autoSlotAmount, fixedSlotCount, tradeSlotLimit } from '@/lib/trade-sizing'
 import type { Funds } from '@/components/dashboard/types'
 
 interface TradingKeys {
@@ -236,7 +236,7 @@ export function CapitalControl() {
     const savedMode: SizingMode = status?.trade_mode === 'manual' ? 'fixed' : 'auto'
     const savedAmount = status?.trade_amount ?? null
     const configured = Boolean(status?.configured)
-    const slots = parseSlotCount(status?.auto_slots)
+    const slots = tradeSlotLimit(marginCapacity ?? 0)
     const perSlot = marginCapacity === null ? null : autoSlotAmount(marginCapacity, slots)
     const fixedSlots =
         marginCapacity === null || parsed === null || invalid ? null : fixedSlotCount(marginCapacity, parsed)
@@ -282,7 +282,7 @@ export function CapitalControl() {
         ? 'Not set. The agent will not place an order until this is saved.'
         : savedMode === 'auto'
           ? perSlot === null
-              ? `Automatic. Your available margin is split into ${slots} equal slots at execution.`
+              ? 'Automatic. Your account balance determines the trade limit.'
               : `Automatic. Up to ${money(perSlot)} margin per trade, across ${slots} slots.`
           : savedFixedSlots === null
             ? `Fixed at ${money(savedAmount || 0)} margin per trade.`
@@ -461,7 +461,7 @@ export function CapitalControl() {
                                 </div>
                                 <div>
                                     <dt>Concurrent positions</dt>
-                                    <dd>{mode === 'auto' ? slots : (fixedSlots ?? '—')}</dd>
+                                    <dd>{mode === 'auto' ? (marginCapacity === null ? '—' : slots) : (fixedSlots ?? '—')}</dd>
                                 </div>
                                 <div>
                                     <dt>Leverage cap</dt>
@@ -471,7 +471,7 @@ export function CapitalControl() {
 
                             <p id="trade-amount-hint" className="max-w-prose text-[11px] leading-relaxed text-ink-tertiary">
                                 {mode === 'auto'
-                                    ? `Auto splits the margin available at execution into ${slots} equal slots, so a position taken in the morning cannot starve the ones the agent wants later.`
+                                    ? 'Auto splits account capital across 3 trades below ₹2,000, 5 through ₹5,000, or 10 above ₹5,000. Available margin is checked again before each order.'
                                     : 'Fixed caps the broker margin any single trade may use. The concurrent figure is what your current balance supports.'}{' '}
                                 Dhan decides the live margin either way, exposure is capped at{' '}
                                 {status?.max_leverage || 5}x, and stop-risk sizing can reduce the quantity further.
