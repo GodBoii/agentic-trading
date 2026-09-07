@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from threading import Lock
 from typing import Any, Callable, Dict, Optional
 
@@ -9,20 +10,28 @@ from agno.tools import Toolkit
 from pipeline.services.dhan_execution_toolkit import DhanExecutionToolkit
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.order_placement_gate import OrderPlacementGate
+from pipeline.services.trade_capacity import account_capital, available_balance, effective_trade_slot_limit
 from pipeline.stock.toolkits.markdown_result import json_tool_result_markdown, tool_result_markdown
 
 
 class StockExecutionCoordinator:
-    """Serializes final margin checks and placements across stock agents in one run."""
+    """Serializes account admission and placement across concurrent event runs."""
 
-    def __init__(self, order_placement_gate: Optional[OrderPlacementGate] = None) -> None:
+    def __init__(self, order_placement_gate: Optional[OrderPlacementGate] = None, *, account_scoped: bool = False) -> None:
         self.order_placement_gate = order_placement_gate
+        self.account_scoped = account_scoped
+        self.analysis_slots: set[str] = set()
+        self.pending_slots: dict[str, float] = {}
         self.placement_lock = (
-            order_placement_gate.placement_lock if order_placement_gate is not None else Lock()
+            order_placement_gate.placement_lock
+            if order_placement_gate is not None and not account_scoped else Lock()
         )
         self.successful_orders: list[Dict[str, Any]] = []
 
     def record_success(self, event: Dict[str, Any]) -> None:
+        if self.account_scoped:
+            self.pending_slots[self.slot_key(event["security_id"], event.get("exchange_segment"))] = time.monotonic()
+            return
         self.successful_orders.append(dict(event))
         if self.order_placement_gate is not None:
             reserve = getattr(self.order_placement_gate, "reserve_trade_slot", None)
@@ -30,6 +39,14 @@ class StockExecutionCoordinator:
                 reserve(int(event["security_id"]))
 
     def active_trade_slots(self, broker_security_ids: set[str]) -> set[str]:
+        if self.account_scoped:
+            now = time.monotonic()
+            grace_seconds = getattr(self.order_placement_gate, "trade_slot_reservation_grace_seconds", 30)
+            self.pending_slots = {
+                key: placed_at for key, placed_at in self.pending_slots.items()
+                if key in broker_security_ids or now - placed_at <= grace_seconds
+            }
+            return set(broker_security_ids) | self.pending_slots.keys()
         if self.order_placement_gate is not None:
             merge = getattr(self.order_placement_gate, "active_trade_slots", None)
             if callable(merge):
@@ -50,6 +67,9 @@ class StockExecutionCoordinator:
     def order_placement_blocked(self) -> bool:
         return self.order_placement_gate is not None and not self.order_placement_gate.allowed
 
+    def slot_key(self, security_id: Any, exchange_segment: Any = None) -> str:
+        return f"{exchange_segment}:{security_id}" if self.account_scoped else str(security_id)
+
 
 class StockExecutionToolkit(Toolkit):
     """New-entry execution tools bound to one stock and a margin allocation."""
@@ -69,7 +89,7 @@ class StockExecutionToolkit(Toolkit):
         final_quote_max_age_seconds: float = 30.0,
         final_candle_max_age_seconds: float = 120.0,
         max_entry_drift_risk_fraction: float = 0.50,
-        allowed_side: Optional[str] = None,
+        balance_based_capacity: bool = False,
     ) -> None:
         self.security_id = int(security_id)
         self.margin_budget = max(0.0, float(margin_budget))
@@ -81,6 +101,9 @@ class StockExecutionToolkit(Toolkit):
             max(0.0001, float(max_risk_fraction_per_slot)),
         )
         self.max_concurrent_trades = max(1, int(max_concurrent_trades))
+        self.balance_based_capacity = balance_based_capacity
+        self.last_capacity: Dict[str, Any] = {}
+        self._active_trade_slots: set[str] = set()
         self.final_state_loader = final_state_loader
         self.final_quote_max_age_seconds = max(1.0, float(final_quote_max_age_seconds))
         self.final_candle_max_age_seconds = max(1.0, float(final_candle_max_age_seconds))
@@ -88,8 +111,6 @@ class StockExecutionToolkit(Toolkit):
             0.0,
             float(max_entry_drift_risk_fraction),
         )
-        normalized_allowed_side = str(allowed_side or "").upper()
-        self.allowed_side = normalized_allowed_side if normalized_allowed_side in {"BUY", "SELL"} else None
         self.exchange_segment = str(exchange_segment or "BSE_EQ").upper()
         if self.exchange_segment not in {"NSE_EQ", "BSE_EQ"}:
             raise ValueError("StockExecutionToolkit requires NSE_EQ or BSE_EQ.")
@@ -97,7 +118,7 @@ class StockExecutionToolkit(Toolkit):
         self._dhan_tools = DhanExecutionToolkit(dhan, entry_only=True)
         self._dhan_tools.set_allowed_security_id(self.security_id)
         self._halted = False
-        self._protected_attempts = 0
+        self._submission_unresolved = False
         self.last_preview: Optional[Dict[str, Any]] = None
         self.last_execution: Optional[Dict[str, Any]] = None
         super().__init__(
@@ -136,10 +157,6 @@ class StockExecutionToolkit(Toolkit):
                 self._failure("valid_stop_loss_price_required_for_leveraged_sizing")
             )
         normalized_side = str(side or "").upper()
-        if self.allowed_side is not None and normalized_side != self.allowed_side:
-            return json_tool_result_markdown(
-                self._failure("side_conflicts_with_detector_direction")
-            )
         if (
             normalized_side == "BUY" and stop >= float(reference_price)
         ) or (
@@ -203,11 +220,6 @@ class StockExecutionToolkit(Toolkit):
         # A sibling agent or scheduled verification already blocked Dhan execution.
         if self.coordinator.order_placement_blocked():
             return json_tool_result_markdown(self._failure("execution_halted_order_placement_blocked"))
-        if self._protected_attempts >= 1:
-            return self._record_preflight_failure(
-                "protected",
-                self._failure("protected_order_attempt_limit_reached"),
-            )
         normalized_type = self._strict_order_type(order_type, {"LIMIT", "MARKET"})
         if not normalized_type:
             self._halted = True
@@ -218,11 +230,11 @@ class StockExecutionToolkit(Toolkit):
                 quantity=quantity,
                 reference_price=entry_price,
             )
-        if self.allowed_side is not None and str(side or "").upper() != self.allowed_side:
-            return json_tool_result_markdown(
-                self._failure("side_conflicts_with_detector_direction")
-            )
         with self.coordinator.placement_lock:
+            if self._has_successful_placement():
+                return json_tool_result_markdown(self._failure("entry_order_already_placed"))
+            if self._submission_unresolved:
+                return json_tool_result_markdown(self._failure("broker_submission_unresolved_reconciliation_required"))
             # Another event may have received DH-905 while this event waited.
             if self.coordinator.order_placement_blocked():
                 return json_tool_result_markdown(
@@ -264,7 +276,7 @@ class StockExecutionToolkit(Toolkit):
                     reference_price=entry_price,
                 )
 
-            self._protected_attempts += 1
+            self._submission_unresolved = True
             response = self._dhan_tools.place_protected_intraday_super_order(
                 security_id=self.security_id,
                 side=side,
@@ -385,15 +397,12 @@ class StockExecutionToolkit(Toolkit):
             return self._failure("current_ltp_unavailable")
         try:
             funds = self._dhan_tools.dhan.fetch_fund_limits()
+            if not self._broker_request_succeeded(funds):
+                return self._failure("available_balance_unavailable")
             data = funds.get("data") if isinstance(funds, dict) else {}
             if isinstance(data, dict) and isinstance(data.get("data"), dict):
                 data = data["data"]
-            current_balance = float(
-                (data or {}).get("availabelBalance")
-                or (data or {}).get("availableBalance")
-                or (data or {}).get("sodLimit")
-                or 0
-            )
+            current_balance = available_balance(data if isinstance(data, dict) else {})
         except Exception as exc:
             return self._failure(f"available_balance_unavailable:{type(exc).__name__}")
         if current_balance <= 0:
@@ -473,38 +482,53 @@ class StockExecutionToolkit(Toolkit):
             return self._failure(f"final_market_state_unavailable:{type(exc).__name__}")
         if not isinstance(state, dict) or str(state.get("status") or "").lower() == "error":
             return self._failure("final_market_state_unavailable")
+        def reject(reason: str) -> str:
+            return json.dumps({
+                "status": "failure",
+                "remarks": reason,
+                "order_submitted": False,
+                "current_market_state": state,
+                "proposed_trade": {
+                    "side": side,
+                    "entry_price": entry_price,
+                    "target_price": target_price,
+                    "stop_loss_price": stop_loss_price,
+                    "allowed_entry_drift": abs(float(entry_price) - float(stop_loss_price)) * self.max_entry_drift_risk_fraction,
+                },
+                "next_action": "Reassess current evidence, then resize before retrying a revised trade. Do not reuse stale chart prices.",
+            }, ensure_ascii=True)
         quote = state.get("quote") if isinstance(state.get("quote"), dict) else {}
         try:
             ltp = float(quote.get("last_price") or 0.0)
         except (TypeError, ValueError):
             ltp = 0.0
         if ltp <= 0:
-            return self._failure("final_ltp_unavailable")
+            return reject("final_ltp_unavailable")
         try:
             quote_age = float(quote.get("last_trade_age_seconds"))
         except (TypeError, ValueError):
             quote_age = float("inf")
         if quote_age > self.final_quote_max_age_seconds:
-            return self._failure("final_quote_stale")
+            return reject("final_quote_stale")
         try:
             candle_age = float(state.get("candle_data_age_seconds"))
         except (TypeError, ValueError):
             candle_age = float("inf")
         if candle_age > self.final_candle_max_age_seconds:
-            return self._failure("final_candle_data_stale")
+            return reject("final_candle_data_stale")
 
         normalized_side = str(side or "").upper()
         entry = float(entry_price)
         target = float(target_price)
         stop = float(stop_loss_price)
         if normalized_side == "BUY" and not stop < ltp < target:
-            return self._failure("final_price_invalidates_buy_setup")
+            return reject("final_price_invalidates_buy_setup")
         if normalized_side == "SELL" and not target < ltp < stop:
-            return self._failure("final_price_invalidates_sell_setup")
+            return reject("final_price_invalidates_sell_setup")
         initial_risk = abs(entry - stop)
         allowed_drift = initial_risk * self.max_entry_drift_risk_fraction
         if initial_risk <= 0 or abs(ltp - entry) > allowed_drift:
-            return self._failure("final_price_drift_exceeds_limit")
+            return reject("final_price_drift_exceeds_limit")
         return None
 
     def _validate_no_existing_trade(self) -> Optional[str]:
@@ -529,7 +553,7 @@ class StockExecutionToolkit(Toolkit):
                     continue
                 row_security_id = str(row.get("securityId") or row.get("security_id") or "")
                 if row_security_id:
-                    active_security_ids.add(row_security_id)
+                    active_security_ids.add(self.coordinator.slot_key(row_security_id, row.get("exchangeSegment") or self.exchange_segment))
                 if self._matches_security(row):
                     return self._failure("assigned_stock_open_intraday_position_exists")
             except (TypeError, ValueError):
@@ -559,10 +583,31 @@ class StockExecutionToolkit(Toolkit):
                 continue
             row_security_id = str(row.get("securityId") or row.get("security_id") or "")
             if row_security_id:
-                active_security_ids.add(row_security_id)
+                active_security_ids.add(self.coordinator.slot_key(row_security_id, row.get("exchangeSegment") or self.exchange_segment))
             if self._matches_security(row):
                 return self._failure("assigned_stock_active_order_exists")
         active_security_ids = self.coordinator.active_trade_slots(active_security_ids)
+        self._active_trade_slots = active_security_ids
+        if self.coordinator.slot_key(self.security_id, self.exchange_segment) in active_security_ids:
+            return self._failure("assigned_stock_active_order_exists")
+        if self.balance_based_capacity:
+            try:
+                funds_response = self._dhan_tools.dhan.fetch_fund_limits()
+                if not self._broker_request_succeeded(funds_response):
+                    return self._failure("account_capacity_funds_unavailable")
+                funds = self._extract_first_dict(funds_response) or {}
+                if available_balance(funds) <= 0:
+                    return self._failure("available_balance_unavailable")
+                capital = account_capital(funds)
+                self.max_concurrent_trades = effective_trade_slot_limit(
+                    capital, self.margin_budget if self.amount_source == "user_amount" else None,
+                )
+            except Exception as exc:
+                return self._failure(f"account_capacity_funds_unavailable:{type(exc).__name__}")
+        self.last_capacity = {
+            "active_trade_count": len(active_security_ids),
+            "max_concurrent_trades": self.max_concurrent_trades,
+        }
         if len(active_security_ids) >= self.max_concurrent_trades:
             return json.dumps(
                 {
@@ -575,6 +620,24 @@ class StockExecutionToolkit(Toolkit):
             )
         return None
 
+    def reserve_analysis_slot(self) -> Optional[str]:
+        """Reserve account capacity before history, chart and model work."""
+        with self.coordinator.placement_lock:
+            error = self._validate_no_existing_trade()
+            if error:
+                return error
+            key = self.coordinator.slot_key(self.security_id, self.exchange_segment)
+            if key in self.coordinator.analysis_slots:
+                return self._failure("assigned_stock_analysis_already_active")
+            if len(self._active_trade_slots | self.coordinator.analysis_slots) >= self.max_concurrent_trades:
+                return json.dumps({"status": "blocked", "remarks": "account_analysis_capacity_in_use", **self.last_capacity})
+            self.coordinator.analysis_slots.add(key)
+            return None
+
+    def release_analysis_slot(self) -> None:
+        with self.coordinator.placement_lock:
+            self.coordinator.analysis_slots.discard(self.coordinator.slot_key(self.security_id, self.exchange_segment))
+
     @staticmethod
     def _broker_request_succeeded(response: Any) -> bool:
         if isinstance(response, list):
@@ -583,7 +646,8 @@ class StockExecutionToolkit(Toolkit):
 
     def _matches_security(self, row: Dict[str, Any]) -> bool:
         value = row.get("securityId") or row.get("security_id")
-        return str(value or "") == str(self.security_id)
+        segment = str(row.get("exchangeSegment") or row.get("exchange_segment") or self.exchange_segment).upper()
+        return str(value or "") == str(self.security_id) and segment == self.exchange_segment
 
     def _record_execution(self, kind: str, response: str, request: Dict[str, Any]) -> str:
         parsed = self._parse(response)
@@ -597,6 +661,8 @@ class StockExecutionToolkit(Toolkit):
         }
         self._halt_if_input_error(parsed)
         broker_status = str(parsed.get("broker_order_status") or "").upper()
+        if broker_status in {"REJECTED", "CANCELLED", "EXPIRED"} or not parsed.get("correlation_id"):
+            self._submission_unresolved = False
         if (
             str(parsed.get("status") or "").lower() == "success"
             and broker_status not in {"REJECTED", "CANCELLED", "EXPIRED"}
@@ -604,6 +670,7 @@ class StockExecutionToolkit(Toolkit):
             self.coordinator.record_success(
                 {
                     "security_id": self.security_id,
+                    "exchange_segment": self.exchange_segment,
                     "kind": kind,
                     **request,
                     "response": parsed,
@@ -647,7 +714,11 @@ class StockExecutionToolkit(Toolkit):
         if not isinstance(self.last_execution, dict):
             return False
         response = self.last_execution.get("response")
-        return isinstance(response, dict) and str(response.get("status") or "").lower() == "success"
+        return (
+            isinstance(response, dict)
+            and str(response.get("status") or "").lower() == "success"
+            and str(response.get("broker_order_status") or "").upper() not in {"REJECTED", "CANCELLED", "EXPIRED"}
+        )
 
     @classmethod
     def _filled_quantity(
