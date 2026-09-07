@@ -196,14 +196,14 @@ class FreshStateDhan(FakeStockDhan):
 
 
 class StockToolkitTests(unittest.TestCase):
-    def test_detector_direction_cannot_be_reversed_by_agent(self):
+    def test_agent_can_choose_sell_independently(self):
         toolkit = StockExecutionToolkit(
-            FakeStockDhan(),
+            FakeStockDhan(include_selected_position=False),
             111,
             500,
-            allowed_side="BUY",
         )
 
+        toolkit._dhan_tools.allow_live_orders = True
         sizing = toolkit.estimate_intraday_quantity(
             side="SELL",
             reference_price=100,
@@ -217,8 +217,8 @@ class StockToolkitTests(unittest.TestCase):
             stop_loss_price=101,
         )
 
-        self.assertIn("side_conflicts_with_detector_direction", sizing)
-        self.assertIn("side_conflicts_with_detector_direction", placement)
+        self.assertIn("- status: success", sizing)
+        self.assertIn("- status: success", placement)
 
     def test_depth_monitor_awaits_async_disconnect_fallback(self):
         class AsyncDisconnectFeed:
@@ -763,6 +763,11 @@ class StockToolkitTests(unittest.TestCase):
 
         self.assertIn("- status: success", result)
         self.assertEqual(dhan.history_calls, 1)
+        initial = toolkit.current_stock_state_payload(force_refresh=False)
+        self.assertEqual(dhan.history_calls, 1)
+        self.assertEqual(initial["quote"]["last_price"], 101.25)
+        toolkit.current_stock_state_payload()
+        self.assertEqual(dhan.history_calls, 2)
         self.assertIn("- last_price: 101.25", result)
         self.assertIn("12:59:00", result)
         self.assertIn("- close: 101.25", result)
