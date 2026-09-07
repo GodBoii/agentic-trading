@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { convexAdminMutation, convexAdminQuery } from '@/lib/convex/server'
-import { AUTO_TRADE_SLOTS } from '@/lib/trade-sizing'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -63,7 +62,7 @@ function orderPlacementResponse(state: OrderPlacementState | null) {
 }
 
 function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPlacementState | null) {
-  const sizingPolicy = { auto_slots: AUTO_TRADE_SLOTS, max_leverage: maxLeverage }
+  const sizingPolicy = { trade_slot_policy: 'account_capital_tiers', max_leverage: maxLeverage }
   const configured = Boolean(entry?.enabled)
   const mode = entry?.tradeMode || 'auto'
   if (mode === 'auto') return {
@@ -72,8 +71,8 @@ function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPl
     trade_mode: 'auto',
     status_code: configured ? 'automatic_balance' : 'automatic_balance_not_saved',
     message: configured
-      ? `Automatic sizing is active. Available margin is split across ${AUTO_TRADE_SLOTS} trade slots.`
-      : `Save Auto to split available margin across ${AUTO_TRADE_SLOTS} trade slots.`,
+      ? 'Automatic sizing is active. Account capital sets the limit: 3 trades below Rs 2,000, 5 through Rs 5,000, and 10 above Rs 5,000.'
+      : 'Save Auto to divide account capital across 3, 5, or 10 trade slots according to your balance.',
     trade_amount: null,
     ...sizingPolicy,
     amount_updated_at_utc: entry?.amountUpdatedAt || null,
