@@ -192,6 +192,7 @@ class PipelineConfig:
     stock_agent_manual_scan_limit: int = 30
     stock_agent_max_workers: int = 4
     stock_agent_max_concurrent_trades: int = 5
+    stock_agent_max_concurrent_events: int = 10
     stock_agent_max_leverage: float = 5.0
     stock_agent_max_risk_fraction_per_slot: float = 0.02
     stock_agent_signal_cache_max_age_seconds: int = 180
