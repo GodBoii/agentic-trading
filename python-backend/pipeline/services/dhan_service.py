@@ -16,6 +16,7 @@ from dhanhq import DhanContext, HistoricalData, MarketFeed, OptionChain, dhanhq
 from dotenv import dotenv_values
 
 from pipeline.config import PipelineConfig
+from pipeline.services.redis_rate_limit import RedisRateLimiter
 from pipeline.services.dhan_credentials import (
     CredentialUnavailable,
     DhanCredentials,
@@ -64,6 +65,7 @@ class DhanService:
         self.rate_limit_hits = deque()
         self.rate_condition = Condition()
         self.quote_condition = Condition()
+        self.option_chain_condition = Condition()
         self.quote_request_gap = self.config.quote_request_gap_seconds
         self.last_quote_request_ts = 0.0
         self.option_chain_request_gap = 3.1
@@ -131,6 +133,8 @@ class DhanService:
         self.gateway_timeout_seconds = self.config.market_data_gateway_timeout_seconds
         self.gateway_session = requests.Session() if self.gateway_url else None
         self.base_url = "https://api.dhan.co/v2"
+        redis_url = os.getenv("DHAN_RATE_LIMIT_REDIS_URL", "").strip()
+        self.redis_limiter = RedisRateLimiter.from_url(redis_url) if redis_url else None
 
     @staticmethod
     def _jwt_epoch_claim(token: Optional[str], claim: str) -> Optional[float]:
@@ -273,9 +277,14 @@ class DhanService:
     ) -> Dict[str, Any]:
         try:
             headers = self._headers()
+            limiter = getattr(self, "redis_limiter", None)
+            if limiter is not None:
+                category = "orders" if path.startswith(("/orders", "/super/orders", "/forever", "/conditional")) else "non-trading"
+                windows = [(1000, 10), (60000, 250), (3600000, 1000), (86400000, 7000)] if category == "orders" else [(1000, 20)]
+                limiter.acquire(str(self.client_id), {category: windows})
             if extra_headers:
                 headers.update(extra_headers)
-            response = requests.request(
+            response = self._http_session().request(
                 method=method,
                 url=f"{self.base_url}{path}",
                 headers=headers,
@@ -298,6 +307,13 @@ class DhanService:
             }
         except Exception as exc:
             return {"status": "failure", "remarks": str(exc), "data": None}
+
+    def _http_session(self) -> requests.Session:
+        session = getattr(self.thread_local, "http_session", None)
+        if session is None:
+            session = requests.Session()
+            self.thread_local.http_session = session
+        return session
 
     def _auth_request(
         self,
@@ -943,8 +959,15 @@ class DhanService:
         return base_delay + jitter + cooldown
 
     def acquire_data_slot(self) -> None:
+        limiter = getattr(self, "redis_limiter", None)
+        if limiter is not None:
+            limiter.acquire(str(self.client_id), {"data": self._data_rate_windows()})
+            return
         self._acquire_shared_data_slot()
         self._acquire_local_data_slot()
+
+    def _data_rate_windows(self) -> list[tuple[int, int]]:
+        return [(1000, min(5, max(1, self.config.historical_rate_limit_per_sec))), (86400000, 100000)]
 
     def _update_historical_rate_limit_cooldown(self, resp: Any) -> None:
         success = isinstance(resp, dict) and str(resp.get("status") or "").lower() == "success"
@@ -1014,15 +1037,14 @@ class DhanService:
 
         state_path = self.config.dhan_rate_limit_state_path
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        if not state_path.exists():
-            state_path.write_text('{"request_times": []}', encoding="utf-8")
 
         window_seconds = self.config.shared_rate_limit_window_seconds
         poll_seconds = self.config.shared_rate_limit_poll_seconds
 
         while True:
-            with state_path.open("r+", encoding="utf-8") as handle:
+            with state_path.open("a+", encoding="utf-8") as handle:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                handle.seek(0)
                 try:
                     raw = handle.read().strip()
                     payload = json.loads(raw) if raw else {"request_times": []}
@@ -1060,12 +1082,11 @@ class DhanService:
             return
 
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        if not state_path.exists():
-            state_path.write_text('{"last_request_ts": 0.0}', encoding="utf-8")
 
         while True:
-            with state_path.open("r+", encoding="utf-8") as handle:
+            with state_path.open("a+", encoding="utf-8") as handle:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                handle.seek(0)
                 try:
                     raw = handle.read().strip()
                     payload = json.loads(raw) if raw else {"last_request_ts": 0.0}
@@ -1087,6 +1108,10 @@ class DhanService:
             time.sleep(max(0.01, wait_time))
 
     def acquire_quote_slot(self) -> None:
+        limiter = getattr(self, "redis_limiter", None)
+        if limiter is not None:
+            limiter.acquire(str(self.client_id), {"quotes": [(max(1000, math.ceil(self.quote_request_gap * 1000)), 1)]})
+            return
         self._acquire_shared_gap(
             self.config.dhan_quote_rate_limit_state_path,
             self.quote_request_gap,
@@ -1422,11 +1447,25 @@ class DhanService:
         )
 
     def _enforce_option_chain_gap(self) -> None:
-        now = time.time()
-        wait_time = self.option_chain_request_gap - (now - self.last_option_chain_request_ts)
-        if wait_time > 0:
-            time.sleep(wait_time)
-        self.last_option_chain_request_ts = time.time()
+        limiter = getattr(self, "redis_limiter", None)
+        if limiter is not None:
+            limiter.acquire(str(self.client_id), {
+                "data": self._data_rate_windows(),
+                "option-chain": [(max(3000, math.ceil(self.option_chain_request_gap * 1000)), 1)],
+            })
+            return
+        self._acquire_shared_gap(
+            self.config.dhan_rate_limit_state_path.with_name("dhan-option-chain-rate-limit.json"),
+            self.option_chain_request_gap,
+        )
+        with self.option_chain_condition:
+            while True:
+                now = time.monotonic()
+                remaining = self.option_chain_request_gap - (now - self.last_option_chain_request_ts)
+                if remaining <= 0:
+                    self.last_option_chain_request_ts = now
+                    return
+                self.option_chain_condition.wait(timeout=remaining)
 
     def fetch_option_chain_expiry_list(
         self,
@@ -1443,7 +1482,9 @@ class DhanService:
             )
             return response if isinstance(response, dict) else {"status": "failure", "data": response}
 
-        self.acquire_data_slot()
+        self.reload_credentials_if_changed()
+        if getattr(self, "redis_limiter", None) is None:
+            self.acquire_data_slot()
         self._enforce_option_chain_gap()
         return self.option_chain_api.expiry_list(
             int(under_security_id),
@@ -1467,7 +1508,9 @@ class DhanService:
             )
             return response if isinstance(response, dict) else {"status": "failure", "data": response}
 
-        self.acquire_data_slot()
+        self.reload_credentials_if_changed()
+        if getattr(self, "redis_limiter", None) is None:
+            self.acquire_data_slot()
         self._enforce_option_chain_gap()
         return self.option_chain_api.option_chain(
             int(under_security_id),
