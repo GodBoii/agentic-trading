@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -249,7 +250,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         packet.update(event)
         self._strip_monitor_context(packet)
         run_context = {
-            "trade_session_id": f"intra-{event['event_id']}",
+            "trade_session_id": self._event_session_id(str(event["event_id"]), normalized_user_id),
             "request_id": str(event["event_id"]),
             "user_id": normalized_user_id,
         }
@@ -760,6 +761,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
             / candidate_packet["market_date"]
             / self._slugify(candidate_packet["display_name"])
             / artifact_identity
+            / hashlib.sha256(str(trade_config.get("user_id") or "").encode()).hexdigest()[:16]
         )
 
         selected_stock = self.execution_helper._normalize_selected_stock(
@@ -1093,6 +1095,11 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
 
         chart_bundle["cloud_image_urls_ordered"] = cloud_urls
         return cloud_urls
+
+    @staticmethod
+    def _event_session_id(event_id: str, user_id: str) -> str:
+        account_key = hashlib.sha256(user_id.encode()).hexdigest()[:16]
+        return f"intra-{event_id}-{account_key}"
 
     def _agno_session_id(
         self,
