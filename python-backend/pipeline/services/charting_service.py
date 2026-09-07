@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -82,6 +83,15 @@ class CandlestickChartService:
         daily_frame: Optional[pd.DataFrame] = None,
     ) -> Dict[str, Any]:
         """Build the full chart set with technical metadata for LLM consumption."""
+        workers = int(os.getenv("CHART_RENDER_PROCESSES", "0"))
+        if workers < 0 or workers > 2:
+            raise ValueError("CHART_RENDER_PROCESSES must be 0, 1, or 2")
+        if workers:
+            from pipeline.services.chart_workers import render_in_process
+            return render_in_process(self, {
+                "frame": frame, "display_name": display_name, "market_date": market_date,
+                "output_dir": output_dir, "signal_time_ist": signal_time_ist, "daily_frame": daily_frame,
+            }, workers=workers)
         with self._render_lock:
             return self._build_intraday_chart_set(
                 frame, display_name, market_date, output_dir, signal_time_ist, daily_frame
@@ -135,6 +145,10 @@ class CandlestickChartService:
         chart_paths_ordered: List[str] = []
         technical_metadata: Dict[str, Any] = {}
 
+        warm_frames = {
+            timeframe: self._compute_warm_indicators(self._resample_all_sessions(local_frame, timeframe))
+            for timeframe in self.CURRENT_DAY_TIMEFRAMES
+        }
         for timeframe in self.CURRENT_DAY_TIMEFRAMES:
             resampled = self._resample_frame(today_frame, timeframe)
             tf_label = self._timeframe_label(timeframe)
@@ -143,7 +157,7 @@ class CandlestickChartService:
 
             # Compute all indicators and zones
             enriched = self._compute_full_indicators(resampled)
-            warm = self._compute_warm_indicators(self._resample_all_sessions(local_frame, timeframe))
+            warm = warm_frames[timeframe]
             for column in ("ema9", "ema21", "rsi", "atr", "bb_upper", "bb_lower"):
                 enriched[column] = warm[column].reindex(enriched.index)
             sr_levels = self._detect_support_resistance(enriched, prev_day_levels)
@@ -291,6 +305,7 @@ class CandlestickChartService:
                 output_path=path,
                 prev_day_levels=prev_day_levels,
                 signal_time_ist=signal_time_ist,
+                warm_frames=warm_frames,
             )
             charts[key] = {
                 "chart_type": key,
@@ -1343,6 +1358,7 @@ class CandlestickChartService:
         market_date: str,
         data_as_of: pd.Timestamp,
         output_path: Path,
+        warm_frames: Optional[Dict[int, pd.DataFrame]] = None,
         **_: Any,
     ) -> Dict[str, Any]:
         """Render warm-started RSI and ATR% for the three current timeframes."""
@@ -1360,8 +1376,10 @@ class CandlestickChartService:
         latest: Dict[str, Any] = {}
         target_day = date.fromisoformat(market_date)
         for timeframe in self.CURRENT_DAY_TIMEFRAMES:
-            resampled = self._resample_all_sessions(local_frame, timeframe)
-            enriched = self._compute_warm_indicators(resampled)
+            enriched = (
+                warm_frames[timeframe] if warm_frames is not None
+                else self._compute_warm_indicators(self._resample_all_sessions(local_frame, timeframe))
+            )
             visible = enriched.loc[enriched.index.date == target_day].copy()
             if visible.empty:
                 continue
