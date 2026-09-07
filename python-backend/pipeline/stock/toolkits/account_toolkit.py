@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from agno.tools import Toolkit
 
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.trade_capacity import account_capital, trade_slot_limit
 from pipeline.stock.toolkits.markdown_result import tool_result_markdown
 
 
@@ -62,6 +63,7 @@ class StockAccountToolkit(Toolkit):
         super_orders = self._extract_list(super_orders_response)
 
         selected_positions: List[Dict[str, Any]] = []
+        active_securities: set[str] = set()
         other_open_positions = 0
         for row in positions:
             if str(row.get("productType") or "").upper() != "INTRADAY":
@@ -72,6 +74,9 @@ class StockAccountToolkit(Toolkit):
                 net_quantity = 0.0
             if net_quantity == 0:
                 continue
+            security_id = row.get("securityId") or row.get("security_id")
+            if security_id not in (None, ""):
+                active_securities.add(f"{row.get('exchangeSegment') or row.get('exchange_segment') or ''}:{security_id}")
             if self._matches_selected(row):
                 selected_positions.append(
                     {
@@ -88,6 +93,9 @@ class StockAccountToolkit(Toolkit):
         for row in self._unique_orders([*orders, *super_orders]):
             if not self._is_active_order(row):
                 continue
+            security_id = row.get("securityId") or row.get("security_id")
+            if security_id not in (None, ""):
+                active_securities.add(f"{row.get('exchangeSegment') or row.get('exchange_segment') or ''}:{security_id}")
             if self._matches_selected(row):
                 selected_orders.append(
                     {
@@ -113,6 +121,9 @@ class StockAccountToolkit(Toolkit):
                 "sodLimit",
             ),
             "utilized_amount": self._first_number(funds, "utilizedAmount"),
+            "account_margin_capacity": account_capital(funds),
+            "active_trade_count": len(active_securities),
+            "max_concurrent_trades": trade_slot_limit(account_capital(funds)),
             "assigned_stock_overlap": {
                 "has_open_intraday_position": bool(selected_positions),
                 "has_active_order": bool(selected_orders),
