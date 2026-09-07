@@ -71,8 +71,6 @@ class StockMarketDataToolkit(Toolkit):
                 pass
 
         stage2 = self.stock_context.get("stage2") or {}
-        indicator_snapshot = dict(self.stock_context.get("indicator_snapshot") or {})
-        indicator_snapshot.pop("patterns", None)
         relative_volume = self.stock_context.get("relative_volume")
         if relative_volume is None:
             relative_volume = stage2.get("time_of_day_rvol")
@@ -91,11 +89,9 @@ class StockMarketDataToolkit(Toolkit):
                 "five_level_depth_summary"
             ),
             "five_level_depth": self.stock_context.get("five_level_depth"),
-            "estimated_slippage_percent": self.stock_context.get("estimated_slippage"),
             "depth_levels": (
                 (self.stock_context.get("data_quality") or {}).get("depth_levels")
             ),
-            "indicator_values": indicator_snapshot,
             "recent_completed_one_minute_bars": list(
                 self.stock_context.get("recent_closed_bars") or []
             )[-10:],
@@ -198,7 +194,7 @@ class StockMarketDataToolkit(Toolkit):
         """
         return tool_result_markdown(self.current_stock_state_payload())
 
-    def current_stock_state_payload(self) -> Dict[str, Any]:
+    def current_stock_state_payload(self, *, force_refresh: bool = True) -> Dict[str, Any]:
         """Fetch fresh quote/candle data for the initial stock-agent snapshot."""
         fetched_at = self._now()
         payload: Dict[str, Any] = {
@@ -217,7 +213,7 @@ class StockMarketDataToolkit(Toolkit):
             missing_fields.append("quote")
 
         try:
-            frame = self._load_intraday_frame(force_refresh=True)
+            frame = self._load_intraday_frame(force_refresh=force_refresh)
             current = frame.loc[frame["timestamp"].dt.date == fetched_at.date()].copy()
             if not current.empty:
                 candle_as_of = current["timestamp"].iloc[-1]
