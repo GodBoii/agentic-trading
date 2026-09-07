@@ -9,7 +9,7 @@ import re
 import tempfile
 import time
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -22,6 +22,7 @@ from pipeline.config import PipelineConfig
 from pipeline.contracts import UNIVERSE_BASELINE_SCHEMA_VERSION
 from pipeline.models import UniverseRecord, VenueIdentity
 from pipeline.services.dhan_service import DhanService
+from pipeline.services.concurrent_work import bounded_results
 from pipeline.services.corporate_action_service import (
     CorporateActionService,
     action_for_stock,
@@ -627,12 +628,11 @@ class UniverseScanner:
 
         workers = max(1, min(4, self.config.stage1_workers))
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(self._intraday_baseline, as_record(stock)): stock
-                for stock in stocks
-            }
-            for future in as_completed(futures):
-                futures[future]["intraday_baselines"] = future.result()
+            for stock, baseline in bounded_results(
+                executor, lambda stock: self._intraday_baseline(as_record(stock)),
+                stocks, limit=workers * 2,
+            ):
+                stock["intraday_baselines"] = baseline
 
         summary = payload.setdefault("summary", {})
         market_date = str(summary.get("market_date") or self.market_time.market_date_str())
@@ -777,12 +777,11 @@ class UniverseScanner:
             f"Loading completed daily history and comparing NSE/BSE liquidity with {workers} workers."
         )
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(self._scan_isin, isin, group, previous_segments): isin
-                for isin, group in groups
-            }
-            for future in as_completed(futures):
-                record, venue_rows, exclusion = future.result()
+            for _, result in bounded_results(
+                executor, lambda item: self._scan_isin(item[0], item[1], previous_segments),
+                groups, limit=workers * 2,
+            ):
+                record, venue_rows, exclusion = result
                 completed_history += 1
                 comparisons.extend(venue_rows)
                 if record:
@@ -803,10 +802,10 @@ class UniverseScanner:
             f"Preparing five-minute historical intraday baselines for {len(records):,} survivors."
         )
         with ThreadPoolExecutor(max_workers=baseline_workers) as executor:
-            futures = {executor.submit(self._intraday_baseline, record): record for record in records}
-            for future in as_completed(futures):
-                record = futures[future]
-                record.intraday_baselines = future.result()
+            for record, baseline in bounded_results(
+                executor, self._intraday_baseline, records, limit=baseline_workers * 2,
+            ):
+                record.intraday_baselines = baseline
                 completed_baselines += 1
                 if completed_baselines == len(records) or completed_baselines % 100 == 0:
                     ready = sum(
