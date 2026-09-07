@@ -13,6 +13,7 @@ from pipeline.config import PipelineConfig
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.storage_service import StorageService
+from pipeline.services.inflight_reads import InflightReads
 
 
 class SignalDataCacheService:
@@ -28,8 +29,14 @@ class SignalDataCacheService:
         self.dhan = dhan
         self.market_time = market_time
         self._lock = Lock()
+        self._prewarming = InflightReads()
 
     def prewarm(self, stock: Dict[str, Any], *, force: bool = False) -> Dict[str, Any]:
+        key = (self.market_time.market_date_str(), str(stock.get("exchange_segment") or "").upper(),
+               int(stock["security_id"]), str(stock.get("instrument") or "EQUITY"), force)
+        return self._prewarming.run(key, lambda: self._prewarm(stock, force=force))
+
+    def _prewarm(self, stock: Dict[str, Any], *, force: bool) -> Dict[str, Any]:
         security_id = int(stock["security_id"])
         market_date = self.market_time.market_date_str()
         exchange_segment = str(stock.get("exchange_segment") or "").upper()
