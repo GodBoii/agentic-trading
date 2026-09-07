@@ -75,8 +75,18 @@ invalidation, activity rank, percentiles, compact recent bars and five-level
 depth. Intra-Finder and the AI gateway cap concurrent new agent work using their
 configured limits. The gateway and stock runner reject expired events.
 
-The configured active-trade gate, fresh funds check, current LTP check and protected
-order workflow remain downstream.
+Account admission checks active positions, pending orders and reserved analysis
+slots before building charts. The account-capital tiers allow three trades below
+Rs 2,000, five from Rs 2,000 through Rs 5,000, and ten above Rs 5,000. Manual margin
+allocations can reduce that count when capital cannot support the full tier.
+
+Scanner direction, setup labels, scores and explanations stay in the event
+archive. The stock agent receives observed market data and charts, chooses BUY,
+SELL or no trade independently, and has no tool-call count limit. Event expiry
+controls admission; it does not impose a deadline on an admitted model run.
+Fresh funds, active-trade capacity, current prices and the agent's stop/target
+geometry are rechecked before protected order placement. Price rejections return
+the refreshed market state for reassessment. See [trading agent policy](trading-agent-policy.md).
 
 ## Recording
 
