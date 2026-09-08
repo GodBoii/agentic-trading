@@ -230,20 +230,31 @@ class UniverseScanner:
             / str(venue["exchange_segment"])
             / f"{venue['security_id']}.parquet"
         )
+        cached = None
+        today = self.market_time.now().date()
         try:
             if cache_path.exists():
-                cached = pd.read_parquet(cache_path)
-                cached["timestamp"] = pd.to_datetime(cached["timestamp"], utc=True, errors="coerce")
+                cached = self._clean_daily_frame(pd.read_parquet(cache_path))
                 cached_market_dates = cached["timestamp"].dt.tz_convert(self.market_time.tz).dt.date
                 if (
                     not cached.empty
-                    and cached_market_dates.max() < self.market_time.now().date()
-                    and datetime.fromtimestamp(cache_path.stat().st_mtime, timezone.utc)
-                    .astimezone(self.market_time.tz)
-                    .date()
-                    == self.market_time.now().date()
+                    and cached_market_dates.max() < today
+                    and cached.attrs.get("fetched_for_market_date") == today.isoformat()
                 ):
                     return cached, None if len(cached) >= self.config.stage1_min_valid_sessions else "insufficient_history"
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            self._log(f"Ignoring invalid daily cache for {venue['exchange_segment']}|{venue['security_id']}: {type(exc).__name__}")
+            cached = None
+
+        def fallback(error: str) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+            if cached is not None and len(cached) >= self.config.stage1_min_valid_sessions:
+                age = (today - cached["timestamp"].dt.tz_convert(self.market_time.tz).dt.date.max()).days
+                if 0 < age <= self.config.stage1_daily_profile_fallback_days:
+                    cached.attrs.update(profile_status="stale", profile_age_days=age, refresh_error=error)
+                    return cached, "cached_profile_after_refresh_failure"
+            return None, error
+
+        try:
             self._wait_for_historical_api()
             response = self._fetch_history_resilient(
                 lambda: self.dhan.fetch_daily_history(
@@ -255,24 +266,16 @@ class UniverseScanner:
                 )
             )
             if not response or str(response.get("status") or "").lower() != "success":
-                return None, str((response or {}).get("remarks") or "historical_fetch_failed")
-            frame = self.dhan.daily_response_to_df(response)
+                return fallback("historical_fetch_failed")
+            frame = self._clean_daily_frame(self.dhan.daily_response_to_df(response))
             if frame.empty:
-                return None, "no_historical_data"
-            today = self.market_time.now().date()
-            frame = frame[frame["timestamp"].dt.date < today].copy()
-            frame = frame.drop_duplicates("timestamp", keep="last").sort_values("timestamp")
-            numeric = ["open", "high", "low", "close", "volume"]
-            frame[numeric] = frame[numeric].apply(pd.to_numeric, errors="coerce")
-            invalid = (
-                frame[numeric].isna().any(axis=1)
-                | (frame[["open", "high", "low", "close"]] <= 0).any(axis=1)
-                | (frame["volume"] < 0)
-                | (frame["high"] < frame[["open", "close", "low"]].max(axis=1))
-                | (frame["low"] > frame[["open", "close", "high"]].min(axis=1))
-            )
-            frame = frame[~invalid].copy()
+                return fallback("no_valid_historical_data")
+            if len(frame) < self.config.stage1_min_valid_sessions:
+                previous, error = fallback("insufficient_history")
+                if previous is not None:
+                    return previous, error
             if not frame.empty:
+                frame.attrs["fetched_for_market_date"] = today.isoformat()
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 temp_path = cache_path.with_name(f".{cache_path.name}.{os.getpid()}.tmp")
                 frame.to_parquet(temp_path, index=False, compression="zstd")
@@ -281,7 +284,24 @@ class UniverseScanner:
                 return frame, "insufficient_history"
             return frame, None
         except Exception as exc:
-            return None, f"{type(exc).__name__}:{exc}"
+            return fallback(type(exc).__name__)
+
+    def _clean_daily_frame(self, frame: pd.DataFrame) -> pd.DataFrame:
+        frame = frame.copy()
+        frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+        dates = frame["timestamp"].dt.tz_convert(self.market_time.tz).dt.date
+        frame = frame[dates < self.market_time.now().date()]
+        frame = frame.drop_duplicates("timestamp", keep="last").sort_values("timestamp")
+        numeric = ["open", "high", "low", "close", "volume"]
+        frame[numeric] = frame[numeric].apply(pd.to_numeric, errors="coerce")
+        valid = (
+            np.isfinite(frame[numeric]).all(axis=1)
+            & (frame[["open", "high", "low", "close"]] > 0).all(axis=1)
+            & (frame["volume"] >= 0)
+            & (frame["high"] >= frame[["open", "close", "low"]].max(axis=1))
+            & (frame["low"] <= frame[["open", "close", "high"]].min(axis=1))
+        )
+        return frame[valid].copy()
 
     def _venue_metrics(self, frame: pd.DataFrame) -> Dict[str, Any]:
         tail20 = frame.tail(20).copy()
@@ -332,10 +352,17 @@ class UniverseScanner:
             comparison = {**venue, "isin": isin, "error": error}
             if frame is not None and not frame.empty:
                 metrics = self._venue_metrics(frame)
+                if frame.attrs.get("profile_status") == "stale":
+                    metrics.update(status="stale", profile_age_days=frame.attrs["profile_age_days"], refresh_error=frame.attrs["refresh_error"])
                 comparison.update(metrics)
                 valid.append((row, venue, frame, metrics))
             comparisons.append(comparison)
         previous_segment = previous_segments.get(isin)
+        previous_comparison = next((item for item in comparisons if item["exchange_segment"] == previous_segment), None)
+        comparison_incomplete = any(item.get("error") for item in comparisons)
+        # A failed comparison is not evidence that another venue is more liquid.
+        if previous_comparison is not None and comparison_incomplete:
+            valid = [item for item in valid if item[1]["exchange_segment"] == previous_segment]
         if valid:
             valid.sort(
                 key=lambda item: (
@@ -350,7 +377,7 @@ class UniverseScanner:
                 (item for item in valid if item[1]["exchange_segment"] == previous_segment),
                 None,
             )
-            reason = "higher_median_traded_value"
+            reason = "previous_venue_incomplete_comparison" if comparison_incomplete and previous_comparison else "higher_median_traded_value"
             if previous and previous is not selected:
                 challenger_value = float(selected[3]["median_daily_value_20_cr"])
                 previous_value = float(previous[3]["median_daily_value_20_cr"])
@@ -360,7 +387,7 @@ class UniverseScanner:
             row, venue, _frame, metrics = selected
             metrics = {
                 **metrics,
-                "status": (
+                "status": metrics.get("status") or (
                     "ready"
                     if int(metrics.get("valid_sessions") or 0) >= self.config.stage1_min_valid_sessions
                     else "partial"
@@ -848,8 +875,14 @@ class UniverseScanner:
             "historical_profiles_ready": sum(
                 (row.get("historical") or {}).get("status") == "ready" for row in stock_rows
             ),
+            "historical_profiles_stale": sum(
+                (row.get("historical") or {}).get("status") == "stale" for row in stock_rows
+            ),
             "historical_profiles_unavailable": sum(
-                (row.get("historical") or {}).get("status") != "ready" for row in stock_rows
+                (row.get("historical") or {}).get("status") == "unavailable" for row in stock_rows
+            ),
+            "historical_profiles_partial": sum(
+                (row.get("historical") or {}).get("status") == "partial" for row in stock_rows
             ),
             "opportunity_filters_applied": self.config.stage1_apply_opportunity_filters,
             "corporate_actions": {
