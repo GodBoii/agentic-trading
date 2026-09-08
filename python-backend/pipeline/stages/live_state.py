@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import deque
 from bisect import bisect_left, bisect_right
 from copy import deepcopy
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, time as dt_time
 from functools import lru_cache
 from itertools import islice
@@ -34,6 +34,10 @@ class OHLCV:
     close: float
     volume: float
     vwap: Optional[float]
+
+    def to_record(self) -> Dict[str, Any]:
+        return {"minute_start": self.minute_start, "open": self.open, "high": self.high,
+                "low": self.low, "close": self.close, "volume": self.volume, "vwap": self.vwap}
 
 
 @dataclass
@@ -478,7 +482,7 @@ class LiveStockState:
             "price_samples": _tail(self.price_samples, 30 if compact else 300),
             "value_samples": _tail(self.value_samples, 30 if compact else 300),
             "depth_samples": _tail(self.depth_samples, 10 if compact else 60),
-            "minute_bars": [asdict(bar) for bar in _tail(self.minute_bars, 20 if compact else 60)],
+            "minute_bars": [bar.to_record() for bar in _tail(self.minute_bars, 20 if compact else 60)],
             "setup_state": deepcopy(self.setup_state),
         }
 
