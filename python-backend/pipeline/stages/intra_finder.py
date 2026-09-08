@@ -14,6 +14,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
+from math import isfinite
 from queue import Empty, SimpleQueue
 from threading import RLock, Thread, current_thread
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -70,6 +71,9 @@ class IntraFinder:
         self.states: Dict[InstrumentKey, LiveStockState] = {}
         self.security_index: Dict[int, List[InstrumentKey]] = defaultdict(list)
         self.event_state: Dict[str, Any] = {}
+        self.session_market_date: Optional[str] = None
+        self.run_id = uuid.uuid4().hex
+        self.persisted_event_counts: Counter[str] = Counter()
         self.ranker = ActivityRanker(
             hot_size=self.config.intra_finder_hot_set_size,
             reserve_size=self.config.intra_finder_hot_reserve_size,
@@ -104,6 +108,9 @@ class IntraFinder:
         self.opening_recovery_requested: set[InstrumentKey] = set()
         self.opening_range_recovery_completed = 0
         self.opening_range_recovery_failed = 0
+        self.opening_recovery_attempts: Counter[InstrumentKey] = Counter()
+        self.opening_recovery_retry_at: Dict[InstrumentKey, float] = {}
+        self.opening_recovery_errors: Counter[str] = Counter()
         self.state_lock = RLock()
         self.dispatch_lock = RLock()
         self.agent_threads: set[Thread] = set()
@@ -190,6 +197,9 @@ class IntraFinder:
             raise RuntimeError("Universe Scanner produced duplicate venue identities.")
         if len(new_stocks) > 5_000:
             raise RuntimeError("The equity universe exceeds one Dhan feed connection.")
+        market_date = self.market_time.market_date_str()
+        if getattr(self, "session_market_date", None) != market_date:
+            self._begin_session(market_date)
         same_universe = self.universe_version == str(summary.get("universe_version") or "") and set(self.stocks) == set(new_stocks)
         self.universe_payload = payload
         self.universe_version = str(summary.get("universe_version") or source_date)
@@ -199,6 +209,11 @@ class IntraFinder:
         for key in new_stocks:
             self.security_index[key[1]].append(key)
         if not same_universe or not self.states:
+            if not same_universe:
+                for name in ("opening_recovery_requested", "opening_recovery_attempts", "opening_recovery_retry_at"):
+                    collection = getattr(self, name, None)
+                    if collection is not None:
+                        collection.clear()
             old_states = self.states
             self.states = {
                 key: old_states.get(key) or LiveStockState.from_stock(stock)
@@ -214,20 +229,95 @@ class IntraFinder:
                     state.refresh_derived(now)
         return stocks
 
+    def _begin_session(self, market_date: str) -> None:
+        previous = getattr(self, "session_market_date", None)
+        if previous and self.states:
+            self._finalize_and_release_session(previous)
+            if self.states:
+                raise RuntimeError("Previous session persistence is incomplete")
+        self.session_market_date = market_date
+        self.last_rank_at = 0.0
+        self.last_ranking = RankingResult([], [], 0)
+        for name in (
+            "packet_count", "reconnect_count", "universe_wait_count", "candidates_seen",
+            "events_formed", "events_triggered", "events_suppressed", "agent_dispatch_successes",
+            "agent_dispatch_failures", "opening_range_recovery_completed", "opening_range_recovery_failed",
+        ):
+            setattr(self, name, 0)
+        for name in ("opening_recovery_attempts", "opening_recovery_retry_at", "opening_recovery_errors", "opening_recovery_requested", "gate_failure_counts"):
+            collection = getattr(self, name, None)
+            if collection is not None:
+                collection.clear()
+
     def _load_event_state(self, market_date: str) -> None:
-        loaded = StorageService.load_snapshot(self.config.stage2_event_state_path(market_date)) or {}
+        if self.io_futures and not self._wait_for_pending_io():
+            raise RuntimeError("Cannot reload event totals while persistence is incomplete")
+        try:
+            loaded = StorageService.load_snapshot(self.config.stage2_event_state_path(market_date)) or {}
+        except json.JSONDecodeError:
+            self._log(f"Rebuilding invalid event snapshot from archive for {market_date}.")
+            loaded = {}
         if (
             int(loaded.get("schema_version") or 0) == self.EVENT_STATE_SCHEMA_VERSION
             and loaded.get("universe_version") == self.universe_version
         ):
             self.event_state = loaded
-            return
-        self.event_state = {
-            "schema_version": self.EVENT_STATE_SCHEMA_VERSION,
-            "universe_version": self.universe_version,
-            "events": {},
-        }
+        else:
+            self.event_state = {
+                "schema_version": self.EVENT_STATE_SCHEMA_VERSION,
+                "universe_version": self.universe_version,
+                "events": {},
+            }
+        daily_ids = set()
+        path = self.config.stage2_events_path(market_date)
+        if path.exists():
+            with path.open(encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        self._log(f"Ignoring malformed event archive row for {market_date}.")
+                        continue
+                    if not isinstance(event, dict):
+                        self._log(f"Ignoring non-object event archive row for {market_date}.")
+                        continue
+                    if event.get("market_date") != market_date or not event.get("event_id"):
+                        continue
+                    daily_ids.add(event["event_id"])
+                    self.event_state["events"].setdefault(event["event_id"], {
+                        key: event.get(key) for key in ("created_at", "expires_at", "setup_type", "direction")
+                    })
+        self.events_formed = len(daily_ids)
+        self.persisted_event_counts[market_date] = len(daily_ids)
+        if path.exists() and path.stat().st_size:
+            with path.open("rb") as handle:
+                handle.seek(-1, os.SEEK_END)
+                terminated = handle.read(1) == b"\n"
+            if not terminated:
+                # Keep a torn row for inspection without swallowing the next append.
+                with path.open("a", encoding="utf-8") as handle:
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
         StorageService.save_snapshot(self.config.stage2_event_state_path(market_date), self.event_state)
+        StorageService.append_json_line(self.config.stage2_results_dir / market_date / "run-manifests.jsonl", {
+            "run_id": self.run_id,
+            "loaded_at": self.market_time.now().isoformat(),
+            "universe_version": self.universe_version,
+            "detector_schema": self.EVENT_STATE_SCHEMA_VERSION,
+            "source_sha256": {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in (Path(__file__), Path(__file__).with_name("live_state.py"),
+                             Path(__file__).with_name("activity_ranker.py"),
+                             *(Path(__file__).parent / "setups").glob("*.py"))
+            },
+            "configuration": {key: value for key, value in vars(self.config).items() if key.startswith("intra_finder_")},
+            "shadow_mode": self.shadow_mode,
+            "record_all_raw": self.record_all_raw,
+            "record_hot_raw": self.record_hot_raw,
+        })
 
     def _runtime_state_payload(self, market_date: Optional[str] = None) -> Dict[str, Any]:
         started = time.perf_counter()
@@ -479,6 +569,8 @@ class IntraFinder:
                 emitted = self._create_event(stock, state, signal, slippage, decision_at or received_at)
                 if emitted is not None:
                     break
+        else:
+            state.reset_pending_setups()
         self._flush_if_due()
         self._save_status_if_due()
         return emitted
@@ -492,7 +584,11 @@ class IntraFinder:
         if now.timestamp() - self.last_rank_at < interval:
             return
         started = time.perf_counter()
+        previous_candidates = self.last_ranking.ranked[:self.config.intra_finder_setup_rank_limit]
         self.last_ranking = self.ranker.rank(self.states, now)
+        for state in previous_candidates:
+            if state.activity_rank is None or state.activity_rank > self.config.intra_finder_setup_rank_limit:
+                state.reset_pending_setups()
         self.last_rank_at = now.timestamp()
         self.last_rank_duration_ms = (time.perf_counter() - started) * 1000.0
         self._observe_timing("rank", self.last_rank_duration_ms)
@@ -620,6 +716,7 @@ class IntraFinder:
                 "chart_seed_bars": bars,
                 "detector_mode": self.detector_mode,
                 "detector_schema_version": self.EVENT_STATE_SCHEMA_VERSION,
+                "run_id": getattr(self, "run_id", None),
                 "universe_source_date": self.universe_source_date,
                 "latest_nifty_context": self._load_context(self.config.nifty_depth_latest_path),
                 "shadow_mode": self.shadow_mode,
@@ -650,6 +747,7 @@ class IntraFinder:
         market_date = str(event["market_date"])
         StorageService.save_snapshot(self.config.stage2_event_state_path(market_date), event_state)
         StorageService.append_json_line(self.config.stage2_events_path(market_date), event)
+        self.persisted_event_counts[market_date] += 1
 
     def _dispatch_event(self, event: Dict[str, Any]) -> bool:
         with self.dispatch_lock:
@@ -767,9 +865,12 @@ class IntraFinder:
                 & (frame["timestamp"].dt.time >= dt_time(9, 15))
                 & (frame["timestamp"].dt.time < dt_time(9, 30))
             ].copy()
-            if opening["timestamp"].dt.floor("min").nunique() < 12:
+            if opening["timestamp"].dt.floor("min").nunique() != 15:
                 return key, None, None, "opening_range_incomplete"
-            return key, float(opening["high"].max()), float(opening["low"].min()), None
+            values = opening[["high", "low"]].apply(pd.to_numeric, errors="coerce")
+            if not all(isfinite(value) for value in values.to_numpy().flat) or (values <= 0).any().any() or (values["high"] < values["low"]).any():
+                return key, None, None, "opening_range_invalid_prices"
+            return key, float(values["high"].max()), float(values["low"].min()), None
         except Exception as exc:
             return key, None, None, type(exc).__name__
 
@@ -780,34 +881,39 @@ class IntraFinder:
             self.opening_range_recovery_failed += 1
             return
         state = self.states.get(key)
+        self.opening_recovery_requested.discard(key)
         if state is None or error or high is None or low is None:
             self.opening_range_recovery_failed += 1
+            self.opening_recovery_errors[error or "state_unavailable"] += 1
+            self.opening_recovery_retry_at[key] = self.market_time.now().timestamp() + 300
             return
         if not state.opening_range_complete:
             state.opening_range_high = high
             state.opening_range_low = low
             state.opening_range_complete = True
             state.opening_range_source = "historical_recovery"
+            state.opening_range_minute_mask = (1 << 15) - 1
         self.opening_range_recovery_completed += 1
 
     def _apply_recovery_results(self) -> None:
         results = getattr(self, "recovery_results", None)
         if results is None:
             return
+        recovered = False
         while True:
             try:
                 generation, kind, future = results.get_nowait()
             except Empty:
-                return
+                break
             if kind == "opening_range":
                 if generation != (self.universe_version, self.market_time.market_date_str()):
                     try:
-                        key, _, _, _ = future.result()
-                        self.opening_recovery_requested.discard(key)
+                        future.result()
                     except Exception as exc:
                         self._log(f"Discarded recovery failed: {type(exc).__name__}.")
                     continue
                 self._apply_opening_range_recovery(future)
+                recovered = True
             else:
                 if generation != self.connection_generation:
                     continue
@@ -815,21 +921,30 @@ class IntraFinder:
                     self.quote_verified_keys.update(future.result())
                 except Exception as exc:
                     self._log(f"Coverage verification failed: {type(exc).__name__}.")
+        if recovered:
+            self._start_opening_range_recovery()
 
     def _start_opening_range_recovery(self) -> None:
-        if self.market_time.now().time() < dt_time(9, 30):
+        now = self.market_time.now()
+        if not dt_time(9, 30) <= now.time() < dt_time(15, 0):
             return
         self.recovery_futures = {future for future in self.recovery_futures if not future.done()}
-        capacity = max(0, 100 - len(self.recovery_futures))
+        capacity = max(0, 8 - len(self.recovery_futures))
         if capacity <= 0:
             return
         missing = [
             (key, stock)
             for key, stock in self.stocks.items()
             if not self.states[key].opening_range_complete and key not in self.opening_recovery_requested
-        ][:capacity]
+            and key in self.full_packet_keys
+            and self.opening_recovery_attempts[key] < 3
+            and self.opening_recovery_retry_at.get(key, 0) <= now.timestamp()
+        ]
+        missing.sort(key=lambda item: (not self.states[item[0]].is_hot, self.states[item[0]].last_packet_at is None))
+        missing = missing[:capacity]
         for key, stock in missing:
             self.opening_recovery_requested.add(key)
+            self.opening_recovery_attempts[key] += 1
             future = self.recovery_executor.submit(self._fetch_opening_range, stock)
             self.recovery_futures.add(future)
             generation = (self.universe_version, self.market_time.market_date_str())
@@ -1010,7 +1125,9 @@ class IntraFinder:
                 and (global_age is None or global_age <= self.config.intra_finder_global_idle_seconds)
                 else "degraded"
             ),
-            "market_date": self.market_time.market_date_str(),
+            "market_date": self.session_market_date or self.market_time.market_date_str(),
+            "run_id": self.run_id,
+            "counter_scope": "process_session_except_daily_events",
             "universe_version": self.universe_version,
             "universe_source_date": self.universe_source_date,
             "expected_instruments": len(self.stocks),
@@ -1032,7 +1149,9 @@ class IntraFinder:
             "universe_wait_count": self.universe_wait_count,
             "opening_range_complete": sum(state.opening_range_complete for state in self.states.values()),
             "opening_range_recovery": {
-                "requested": len(self.opening_recovery_requested),
+                "requested": sum(self.opening_recovery_attempts.values()),
+                "pending": len(self.opening_recovery_requested),
+                "errors": dict(self.opening_recovery_errors),
                 "completed": self.opening_range_recovery_completed,
                 "failed": self.opening_range_recovery_failed,
             },
@@ -1082,6 +1201,7 @@ class IntraFinder:
 
     def _persist_status(self, payload: Dict[str, Any]) -> None:
         market_date = str((payload.get("summary") or {}).get("market_date") or self.market_time.market_date_str())
+        payload["summary"]["events_persisted"] = self.persisted_event_counts[market_date]
         StorageService.save_snapshot(self.config.stage2_daily_path(market_date), payload, compact=True)
         StorageService.save_snapshot(self.config.stage2_latest_path, payload, compact=True)
 
@@ -1271,7 +1391,12 @@ class IntraFinder:
         return count
 
     def _finalize_and_release_session(self, market_date: str) -> None:
+        market_date = getattr(self, "session_market_date", None) or market_date
         if self.released_session_date == market_date:
+            return
+        if not self.states:
+            # An after-close restart must not overwrite the completed day's report.
+            self.released_session_date = market_date
             return
         self._mark_session_ended(market_date)
         if not self._wait_for_pending_io():
@@ -1319,6 +1444,8 @@ class IntraFinder:
                 self.quote_verified_keys.clear()
                 self.coverage_milestones_logged.clear()
                 self.connection_generation += 1
+                for state in self.states.values():
+                    state.reset_pending_setups()
                 self.last_global_packet_at = None
                 self.connected_at = self.market_time.now()
                 self.connection_state = "CONNECTED"
@@ -1387,8 +1514,9 @@ class IntraFinder:
         try:
             self._drain_and_close_feed(self.current_feed)
             self.current_feed = None
-            self.flush(force_checkpoint=True)
-            self._save_status_if_due(force=True)
+            self.flush(force_checkpoint=bool(self.states), checkpoint_market_date=self.session_market_date)
+            if self.states:
+                self._save_status_if_due(force=True)
         finally:
             self.recovery_executor.shutdown(wait=False, cancel_futures=True)
             self.io_executor.shutdown(wait=True, cancel_futures=False)
