@@ -25,6 +25,7 @@ from pipeline.config import PipelineConfig
 from pipeline.models import SetupEvent
 from pipeline.services.dhan_service import DhanService
 from pipeline.services.feed_receiver import FeedReceiver
+from pipeline.services.latency_metrics import LatencyMetrics
 from pipeline.services.market_calendar_service import MarketCalendarService
 from pipeline.services.market_time_service import MarketTimeService
 from pipeline.services.process_memory_service import release_unused_process_memory
@@ -80,6 +81,7 @@ class IntraFinder:
         self.setup_engine = SetupEngine()
         self.last_rank_at = 0.0
         self.last_rank_duration_ms = 0.0
+        self.latency_metrics = LatencyMetrics()
         self.last_ranking = RankingResult([], [], 0)
         self.raw_buffer: List[Dict[str, Any]] = []
         self.derived_buffer: List[Dict[str, Any]] = []
@@ -228,11 +230,13 @@ class IntraFinder:
         StorageService.save_snapshot(self.config.stage2_event_state_path(market_date), self.event_state)
 
     def _runtime_state_payload(self, market_date: Optional[str] = None) -> Dict[str, Any]:
+        started = time.perf_counter()
         state_rows: Dict[str, Any] = {}
         with self.state_lock:
             for key, state in self.states.items():
                 payload = state.checkpoint(compact=not state.is_hot)
                 state_rows[self._key_text(key)] = payload
+        self._observe_timing("checkpoint_build", (time.perf_counter() - started) * 1000)
         return {
             "schema_version": self.RUNTIME_STATE_SCHEMA_VERSION,
             "market_date": market_date or self.market_time.market_date_str(),
@@ -491,6 +495,7 @@ class IntraFinder:
         self.last_ranking = self.ranker.rank(self.states, now)
         self.last_rank_at = now.timestamp()
         self.last_rank_duration_ms = (time.perf_counter() - started) * 1000.0
+        self._observe_timing("rank", self.last_rank_duration_ms)
 
     def _safety_gates(
         self,
@@ -897,7 +902,9 @@ class IntraFinder:
     def _submit_io(self, function: Any, *args: Any) -> None:
         self._check_io()
         if len(self.io_futures) >= self.io_pending_limit:
+            started = time.perf_counter()
             wait(self.io_futures, return_when=FIRST_COMPLETED)
+            self._observe_timing("io_wait", (time.perf_counter() - started) * 1000)
             self._check_io()
         self.io_futures.add(self.io_executor.submit(function, *args))
 
@@ -931,7 +938,7 @@ class IntraFinder:
             for hour, hour_rows in grouped.items():
                 self._write_parquet(base / directory_name / f"hour={hour}", prefix, hour_rows)
         if checkpoint is not None:
-            StorageService.save_snapshot(self.config.stage2_runtime_state_path(market_date), checkpoint)
+            StorageService.save_snapshot(self.config.stage2_runtime_state_path(market_date), checkpoint, compact=True)
 
     def flush(
         self,
@@ -968,6 +975,7 @@ class IntraFinder:
     def _save_status_if_due(self, *, force: bool = False) -> None:
         if not force and time.time() - self.last_status_save < self.config.intra_finder_status_seconds:
             return
+        started = time.perf_counter()
         now = self.market_time.now()
         stale_before = now - timedelta(seconds=self.config.intra_finder_data_stale_seconds)
         stock_rows: List[Dict[str, Any]] = []
@@ -1050,6 +1058,7 @@ class IntraFinder:
             **self._queue_metrics(),
         }
         payload = StorageService.build_payload("intra_finder", summary, "stocks", stock_rows)
+        self._observe_timing("status_build", (time.perf_counter() - started) * 1000)
         self._submit_io(self._persist_status, payload)
         self.last_status_save = time.time()
         self._log_progress(summary, force=force)
@@ -1073,8 +1082,8 @@ class IntraFinder:
 
     def _persist_status(self, payload: Dict[str, Any]) -> None:
         market_date = str((payload.get("summary") or {}).get("market_date") or self.market_time.market_date_str())
-        StorageService.save_snapshot(self.config.stage2_daily_path(market_date), payload)
-        StorageService.save_snapshot(self.config.stage2_latest_path, payload)
+        StorageService.save_snapshot(self.config.stage2_daily_path(market_date), payload, compact=True)
+        StorageService.save_snapshot(self.config.stage2_latest_path, payload, compact=True)
 
     def health_payload(self) -> Tuple[bool, Dict[str, Any]]:
         now = self.market_time.now()
@@ -1130,7 +1139,13 @@ class IntraFinder:
             "max_ingress_delay_ms": round(getattr(self, "max_ingress_delay_ms", 0), 3),
             "persistence_pending": len(getattr(self, "io_futures", ())),
             "persistence_error": getattr(self, "persistence_error", None),
+            "latency_histograms": self.latency_metrics.snapshot() if hasattr(self, "latency_metrics") else None,
         }
+
+    def _observe_timing(self, name: str, milliseconds: float) -> None:
+        metrics = getattr(self, "latency_metrics", None)
+        if metrics is not None:
+            metrics.observe(name, milliseconds)
 
     def enforce_retention(self) -> None:
         root = self.config.stage2_results_dir.resolve()
@@ -1335,6 +1350,7 @@ class IntraFinder:
                     item = self._get_feed_data(feed)
                     self.ingress_delay_ms = max(0, (time.monotonic() - item.received_monotonic) * 1000)
                     self.max_ingress_delay_ms = max(self.max_ingress_delay_ms, self.ingress_delay_ms)
+                    self._observe_timing("ingress", self.ingress_delay_ms)
                     self.process_packet(
                         item.packet, received_at=item.received_at,
                         allow_signals=self.ingress_delay_ms <= self.config.intra_finder_data_stale_seconds * 1000,
