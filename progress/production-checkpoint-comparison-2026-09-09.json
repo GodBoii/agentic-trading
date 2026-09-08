@@ -1,0 +1,12 @@
+{
+  "input_bytes": 40324083,
+  "saved_at": "2026-09-08T14:04:36.889868+05:30",
+  "states": 3510,
+  "timings": {
+    "before_status_median_ms": 26.01530001265928,
+    "before_checkpoint_median_ms": 71.58489999710582,
+    "after_status_median_ms": 26.42420001211576,
+    "after_checkpoint_median_ms": 75.24410000769421
+  },
+  "depth_median_parity": true
+}
