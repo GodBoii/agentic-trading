@@ -88,7 +88,11 @@ def replay_opportunities(
             else settings.intra_finder_rank_interval_seconds
         )
         if received_at.timestamp() - last_rank_at >= interval:
+            previous_candidates = [state for state in states.values() if state.activity_rank is not None and state.activity_rank <= settings.intra_finder_setup_rank_limit]
             ranker.rank(states, received_at)
+            for previous in previous_candidates:
+                if previous.activity_rank is None or previous.activity_rank > settings.intra_finder_setup_rank_limit:
+                    previous.reset_pending_setups()
             last_rank_at = received_at.timestamp()
             rank_count += 1
         if state.activity_rank is None or state.activity_rank > settings.intra_finder_setup_rank_limit:
