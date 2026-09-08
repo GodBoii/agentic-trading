@@ -1,0 +1,1926 @@
+{
+  "date": "2026-08-28",
+  "reference": "bfd46e0",
+  "sampling": "all recorded packets, no time bucketing",
+  "source_manifest": [
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892548145-3ff46a53.parquet",
+      "size": 6887,
+      "mtime_ns": 1787892548250545600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892578298-cce26649.parquet",
+      "size": 1601795,
+      "mtime_ns": 1787892578445276700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892608410-c5566650.parquet",
+      "size": 1466229,
+      "mtime_ns": 1787892608522362900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892638519-09c7a520.parquet",
+      "size": 1451582,
+      "mtime_ns": 1787892638641247900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892668620-6a854ef8.parquet",
+      "size": 1368616,
+      "mtime_ns": 1787892668738558300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892698854-8c8df388.parquet",
+      "size": 1331730,
+      "mtime_ns": 1787892698992515600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892728959-29088939.parquet",
+      "size": 1409723,
+      "mtime_ns": 1787892729118615400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892759077-df604a09.parquet",
+      "size": 1330889,
+      "mtime_ns": 1787892759203795300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892789195-a6ae5b9a.parquet",
+      "size": 1326050,
+      "mtime_ns": 1787892789288929400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892819295-4575b5d2.parquet",
+      "size": 1315294,
+      "mtime_ns": 1787892819379595500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892849405-45724198.parquet",
+      "size": 1372428,
+      "mtime_ns": 1787892849499184300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892879507-096c72c8.parquet",
+      "size": 1325190,
+      "mtime_ns": 1787892879599455300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892909613-e987907e.parquet",
+      "size": 1338214,
+      "mtime_ns": 1787892909702641100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892939735-6382602e.parquet",
+      "size": 1407786,
+      "mtime_ns": 1787892939845537900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892969847-9db98e01.parquet",
+      "size": 1362506,
+      "mtime_ns": 1787892969954071500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787892999947-43ebf03d.parquet",
+      "size": 1375185,
+      "mtime_ns": 1787893000047620500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893030042-83d4dfd8.parquet",
+      "size": 1341354,
+      "mtime_ns": 1787893030143546200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893060147-4b7f6d04.parquet",
+      "size": 1307462,
+      "mtime_ns": 1787893060237326400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893090263-d213a94c.parquet",
+      "size": 1311627,
+      "mtime_ns": 1787893090353880500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893120435-8f584af8.parquet",
+      "size": 1317458,
+      "mtime_ns": 1787893120526879500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893150469-e48dc14f.parquet",
+      "size": 1307102,
+      "mtime_ns": 1787893150553592300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893180589-9bef573a.parquet",
+      "size": 1266570,
+      "mtime_ns": 1787893180678772300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893210739-683cc136.parquet",
+      "size": 1325508,
+      "mtime_ns": 1787893210854051100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893240814-c5eecb40.parquet",
+      "size": 1362960,
+      "mtime_ns": 1787893240906073400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893270922-3eb8ff83.parquet",
+      "size": 1359240,
+      "mtime_ns": 1787893271014548400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893301037-606a162d.parquet",
+      "size": 1330532,
+      "mtime_ns": 1787893301122874500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893331133-9d11b7e4.parquet",
+      "size": 1362523,
+      "mtime_ns": 1787893331228802100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893361236-2d6b736f.parquet",
+      "size": 1323600,
+      "mtime_ns": 1787893361336137200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893391328-06d444f6.parquet",
+      "size": 1338277,
+      "mtime_ns": 1787893391418392300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893421460-f45ce10f.parquet",
+      "size": 1321714,
+      "mtime_ns": 1787893421563173300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893451561-78af28cd.parquet",
+      "size": 1281136,
+      "mtime_ns": 1787893451661832400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893481652-19d9f129.parquet",
+      "size": 1228705,
+      "mtime_ns": 1787893481757016000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893511781-47d43107.parquet",
+      "size": 1296391,
+      "mtime_ns": 1787893511875028400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893541911-05fcec66.parquet",
+      "size": 1333415,
+      "mtime_ns": 1787893542010866200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893572109-bd8e3001.parquet",
+      "size": 1279763,
+      "mtime_ns": 1787893572205109400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893602130-0a65334c.parquet",
+      "size": 1286578,
+      "mtime_ns": 1787893602219104300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893632232-4d5147e4.parquet",
+      "size": 1328901,
+      "mtime_ns": 1787893632319997500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893662342-9c54bc76.parquet",
+      "size": 1276257,
+      "mtime_ns": 1787893662439084100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893692452-885f7490.parquet",
+      "size": 1324742,
+      "mtime_ns": 1787893692547063800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893722579-6356bdb9.parquet",
+      "size": 1348799,
+      "mtime_ns": 1787893722674684500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893752677-ff1a385f.parquet",
+      "size": 1337804,
+      "mtime_ns": 1787893752765899300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893782774-4f18da1b.parquet",
+      "size": 1338995,
+      "mtime_ns": 1787893782869913300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893812920-076e4f70.parquet",
+      "size": 1284525,
+      "mtime_ns": 1787893813003229500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893842978-82c4f5dd.parquet",
+      "size": 1316320,
+      "mtime_ns": 1787893843074010900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893873084-621c98a6.parquet",
+      "size": 1279201,
+      "mtime_ns": 1787893873166551600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893903201-f8077aa0.parquet",
+      "size": 1284135,
+      "mtime_ns": 1787893903301630200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893933321-4b4cf140.parquet",
+      "size": 1251541,
+      "mtime_ns": 1787893933413043400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893963420-fda83d73.parquet",
+      "size": 1337784,
+      "mtime_ns": 1787893963506540300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787893993533-e4beb08d.parquet",
+      "size": 1299984,
+      "mtime_ns": 1787893993624203200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894023636-d813cc35.parquet",
+      "size": 1360856,
+      "mtime_ns": 1787894023725303300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894053772-b1e99f8f.parquet",
+      "size": 1322075,
+      "mtime_ns": 1787894053865187900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894083874-c60d9dd2.parquet",
+      "size": 1331805,
+      "mtime_ns": 1787894083973123900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894113979-2bba86f5.parquet",
+      "size": 1356249,
+      "mtime_ns": 1787894114081579700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894144092-ca1bcdad.parquet",
+      "size": 1325906,
+      "mtime_ns": 1787894144193868200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894174196-0254ee2d.parquet",
+      "size": 1325931,
+      "mtime_ns": 1787894174293445300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894204301-551168d4.parquet",
+      "size": 1337061,
+      "mtime_ns": 1787894204395698000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894234416-8098ee78.parquet",
+      "size": 1319686,
+      "mtime_ns": 1787894234510878000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894264509-b183c3cd.parquet",
+      "size": 1313684,
+      "mtime_ns": 1787894264604238300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894294610-3727cf51.parquet",
+      "size": 1313300,
+      "mtime_ns": 1787894294699448200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894324709-977b7be0.parquet",
+      "size": 1278097,
+      "mtime_ns": 1787894324799498500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894354825-c1b61747.parquet",
+      "size": 1341016,
+      "mtime_ns": 1787894354921659300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894384938-6f26caf1.parquet",
+      "size": 1278363,
+      "mtime_ns": 1787894385035587100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894415058-7cba42f9.parquet",
+      "size": 1314820,
+      "mtime_ns": 1787894415157390200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894445147-b8f2d55d.parquet",
+      "size": 1356162,
+      "mtime_ns": 1787894445242560700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894475249-7443fb1f.parquet",
+      "size": 1344281,
+      "mtime_ns": 1787894475342337200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894505356-accd15df.parquet",
+      "size": 1307155,
+      "mtime_ns": 1787894505446156200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894535467-49e165c2.parquet",
+      "size": 1298003,
+      "mtime_ns": 1787894535555095000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894565568-55a7411a.parquet",
+      "size": 1286764,
+      "mtime_ns": 1787894565654902300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894595681-c6ff6608.parquet",
+      "size": 1263487,
+      "mtime_ns": 1787894595778744800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894625820-edfa1b67.parquet",
+      "size": 1272918,
+      "mtime_ns": 1787894625924511900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894655896-bd033218.parquet",
+      "size": 1274754,
+      "mtime_ns": 1787894655995398600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894686000-a2225468.parquet",
+      "size": 1256925,
+      "mtime_ns": 1787894686085172800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894716108-4c361530.parquet",
+      "size": 1335358,
+      "mtime_ns": 1787894716201300300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894746207-d6441e03.parquet",
+      "size": 1325965,
+      "mtime_ns": 1787894746302325800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894776305-e731fd39.parquet",
+      "size": 1333075,
+      "mtime_ns": 1787894776396394700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894806488-8f0ec607.parquet",
+      "size": 1340755,
+      "mtime_ns": 1787894806582363000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894836532-d918d900.parquet",
+      "size": 1330694,
+      "mtime_ns": 1787894836641391400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894866631-791c8fed.parquet",
+      "size": 1351526,
+      "mtime_ns": 1787894866728395600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894896748-1178f7f8.parquet",
+      "size": 1288984,
+      "mtime_ns": 1787894896859189700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894926849-9030b455.parquet",
+      "size": 1277772,
+      "mtime_ns": 1787894926958517600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894956944-3f5722b8.parquet",
+      "size": 1323286,
+      "mtime_ns": 1787894957032723200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787894987057-7c4235d5.parquet",
+      "size": 1301385,
+      "mtime_ns": 1787894987155214100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=10\\packets-1787895017164-65537d49.parquet",
+      "size": 541912,
+      "mtime_ns": 1787895017211941200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895017217-6a47e435.parquet",
+      "size": 762413,
+      "mtime_ns": 1787895017276171700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895047267-a1d79a03.parquet",
+      "size": 1280310,
+      "mtime_ns": 1787895047375117800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895077399-8c05cc6f.parquet",
+      "size": 1298896,
+      "mtime_ns": 1787895077513937700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895107498-97797241.parquet",
+      "size": 1255531,
+      "mtime_ns": 1787895107617036100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895137603-d12615c7.parquet",
+      "size": 1271422,
+      "mtime_ns": 1787895137707799100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895167706-1a1ac089.parquet",
+      "size": 1278646,
+      "mtime_ns": 1787895167805927700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895197808-5a19a30d.parquet",
+      "size": 1274569,
+      "mtime_ns": 1787895197908439800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895227909-e957de41.parquet",
+      "size": 1254689,
+      "mtime_ns": 1787895228006270400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895258037-cd0a4486.parquet",
+      "size": 1286005,
+      "mtime_ns": 1787895258146635400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895288131-035291a7.parquet",
+      "size": 1257108,
+      "mtime_ns": 1787895288229207800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895318327-0d8c2540.parquet",
+      "size": 1286608,
+      "mtime_ns": 1787895318427145700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895348354-b9fdd03d.parquet",
+      "size": 1332891,
+      "mtime_ns": 1787895348458522200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895378582-bd8de880.parquet",
+      "size": 1227282,
+      "mtime_ns": 1787895378728764500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895408621-658342a2.parquet",
+      "size": 1149061,
+      "mtime_ns": 1787895408705858500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895438780-58963e38.parquet",
+      "size": 1247102,
+      "mtime_ns": 1787895438898864000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895468871-2c382911.parquet",
+      "size": 1241868,
+      "mtime_ns": 1787895468964042600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895498958-0aca5fa7.parquet",
+      "size": 1238203,
+      "mtime_ns": 1787895499049296400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895529058-139cd510.parquet",
+      "size": 1288480,
+      "mtime_ns": 1787895529144993000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895559172-bd32a42a.parquet",
+      "size": 1254495,
+      "mtime_ns": 1787895559293986900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895589274-1220cbfa.parquet",
+      "size": 1337937,
+      "mtime_ns": 1787895589375617000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895619380-17ba7f50.parquet",
+      "size": 1224679,
+      "mtime_ns": 1787895619467501800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895649486-72cc6309.parquet",
+      "size": 1313337,
+      "mtime_ns": 1787895649583470400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895679603-fedb6f52.parquet",
+      "size": 1166289,
+      "mtime_ns": 1787895679760122100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895709707-a7010d64.parquet",
+      "size": 1199093,
+      "mtime_ns": 1787895709793675000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895739820-5aa0b6ac.parquet",
+      "size": 1213666,
+      "mtime_ns": 1787895739915126900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895769919-4a7ca470.parquet",
+      "size": 1265539,
+      "mtime_ns": 1787895770020393800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895800073-9413c92b.parquet",
+      "size": 1272385,
+      "mtime_ns": 1787895800183542800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895830160-912825ad.parquet",
+      "size": 1358019,
+      "mtime_ns": 1787895830259170900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895860256-d0dc8693.parquet",
+      "size": 1146670,
+      "mtime_ns": 1787895860338242800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895890365-3e8b927b.parquet",
+      "size": 1318221,
+      "mtime_ns": 1787895890455316800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895920477-1a94e39f.parquet",
+      "size": 1201812,
+      "mtime_ns": 1787895920642613500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895950570-1e1645c1.parquet",
+      "size": 1151118,
+      "mtime_ns": 1787895950759040400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787895980690-a17ba9f0.parquet",
+      "size": 1137524,
+      "mtime_ns": 1787895980780481200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896010835-9e9992f5.parquet",
+      "size": 1246023,
+      "mtime_ns": 1787896010944356600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896040920-2afbb205.parquet",
+      "size": 1217558,
+      "mtime_ns": 1787896041021767700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896071027-dbcd508a.parquet",
+      "size": 1317902,
+      "mtime_ns": 1787896071119230400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896101204-3bb525fe.parquet",
+      "size": 1285121,
+      "mtime_ns": 1787896101288982400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896131232-b675a56b.parquet",
+      "size": 1333883,
+      "mtime_ns": 1787896131321700300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896161332-7c8662da.parquet",
+      "size": 1271530,
+      "mtime_ns": 1787896161431514300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896191427-75cdf91f.parquet",
+      "size": 1328676,
+      "mtime_ns": 1787896191525999600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896221530-a161ed40.parquet",
+      "size": 1258012,
+      "mtime_ns": 1787896221631530300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896251640-cf611afa.parquet",
+      "size": 1301755,
+      "mtime_ns": 1787896251736112900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896281763-20cada6c.parquet",
+      "size": 1296602,
+      "mtime_ns": 1787896281872863400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896311902-ceb1d34a.parquet",
+      "size": 1339087,
+      "mtime_ns": 1787896312014497500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896341990-8824e3dd.parquet",
+      "size": 1259495,
+      "mtime_ns": 1787896342093889300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896372086-904c0d19.parquet",
+      "size": 1309144,
+      "mtime_ns": 1787896372176422600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896402193-d31830a7.parquet",
+      "size": 1228094,
+      "mtime_ns": 1787896402281240900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896432305-1198ca14.parquet",
+      "size": 1280563,
+      "mtime_ns": 1787896432394412700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896462395-7b2ed228.parquet",
+      "size": 1242412,
+      "mtime_ns": 1787896462484469800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896492522-ad928287.parquet",
+      "size": 1344357,
+      "mtime_ns": 1787896492631517100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896522640-03bf23d4.parquet",
+      "size": 1250222,
+      "mtime_ns": 1787896522733730900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896552737-10a81f54.parquet",
+      "size": 1356425,
+      "mtime_ns": 1787896552846522600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896582829-b9ed2e6f.parquet",
+      "size": 1182097,
+      "mtime_ns": 1787896582920780700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896612940-ad01ff7c.parquet",
+      "size": 1310485,
+      "mtime_ns": 1787896613041602000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896643069-3ec51ccd.parquet",
+      "size": 1260752,
+      "mtime_ns": 1787896643169173400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896673226-f296c185.parquet",
+      "size": 1348868,
+      "mtime_ns": 1787896673326156200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896703317-b78b391c.parquet",
+      "size": 1257751,
+      "mtime_ns": 1787896703400583900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896733435-a15f2e63.parquet",
+      "size": 1324548,
+      "mtime_ns": 1787896733536620000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896763550-79d75155.parquet",
+      "size": 1288395,
+      "mtime_ns": 1787896763648173000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896793662-9b29ec2e.parquet",
+      "size": 1343882,
+      "mtime_ns": 1787896793768156700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896823775-711bfe37.parquet",
+      "size": 1219755,
+      "mtime_ns": 1787896824095441500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896853962-09203730.parquet",
+      "size": 1154167,
+      "mtime_ns": 1787896854054259100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896884094-4a6044e1.parquet",
+      "size": 1143019,
+      "mtime_ns": 1787896884178595300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896914164-737f57c2.parquet",
+      "size": 1175188,
+      "mtime_ns": 1787896914249001100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896944277-f3e506c9.parquet",
+      "size": 1175597,
+      "mtime_ns": 1787896944364972600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787896974453-a17f3b08.parquet",
+      "size": 1301485,
+      "mtime_ns": 1787896974574526400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897004542-d4757cb5.parquet",
+      "size": 1253688,
+      "mtime_ns": 1787897004643696700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897034678-ed058333.parquet",
+      "size": 1374817,
+      "mtime_ns": 1787897034791946000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897064761-c255c6da.parquet",
+      "size": 1263994,
+      "mtime_ns": 1787897064854692100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897094863-0d971afc.parquet",
+      "size": 1348699,
+      "mtime_ns": 1787897094953086800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897124961-7c5c3a33.parquet",
+      "size": 1259318,
+      "mtime_ns": 1787897125049504600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897155065-7642693c.parquet",
+      "size": 1314890,
+      "mtime_ns": 1787897155153327500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897185219-3462f5d9.parquet",
+      "size": 1113417,
+      "mtime_ns": 1787897185316913400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897215309-15fe05be.parquet",
+      "size": 1228249,
+      "mtime_ns": 1787897215405862700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897245470-347183f2.parquet",
+      "size": 1264910,
+      "mtime_ns": 1787897245579021500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897275542-9931e56e.parquet",
+      "size": 1269171,
+      "mtime_ns": 1787897275632149500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897305663-8f15820d.parquet",
+      "size": 1255050,
+      "mtime_ns": 1787897305767366400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897335761-8e2773c3.parquet",
+      "size": 1336904,
+      "mtime_ns": 1787897335853282100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897365861-a57f3664.parquet",
+      "size": 1278188,
+      "mtime_ns": 1787897365946450800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897396047-33c4fd31.parquet",
+      "size": 1324459,
+      "mtime_ns": 1787897396150358900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897426086-dc434862.parquet",
+      "size": 1297115,
+      "mtime_ns": 1787897426185395600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897456191-bb6462f5.parquet",
+      "size": 1356395,
+      "mtime_ns": 1787897456290944900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897486304-6c1c0d34.parquet",
+      "size": 1333802,
+      "mtime_ns": 1787897486414842700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897516397-20706c0d.parquet",
+      "size": 1357026,
+      "mtime_ns": 1787897516500641200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897546500-04526617.parquet",
+      "size": 1336266,
+      "mtime_ns": 1787897546589580400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897576605-0d7075db.parquet",
+      "size": 1369439,
+      "mtime_ns": 1787897576697622500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897606705-4b6c816d.parquet",
+      "size": 1304442,
+      "mtime_ns": 1787897606799065800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897636810-eb8ce367.parquet",
+      "size": 1361118,
+      "mtime_ns": 1787897636903630600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897666916-c9aca709.parquet",
+      "size": 1308179,
+      "mtime_ns": 1787897667019276700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897697023-680ce167.parquet",
+      "size": 1357658,
+      "mtime_ns": 1787897697125277000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897727140-115c415f.parquet",
+      "size": 1343541,
+      "mtime_ns": 1787897727246327900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897757258-e8b529c3.parquet",
+      "size": 1346854,
+      "mtime_ns": 1787897757360345700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897787342-2ee07a51.parquet",
+      "size": 1212169,
+      "mtime_ns": 1787897787431112100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897817452-97d95814.parquet",
+      "size": 1341173,
+      "mtime_ns": 1787897817544546100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897847606-8d2d0a1d.parquet",
+      "size": 1023905,
+      "mtime_ns": 1787897847694367500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897877744-de8aab78.parquet",
+      "size": 1102796,
+      "mtime_ns": 1787897877859445200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897907913-b1581076.parquet",
+      "size": 1043170,
+      "mtime_ns": 1787897908009040700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897937980-8660adb4.parquet",
+      "size": 1111447,
+      "mtime_ns": 1787897938081807900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897968091-52c8919f.parquet",
+      "size": 1040129,
+      "mtime_ns": 1787897968184434700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787897998198-19d61384.parquet",
+      "size": 1081538,
+      "mtime_ns": 1787897998324910600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898028310-64279edd.parquet",
+      "size": 1019183,
+      "mtime_ns": 1787898028399754900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898058433-6105b747.parquet",
+      "size": 1116925,
+      "mtime_ns": 1787898058525752900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898088531-963722d8.parquet",
+      "size": 1066817,
+      "mtime_ns": 1787898088630884800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898118642-cafad02b.parquet",
+      "size": 1113240,
+      "mtime_ns": 1787898118734218100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898148762-10029169.parquet",
+      "size": 1057137,
+      "mtime_ns": 1787898148856088100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898178880-88341074.parquet",
+      "size": 1094357,
+      "mtime_ns": 1787898178977757200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898209001-ecfeb4ac.parquet",
+      "size": 1027896,
+      "mtime_ns": 1787898209093566800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898239099-d8772f21.parquet",
+      "size": 1102761,
+      "mtime_ns": 1787898239193833500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898269204-1fe5dc85.parquet",
+      "size": 1091863,
+      "mtime_ns": 1787898269299274400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898299317-46e1233d.parquet",
+      "size": 1090959,
+      "mtime_ns": 1787898299420053600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898329432-b39c36e8.parquet",
+      "size": 1084894,
+      "mtime_ns": 1787898329524306600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898359529-073daded.parquet",
+      "size": 1094190,
+      "mtime_ns": 1787898359624294700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898389651-106062c4.parquet",
+      "size": 1083224,
+      "mtime_ns": 1787898389741592200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898419769-8c564f96.parquet",
+      "size": 1103024,
+      "mtime_ns": 1787898419862909000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898449877-be5f7a9e.parquet",
+      "size": 1055140,
+      "mtime_ns": 1787898449963038600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898479990-e4541ffc.parquet",
+      "size": 1087873,
+      "mtime_ns": 1787898480091509600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898510104-0975c40d.parquet",
+      "size": 1109092,
+      "mtime_ns": 1787898510200132900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898540227-a77b4923.parquet",
+      "size": 1132287,
+      "mtime_ns": 1787898540322210700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898570317-7ad5d0f9.parquet",
+      "size": 1074480,
+      "mtime_ns": 1787898570403489000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=11\\packets-1787898600440-2a040813.parquet",
+      "size": 1078669,
+      "mtime_ns": 1787898600536356700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898600543-91ea6271.parquet",
+      "size": 17979,
+      "mtime_ns": 1787898600563942000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898630551-9435b937.parquet",
+      "size": 1091094,
+      "mtime_ns": 1787898630656863500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898660679-fecd3c39.parquet",
+      "size": 1135611,
+      "mtime_ns": 1787898660777877300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898690781-1efa92e2.parquet",
+      "size": 1084187,
+      "mtime_ns": 1787898690868551100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898720890-4ba36755.parquet",
+      "size": 1112538,
+      "mtime_ns": 1787898720982467400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898750997-084129db.parquet",
+      "size": 1157501,
+      "mtime_ns": 1787898751090102500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898781114-45bb5408.parquet",
+      "size": 1127130,
+      "mtime_ns": 1787898781206923700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898811212-e3b4f383.parquet",
+      "size": 1112833,
+      "mtime_ns": 1787898811309845200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898841341-00fe8c55.parquet",
+      "size": 1129802,
+      "mtime_ns": 1787898841435622100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898871471-841a2ecc.parquet",
+      "size": 1065810,
+      "mtime_ns": 1787898871561901000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898901587-26d34de0.parquet",
+      "size": 1085664,
+      "mtime_ns": 1787898901681941100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898931693-800aa294.parquet",
+      "size": 1041811,
+      "mtime_ns": 1787898931776149200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898961801-4024cb40.parquet",
+      "size": 1106281,
+      "mtime_ns": 1787898961896037800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787898991912-f4faa185.parquet",
+      "size": 1078850,
+      "mtime_ns": 1787898991998838800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899022087-b2cf40be.parquet",
+      "size": 1118322,
+      "mtime_ns": 1787899022179433100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899052123-df759262.parquet",
+      "size": 1089062,
+      "mtime_ns": 1787899052220679900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899082245-1822022f.parquet",
+      "size": 1085275,
+      "mtime_ns": 1787899082353932800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899112387-5bae5a26.parquet",
+      "size": 1089247,
+      "mtime_ns": 1787899112483290500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899142571-051606da.parquet",
+      "size": 1061279,
+      "mtime_ns": 1787899142678008900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899172646-8b545667.parquet",
+      "size": 1058423,
+      "mtime_ns": 1787899172738080100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899202760-6f3113a5.parquet",
+      "size": 1081811,
+      "mtime_ns": 1787899202851822600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899232870-9435c444.parquet",
+      "size": 1092719,
+      "mtime_ns": 1787899232957732100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899262980-f9479fa4.parquet",
+      "size": 1092590,
+      "mtime_ns": 1787899263074418400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899293090-a4dbe076.parquet",
+      "size": 1069787,
+      "mtime_ns": 1787899293178279200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899323214-085c313d.parquet",
+      "size": 1105538,
+      "mtime_ns": 1787899323302736200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899353331-d0bd5878.parquet",
+      "size": 1091791,
+      "mtime_ns": 1787899353426872100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899383441-080da4c4.parquet",
+      "size": 1065882,
+      "mtime_ns": 1787899383537985400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899413540-6d806b5e.parquet",
+      "size": 1071794,
+      "mtime_ns": 1787899413628175300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899443646-789915a1.parquet",
+      "size": 1073534,
+      "mtime_ns": 1787899443738217300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899473753-1231a1ea.parquet",
+      "size": 1075632,
+      "mtime_ns": 1787899473838927900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899503875-25a21f7e.parquet",
+      "size": 1059104,
+      "mtime_ns": 1787899503969472600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899533971-4615c70e.parquet",
+      "size": 1085656,
+      "mtime_ns": 1787899534060724400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899564095-d7dce0df.parquet",
+      "size": 1086285,
+      "mtime_ns": 1787899564184054200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899594212-8cdad3a2.parquet",
+      "size": 1059388,
+      "mtime_ns": 1787899594311431800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899624319-75befc83.parquet",
+      "size": 1092472,
+      "mtime_ns": 1787899624441136000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899654459-77282a50.parquet",
+      "size": 1078626,
+      "mtime_ns": 1787899654543908500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899684557-234f7551.parquet",
+      "size": 1046414,
+      "mtime_ns": 1787899684644851700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899714655-7530457d.parquet",
+      "size": 1085914,
+      "mtime_ns": 1787899714746983100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899744764-581e4591.parquet",
+      "size": 1044493,
+      "mtime_ns": 1787899744852874100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899774875-4f752de9.parquet",
+      "size": 1071921,
+      "mtime_ns": 1787899774969232600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899805013-b2400653.parquet",
+      "size": 1070419,
+      "mtime_ns": 1787899805105023500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899835129-0ac1cf4d.parquet",
+      "size": 1074943,
+      "mtime_ns": 1787899835222641500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899865298-14660829.parquet",
+      "size": 1030456,
+      "mtime_ns": 1787899865401751900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899895360-c5ed6f35.parquet",
+      "size": 1063291,
+      "mtime_ns": 1787899895463036600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899925462-99f77c1c.parquet",
+      "size": 1044014,
+      "mtime_ns": 1787899925552048400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899955576-40b8455a.parquet",
+      "size": 1093763,
+      "mtime_ns": 1787899955672050500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787899985679-e9b26dcc.parquet",
+      "size": 1063082,
+      "mtime_ns": 1787899985766307500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900015814-030c72f2.parquet",
+      "size": 1080300,
+      "mtime_ns": 1787900015907133000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900045926-69f0d59a.parquet",
+      "size": 1030544,
+      "mtime_ns": 1787900046023825100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900076029-9a55001f.parquet",
+      "size": 1061715,
+      "mtime_ns": 1787900076130737100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900106148-a8e5bc7b.parquet",
+      "size": 1043145,
+      "mtime_ns": 1787900106238130500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900136264-2d4845e3.parquet",
+      "size": 1078635,
+      "mtime_ns": 1787900136353908600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900166370-d432a285.parquet",
+      "size": 1042021,
+      "mtime_ns": 1787900166458757400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900196479-4c0a74f9.parquet",
+      "size": 1069202,
+      "mtime_ns": 1787900196571955500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900226598-491c6aad.parquet",
+      "size": 1029681,
+      "mtime_ns": 1787900226685824600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900256703-8f033c2f.parquet",
+      "size": 1073138,
+      "mtime_ns": 1787900256794104200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900286839-fb71c481.parquet",
+      "size": 1055221,
+      "mtime_ns": 1787900286950011500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900316956-eb596a6f.parquet",
+      "size": 1057980,
+      "mtime_ns": 1787900317073532500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900347097-dd5543eb.parquet",
+      "size": 1032885,
+      "mtime_ns": 1787900347204628900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900377201-d54d65e7.parquet",
+      "size": 1096156,
+      "mtime_ns": 1787900377295029700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900407315-be10e160.parquet",
+      "size": 1030836,
+      "mtime_ns": 1787900407401890400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900437490-648d11c7.parquet",
+      "size": 1099427,
+      "mtime_ns": 1787900437580472600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900467544-8bfe2ef9.parquet",
+      "size": 1026295,
+      "mtime_ns": 1787900467634844500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900497651-01cee457.parquet",
+      "size": 1034105,
+      "mtime_ns": 1787900497745667700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900527765-e1973193.parquet",
+      "size": 1028017,
+      "mtime_ns": 1787900527875756900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900557885-aaeee849.parquet",
+      "size": 1061464,
+      "mtime_ns": 1787900558027682600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900587998-b3043578.parquet",
+      "size": 1047187,
+      "mtime_ns": 1787900588098583900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900618094-3ca6b0fb.parquet",
+      "size": 1045585,
+      "mtime_ns": 1787900618199167400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900648196-944c0cf0.parquet",
+      "size": 1033870,
+      "mtime_ns": 1787900648283100300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900678301-d7f28006.parquet",
+      "size": 1076873,
+      "mtime_ns": 1787900678406537700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900708404-2574ef11.parquet",
+      "size": 1030131,
+      "mtime_ns": 1787900708497300100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900738513-9d2c1cd3.parquet",
+      "size": 1038128,
+      "mtime_ns": 1787900738619259100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900768646-49a9015d.parquet",
+      "size": 1011401,
+      "mtime_ns": 1787900768740600800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900798784-c6409089.parquet",
+      "size": 1070205,
+      "mtime_ns": 1787900798887891400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900828877-1f94f184.parquet",
+      "size": 1045250,
+      "mtime_ns": 1787900828972521100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900858974-6b8410cf.parquet",
+      "size": 1074141,
+      "mtime_ns": 1787900859071757900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900889093-3ed04e88.parquet",
+      "size": 1042543,
+      "mtime_ns": 1787900889183243100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900919204-1a4077cb.parquet",
+      "size": 1082626,
+      "mtime_ns": 1787900919315321400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900949306-7237dfaa.parquet",
+      "size": 1022044,
+      "mtime_ns": 1787900949394371000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787900979430-3ffbdee1.parquet",
+      "size": 1064431,
+      "mtime_ns": 1787900979524579700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901009633-2aebf391.parquet",
+      "size": 1036002,
+      "mtime_ns": 1787901009730480800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901039671-4aae33b0.parquet",
+      "size": 1054830,
+      "mtime_ns": 1787901039776337700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901069790-b91b044c.parquet",
+      "size": 1024313,
+      "mtime_ns": 1787901069889490600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901099892-a61a3701.parquet",
+      "size": 1062636,
+      "mtime_ns": 1787901099976749900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901129999-bd1b5a5f.parquet",
+      "size": 1067963,
+      "mtime_ns": 1787901130092664600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901160123-e97b632a.parquet",
+      "size": 1119305,
+      "mtime_ns": 1787901160226111300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901190212-1aeeb3ff.parquet",
+      "size": 1068902,
+      "mtime_ns": 1787901190305715500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901220324-73ac9aa8.parquet",
+      "size": 1118450,
+      "mtime_ns": 1787901220421823000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901250477-98216d4e.parquet",
+      "size": 1016857,
+      "mtime_ns": 1787901250577324400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901280583-dae9c842.parquet",
+      "size": 1089305,
+      "mtime_ns": 1787901280685078500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901310621-f0b235d0.parquet",
+      "size": 1115753,
+      "mtime_ns": 1787901310723242300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901340661-387edf39.parquet",
+      "size": 1063766,
+      "mtime_ns": 1787901340755985000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901370702-892f16da.parquet",
+      "size": 1026231,
+      "mtime_ns": 1787901370791803700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901400765-b366b80d.parquet",
+      "size": 1064354,
+      "mtime_ns": 1787901400861359200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901430807-23b3809d.parquet",
+      "size": 1018154,
+      "mtime_ns": 1787901430908843400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901460864-f51a07da.parquet",
+      "size": 1037263,
+      "mtime_ns": 1787901460965946700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901490908-daf3d981.parquet",
+      "size": 1020661,
+      "mtime_ns": 1787901490992648000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901520955-d71ab78d.parquet",
+      "size": 1034975,
+      "mtime_ns": 1787901521045727800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901550995-8626cae9.parquet",
+      "size": 1017126,
+      "mtime_ns": 1787901551084773500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901581043-d0bcb297.parquet",
+      "size": 1050614,
+      "mtime_ns": 1787901581143769600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901611083-c4868e61.parquet",
+      "size": 1016845,
+      "mtime_ns": 1787901611179514900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901641149-23b4642b.parquet",
+      "size": 1057007,
+      "mtime_ns": 1787901641243839800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901671174-252de73d.parquet",
+      "size": 1020512,
+      "mtime_ns": 1787901671270965600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901701210-76870d9c.parquet",
+      "size": 1014799,
+      "mtime_ns": 1787901701311789800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901731240-3429ec21.parquet",
+      "size": 1009747,
+      "mtime_ns": 1787901731331506800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901761308-5f31b152.parquet",
+      "size": 1050037,
+      "mtime_ns": 1787901761420707900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901791416-ab88a696.parquet",
+      "size": 1001547,
+      "mtime_ns": 1787901791511807800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901821559-b923080c.parquet",
+      "size": 1015995,
+      "mtime_ns": 1787901821653915000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901851650-612e4122.parquet",
+      "size": 1023021,
+      "mtime_ns": 1787901851740133600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901881832-650c96c1.parquet",
+      "size": 1059194,
+      "mtime_ns": 1787901881932276400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901911950-ed0d8fcd.parquet",
+      "size": 1010382,
+      "mtime_ns": 1787901912055829000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901942065-fcd8ac77.parquet",
+      "size": 1016103,
+      "mtime_ns": 1787901942164458500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787901972179-0cb4e55f.parquet",
+      "size": 1001413,
+      "mtime_ns": 1787901972274594900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902002290-fddeeb8d.parquet",
+      "size": 1041560,
+      "mtime_ns": 1787902002387547400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902032394-7de1103e.parquet",
+      "size": 1001521,
+      "mtime_ns": 1787902032483401500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902062511-dafcd39b.parquet",
+      "size": 1059390,
+      "mtime_ns": 1787902062608146100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902092620-95b6fed8.parquet",
+      "size": 986120,
+      "mtime_ns": 1787902092716672700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902122733-e8164d7a.parquet",
+      "size": 1040198,
+      "mtime_ns": 1787902122828721300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902152858-962661cd.parquet",
+      "size": 1014411,
+      "mtime_ns": 1787902152969277700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902182980-6eed4fa4.parquet",
+      "size": 1036583,
+      "mtime_ns": 1787902183078205400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=12\\packets-1787902213078-86429852.parquet",
+      "size": 578085,
+      "mtime_ns": 1787902213142839800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902213149-c8b3bfa0.parquet",
+      "size": 430195,
+      "mtime_ns": 1787902213195132500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902243207-f615e633.parquet",
+      "size": 1027383,
+      "mtime_ns": 1787902243300508600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902273301-05b19ed8.parquet",
+      "size": 984771,
+      "mtime_ns": 1787902273390956200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902303412-6049e1eb.parquet",
+      "size": 1032021,
+      "mtime_ns": 1787902303503106900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902333519-2c54e245.parquet",
+      "size": 993755,
+      "mtime_ns": 1787902333615700900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902363632-486fde6d.parquet",
+      "size": 1044988,
+      "mtime_ns": 1787902363731554400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902393781-58eb9b7d.parquet",
+      "size": 996912,
+      "mtime_ns": 1787902393914316700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902423903-33d80d24.parquet",
+      "size": 1029418,
+      "mtime_ns": 1787902424000589300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902453995-a8d8cb2a.parquet",
+      "size": 993200,
+      "mtime_ns": 1787902454079004700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902484128-a6338606.parquet",
+      "size": 1038132,
+      "mtime_ns": 1787902484224560000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902527127-a5540c0c.parquet",
+      "size": 324834,
+      "mtime_ns": 1787902531212953500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902583285-cdb163eb.parquet",
+      "size": 11004,
+      "mtime_ns": 1787902583680682800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902641516-9deadce1.parquet",
+      "size": 20560,
+      "mtime_ns": 1787902642407361700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902690986-4f2e263d.parquet",
+      "size": 21238,
+      "mtime_ns": 1787902691366446600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902738588-a28099dc.parquet",
+      "size": 21368,
+      "mtime_ns": 1787902739026350100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902786445-4967dd0d.parquet",
+      "size": 21660,
+      "mtime_ns": 1787902786701788900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902829488-008b30e2.parquet",
+      "size": 21524,
+      "mtime_ns": 1787902829826804200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902875788-411c3a65.parquet",
+      "size": 19934,
+      "mtime_ns": 1787902876863125600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902924008-b5fd2dfc.parquet",
+      "size": 21527,
+      "mtime_ns": 1787902924411009800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787902977579-43cbf85a.parquet",
+      "size": 21836,
+      "mtime_ns": 1787902977959634800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903023448-5625c5dd.parquet",
+      "size": 18825,
+      "mtime_ns": 1787903024096936100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903071941-9e5a9882.parquet",
+      "size": 20336,
+      "mtime_ns": 1787903072606074400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903125037-83b2c982.parquet",
+      "size": 20820,
+      "mtime_ns": 1787903125387691200
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903173846-f9424901.parquet",
+      "size": 22225,
+      "mtime_ns": 1787903174273606800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903230051-bd361968.parquet",
+      "size": 21992,
+      "mtime_ns": 1787903231147898600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903282298-e2aa2d01.parquet",
+      "size": 23114,
+      "mtime_ns": 1787903282883817900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903341767-246f86e9.parquet",
+      "size": 20682,
+      "mtime_ns": 1787903342596817800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903399439-995a16d5.parquet",
+      "size": 19782,
+      "mtime_ns": 1787903399967047700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903448430-ba539336.parquet",
+      "size": 21956,
+      "mtime_ns": 1787903449389858600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903493873-bdc3bb76.parquet",
+      "size": 20380,
+      "mtime_ns": 1787903494416609500
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903547915-5d4e2f5c.parquet",
+      "size": 20449,
+      "mtime_ns": 1787903548684806300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903593238-08f316ae.parquet",
+      "size": 21079,
+      "mtime_ns": 1787903594415350900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903638464-0b4c2d61.parquet",
+      "size": 18935,
+      "mtime_ns": 1787903639340641000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903690814-95db9c36.parquet",
+      "size": 20330,
+      "mtime_ns": 1787903691647566400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903737316-bb275dd8.parquet",
+      "size": 22661,
+      "mtime_ns": 1787903737869328000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903783828-9d9a3cdd.parquet",
+      "size": 22073,
+      "mtime_ns": 1787903784627645700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903826858-cecbbfe3.parquet",
+      "size": 18851,
+      "mtime_ns": 1787903827424249700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903869603-fb2c1620.parquet",
+      "size": 20107,
+      "mtime_ns": 1787903869956588700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903915827-4856bbce.parquet",
+      "size": 20835,
+      "mtime_ns": 1787903916636428800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787903961270-59326c76.parquet",
+      "size": 20396,
+      "mtime_ns": 1787903961823224800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904008407-220d0d13.parquet",
+      "size": 16364,
+      "mtime_ns": 1787904009017059300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904059712-da200ea2.parquet",
+      "size": 20894,
+      "mtime_ns": 1787904060510521700
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904107683-51a5028b.parquet",
+      "size": 18518,
+      "mtime_ns": 1787904108183037100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904156770-fe6a6bc9.parquet",
+      "size": 19643,
+      "mtime_ns": 1787904157410238100
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904215964-d101e1e3.parquet",
+      "size": 20926,
+      "mtime_ns": 1787904216508063600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904275298-7f1a771a.parquet",
+      "size": 23719,
+      "mtime_ns": 1787904275792889000
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904324150-d15a1935.parquet",
+      "size": 20018,
+      "mtime_ns": 1787904324795195600
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904377025-0bca1f74.parquet",
+      "size": 21818,
+      "mtime_ns": 1787904377897119800
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904432867-112da53d.parquet",
+      "size": 21926,
+      "mtime_ns": 1787904433909004900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904482544-350fd310.parquet",
+      "size": 23592,
+      "mtime_ns": 1787904483018891300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904534447-ab716e18.parquet",
+      "size": 18827,
+      "mtime_ns": 1787904534829156400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904581880-510e1f66.parquet",
+      "size": 22349,
+      "mtime_ns": 1787904582305344400
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904629540-bebcdaa0.parquet",
+      "size": 20611,
+      "mtime_ns": 1787904630384562900
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787904676176-14bdd9a7.parquet",
+      "size": 21621,
+      "mtime_ns": 1787904676571162300
+    },
+    {
+      "path": "python-backend\\results\\stage2\\2026-08-28\\raw-depth\\hour=13\\packets-1787919677046-4e2a50db.parquet",
+      "size": 20933,
+      "mtime_ns": 1787919677073075200
+    }
+  ],
+  "results": {
+    "before": {
+      "packets": 3781457,
+      "events": 86,
+      "elapsed_seconds": 353.4514,
+      "families": {
+        "VWAP_REVERSION": 74,
+        "VOLATILITY_IGNITION": 12
+      },
+      "holds_over30": 1,
+      "max_hold_seconds": 31.930118
+    },
+    "after": {
+      "packets": 3781457,
+      "events": 83,
+      "elapsed_seconds": 357.37,
+      "families": {
+        "VWAP_REVERSION": 72,
+        "VOLATILITY_IGNITION": 11
+      },
+      "holds_over30": 0,
+      "max_hold_seconds": 6.541263
+    }
+  }
+}
