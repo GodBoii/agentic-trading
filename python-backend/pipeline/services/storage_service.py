@@ -23,9 +23,12 @@ class StorageService:
         return timezone(timedelta(hours=5, minutes=30), name="IST")
 
     @staticmethod
-    def save_snapshot(path: Path, payload: Dict[str, Any]) -> None:
+    def save_snapshot(path: Path, payload: Dict[str, Any], *, compact: bool = False) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        serialized = json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+        serialized = json.dumps(
+            payload, indent=None if compact else 2,
+            separators=(",", ":") if compact else None, ensure_ascii=False, default=str,
+        )
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{path.name}.",
             suffix=".tmp",
