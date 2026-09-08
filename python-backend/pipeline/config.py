@@ -67,6 +67,7 @@ class PipelineConfig:
     stage1_apply_opportunity_filters: bool = False
     stage1_universe_fallback_max_age_days: int = 4
     stage1_intraday_baseline_cache_days: int = 7
+    stage1_daily_profile_fallback_days: int = 7
 
     stage2_history_days: int = 15
     stage2_min_rvol: float = 1.3
