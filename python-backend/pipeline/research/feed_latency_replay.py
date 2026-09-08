@@ -17,7 +17,7 @@ import pyarrow.parquet as pq
 from pipeline.config import PipelineConfig
 from pipeline.services.feed_receiver import FeedReceiver
 from pipeline.stages.intra_finder import IntraFinder
-from pipeline.stages.live_state import LiveStockState
+from pipeline.stages.live_state import LiveStockState, OHLCV
 
 
 def main() -> None:
@@ -25,6 +25,7 @@ def main() -> None:
     parser.add_argument("--stocks", type=int, default=3500)
     parser.add_argument("--rounds", type=int, default=15)
     parser.add_argument("--samples", type=int, default=900)
+    parser.add_argument("--bars-per-stock", type=int, default=0, choices=range(421), metavar="0..420")
     parser.add_argument("--rank-interval", type=int, default=1)
     parser.add_argument("--flush-seconds", type=int, default=5)
     parser.add_argument("--paced", action="store_true", help="Spread each round across one second")
@@ -71,6 +72,11 @@ def main() -> None:
                                        for i in range(args.samples))
             state.value_samples.extend((base.timestamp() - args.samples + i, 10000000 - (args.samples - i) * 1000)
                                        for i in range(args.samples))
+            state.minute_bars.extend(
+                OHLCV((base - timedelta(minutes=args.bars_per_stock - i)).isoformat(),
+                      100.0, 100.1, 99.9, 100.0, 1000.0, 100.0)
+                for i in range(args.bars_per_stock)
+            )
             finder.stocks[state.key] = stock
             finder.states[state.key] = state
         emitted = 0
@@ -124,6 +130,7 @@ def main() -> None:
         except ImportError:
             peak_rss_mib = None
         print(json.dumps({"stocks": args.stocks, "samples": args.samples, "packets": len(delays),
+                          "bars_per_stock": args.bars_per_stock,
                           "peak_rss_mib_linux": peak_rss_mib,
                           "paced": args.paced, "rank_interval": args.rank_interval,
                           "flush_seconds": args.flush_seconds,
