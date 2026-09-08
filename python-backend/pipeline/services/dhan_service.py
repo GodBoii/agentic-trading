@@ -1279,6 +1279,12 @@ class DhanService:
                 if self._is_rate_limited(resp) and attempt < retries - 1:
                     time.sleep(self._compute_rate_limit_delay(attempt))
                     continue
+                # Valid history requests can transiently return DH-905 Input_Exception.
+                # Retry once within the existing attempt budget; placement is unaffected.
+                code, error_type, _ = self._response_error_details(resp)
+                if attempt == 0 and retries > 1 and code in {"dh-905", "905"} and error_type.lower() == "input_exception":
+                    time.sleep(0.25)
+                    continue
                 break
 
         return last_response
@@ -1354,6 +1360,12 @@ class DhanService:
 
                 if self._is_rate_limited(resp) and attempt < retries - 1:
                     time.sleep(self._compute_rate_limit_delay(attempt))
+                    continue
+                # Valid history requests can transiently return DH-905 Input_Exception.
+                # Retry once within the existing attempt budget; placement is unaffected.
+                code, error_type, _ = self._response_error_details(resp)
+                if attempt == 0 and retries > 1 and code in {"dh-905", "905"} and error_type.lower() == "input_exception":
+                    time.sleep(0.25)
                     continue
                 break
 
