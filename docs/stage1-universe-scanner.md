@@ -33,6 +33,19 @@ liquidity. Dhan intraday candles provide median same-time cumulative volume and
 range baselines. Intraday profiles are cached for seven days so the daily scan
 does not refetch thousands of unchanged histories.
 
+Daily caches record the market date of the successful fetch instead of using
+file modification time as proof of freshness. If a refresh fails or returns an
+unusable/short result, a validated profile with at least 21 sessions can remain
+available for up to seven calendar days from its last candle. It is labelled
+`stale`, with its age and refresh failure recorded. Stale fallback does not
+overwrite the cache. Ready, stale, partial and unavailable profiles have
+separate summary counts.
+
+An incomplete venue comparison keeps the previous venue while it remains in
+the eligible master. A successful comparison can still select a more liquid
+venue using the existing hysteresis. Missing history never removes a tradable
+stock from the broad universe.
+
 The first broad build can take longer because the profile cache is empty.
 Intra-Finder accepts a completed last-known-good universe up to four calendar
 days old, so a slow profile refresh cannot prevent market-open collection.
