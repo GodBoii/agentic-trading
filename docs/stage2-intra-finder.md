@@ -40,8 +40,31 @@ It then calculates real cross-sectional percentile ranks for:
 and movement are therefore required. Traded value and spread break ties.
 
 The first 60 stocks form the hot working set. Ranks 61 to 100 provide short
-hysteresis so boundary movement does not repeatedly create and destroy setup
-state. Setup detection and agent admission run only for the top 10 ranks.
+hysteresis so small rank changes retain detailed observation and raw recording.
+Setup detection and agent admission run only for the top 10 ranks.
+
+An armed setup resets when it leaves the evaluated ranks, processing is too
+stale to evaluate, or the process reconnects/restores state. Successive qualifying
+observations must be at most five seconds apart. Pre-open packets do not count
+toward the opening-drive observation period.
+
+A live opening range requires observations in all 15 opening minutes, with no
+gap above 60 seconds including the window boundaries. Historical recovery
+requires all 15 one-minute candles and valid high/low prices. Older checkpoints
+without coverage evidence retain prices but mark the range unverified.
+Recovery prioritizes hot observed stocks, keeps at most eight requests pending,
+refills after completion, and retries up to three times per instrument with
+five minutes between failures. Recovery stops at 15:00. The normal gateway
+rate limits still apply.
+
+Daily event totals restore from distinct, same-date JSONL event IDs. Status
+also reports acknowledged `events_persisted`; other operational counters are
+scoped to the process and market session. Run manifests record source hashes,
+effective selection configuration and run identity. An empty after-close
+restart does not replace the completed day's status.
+
+See [September 9 implementation and comparisons](../progress/intra-finder-implementation-2026-09-09.md)
+for the evidence behind the retained top-10 policy and remaining latency work.
 
 ## Setup families
 
