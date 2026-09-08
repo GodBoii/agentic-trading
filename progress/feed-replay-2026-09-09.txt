@@ -1,0 +1,36 @@
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] LIVE | connection=CONNECTED packets=1 coverage=1/3,500 eligible=3,500 hot=60 rank_ms=226.15 candidates=0 events=0 agents=0 shadow=True gates=none
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] Feed coverage reached 25%: 875/3,500.
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] Feed coverage reached 50%: 1,750/3,500.
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] Feed coverage reached 75%: 2,625/3,500.
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] Feed coverage reached 90%: 3,150/3,500.
+[2026-09-07 10:00:01 UTC+05:30] [Intra-Finder] Feed coverage reached 100%: 3,500/3,500.
+[2026-09-07 10:00:30 UTC+05:30] [Intra-Finder] LIVE | connection=CONNECTED packets=105,000 coverage=3,500/3,500 eligible=3,500 hot=60 rank_ms=180.11 candidates=0 events=0 agents=0 shadow=True gates=none
+{
+  "stocks": 3500,
+  "samples": 900,
+  "packets": 105000,
+  "peak_rss_mib_linux": null,
+  "paced": true,
+  "rank_interval": 5,
+  "flush_seconds": 5,
+  "preconnection_preparation_ms": 527.0957000029739,
+  "recorded_packets": 105000,
+  "elapsed_seconds": 31.099175399984233,
+  "ingress_ms": {
+    "p50": 3.879699987010099,
+    "p95": 136.7066849954426,
+    "p99": 261.0456069943028,
+    "max": 472.2073000157252
+  },
+  "ranking_ms": [
+    226.15259999292903,
+    152.593299979344,
+    170.70909999893047,
+    169.01559999678284,
+    174.91669999435544,
+    180.1143999909982
+  ],
+  "queue_high_water": 1659,
+  "queue_full_waits": 0,
+  "persistence_error": null
+}
