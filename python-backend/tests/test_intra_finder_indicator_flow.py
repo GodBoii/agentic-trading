@@ -105,6 +105,7 @@ class SetupEngineTests(unittest.TestCase):
         self.assertEqual(list(item.minute_bars), [])
         self.assertEqual(item.minute_builder.minute_start, market_open)
         self.assertEqual(item.minute_builder.open, 101.0)
+        self.assertEqual(item.first_packet_at, market_open.isoformat())
 
     def test_opening_setup_can_trigger_without_completed_minute_bars(self) -> None:
         start = datetime.fromisoformat("2026-08-28T09:15:00+05:30")
@@ -124,6 +125,7 @@ class SetupEngineTests(unittest.TestCase):
         engine = SetupEngine()
 
         self.assertEqual(engine.evaluate(item, start + timedelta(seconds=30)), [])
+        self.assertEqual(engine.evaluate(item, start + timedelta(seconds=35)), [])
         signals = engine.evaluate(item, start + timedelta(seconds=39))
 
         self.assertEqual(len(item.minute_bars), 0)
@@ -295,6 +297,7 @@ class IntraFinderFlowTests(unittest.TestCase):
         finder.record_hot_raw = False
         finder.last_rank_at = 0.0
         finder.last_rank_duration_ms = 0.0
+        finder.last_ranking = RankingResult([], [], 0)
         finder.candidates_seen = 0
         finder.events_formed = 0
         finder.events_suppressed = 0
