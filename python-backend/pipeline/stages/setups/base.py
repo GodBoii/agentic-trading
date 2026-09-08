@@ -49,6 +49,14 @@ def arm_or_trigger(
         except ValueError:
             tracker.pop("cooldown_until", None)
     identity = f"{family}:{direction}"
+    try:
+        last_checked = datetime.fromisoformat(str(tracker.get("last_checked_at", "")))
+        gap = (now - last_checked).total_seconds()
+    except (TypeError, ValueError):
+        gap = float("inf")
+    # A held condition requires adjacent observations, not merely elapsed time.
+    if tracker.get("phase") == SetupPhase.ARMED.value and not 0 <= gap <= min(5, hold_seconds):
+        reset_tracker(tracker)
     if tracker.get("identity") != identity:
         tracker.clear()
         tracker.update(
@@ -56,12 +64,14 @@ def arm_or_trigger(
                 "phase": SetupPhase.ARMED.value,
                 "identity": identity,
                 "armed_at": now.isoformat(),
+                "last_checked_at": now.isoformat(),
                 "level": level,
                 "invalidation": invalidation,
                 "direction": direction,
             }
         )
         return None
+    tracker["last_checked_at"] = now.isoformat()
     try:
         armed_at = datetime.fromisoformat(str(tracker["armed_at"]))
     except (KeyError, ValueError):
