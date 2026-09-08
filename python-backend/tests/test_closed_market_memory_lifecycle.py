@@ -42,6 +42,7 @@ class ClosedMarketMemoryLifecycleTests(TestCase):
     def test_intra_finder_clears_only_after_final_io_succeeds(self) -> None:
         finder = IntraFinder.__new__(IntraFinder)
         finder.released_session_date = None
+        finder.states = {("NSE_EQ", 1): object()}
         finder._mark_session_ended = Mock()
         finder._wait_for_pending_io = Mock(return_value=False)
         finder._release_session_memory = Mock()
