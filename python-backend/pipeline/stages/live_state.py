@@ -106,6 +106,9 @@ class LiveStockState:
     opening_range_low: Optional[float] = None
     opening_range_complete: bool = False
     opening_range_source: Optional[str] = None
+    opening_range_minute_mask: int = 0
+    opening_range_last_observation: Optional[float] = None
+    opening_range_max_gap_seconds: float = 0.0
     depth: List[Dict[str, float]] = field(default_factory=list)
     best_bid: Optional[float] = None
     best_ask: Optional[float] = None
@@ -190,6 +193,7 @@ class LiveStockState:
         stamp = received_at.isoformat()
         starting_live_session = received_at.time() >= dt_time(9, 15) and not self.session_live_started
         if starting_live_session:
+            self.first_packet_at = stamp
             self.price_samples.clear()
             self.value_samples.clear()
             self.depth_samples.clear()
@@ -277,11 +281,33 @@ class LiveStockState:
 
     def _update_opening_range(self, price: float, now: datetime) -> None:
         if dt_time(9, 15) <= now.time() < dt_time(9, 30):
+            timestamp = now.timestamp()
+            previous = self.opening_range_last_observation
+            if previous is None:
+                previous = now.replace(hour=9, minute=15, second=0, microsecond=0).timestamp()
+            self.opening_range_max_gap_seconds = max(self.opening_range_max_gap_seconds, timestamp - previous)
+            self.opening_range_last_observation = timestamp
+            self.opening_range_minute_mask |= 1 << (now.minute - 15)
             self.opening_range_high = price if self.opening_range_high is None else max(self.opening_range_high, price)
             self.opening_range_low = price if self.opening_range_low is None else min(self.opening_range_low, price)
             self.opening_range_source = "live_feed"
         elif now.time() >= dt_time(9, 30) and self.opening_range_high is not None:
-            self.opening_range_complete = True
+            if self.opening_range_source != "historical_recovery":
+                end = now.replace(hour=9, minute=30, second=0, microsecond=0).timestamp()
+                gap = end - (self.opening_range_last_observation or end - 900)
+                self.opening_range_complete = (
+                    self.opening_range_minute_mask == (1 << 15) - 1
+                    and max(gap, self.opening_range_max_gap_seconds) <= 60
+                )
+
+    def reset_pending_setups(self) -> None:
+        for tracker in self.setup_state.values():
+            if tracker.get("phase") == "ARMED":
+                cooldown = tracker.get("cooldown_until")
+                tracker.clear()
+                tracker["phase"] = "IDLE"
+                if cooldown:
+                    tracker["cooldown_until"] = cooldown
 
     def _update_bar(self, now: datetime, price: float, volume: float, vwap: Optional[float]) -> List[OHLCV]:
         minute = now.replace(second=0, microsecond=0)
@@ -414,7 +440,12 @@ class LiveStockState:
             return None
 
     def depth_median(self, seconds: int, now_ts: float) -> Optional[float]:
-        values = sorted(value for timestamp, value, _ in self.depth_samples if timestamp >= now_ts - seconds)
+        cutoff = now_ts - seconds
+        if self._samples_ordered:
+            start = bisect_left(self.depth_samples, cutoff, key=itemgetter(0))
+            values = sorted(value for _, value, _ in islice(self.depth_samples, start, None))
+        else:
+            values = sorted(value for timestamp, value, _ in self.depth_samples if timestamp >= cutoff)
         if not values:
             return None
         middle = len(values) // 2
@@ -431,6 +462,8 @@ class LiveStockState:
             "opening_range_high": self.opening_range_high,
             "opening_range_low": self.opening_range_low,
             "opening_range_complete": self.opening_range_complete,
+            "opening_range_observed_minutes": self.opening_range_minute_mask.bit_count(),
+            "opening_range_source": self.opening_range_source,
             "relative_volume": self.volume_pace,
             "volume_acceleration": self.volume_acceleration,
             "realized_volatility_percent": self.realized_volatility_percent,
@@ -478,6 +511,9 @@ class LiveStockState:
             "opening_range_low": self.opening_range_low,
             "opening_range_complete": self.opening_range_complete,
             "opening_range_source": self.opening_range_source,
+            "opening_range_minute_mask": self.opening_range_minute_mask,
+            "opening_range_last_observation": self.opening_range_last_observation,
+            "opening_range_max_gap_seconds": self.opening_range_max_gap_seconds,
             "session_live_started": self.session_live_started,
             "price_samples": _tail(self.price_samples, 30 if compact else 300),
             "value_samples": _tail(self.value_samples, 30 if compact else 300),
@@ -494,18 +530,23 @@ class LiveStockState:
             "cumulative_value", "session_vwap", "session_open", "session_high", "session_low",
             "opening_range_high", "opening_range_low", "opening_range_complete",
             "opening_range_source", "setup_state",
+            "opening_range_minute_mask", "opening_range_last_observation", "opening_range_max_gap_seconds",
             "session_live_started",
         ):
             if name in payload:
                 setattr(self, name, payload[name])
+        if "opening_range_minute_mask" not in payload:
+            self.opening_range_complete = False
+            self.opening_range_source = "legacy_unverified"
+        self.reset_pending_setups()
         self.price_samples = deque(_tuples(payload.get("price_samples"), 2), maxlen=900)
         self.value_samples = deque(_tuples(payload.get("value_samples"), 2), maxlen=900)
+        self.depth_samples = deque(_tuples(payload.get("depth_samples"), 3), maxlen=180)
         self._samples_ordered = all(
             previous[0] <= current[0]
-            for samples in (self.price_samples, self.value_samples)
+            for samples in (self.price_samples, self.value_samples, self.depth_samples)
             for previous, current in zip(samples, islice(samples, 1, None))
         )
-        self.depth_samples = deque(_tuples(payload.get("depth_samples"), 3), maxlen=180)
         self.minute_bars = deque(
             (OHLCV(**row) for row in payload.get("minute_bars") or [] if isinstance(row, dict)),
             maxlen=420,
