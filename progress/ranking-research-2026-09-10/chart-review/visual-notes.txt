@@ -1,0 +1,120 @@
+Visual coverage: all 118 panels in charts-01 through charts-10 inspected. These are sampled one-minute OHLC bands, close lines and VWAP, with every signal, AI start and filled entry. Flat traces require caution: sparse trading, limits and recording gaps cannot be distinguished by shape alone. Notes describe observed chronology, not a rule that could predict the future.
+
+AGI Infra: AI entry follows the first strong rally and pullback; later signals cluster around VWAP and consolidation.
+Adani Enterprises: signal during morning advance; no AI; remaining immediate rise then long consolidation.
+Adani Ports & SEZ: signal near first local peak; second sustained afternoon advance has no fresh visible signal at onset.
+Aditya Vision: single signal during nearly flat midday prices after opening swings.
+Aegis Logistics: signals mostly at brief midday or afternoon fluctuations, after opening rise.
+Amd Industries: sparse stair-step decline; one marker does not establish executable momentum.
+Andhra Paper: AI starts near sharp morning low; repeated later signals mostly range trading.
+Anlon Healthcare: morning high signal precedes pullback; later signals alternate through ranges.
+Anmol: stair-step bullish morning ending in flat ceiling; limited signals.
+Antelopus Selan Energy: early signals precede substantial morning rally; no AI.
+Anuh Pharma: signal at morning trough and afternoon breakdown; no AI.
+Atlas Cycle (Haryana): AI entry after steep initial decline; mostly flat prices afterward, later fresh decline.
+Axtel Industries: AI at reversal after opening spike; sparse and sideways thereafter.
+BMW Industries: repeated signals around midday upswing and reversal; no AI.
+Bal Pharma: AI entry precedes large morning advance and a flat upper plateau. Clear counterexample to all AI choices being sideways.
+Black Buck: early AI entry before further decline, but first adverse rebound matters for stop execution.
+Brightcom Group: early marker followed by continued decline; no AI.
+Chemfab Alkalis: main lift starts before clustered signals near local top; sparse later range.
+Chennai Petroleum Corporation: lone signal after much of the morning advance; afternoon continuation.
+Coal India: signal after opening expansion; mostly sideways thereafter.
+Coffee Day Enterprises: early signals during decline; additional decline then lengthy base and rebound.
+Coforge: early marker before ascent; later one during continuation; no AI.
+Confidence Futuristic Energetech: sparse stepwise midday expansion; onset has little signal coverage.
+Corona Remedies: AI early in morning expansion; later many signals along decline and closing rebound.
+DLF: late signals during sharp decline; initial sideways periods also generate signals.
+Ellenbarrie Industrial Gases: signals cover morning rise, repeated retests, and late upward step to flat ceiling.
+Emami: clustered signals in sharp midday spike; spike promptly reverses.
+Enviro Infra Engineers: initial signal near spike, later ones amid narrow range and slow decline.
+Excelsoft Technologies: two AI entries near end of midday rally and ensuing decline; subsequent flat period.
+Federal Mogul Goetze: AI after first meaningful decline; slow further decline rather than fresh large impulse.
+GSP Crop Science: signals during downtrend and its sharp rebound; no AI.
+Genesys International Corp: signals after large initial decline, near lows before rebound.
+Goa Carbon: morning signals before further ascent and flat ceiling; no AI.
+Graphite: early AI short immediately precedes sustained rally; numerous later signals around plateau.
+Grindwell Norton: sparse stepping path; lone late marker near low.
+Gujarat Themis Biosyn: early AI around opening rebound; later signals mark sustained decline.
+HBL Engineering: morning high and subsequent breakdown both signalled; no AI.
+HCL Technologies: early low signal before rebound; later sustained decline lacks timely new signal.
+Hikal: sparse range with midday upswing and reversal; few signals.
+Hindustan Oil Exploration: signals near high and subsequent breakdown; no AI.
+Huhtamaki PPL: signal bursts mostly near local highs after earlier advance.
+IFGL Refractories: signals begin after large late-morning expansion, then cluster in range.
+IKIO Technologies: morning low and afternoon local high signalled; broad choppy range.
+Indbank Merchant Banking: sparse decline, lone marker near afternoon low.
+India Nippon Electricals: signals late in substantial afternoon rally; no AI.
+Indo Rama Synthetics: signals late in afternoon advance; base breakout itself not marked.
+Innovision: AI entries after initial decline and around subsequent base; long range follows.
+Ion Exchange: sparse prices; lone marker near early trough, subsequent rebound.
+Jayant Agro Organics: opening AI entry; irregular low-activity looking path later declines.
+Jaykay Enterprises: AI begins around local high long after initial ascent; no filled star in chart.
+Jindal Stainless: several signals during strong afternoon continuation; no AI.
+Jindal Worldwide: signals around end of morning climb; reversal follows.
+Jocil: signals cluster at bottom after a large sparse decline.
+Kirloskar Ferrous Industries: signals start with midday break, repeat heavily at local highs, then range.
+LWS Knitwear: lone signal after initial decline; later sharp decline not marked at start.
+Laffans Petrochemicals: early marker amid large sparse fluctuations; mostly flat afterward.
+Lakshmi Finance & Industrial Corp: signals after initial advance, around end of second upswing; then decline.
+M Tek Copper: repeated AI around morning high zone; subsequent sustained decline.
+Maithan Alloys: early marker; strongest afternoon step has no timely signal.
+Manali Petrochemicals: signals during decline; no AI.
+Mangalam Global Enterprise: signals at midday break and reversal; no AI.
+Mangalore Refinery & Petroleum: signals follow multi-stage climb and local peaks; no AI.
+Manoj Vaibhav Gems: AI early before further rise but severe intervening dips matter.
+Master Trust: signals mostly after second advance near high; later decline.
+Medicamen Biotech: many signals throughout afternoon trend and consolidation; no AI despite repeated chances.
+Medico Remedies: AI during recovery after morning downtrend; no order; later choppy range.
+Menon Pistons: AI near exhausted morning decline and low; rebound then sideways.
+Mishra Dhatu Nigam: signals near recovery high, followed by reversal.
+Moneyboxx Finance: sparse stepwise decline; flat lower plateau after midday fall.
+Mukka Proteins: signal near opening high and later rebound high; both followed by decline.
+NLC India: signals after steep opening fall and during later decline; no AI.
+NOCIL: signals around breakout and retests; afternoon second upward step.
+Novartis: early signal before strong rally and flat ceiling; no AI.
+Onesource Specialty Pharma: many signals after discontinuous morning drop, then choppy recovery.
+Orient Green Power: AI late in range after early rally and retracement; later signals mostly oscillations.
+Oriental Aromatics: several signals after morning expansion, mainly near highs and range.
+PCBL Chemical: two AI entries within morning range after initial rise; afternoon fresh spike has no AI.
+Pashupati Cotspin: AI after opening fall; nearly flat thereafter.
+Pilani Investment & Industries: marker during opening fall; no fresh signal at strong closing rally.
+Power & Instrumentation: signals cover two upward impulses and intermediate range; no AI.
+RIR Power Electronics: midday signals near brief peak, followed by reversal.
+RPSG Ventures: morning continuation signalled; remaining day flat to declining.
+Radhika Jeweltech: first AI during initial spike, second trade after retreat into range.
+Rasi Electrodes: signals before and during morning rise; AI only after abrupt reversal.
+Raymond: early AI before continued decline, no order; later rebound and afternoon downleg signalled.
+Raymond Lifestyle: AI before prolonged decline, no order; repeated later downtrend signals.
+Responsive Industries: several signals during substantial afternoon rally; no AI.
+Ruby Mills: signals during morning climb near highs; later range.
+SEL Manufacturing: signal after volatile spike sequence, before renewed fall; sparse price path.
+SMC Global Securities: signal after decline into local trough; no AI.
+Sarda Energy & Minerals: signals cover morning and afternoon climbs, also local reversals; no AI.
+Share India Securities: signals during major midday advance and subsequent consolidation; no AI.
+Shivalik Rasayan: few signals during stair-step uptrend ending in flat ceiling.
+Shriram Asset Management Company: marker after steep morning step down; sparse range afterward.
+Signpost India: morning downside and afternoon upside impulses signalled, many repeated at high; no AI.
+South West Pinnacle: signals during late morning break and subsequent slow decline.
+Sreeleathers: signals during first climb and retracement; largest later upward step barely represented.
+Steel Exchange India: signals after midday spike, mostly in declining range.
+Subex: signals near midday spike peak and reversal, then range.
+Superhouse: markers near end of strong morning climb; prolonged range afterward.
+Suyog Telematics: late signal during sustained afternoon decline.
+Swarnsarita Gems: sparse flat morning; late signal after large step down.
+Symphony: signals around morning highs then early reversal; range afterward.
+TCC Concept: AI after most of midday rally has reversed; remaining path choppy.
+TTK Healthcare: early AI in range; repeated later signals after decline and during range.
+TaaL Tech: signals during stair-step rise; no AI.
+Tamilnadu Petroproducts: AI amid downtrend after opening volatility; decline continues with bounces.
+Techno Electric & Engineering: signal during midmorning upward step; irregular range afterward.
+Tega Industries: signals near afternoon spike and decline; gradual prior climb mostly unmarked.
+Texmo Pipes & Products: signal immediately before strong late-morning expansion; no AI.
+The New India Assurance Company: midday upward impulse and peak signalled, then reversion.
+Ultracab: single early marker before rebound; sparse range thereafter.
+Utkarsh Small Finance Bank: multiple signals during afternoon expansion and retracement; no AI.
+VA Tech Wabag: early signal near top of opening move; flat later.
+Vaxfab Enterprises: isolated marker in sparse stepped range; executable continuity uncertain.
+Welspun Living: signals near morning recovery and breakdown; no AI.
+Westlife Foodworld: single early marker after sharp opening rise; range afterward.
+Xchanging Solutions: early AI before sparse prolonged range, no order; late step up lacks signal.
