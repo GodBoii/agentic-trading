@@ -4,6 +4,7 @@ import unittest
 import sys
 import types
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 if "dhanhq" not in sys.modules:
     fake_dhan = types.ModuleType("dhanhq")
@@ -17,6 +18,7 @@ if "dhanhq" not in sys.modules:
 
 from pipeline.config import PipelineConfig
 from pipeline.research.opportunity_replay import replay_opportunities
+from pipeline.stages.setups import SetupEngine
 
 
 class OpportunityReplayTests(unittest.TestCase):
@@ -58,17 +60,28 @@ class OpportunityReplayTests(unittest.TestCase):
                 }
             )
 
-        result = replay_opportunities(
-            stocks=[stock],
-            rows=rows,
-            config=PipelineConfig(
-                intra_finder_hot_set_size=1,
-                intra_finder_hot_reserve_size=1,
-            ),
-        )
+        original_evaluate = SetupEngine.evaluate
+        calculation_times = []
+
+        def evaluate_with_time_check(engine, state, now):
+            calculation_times.append((state.derived_as_of, now.isoformat()))
+            return original_evaluate(engine, state, now)
+
+        with patch.object(SetupEngine, "evaluate", evaluate_with_time_check):
+            result = replay_opportunities(
+                stocks=[stock],
+                rows=rows,
+                config=PipelineConfig(
+                    intra_finder_hot_set_size=1,
+                    intra_finder_hot_reserve_size=1,
+                    intra_finder_open_rank_interval_seconds=5,
+                ),
+            )
 
         self.assertGreater(result["rank_evaluations"], 1)
         self.assertTrue(any(event["setup_type"] == "OPENING_DRIVE" for event in result["events"]))
+        self.assertGreater(len(calculation_times), result["rank_evaluations"])
+        self.assertTrue(all(calculated == evaluated for calculated, evaluated in calculation_times))
 
 
 if __name__ == "__main__":
