@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("--bars-per-stock", type=int, default=0, choices=range(421), metavar="0..420")
     parser.add_argument("--rank-interval", type=int, default=1)
     parser.add_argument("--flush-seconds", type=int, default=5)
+    parser.add_argument("--status-seconds", type=int, default=60)
     parser.add_argument("--paced", action="store_true", help="Spread each round across one second")
     args = parser.parse_args()
     base = datetime.fromisoformat("2026-09-07T10:00:00+05:30")
@@ -37,7 +38,7 @@ def main() -> None:
                          stage2_latest_path=root / "stage2/latest.json",
                          intra_finder_shadow_mode=True, intra_finder_record_all_raw_packets=True,
                          intra_finder_flush_seconds=args.flush_seconds,
-                         intra_finder_status_seconds=max(5, args.flush_seconds),
+                         intra_finder_status_seconds=max(1, args.status_seconds),
                          intra_finder_rank_interval_seconds=args.rank_interval)
         with patch("pipeline.stages.intra_finder.DhanService", return_value=None):
             finder = IntraFinder(config)
@@ -121,9 +122,21 @@ def main() -> None:
             receiver.stop()
             finder.close()
             loop.close()
+        processing_seconds = time.monotonic() - started
         written = sum(pq.read_metadata(path).num_rows for path in root.glob("stage2/*/raw-depth/**/*.parquet"))
         if written != len(delays):
             raise AssertionError(f"raw recording mismatch: {written} != {len(delays)}")
+        seen = np.zeros(len(delays), dtype=bool)
+        for path in root.glob("stage2/*/raw-depth/**/*.parquet"):
+            sequences = [int(json.loads(row)["sequence"]) for row in pq.read_table(path, columns=["packet_json"])["packet_json"].to_pylist()]
+            if any(b <= a for a, b in zip(sequences, sequences[1:])):
+                raise AssertionError("stored packet order changed within a shard")
+            indices = np.asarray(sequences, dtype=np.int64) - 1
+            if np.any(indices < 0) or np.any(indices >= len(seen)) or np.any(seen[indices]):
+                raise AssertionError("stored packet sequence is invalid or duplicated")
+            seen[indices] = True
+        if not seen.all():
+            raise AssertionError("a processed packet was not persisted")
         try:
             import resource
             peak_rss_mib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
@@ -134,8 +147,10 @@ def main() -> None:
                           "peak_rss_mib_linux": peak_rss_mib,
                           "paced": args.paced, "rank_interval": args.rank_interval,
                           "flush_seconds": args.flush_seconds,
+                          "status_seconds": args.status_seconds,
+                          "stored_sequences_verified": True,
                           "preconnection_preparation_ms": preparation_ms,
-                          "recorded_packets": written, "elapsed_seconds": time.monotonic() - started,
+                          "recorded_packets": written, "elapsed_seconds": processing_seconds,
                           "ingress_ms": dict(zip(("p50", "p95", "p99", "max"), np.percentile(delays, [50, 95, 99, 100]).tolist())),
                           "ranking_ms": ranks, "queue_high_water": receiver.high_water,
                           "queue_full_waits": receiver.full_waits, "persistence_error": finder.persistence_error}, indent=2))
