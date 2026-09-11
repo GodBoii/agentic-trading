@@ -1,0 +1,119 @@
+key,name,signals,ai_runs,orders,bars,first_signal,median_signal_abs_return_15,best_signal_abs_return_15,sheet,panel,visual_observation
+NSE_EQ|24445,AGI Infra,18,1,1,376,10:54:14,0.4153237423430156,1.5424610051993026,charts-01.png,1,AI entry follows the first strong rally and pullback; later signals cluster around VWAP and consolidation.
+NSE_EQ|25,Adani Enterprises,1,0,0,364,10:21:49,0.689255346560147,0.689255346560147,charts-01.png,2,signal during morning advance; no AI; remaining immediate rise then long consolidation.
+BSE_EQ|532921,Adani Ports & SEZ,1,0,0,361,10:25:04,0.4093933018706974,0.4093933018706974,charts-01.png,3,signal near first local peak; second sustained afternoon advance has no fresh visible signal at onset.
+NSE_EQ|25984,Aditya Vision,1,0,0,375,11:53:34,0.1048387096774128,0.1048387096774128,charts-01.png,4,single signal during nearly flat midday prices after opening swings.
+BSE_EQ|500003,Aegis Logistics,3,0,0,378,12:31:07,0.1571738642317077,1.056629314883062,charts-01.png,5,"signals mostly at brief midday or afternoon fluctuations, after opening rise."
+NSE_EQ|14398,Amd Industries,1,0,0,276,10:10:56,0.7507251322299902,0.7507251322299902,charts-01.png,6,sparse stair-step decline; one marker does not establish executable momentum.
+NSE_EQ|166,Andhra Paper,15,1,0,376,10:08:46,0.1162790697674331,1.5015457088178863,charts-01.png,7,AI starts near sharp morning low; repeated later signals mostly range trading.
+NSE_EQ|758968,Anlon Healthcare,4,0,0,376,10:58:19,1.369618993842581,1.878522229179702,charts-01.png,8,morning high signal precedes pullback; later signals alternate through ranges.
+NSE_EQ|3727,Anmol,2,0,0,368,10:07:58,1.3490360993706152,1.8612521150592087,charts-01.png,9,stair-step bullish morning ending in flat ceiling; limited signals.
+NSE_EQ|13598,Antelopus Selan Energy,2,0,0,377,09:15:58,2.264677458209285,3.303897016827051,charts-01.png,10,early signals precede substantial morning rally; no AI.
+NSE_EQ|28314,Anuh Pharma,3,0,0,375,09:49:00,0.3089598352214229,0.5459414915533589,charts-01.png,11,signal at morning trough and afternoon breakdown; no AI.
+NSE_EQ|4568,Atlas Cycle (Haryana),7,1,1,329,09:22:26,0.8679762448606687,1.0424354243542489,charts-01.png,12,"AI entry after steep initial decline; mostly flat prices afterward, later fresh decline."
+NSE_EQ|764613,Axtel Industries,1,1,1,317,09:20:33,2.398190045248872,2.398190045248872,charts-02.png,1,AI at reversal after opening spike; sparse and sideways thereafter.
+BSE_EQ|542669,BMW Industries,9,0,0,376,10:23:29,0.6054315862307424,3.0918727915194344,charts-02.png,2,repeated signals around midday upswing and reversal; no AI.
+NSE_EQ|13441,Bal Pharma,2,1,1,356,09:21:41,3.2993786278245727,3.9553752535496978,charts-02.png,3,AI entry precedes large morning advance and a flat upper plateau. Clear counterexample to all AI choices being sideways.
+NSE_EQ|27144,Black Buck,3,1,1,376,09:15:31,0.367741383733855,1.9683714670255648,charts-02.png,4,"early AI entry before further decline, but first adverse rebound matters for stop execution."
+NSE_EQ|8833,Brightcom Group,1,0,0,377,10:19:55,0.1937984496124034,0.1937984496124034,charts-02.png,5,early marker followed by continued decline; no AI.
+NSE_EQ|2799,Chemfab Alkalis,3,0,0,279,11:20:00,0.2097260453532645,0.2097260453532645,charts-02.png,6,main lift starts before clustered signals near local top; sparse later range.
+NSE_EQ|2049,Chennai Petroleum Corporation,1,0,0,377,12:35:40,0.6628728659871075,0.6628728659871075,charts-02.png,7,lone signal after much of the morning advance; afternoon continuation.
+NSE_EQ|20374,Coal India,1,0,0,364,09:27:44,0.1039021011313923,0.1039021011313923,charts-02.png,8,signal after opening expansion; mostly sideways thereafter.
+NSE_EQ|11165,Coffee Day Enterprises,3,0,0,375,09:19:23,0.3548196333530429,0.764705882352934,charts-02.png,9,early signals during decline; additional decline then lengthy base and rebound.
+NSE_EQ|11543,Coforge,2,0,0,364,09:16:41,0.6649559036297825,1.1957484499557136,charts-02.png,10,early marker before ascent; later one during continuation; no AI.
+NSE_EQ|764638,Confidence Futuristic Energetech,1,0,0,270,13:11:52,0.3896103896103842,0.3896103896103842,charts-02.png,11,sparse stepwise midday expansion; onset has little signal coverage.
+NSE_EQ|760254,Corona Remedies,14,1,0,376,09:29:02,0.3704543901251411,0.9744990892532002,charts-02.png,12,AI early in morning expansion; later many signals along decline and closing rebound.
+BSE_EQ|532868,DLF,4,0,0,362,14:35:37,0.4323010730086507,0.575408843125369,charts-03.png,1,late signals during sharp decline; initial sideways periods also generate signals.
+NSE_EQ|758563,Ellenbarrie Industrial Gases,10,0,0,376,10:06:06,0.594985125371883,1.409653994019644,charts-03.png,2,"signals cover morning rise, repeated retests, and late upward step to flat ceiling."
+NSE_EQ|13517,Emami,3,0,0,376,11:25:32,0.881527981835184,0.881527981835184,charts-03.png,3,clustered signals in sharp midday spike; spike promptly reverses.
+NSE_EQ|27213,Enviro Infra Engineers,5,0,0,377,09:16:08,0.719077264610779,1.2058529145417274,charts-03.png,4,"initial signal near spike, later ones amid narrow range and slow decline."
+NSE_EQ|760007,Excelsoft Technologies,15,2,2,377,10:51:02,1.3140604467805517,2.796566077003116,charts-03.png,5,two AI entries near end of midday rally and ensuing decline; subsequent flat period.
+NSE_EQ|1190,Federal Mogul Goetze,2,1,1,376,09:31:58,0.9037738857671896,1.6886930983847304,charts-03.png,6,AI after first meaningful decline; slow further decline rather than fresh large impulse.
+NSE_EQ|762239,GSP Crop Science,8,0,0,376,09:41:52,1.5272189803060163,3.814311058545239,charts-03.png,7,signals during downtrend and its sharp rebound; no AI.
+NSE_EQ|10905,Genesys International Corp,3,0,0,376,09:39:59,0.2211747643219741,0.4332129963898867,charts-03.png,8,"signals after large initial decline, near lows before rebound."
+BSE_EQ|509567,Goa Carbon,5,0,0,310,09:26:49,1.816788880376485,5.082547169811313,charts-03.png,9,morning signals before further ascent and flat ceiling; no AI.
+BSE_EQ|509488,Graphite,32,1,1,378,09:15:58,0.5545616399910691,6.526342809471863,charts-03.png,10,early AI short immediately precedes sustained rally; numerous later signals around plateau.
+BSE_EQ|506076,Grindwell Norton,1,0,0,377,14:14:28,0.1613756613756622,0.1613756613756622,charts-03.png,11,sparse stepping path; lone late marker near low.
+NSE_EQ|29731,Gujarat Themis Biosyn,17,1,1,376,09:25:54,0.4435573297848716,1.3412984670874817,charts-03.png,12,early AI around opening rebound; later signals mark sustained decline.
+NSE_EQ|13966,HBL Engineering,7,0,0,377,10:07:46,0.3166018072686682,2.3201403782413754,charts-04.png,1,morning high and subsequent breakdown both signalled; no AI.
+BSE_EQ|532281,HCL Technologies,1,0,0,362,09:16:51,0.1212905312525158,0.1212905312525158,charts-04.png,2,early low signal before rebound; later sustained decline lacks timely new signal.
+BSE_EQ|524735,Hikal,3,0,0,378,09:53:23,0.1450777202072428,0.2690397350993412,charts-04.png,3,sparse range with midday upswing and reversal; few signals.
+NSE_EQ|1403,Hindustan Oil Exploration,9,0,0,376,10:26:52,0.2251330331559442,1.584770258148116,charts-04.png,4,signals near high and subsequent breakdown; no AI.
+NSE_EQ|2562,Huhtamaki PPL,6,0,0,376,12:03:49,0.2898417815121068,1.5270018621973969,charts-04.png,5,signal bursts mostly near local highs after earlier advance.
+NSE_EQ|436,IFGL Refractories,8,0,0,372,11:08:40,0.4324154021913107,2.873908423046712,charts-04.png,6,"signals begin after large late-morning expansion, then cluster in range."
+NSE_EQ|16822,IKIO Technologies,2,0,0,376,09:58:40,0.2558537320095144,0.4043249136834514,charts-04.png,7,morning low and afternoon local high signalled; broad choppy range.
+NSE_EQ|16933,Indbank Merchant Banking,1,0,0,339,13:24:06,0.3731343283582156,0.3731343283582156,charts-04.png,8,"sparse decline, lone marker near afternoon low."
+BSE_EQ|532240,India Nippon Electricals,3,0,0,373,14:45:10,2.3830847708422587,5.4036050156739845,charts-04.png,9,signals late in substantial afternoon rally; no AI.
+BSE_EQ|500207,Indo Rama Synthetics,3,0,0,377,14:32:18,2.37249283667621,2.6071428571428523,charts-04.png,10,signals late in afternoon advance; base breakout itself not marked.
+NSE_EQ|761528,Innovision,6,2,2,377,09:21:34,0.69031511733611,3.652114829284869,charts-04.png,11,AI entries after initial decline and around subsequent base; long range follows.
+BSE_EQ|500214,Ion Exchange,1,0,0,377,10:23:02,0.0348027842227427,0.0348027842227427,charts-04.png,12,"sparse prices; lone marker near early trough, subsequent rebound."
+NSE_EQ|4041,Jayant Agro Organics,1,1,1,366,09:18:20,0.2426623526692872,0.2426623526692872,charts-05.png,1,opening AI entry; irregular low-activity looking path later declines.
+NSE_EQ|760073,Jaykay Enterprises,5,1,1,376,09:54:07,0.4218406511793837,1.4302258251302824,charts-05.png,2,AI begins around local high long after initial ascent; no filled star in chart.
+NSE_EQ|11236,Jindal Stainless,6,0,0,376,13:42:57,0.533040047756228,1.4082687338501154,charts-05.png,3,several signals during strong afternoon continuation; no AI.
+NSE_EQ|20642,Jindal Worldwide,4,0,0,377,10:57:17,0.6876452892109863,0.8813678829543425,charts-05.png,4,signals around end of morning climb; reversal follows.
+NSE_EQ|16927,Jocil,4,0,0,288,11:37:20,0.8840530884008879,1.3087248322147582,charts-05.png,5,signals cluster at bottom after a large sparse decline.
+NSE_EQ|14466,Kirloskar Ferrous Industries,15,0,0,371,11:47:24,0.5980350277659197,1.1277403035413136,charts-05.png,6,"signals start with midday break, repeat heavily at local highs, then range."
+BSE_EQ|531402,LWS Knitwear,1,0,0,232,14:35:23,0.6993006993007089,0.6993006993007089,charts-05.png,7,lone signal after initial decline; later sharp decline not marked at start.
+BSE_EQ|524522,Laffans Petrochemicals,1,0,0,186,09:24:12,2.2021660649819585,2.2021660649819585,charts-05.png,8,early marker amid large sparse fluctuations; mostly flat afterward.
+NSE_EQ|7902,Lakshmi Finance & Industrial Corp,5,0,0,365,09:58:55,0.6570713391739758,1.1633053044193042,charts-05.png,9,"signals after initial advance, around end of second upswing; then decline."
+NSE_EQ|22360,M Tek Copper,4,3,3,376,09:25:19,0.5796098031635555,1.6981132075471694,charts-05.png,10,repeated AI around morning high zone; subsequent sustained decline.
+NSE_EQ|24538,Maithan Alloys,1,0,0,375,14:46:56,0.680772769089244,0.680772769089244,charts-05.png,11,early marker; strongest afternoon step has no timely signal.
+NSE_EQ|13796,Manali Petrochemicals,2,0,0,377,11:41:15,0.5679881858457358,0.5679881858457358,charts-05.png,12,signals during decline; no AI.
+NSE_EQ|1593,Mangalam Global Enterprise,7,0,0,335,12:25:54,1.6049382716049498,3.402187120291622,charts-06.png,1,signals at midday break and reversal; no AI.
+NSE_EQ|2283,Mangalore Refinery & Petroleum,9,0,0,377,11:38:52,0.4414409504605254,1.553419151594149,charts-06.png,2,signals follow multi-stage climb and local peaks; no AI.
+NSE_EQ|19015,Manoj Vaibhav Gems,2,1,1,376,09:15:57,3.067747107232688,4.401849354652287,charts-06.png,3,AI early before further rise but severe intervening dips matter.
+NSE_EQ|27047,Master Trust,4,0,0,368,14:04:11,0.6320943409777069,0.7566204287515754,charts-06.png,4,signals mostly after second advance near high; later decline.
+NSE_EQ|6278,Medicamen Biotech,31,0,0,376,09:23:20,0.7566426183353792,2.394715111478108,charts-06.png,5,many signals throughout afternoon trend and consolidation; no AI despite repeated chances.
+NSE_EQ|9667,Medico Remedies,14,1,0,376,09:32:53,1.4304823353529006,3.4433693796243725,charts-06.png,6,AI during recovery after morning downtrend; no order; later choppy range.
+NSE_EQ|762787,Menon Pistons,4,1,1,330,09:26:44,0.8180759375727986,1.2839506172839577,charts-06.png,7,AI near exhausted morning decline and low; rebound then sideways.
+NSE_EQ|2463,Mishra Dhatu Nigam,2,0,0,377,11:24:07,0.4479347413626044,0.4588624479778147,charts-06.png,8,"signals near recovery high, followed by reversal."
+NSE_EQ|759381,Moneyboxx Finance,3,0,0,310,09:26:47,0.8360878864476007,0.8360878864476007,charts-06.png,9,sparse stepwise decline; flat lower plateau after midday fall.
+NSE_EQ|22980,Mukka Proteins,2,0,0,374,11:34:02,0.7556991092087351,0.8849557522124019,charts-06.png,10,signal near opening high and later rebound high; both followed by decline.
+BSE_EQ|513683,NLC India,4,0,0,377,09:52:00,0.4017923623811481,0.763914150600209,charts-06.png,11,signals after steep opening fall and during later decline; no AI.
+NSE_EQ|2442,NOCIL,3,0,0,376,10:37:38,0.0961076405574079,0.4454579201357611,charts-06.png,12,signals around breakout and retests; afternoon second upward step.
+NSE_EQ|9007,Novartis,1,0,0,370,09:22:14,4.229222861214299,4.229222861214299,charts-07.png,1,early signal before strong rally and flat ceiling; no AI.
+NSE_EQ|29224,Onesource Specialty Pharma,13,0,0,376,10:12:07,0.1873506040441896,1.5589328810906131,charts-07.png,2,"many signals after discontinuous morning drop, then choppy recovery."
+NSE_EQ|20110,Orient Green Power,18,1,1,376,09:51:55,0.5082414597116891,5.177372962607851,charts-07.png,3,AI late in range after early rally and retracement; later signals mostly oscillations.
+NSE_EQ|10768,Oriental Aromatics,5,0,0,364,10:17:07,0.2655434484021723,0.4697430229345212,charts-07.png,4,"several signals after morning expansion, mainly near highs and range."
+BSE_EQ|506590,PCBL Chemical,14,2,2,379,09:39:11,0.6015824694451,0.882969170906911,charts-07.png,5,two AI entries within morning range after initial rise; afternoon fresh spike has no AI.
+NSE_EQ|757955,Pashupati Cotspin,1,1,1,175,09:30:45,0.443896424167689,0.443896424167689,charts-07.png,6,AI after opening fall; nearly flat thereafter.
+NSE_EQ|11445,Pilani Investment & Industries,1,0,0,354,09:56:30,0.6788321167883193,0.6788321167883193,charts-07.png,7,marker during opening fall; no fresh signal at strong closing rally.
+NSE_EQ|15716,Power & Instrumentation,9,0,0,361,10:21:15,0.8341143392689876,1.9958576539258144,charts-07.png,8,signals cover two upward impulses and intermediate range; no AI.
+NSE_EQ|764121,RIR Power Electronics,4,0,0,376,12:46:54,0.8729457649990502,1.4984805616682473,charts-07.png,9,"midday signals near brief peak, followed by reversal."
+NSE_EQ|8119,RPSG Ventures,5,0,0,373,10:02:04,0.3760683760683725,2.7949947374576123,charts-07.png,10,morning continuation signalled; remaining day flat to declining.
+NSE_EQ|10343,Radhika Jeweltech,11,2,1,376,09:33:52,0.5838760386256414,1.5007724564113922,charts-07.png,11,"first AI during initial spike, second trade after retreat into range."
+BSE_EQ|531233,Rasi Electrodes,4,1,0,323,10:07:12,4.404945904173108,5.161787365177184,charts-07.png,12,signals before and during morning rise; AI only after abrupt reversal.
+NSE_EQ|2859,Raymond,5,1,0,377,09:16:04,0.6549274019153506,1.9976875642343288,charts-08.png,1,"early AI before continued decline, no order; later rebound and afternoon downleg signalled."
+NSE_EQ|25073,Raymond Lifestyle,16,1,0,376,09:15:58,0.6621751228237882,2.8714707700762454,charts-08.png,2,"AI before prolonged decline, no order; repeated later downtrend signals."
+NSE_EQ|20323,Responsive Industries,9,0,0,365,14:03:14,1.0768300060496117,6.416772554002548,charts-08.png,3,several signals during substantial afternoon rally; no AI.
+NSE_EQ|2939,Ruby Mills,4,0,0,360,09:59:28,0.2666864476609298,1.4446568939876725,charts-08.png,4,signals during morning climb near highs; later range.
+NSE_EQ|6262,SEL Manufacturing,1,0,0,231,14:19:04,5.36585365853658,5.36585365853658,charts-08.png,5,"signal after volatile spike sequence, before renewed fall; sparse price path."
+NSE_EQ|2320,SMC Global Securities,1,0,0,351,12:17:50,0.3338500059616001,0.3338500059616001,charts-08.png,6,signal after decline into local trough; no AI.
+NSE_EQ|17758,Sarda Energy & Minerals,15,0,0,376,10:37:29,0.399310282239762,1.6833777941311912,charts-08.png,7,"signals cover morning and afternoon climbs, also local reversals; no AI."
+BSE_EQ|540725,Share India Securities,13,0,0,377,12:47:46,0.6118648576749264,1.5424836601307224,charts-08.png,8,signals during major midday advance and subsequent consolidation; no AI.
+BSE_EQ|539148,Shivalik Rasayan,2,0,0,359,12:50:54,0.10928961748633,0.10928961748633,charts-08.png,9,few signals during stair-step uptrend ending in flat ceiling.
+BSE_EQ|531359,Shriram Asset Management Company,1,0,0,210,10:12:06,0.3773584905660376,0.3773584905660376,charts-08.png,10,marker after steep morning step down; sparse range afterward.
+NSE_EQ|22656,Signpost India,21,0,0,352,09:57:56,0.7869692532943118,2.8487947406866443,charts-08.png,11,"morning downside and afternoon upside impulses signalled, many repeated at high; no AI."
+BSE_EQ|543986,South West Pinnacle,3,0,0,377,09:22:32,0.537968135733502,1.4063811922754077,charts-08.png,12,signals during late morning break and subsequent slow decline.
+NSE_EQ|31837,Sreeleathers,5,0,0,376,09:43:34,0.4650406504065119,2.572347266881025,charts-09.png,1,signals during first climb and retracement; largest later upward step barely represented.
+BSE_EQ|534748,Steel Exchange India,5,0,0,377,09:51:30,0.6514657980456029,1.0586319218240936,charts-09.png,2,"signals after midday spike, mostly in declining range."
+NSE_EQ|967,Subex,4,0,0,377,11:15:09,0.7582826247813423,1.4887063655030786,charts-09.png,3,"signals near midday spike peak and reversal, then range."
+NSE_EQ|20616,Superhouse,2,0,0,344,11:45:42,2.3178807947019875,2.3178807947019875,charts-09.png,4,markers near end of strong morning climb; prolonged range afterward.
+NSE_EQ|24851,Suyog Telematics,1,0,0,373,14:16:41,0.1422879908935748,0.1422879908935748,charts-09.png,5,late signal during sustained afternoon decline.
+NSE_EQ|765185,Swarnsarita Gems,2,0,0,315,13:59:33,1.5075376884422065,1.5075376884422065,charts-09.png,6,sparse flat morning; late signal after large step down.
+NSE_EQ|24190,Symphony,4,0,0,377,09:57:52,0.4976925357906836,0.8060654429369429,charts-09.png,7,signals around morning highs then early reversal; range afterward.
+BSE_EQ|512038,TCC Concept,4,1,1,379,13:19:51,1.3019863727753378,6.063618290258455,charts-09.png,8,AI after most of midday rally has reversed; remaining path choppy.
+NSE_EQ|11369,TTK Healthcare,26,1,0,376,09:25:45,0.274360970187476,1.0199918400652708,charts-09.png,9,early AI in range; repeated later signals after decline and during range.
+BSE_EQ|539956,TaaL Tech,2,0,0,377,12:07:45,0.3068739770867412,0.3068739770867412,charts-09.png,10,signals during stair-step rise; no AI.
+NSE_EQ|3509,Tamilnadu Petroproducts,11,1,1,376,09:24:13,0.5357525537538432,1.4635854341736754,charts-09.png,11,AI amid downtrend after opening volatility; decline continues with bounces.
+BSE_EQ|542141,Techno Electric & Engineering,1,0,0,377,10:52:49,0.4198883711403534,0.4198883711403534,charts-09.png,12,signal during midmorning upward step; irregular range afterward.
+NSE_EQ|7105,Tega Industries,4,0,0,376,14:10:25,0.4339484179132824,0.9155466870121588,charts-10.png,1,signals near afternoon spike and decline; gradual prior climb mostly unmarked.
+NSE_EQ|18214,Texmo Pipes & Products,5,0,0,376,09:34:09,3.446359088382433,4.144796380090488,charts-10.png,2,signal immediately before strong late-morning expansion; no AI.
+NSE_EQ|399,The New India Assurance Company,4,0,0,377,10:29:00,0.8224923564956188,1.0019267822735989,charts-10.png,3,"midday upward impulse and peak signalled, then reversion."
+BSE_EQ|538706,Ultracab,1,0,0,372,13:20:03,0.1096491228070206,0.1096491228070206,charts-10.png,4,single early marker before rebound; sparse range thereafter.
+NSE_EQ|17358,Utkarsh Small Finance Bank,8,0,0,377,13:10:14,0.6575431790414865,4.0506329113924044,charts-10.png,5,multiple signals during afternoon expansion and retracement; no AI.
+NSE_EQ|20188,VA Tech Wabag,1,0,0,377,09:34:37,0.1607643195076002,0.1607643195076002,charts-10.png,6,early signal near top of opening move; flat later.
+BSE_EQ|542803,Vaxfab Enterprises,1,0,0,165,10:58:05,,0.0,charts-10.png,7,isolated marker in sparse stepped range; executable continuity uncertain.
+BSE_EQ|514162,Welspun Living,2,0,0,378,09:28:18,0.6977975211310938,0.7797731568998101,charts-10.png,8,signals near morning recovery and breakdown; no AI.
+BSE_EQ|505533,Westlife Foodworld,1,0,0,377,11:03:14,0.2427402679133328,0.2427402679133328,charts-10.png,9,single early marker after sharp opening rise; range afterward.
+BSE_EQ|532616,Xchanging Solutions,1,1,0,338,09:28:02,0.2687322162503891,0.2687322162503891,charts-10.png,10,"early AI before sparse prolonged range, no order; late step up lacks signal."
