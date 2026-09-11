@@ -97,6 +97,7 @@ def replay_opportunities(
             rank_count += 1
         if state.activity_rank is None or state.activity_rank > settings.intra_finder_setup_rank_limit:
             continue
+        state.refresh_candidate_features(received_at)
         for signal in engine.evaluate(state, received_at):
             events.append(
                 {
