@@ -1,0 +1,807 @@
+[
+  {
+    "name": "Black Buck",
+    "order_id": "34326090913272",
+    "signal_to_fill_seconds": 88.20575904846191,
+    "signal_5m": {
+      "abs_close_pct": 0.08411843876177658,
+      "range_pct": 0.7150067294751009,
+      "signed_pct": -0.08411843876177658
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.19406007424906804,
+      "range_pct": 0.8690516368545355,
+      "signed_pct": 0.19406007424906804
+    },
+    "fill_5m": {
+      "abs_close_pct": 1.195286195286199,
+      "range_pct": 1.8518518518518516,
+      "signed_pct": -1.195286195286199
+    },
+    "signal_15m": {
+      "abs_close_pct": 1.9683714670255605,
+      "range_pct": 2.7759084791386273,
+      "signed_pct": -1.9683714670255605
+    },
+    "ai_15m": {
+      "abs_close_pct": 1.5356058049274421,
+      "range_pct": 2.784340195747553,
+      "signed_pct": -1.5356058049274421
+    },
+    "fill_15m": {
+      "abs_close_pct": 2.0033670033669995,
+      "range_pct": 2.7777777777777777,
+      "signed_pct": -2.0033670033669995
+    }
+  },
+  {
+    "name": "Graphite",
+    "order_id": "23326090913072",
+    "signal_to_fill_seconds": 142.76082801818848,
+    "signal_5m": {
+      "abs_close_pct": 2.894179554642889,
+      "range_pct": 3.8054289931335403,
+      "signed_pct": 2.894179554642889
+    },
+    "ai_5m": {
+      "abs_close_pct": 2.848766808998792,
+      "range_pct": 3.537059460837423,
+      "signed_pct": 2.848766808998792
+    },
+    "fill_5m": {
+      "abs_close_pct": 1.2058786584599954,
+      "range_pct": 1.6706443914081086,
+      "signed_pct": 1.2058786584599954
+    },
+    "signal_15m": {
+      "abs_close_pct": 6.526342809471863,
+      "range_pct": 7.270743759224793,
+      "signed_pct": 6.526342809471863
+    },
+    "ai_15m": {
+      "abs_close_pct": 6.283856988082349,
+      "range_pct": 6.876553438276711,
+      "signed_pct": 6.283856988082349
+    },
+    "fill_15m": {
+      "abs_close_pct": 4.980530084160279,
+      "range_pct": 5.451576435121213,
+      "signed_pct": 4.980530084160279
+    }
+  },
+  {
+    "name": "Manoj Vaibhav Gems",
+    "order_id": "23326090913172",
+    "signal_to_fill_seconds": 129.01517295837402,
+    "signal_5m": {
+      "abs_close_pct": 0.29859371989981515,
+      "range_pct": 2.220188788287427,
+      "signed_pct": -0.29859371989981515
+    },
+    "ai_5m": {
+      "abs_close_pct": 2.085609767684933,
+      "range_pct": 2.712717943845317,
+      "signed_pct": -2.085609767684933
+    },
+    "fill_5m": {
+      "abs_close_pct": 1.000957854406132,
+      "range_pct": 1.7768199233716513,
+      "signed_pct": -1.000957854406132
+    },
+    "signal_15m": {
+      "abs_close_pct": 4.40184935465229,
+      "range_pct": 6.607590059718745,
+      "signed_pct": 4.40184935465229
+    },
+    "ai_15m": {
+      "abs_close_pct": 1.919331084612092,
+      "range_pct": 6.518124376454939,
+      "signed_pct": 1.919331084612092
+    },
+    "fill_15m": {
+      "abs_close_pct": 1.9157088122605364,
+      "range_pct": 6.570881226053639,
+      "signed_pct": 1.9157088122605364
+    }
+  },
+  {
+    "name": "Jayant Agro Organics",
+    "order_id": "22326090920372",
+    "signal_to_fill_seconds": 158.70496606826782,
+    "signal_5m": {
+      "abs_close_pct": 0.8666512595331638,
+      "range_pct": 1.3481241814960327,
+      "signed_pct": -0.8666512595331638
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.8666512595331638,
+      "range_pct": 1.3481241814960327,
+      "signed_pct": -0.8666512595331638
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.7751937984496124,
+      "range_pct": 1.5193798449612466,
+      "signed_pct": 0.7751937984496124
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.24266235266928415,
+      "range_pct": 1.7756721361990653,
+      "signed_pct": -0.24266235266928415
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.24266235266928415,
+      "range_pct": 1.7756721361990653,
+      "signed_pct": -0.24266235266928415
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.10465116279069063,
+      "range_pct": 1.786821705426362,
+      "signed_pct": 0.10465116279069063
+    }
+  },
+  {
+    "name": "Bal Pharma",
+    "order_id": "32326090922872",
+    "signal_to_fill_seconds": 58.30531907081604,
+    "signal_5m": {
+      "abs_close_pct": 0.5780933062880256,
+      "range_pct": 1.5010141987829657,
+      "signed_pct": -0.5780933062880256
+    },
+    "ai_5m": {
+      "abs_close_pct": 2.697159265716332,
+      "range_pct": 3.5688647318223814,
+      "signed_pct": 2.697159265716332
+    },
+    "fill_5m": {
+      "abs_close_pct": 2.697159265716332,
+      "range_pct": 3.5688647318223814,
+      "signed_pct": 2.697159265716332
+    },
+    "signal_15m": {
+      "abs_close_pct": 3.9553752535497018,
+      "range_pct": 7.789046653144023,
+      "signed_pct": 3.9553752535497018
+    },
+    "ai_15m": {
+      "abs_close_pct": 4.717464875397389,
+      "range_pct": 7.8761152702287,
+      "signed_pct": 4.717464875397389
+    },
+    "fill_15m": {
+      "abs_close_pct": 4.717464875397389,
+      "range_pct": 7.8761152702287,
+      "signed_pct": 4.717464875397389
+    }
+  },
+  {
+    "name": "Atlas Cycle (Haryana)",
+    "order_id": "32326090923772",
+    "signal_to_fill_seconds": 101.06563305854797,
+    "signal_5m": {
+      "abs_close_pct": 1.4760147601475961,
+      "range_pct": 3.0904059040590353,
+      "signed_pct": 1.4760147601475961
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.35829122645842953,
+      "range_pct": 2.9030776297657295,
+      "signed_pct": 0.35829122645842953
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.5116491548652373,
+      "range_pct": 2.5125628140703515,
+      "signed_pct": 0.5116491548652373
+    },
+    "signal_15m": {
+      "abs_close_pct": 1.0424354243542393,
+      "range_pct": 3.0904059040590353,
+      "signed_pct": 1.0424354243542393
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.31235645383555666,
+      "range_pct": 3.0500689021589285,
+      "signed_pct": 0.31235645383555666
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.8679762448606696,
+      "range_pct": 3.0333485609867457,
+      "signed_pct": -0.8679762448606696
+    }
+  },
+  {
+    "name": "M Tek Copper",
+    "order_id": "23326090914172",
+    "signal_to_fill_seconds": 120.8113660812378,
+    "signal_5m": {
+      "abs_close_pct": 0.5715192887759952,
+      "range_pct": 1.809811081123989,
+      "signed_pct": 0.5715192887759952
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.5715192887759952,
+      "range_pct": 1.809811081123989,
+      "signed_pct": 0.5715192887759952
+    },
+    "fill_5m": {
+      "abs_close_pct": 2.3656587811373933,
+      "range_pct": 2.3656587811373933,
+      "signed_pct": -2.3656587811373933
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.9842832195586673,
+      "range_pct": 3.2386093030639764,
+      "signed_pct": -0.9842832195586673
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.9842832195586673,
+      "range_pct": 3.2386093030639764,
+      "signed_pct": -0.9842832195586673
+    },
+    "fill_15m": {
+      "abs_close_pct": 1.8486605044649846,
+      "range_pct": 2.929656901143659,
+      "signed_pct": -1.8486605044649846
+    }
+  },
+  {
+    "name": "Gujarat Themis Biosyn",
+    "order_id": "23326090914372",
+    "signal_to_fill_seconds": 107.1757299900055,
+    "signal_5m": {
+      "abs_close_pct": 1.012961551029307,
+      "range_pct": 1.949678684239187,
+      "signed_pct": -1.012961551029307
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.5869324473975587,
+      "range_pct": 1.5725359911406347,
+      "signed_pct": 0.5869324473975587
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.6875138611665608,
+      "range_pct": 1.3972055888223578,
+      "signed_pct": 0.6875138611665608
+    },
+    "signal_15m": {
+      "abs_close_pct": 1.0456377300947635,
+      "range_pct": 1.982354863304656,
+      "signed_pct": -1.0456377300947635
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.4761904761904711,
+      "range_pct": 1.6057585825027685,
+      "signed_pct": 0.4761904761904711
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.4435573297848747,
+      "range_pct": 1.6078953204701707,
+      "signed_pct": 0.4435573297848747
+    }
+  },
+  {
+    "name": "Pashupati Cotspin",
+    "order_id": "32326090931272",
+    "signal_to_fill_seconds": 108.01891994476318,
+    "signal_5m": {
+      "abs_close_pct": 0.7521578298397035,
+      "range_pct": 0.8754623921085003,
+      "signed_pct": 0.7521578298397035
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.5545969928518645,
+      "range_pct": 0.7024895242790155,
+      "signed_pct": 0.5545969928518645
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.13500245459008275,
+      "range_pct": 0.5277368679430444,
+      "signed_pct": 0.13500245459008275
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.44389642416769354,
+      "range_pct": 0.8754623921085003,
+      "signed_pct": 0.44389642416769354
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.2588119299975274,
+      "range_pct": 0.7024895242790155,
+      "signed_pct": 0.2588119299975274
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.15954835542465595,
+      "range_pct": 0.5277368679430444,
+      "signed_pct": -0.15954835542465595
+    }
+  },
+  {
+    "name": "M Tek Copper",
+    "order_id": "32326090935772",
+    "signal_to_fill_seconds": 320.61842608451843,
+    "signal_5m": {
+      "abs_close_pct": 0.19083969465648445,
+      "range_pct": 2.290076335877859,
+      "signed_pct": 0.19083969465648445
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.894568690095839,
+      "range_pct": 2.3003194888178875,
+      "signed_pct": 0.894568690095839
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.6028875138822823,
+      "range_pct": 1.2057750277645647,
+      "signed_pct": -0.6028875138822823
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.17493638676844692,
+      "range_pct": 2.290076335877859,
+      "signed_pct": 0.17493638676844692
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.9744408945686891,
+      "range_pct": 2.3003194888178875,
+      "signed_pct": 0.9744408945686891
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.06346184356655425,
+      "range_pct": 1.7293352371886346,
+      "signed_pct": -0.06346184356655425
+    }
+  },
+  {
+    "name": "Menon Pistons",
+    "order_id": "22326090932872",
+    "signal_to_fill_seconds": 204.73089790344238,
+    "signal_5m": {
+      "abs_close_pct": 0.6037735849056654,
+      "range_pct": 0.6792452830188579,
+      "signed_pct": 0.6037735849056654
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.6037735849056654,
+      "range_pct": 0.6792452830188579,
+      "signed_pct": 0.6037735849056654
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.05002501250626095,
+      "range_pct": 0.6128064032015944,
+      "signed_pct": 0.05002501250626095
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.35220125786163664,
+      "range_pct": 0.6918238993710657,
+      "signed_pct": 0.35220125786163664
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.35220125786163664,
+      "range_pct": 0.6918238993710657,
+      "signed_pct": 0.35220125786163664
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.05002501250626095,
+      "range_pct": 0.687843921960977,
+      "signed_pct": 0.05002501250626095
+    }
+  },
+  {
+    "name": "Innovision",
+    "order_id": "23326090915272",
+    "signal_to_fill_seconds": 229.90964603424072,
+    "signal_5m": {
+      "abs_close_pct": 0.17825311942959002,
+      "range_pct": 1.2299465240641672,
+      "signed_pct": 0.17825311942959002
+    },
+    "ai_5m": {
+      "abs_close_pct": 1.4285714285714286,
+      "range_pct": 2.446428571428559,
+      "signed_pct": 1.4285714285714286
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.7882479398065169,
+      "range_pct": 1.8989609458975112,
+      "signed_pct": 0.7882479398065169
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.267379679144385,
+      "range_pct": 2.442067736185371,
+      "signed_pct": 0.267379679144385
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.5535714285714326,
+      "range_pct": 2.446428571428559,
+      "signed_pct": 0.5535714285714326
+    },
+    "fill_15m": {
+      "abs_close_pct": 1.0927982801862968,
+      "range_pct": 1.8989609458975112,
+      "signed_pct": 1.0927982801862968
+    }
+  },
+  {
+    "name": "PCBL Chemical",
+    "order_id": "34326090916272",
+    "signal_to_fill_seconds": 115.47895789146423,
+    "signal_5m": {
+      "abs_close_pct": 0.40298507462687244,
+      "range_pct": 0.9701492537313432,
+      "signed_pct": 0.40298507462687244
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.4923168730419317,
+      "range_pct": 0.9846337460838465,
+      "signed_pct": 0.4923168730419317
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.26869682042096854,
+      "range_pct": 0.9852216748768508,
+      "signed_pct": 0.26869682042096854
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.2985074626865672,
+      "range_pct": 1.1194029850746268,
+      "signed_pct": 0.2985074626865672
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.34312994181710704,
+      "range_pct": 1.1189019841861854,
+      "signed_pct": 0.34312994181710704
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.16420361247947796,
+      "range_pct": 1.1195700850873265,
+      "signed_pct": 0.16420361247947796
+    }
+  },
+  {
+    "name": "Innovision",
+    "order_id": "32326090949672",
+    "signal_to_fill_seconds": 176.4387640953064,
+    "signal_5m": {
+      "abs_close_pct": 1.5619453319133951,
+      "range_pct": 1.899183528576488,
+      "signed_pct": 1.5619453319133951
+    },
+    "ai_5m": {
+      "abs_close_pct": 1.5619453319133951,
+      "range_pct": 1.899183528576488,
+      "signed_pct": 1.5619453319133951
+    },
+    "fill_5m": {
+      "abs_close_pct": 1.7739932588256162,
+      "range_pct": 1.9513925847081781,
+      "signed_pct": 1.7739932588256162
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.8519701810436757,
+      "range_pct": 2.041178558750444,
+      "signed_pct": 0.8519701810436757
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.8519701810436757,
+      "range_pct": 2.041178558750444,
+      "signed_pct": 0.8519701810436757
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.7982969664715274,
+      "range_pct": 1.9513925847081781,
+      "signed_pct": 0.7982969664715274
+    }
+  },
+  {
+    "name": "Federal Mogul Goetze",
+    "order_id": "34326090917072",
+    "signal_to_fill_seconds": 345.80497908592224,
+    "signal_5m": {
+      "abs_close_pct": 0.22690437601296842,
+      "range_pct": 0.3889789303079441,
+      "signed_pct": 0.22690437601296842
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.10787486515641855,
+      "range_pct": 0.4962243797195278,
+      "signed_pct": 0.10787486515641855
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.2909482758620739,
+      "range_pct": 0.4849137931034483,
+      "signed_pct": -0.2909482758620739
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.11885467314965129,
+      "range_pct": 0.659103187466237,
+      "signed_pct": -0.11885467314965129
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.25889967637540207,
+      "range_pct": 0.6688241639697999,
+      "signed_pct": -0.25889967637540207
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.5064655172413842,
+      "range_pct": 0.7327586206896626,
+      "signed_pct": -0.5064655172413842
+    }
+  },
+  {
+    "name": "PCBL Chemical",
+    "order_id": "23326090916972",
+    "signal_to_fill_seconds": 145.14118599891663,
+    "signal_5m": {
+      "abs_close_pct": 0.11839573775345096,
+      "range_pct": 0.3699866804795027,
+      "signed_pct": -0.11839573775345096
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.04444444444443771,
+      "range_pct": 0.3703703703703704,
+      "signed_pct": 0.04444444444443771
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.23738872403561168,
+      "range_pct": 0.43026706231453665,
+      "signed_pct": -0.23738872403561168
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.8583690987124564,
+      "range_pct": 1.139558975876875,
+      "signed_pct": -0.8583690987124564
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.5037037037037003,
+      "range_pct": 1.1407407407407475,
+      "signed_pct": -0.5037037037037003
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.10385756676558539,
+      "range_pct": 1.0385756676557862,
+      "signed_pct": -0.10385756676558539
+    }
+  },
+  {
+    "name": "AGI Infra",
+    "order_id": "34326090918372",
+    "signal_to_fill_seconds": 78.85985088348389,
+    "signal_5m": {
+      "abs_close_pct": 0.4644761740925591,
+      "range_pct": 1.3418200584895845,
+      "signed_pct": 0.4644761740925591
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.4644761740925591,
+      "range_pct": 1.3418200584895845,
+      "signed_pct": 0.4644761740925591
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.11984249272385644,
+      "range_pct": 1.147063858928254,
+      "signed_pct": -0.11984249272385644
+    },
+    "signal_15m": {
+      "abs_close_pct": 1.4450369860657306,
+      "range_pct": 4.094271460519518,
+      "signed_pct": 1.4450369860657306
+    },
+    "ai_15m": {
+      "abs_close_pct": 1.4450369860657306,
+      "range_pct": 4.094271460519518,
+      "signed_pct": 1.4450369860657306
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.13696284882724782,
+      "range_pct": 3.886320835473366,
+      "signed_pct": 0.13696284882724782
+    }
+  },
+  {
+    "name": "Radhika Jeweltech",
+    "order_id": "32326090972572",
+    "signal_to_fill_seconds": 91.83804106712341,
+    "signal_5m": {
+      "abs_close_pct": 0.23726132640378908,
+      "range_pct": 0.5649079200090384,
+      "signed_pct": 0.23726132640378908
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.23726132640378908,
+      "range_pct": 0.5649079200090384,
+      "signed_pct": 0.23726132640378908
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.2714932126696774,
+      "range_pct": 0.5656108597285068,
+      "signed_pct": 0.2714932126696774
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.10168342560161472,
+      "range_pct": 0.6891876624110264,
+      "signed_pct": 0.10168342560161472
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.10168342560161472,
+      "range_pct": 0.6891876624110264,
+      "signed_pct": 0.10168342560161472
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.22624434389138987,
+      "range_pct": 0.6900452488687776,
+      "signed_pct": 0.22624434389138987
+    }
+  },
+  {
+    "name": "Tamilnadu Petroproducts",
+    "order_id": "32326090975372",
+    "signal_to_fill_seconds": 231.12234592437744,
+    "signal_5m": {
+      "abs_close_pct": 0.3064861012116738,
+      "range_pct": 0.41339985744831365,
+      "signed_pct": 0.3064861012116738
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.3064861012116738,
+      "range_pct": 0.41339985744831365,
+      "signed_pct": 0.3064861012116738
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.5187237973424216,
+      "range_pct": 0.5684644354437657,
+      "signed_pct": -0.5187237973424216
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.7840342124020119,
+      "range_pct": 1.575196008553106,
+      "signed_pct": -0.7840342124020119
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.7840342124020119,
+      "range_pct": 1.575196008553106,
+      "signed_pct": -0.7840342124020119
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.87401406949477,
+      "range_pct": 1.570383002913386,
+      "signed_pct": -0.87401406949477
+    }
+  },
+  {
+    "name": "Orient Green Power",
+    "order_id": "23326090918772",
+    "signal_to_fill_seconds": 84.20674896240234,
+    "signal_5m": {
+      "abs_close_pct": 0.30395136778114856,
+      "range_pct": 0.5065856129685989,
+      "signed_pct": -0.30395136778114856
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.30395136778114856,
+      "range_pct": 0.5065856129685989,
+      "signed_pct": -0.30395136778114856
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.10131712259371618,
+      "range_pct": 0.5065856129685989,
+      "signed_pct": -0.10131712259371618
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.6079027355623151,
+      "range_pct": 1.2158054711246122,
+      "signed_pct": 0.6079027355623151
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.6079027355623151,
+      "range_pct": 1.2158054711246122,
+      "signed_pct": 0.6079027355623151
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.10131712259373417,
+      "range_pct": 1.2158054711246122,
+      "signed_pct": 0.10131712259373417
+    }
+  },
+  {
+    "name": "Excelsoft Technologies",
+    "order_id": "22326090996172",
+    "signal_to_fill_seconds": 75.47857809066772,
+    "signal_5m": {
+      "abs_close_pct": 0.05111167901864559,
+      "range_pct": 0.7411193457705063,
+      "signed_pct": 0.05111167901864559
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.07658922644881576,
+      "range_pct": 0.7403625223385222,
+      "signed_pct": -0.07658922644881576
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.08945686900957595,
+      "range_pct": 0.7284345047923236,
+      "signed_pct": -0.08945686900957595
+    },
+    "signal_15m": {
+      "abs_close_pct": 1.1755686174290847,
+      "range_pct": 1.8016866854076112,
+      "signed_pct": -1.1755686174290847
+    },
+    "ai_15m": {
+      "abs_close_pct": 1.595608884350268,
+      "range_pct": 1.9402604033699207,
+      "signed_pct": -1.595608884350268
+    },
+    "fill_15m": {
+      "abs_close_pct": 1.7507987220447343,
+      "range_pct": 2.479233226837058,
+      "signed_pct": -1.7507987220447343
+    }
+  },
+  {
+    "name": "Excelsoft Technologies",
+    "order_id": "23326090922472",
+    "signal_to_fill_seconds": 147.33432006835938,
+    "signal_5m": {
+      "abs_close_pct": 0.1037748086651943,
+      "range_pct": 0.8431703204047292,
+      "signed_pct": 0.1037748086651943
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.1037748086651943,
+      "range_pct": 0.8431703204047292,
+      "signed_pct": 0.1037748086651943
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.27322404371583886,
+      "range_pct": 1.1189175123601345,
+      "signed_pct": -0.27322404371583886
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.6356207030743405,
+      "range_pct": 1.2582695550655063,
+      "signed_pct": -0.6356207030743405
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.6356207030743405,
+      "range_pct": 1.2582695550655063,
+      "signed_pct": -0.6356207030743405
+    },
+    "fill_15m": {
+      "abs_close_pct": 0.23419203747071637,
+      "range_pct": 1.2620348685922442,
+      "signed_pct": -0.23419203747071637
+    }
+  },
+  {
+    "name": "TCC Concept",
+    "order_id": "23326090923372",
+    "signal_to_fill_seconds": 203.27333402633667,
+    "signal_5m": {
+      "abs_close_pct": 0.19323671497584816,
+      "range_pct": 1.1594202898550752,
+      "signed_pct": -0.19323671497584816
+    },
+    "ai_5m": {
+      "abs_close_pct": 0.09671179883945291,
+      "range_pct": 1.1605415860735036,
+      "signed_pct": 0.09671179883945291
+    },
+    "fill_5m": {
+      "abs_close_pct": 0.29041626331074266,
+      "range_pct": 0.5808325266214853,
+      "signed_pct": -0.29041626331074266
+    },
+    "signal_15m": {
+      "abs_close_pct": 0.772946859903379,
+      "range_pct": 1.8357487922705369,
+      "signed_pct": -0.772946859903379
+    },
+    "ai_15m": {
+      "abs_close_pct": 0.870406189555131,
+      "range_pct": 1.8375241779497151,
+      "signed_pct": -0.870406189555131
+    },
+    "fill_15m": {
+      "abs_close_pct": 1.1616650532429844,
+      "range_pct": 1.5488867376573032,
+      "signed_pct": -1.1616650532429844
+    }
+  }
+]
