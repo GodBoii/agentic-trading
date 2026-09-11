@@ -1,0 +1,58 @@
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] LIVE | connection=CONNECTED packets=1 coverage=1/3,500 eligible=3,500 hot=60 rank_ms=557.17 candidates=0 events=0 agents=0 shadow=True gates=none
+[2026-09-07 10:00:00 UTC+05:30] [Intra-Finder] Feed coverage reached 25%: 875/3,500.
+[2026-09-07 10:00:01 UTC+05:30] [Intra-Finder] Feed coverage reached 50%: 1,750/3,500.
+[2026-09-07 10:00:01 UTC+05:30] [Intra-Finder] Feed coverage reached 75%: 2,625/3,500.
+[2026-09-07 10:00:01 UTC+05:30] [Intra-Finder] Feed coverage reached 90%: 3,150/3,500.
+[2026-09-07 10:00:01 UTC+05:30] [Intra-Finder] Feed coverage reached 100%: 3,500/3,500.
+[2026-09-07 10:01:00 UTC+05:30] [Intra-Finder] LIVE | connection=CONNECTED packets=210,128 coverage=3,500/3,500 eligible=3,500 hot=79 rank_ms=251.44 candidates=0 events=0 agents=0 shadow=True gates=none
+[2026-09-07 10:02:00 UTC+05:30] [Intra-Finder] LIVE | connection=CONNECTED packets=420,000 coverage=3,500/3,500 eligible=3,500 hot=60 rank_ms=205.03 candidates=0 events=0 agents=0 shadow=True gates=none
+{
+  "stocks": 3500,
+  "samples": 900,
+  "packets": 420000,
+  "bars_per_stock": 120,
+  "peak_rss_mib_linux": 1407.8671875,
+  "paced": true,
+  "rank_interval": 5,
+  "flush_seconds": 30,
+  "status_seconds": 60,
+  "stored_sequences_verified": true,
+  "preconnection_preparation_ms": 1287.3114220000161,
+  "recorded_packets": 420000,
+  "elapsed_seconds": 121.62127181000002,
+  "ingress_ms": {
+    "p50": 0.513820000008991,
+    "p95": 332.5371414500097,
+    "p99": 554.026568279995,
+    "max": 836.3436260000014
+  },
+  "ranking_ms": [
+    557.1749970000042,
+    199.98286800000642,
+    191.42394599998624,
+    193.97950900000183,
+    258.91020099999196,
+    343.74547199999483,
+    258.9046530000019,
+    201.57522100001302,
+    197.72490799999787,
+    215.52440900001102,
+    355.63737399999695,
+    302.9468409999936,
+    251.4450150000016,
+    456.30213000001163,
+    202.96967999999538,
+    204.12617399998112,
+    210.30453700001317,
+    206.03307199999676,
+    196.54719299998646,
+    206.35932400000456,
+    195.40263200002528,
+    192.26904700002478,
+    200.19341599999052,
+    205.02456399998437
+  ],
+  "queue_high_water": 3102,
+  "queue_full_waits": 0,
+  "persistence_error": null
+}
