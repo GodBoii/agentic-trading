@@ -1,0 +1,1826 @@
+[
+  {
+    "day": "2026-09-02",
+    "decision_times": 64,
+    "candidate_rows": 5488,
+    "eligible_rallies": 461,
+    "policies": {
+      "activity": {
+        "selected": 632,
+        "labelled": 580,
+        "median_spread_pct": 0.07455500000000001,
+        "median_value5": 25208639.4,
+        "capture_rate": 0.2386117136659436,
+        "by_phase": {
+          "all": {
+            "n": 580,
+            "rallies": 110,
+            "rally_rate": 0.1896551724137931,
+            "rally_after_spread_rate": 0.17758620689655172,
+            "median_abs_return_pct": 0.3033773483477442
+          },
+          "opening": {
+            "n": 30,
+            "rallies": 9,
+            "rally_rate": 0.3,
+            "rally_after_spread_rate": 0.3,
+            "median_abs_return_pct": 0.5635681230205747
+          },
+          "morning": {
+            "n": 216,
+            "rallies": 44,
+            "rally_rate": 0.2037037037037037,
+            "rally_after_spread_rate": 0.18981481481481483,
+            "median_abs_return_pct": 0.326084219166356
+          },
+          "afternoon": {
+            "n": 334,
+            "rallies": 57,
+            "rally_rate": 0.17065868263473055,
+            "rally_after_spread_rate": 0.15868263473053892,
+            "median_abs_return_pct": 0.2722604643640547
+          }
+        }
+      },
+      "recent_range": {
+        "selected": 632,
+        "labelled": 556,
+        "median_spread_pct": 0.082815,
+        "median_value5": 14695299.125,
+        "capture_rate": 0.2039045553145336,
+        "by_phase": {
+          "all": {
+            "n": 556,
+            "rallies": 94,
+            "rally_rate": 0.16906474820143885,
+            "rally_after_spread_rate": 0.1474820143884892,
+            "median_abs_return_pct": 0.2816217694516676
+          },
+          "opening": {
+            "n": 30,
+            "rallies": 11,
+            "rally_rate": 0.36666666666666664,
+            "rally_after_spread_rate": 0.36666666666666664,
+            "median_abs_return_pct": 0.5320143545992806
+          },
+          "morning": {
+            "n": 213,
+            "rallies": 43,
+            "rally_rate": 0.20187793427230047,
+            "rally_after_spread_rate": 0.17370892018779344,
+            "median_abs_return_pct": 0.3266448903406438
+          },
+          "afternoon": {
+            "n": 313,
+            "rallies": 40,
+            "rally_rate": 0.12779552715654952,
+            "rally_after_spread_rate": 0.10862619808306709,
+            "median_abs_return_pct": 0.2307692307692344
+          }
+        }
+      },
+      "fresh_movement": {
+        "selected": 632,
+        "labelled": 555,
+        "median_spread_pct": 0.08035500000000001,
+        "median_value5": 9612837.6,
+        "capture_rate": 0.18004338394793926,
+        "by_phase": {
+          "all": {
+            "n": 555,
+            "rallies": 83,
+            "rally_rate": 0.14954954954954955,
+            "rally_after_spread_rate": 0.13333333333333333,
+            "median_abs_return_pct": 0.2245629043469033
+          },
+          "opening": {
+            "n": 32,
+            "rallies": 13,
+            "rally_rate": 0.40625,
+            "rally_after_spread_rate": 0.375,
+            "median_abs_return_pct": 0.6103429074158895
+          },
+          "morning": {
+            "n": 216,
+            "rallies": 38,
+            "rally_rate": 0.17592592592592593,
+            "rally_after_spread_rate": 0.14814814814814814,
+            "median_abs_return_pct": 0.2914748766572106
+          },
+          "afternoon": {
+            "n": 307,
+            "rallies": 32,
+            "rally_rate": 0.10423452768729642,
+            "rally_after_spread_rate": 0.09771986970684039,
+            "median_abs_return_pct": 0.18612071257645413
+          }
+        }
+      },
+      "renewed_volume": {
+        "selected": 632,
+        "labelled": 554,
+        "median_spread_pct": 0.07813,
+        "median_value5": 7845636.399999999,
+        "capture_rate": 0.14316702819956617,
+        "by_phase": {
+          "all": {
+            "n": 554,
+            "rallies": 66,
+            "rally_rate": 0.11913357400722022,
+            "rally_after_spread_rate": 0.10108303249097472,
+            "median_abs_return_pct": 0.20974136971739776
+          },
+          "opening": {
+            "n": 29,
+            "rallies": 4,
+            "rally_rate": 0.13793103448275862,
+            "rally_after_spread_rate": 0.13793103448275862,
+            "median_abs_return_pct": 0.32184629876756965
+          },
+          "morning": {
+            "n": 214,
+            "rallies": 29,
+            "rally_rate": 0.13551401869158877,
+            "rally_after_spread_rate": 0.102803738317757,
+            "median_abs_return_pct": 0.23239305965080392
+          },
+          "afternoon": {
+            "n": 311,
+            "rallies": 33,
+            "rally_rate": 0.10610932475884244,
+            "rally_after_spread_rate": 0.09646302250803858,
+            "median_abs_return_pct": 0.19574259848299524
+          }
+        }
+      },
+      "efficient_movement": {
+        "selected": 632,
+        "labelled": 558,
+        "median_spread_pct": 0.07007,
+        "median_value5": 12440844.45,
+        "capture_rate": 0.15835140997830802,
+        "by_phase": {
+          "all": {
+            "n": 558,
+            "rallies": 73,
+            "rally_rate": 0.13082437275985664,
+            "rally_after_spread_rate": 0.11827956989247312,
+            "median_abs_return_pct": 0.23143972459112594
+          },
+          "opening": {
+            "n": 30,
+            "rallies": 7,
+            "rally_rate": 0.23333333333333334,
+            "rally_after_spread_rate": 0.23333333333333334,
+            "median_abs_return_pct": 0.38085760366733945
+          },
+          "morning": {
+            "n": 213,
+            "rallies": 28,
+            "rally_rate": 0.13145539906103287,
+            "rally_after_spread_rate": 0.107981220657277,
+            "median_abs_return_pct": 0.24307052965852893
+          },
+          "afternoon": {
+            "n": 315,
+            "rallies": 38,
+            "rally_rate": 0.12063492063492064,
+            "rally_after_spread_rate": 0.11428571428571428,
+            "median_abs_return_pct": 0.2103049421661396
+          }
+        }
+      },
+      "volume_and_range": {
+        "selected": 632,
+        "labelled": 554,
+        "median_spread_pct": 0.077815,
+        "median_value5": 7452931.43,
+        "capture_rate": 0.14533622559652928,
+        "by_phase": {
+          "all": {
+            "n": 554,
+            "rallies": 67,
+            "rally_rate": 0.12093862815884476,
+            "rally_after_spread_rate": 0.10108303249097472,
+            "median_abs_return_pct": 0.2002274650438285
+          },
+          "opening": {
+            "n": 29,
+            "rallies": 6,
+            "rally_rate": 0.20689655172413793,
+            "rally_after_spread_rate": 0.20689655172413793,
+            "median_abs_return_pct": 0.40993206840009844
+          },
+          "morning": {
+            "n": 216,
+            "rallies": 31,
+            "rally_rate": 0.14351851851851852,
+            "rally_after_spread_rate": 0.11574074074074074,
+            "median_abs_return_pct": 0.22373495505387808
+          },
+          "afternoon": {
+            "n": 309,
+            "rallies": 30,
+            "rally_rate": 0.0970873786407767,
+            "rally_after_spread_rate": 0.08090614886731391,
+            "median_abs_return_pct": 0.18189450118930583
+          }
+        }
+      },
+      "compression_expansion": {
+        "selected": 632,
+        "labelled": 557,
+        "median_spread_pct": 0.07178000000000001,
+        "median_value5": 7099401.9499999955,
+        "capture_rate": 0.12581344902386118,
+        "by_phase": {
+          "all": {
+            "n": 557,
+            "rallies": 58,
+            "rally_rate": 0.10412926391382406,
+            "rally_after_spread_rate": 0.08258527827648116,
+            "median_abs_return_pct": 0.17907932160539097
+          },
+          "opening": {
+            "n": 29,
+            "rallies": 4,
+            "rally_rate": 0.13793103448275862,
+            "rally_after_spread_rate": 0.13793103448275862,
+            "median_abs_return_pct": 0.29816985399957474
+          },
+          "morning": {
+            "n": 219,
+            "rallies": 28,
+            "rally_rate": 0.1278538812785388,
+            "rally_after_spread_rate": 0.0958904109589041,
+            "median_abs_return_pct": 0.1841768097373464
+          },
+          "afternoon": {
+            "n": 309,
+            "rallies": 26,
+            "rally_rate": 0.08414239482200647,
+            "rally_after_spread_rate": 0.06796116504854369,
+            "median_abs_return_pct": 0.16054456717184973
+          }
+        }
+      },
+      "liquidity": {
+        "selected": 632,
+        "labelled": 610,
+        "median_spread_pct": 0.04281,
+        "median_value5": 97868256.535,
+        "capture_rate": 0.1735357917570499,
+        "by_phase": {
+          "all": {
+            "n": 610,
+            "rallies": 80,
+            "rally_rate": 0.13114754098360656,
+            "rally_after_spread_rate": 0.12295081967213115,
+            "median_abs_return_pct": 0.19017104883961022
+          },
+          "opening": {
+            "n": 32,
+            "rallies": 5,
+            "rally_rate": 0.15625,
+            "rally_after_spread_rate": 0.125,
+            "median_abs_return_pct": 0.524796178482323
+          },
+          "morning": {
+            "n": 228,
+            "rallies": 32,
+            "rally_rate": 0.14035087719298245,
+            "rally_after_spread_rate": 0.14035087719298245,
+            "median_abs_return_pct": 0.182682668783396
+          },
+          "afternoon": {
+            "n": 350,
+            "rallies": 43,
+            "rally_rate": 0.12285714285714286,
+            "rally_after_spread_rate": 0.11142857142857143,
+            "median_abs_return_pct": 0.18213846421121782
+          }
+        }
+      }
+    }
+  },
+  {
+    "day": "2026-09-03",
+    "decision_times": 66,
+    "candidate_rows": 5843,
+    "eligible_rallies": 574,
+    "policies": {
+      "activity": {
+        "selected": 651,
+        "labelled": 615,
+        "median_spread_pct": 0.08624,
+        "median_value5": 16935952.06,
+        "capture_rate": 0.2264808362369338,
+        "by_phase": {
+          "all": {
+            "n": 615,
+            "rallies": 130,
+            "rally_rate": 0.21138211382113822,
+            "rally_after_spread_rate": 0.17073170731707318,
+            "median_abs_return_pct": 0.30933333333333923
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 20,
+            "rally_rate": 0.4,
+            "rally_after_spread_rate": 0.3,
+            "median_abs_return_pct": 0.553445481721393
+          },
+          "morning": {
+            "n": 233,
+            "rallies": 52,
+            "rally_rate": 0.22317596566523606,
+            "rally_after_spread_rate": 0.1759656652360515,
+            "median_abs_return_pct": 0.3430049482680886
+          },
+          "afternoon": {
+            "n": 332,
+            "rallies": 58,
+            "rally_rate": 0.1746987951807229,
+            "rally_after_spread_rate": 0.14759036144578314,
+            "median_abs_return_pct": 0.2539765470799926
+          }
+        }
+      },
+      "recent_range": {
+        "selected": 651,
+        "labelled": 596,
+        "median_spread_pct": 0.09324,
+        "median_value5": 10167639.705,
+        "capture_rate": 0.20557491289198607,
+        "by_phase": {
+          "all": {
+            "n": 596,
+            "rallies": 118,
+            "rally_rate": 0.19798657718120805,
+            "rally_after_spread_rate": 0.1610738255033557,
+            "median_abs_return_pct": 0.3152884413338275
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 11,
+            "rally_rate": 0.22,
+            "rally_after_spread_rate": 0.18,
+            "median_abs_return_pct": 0.3798089031265439
+          },
+          "morning": {
+            "n": 230,
+            "rallies": 47,
+            "rally_rate": 0.20434782608695654,
+            "rally_after_spread_rate": 0.16521739130434782,
+            "median_abs_return_pct": 0.37432218470204726
+          },
+          "afternoon": {
+            "n": 316,
+            "rallies": 60,
+            "rally_rate": 0.189873417721519,
+            "rally_after_spread_rate": 0.1550632911392405,
+            "median_abs_return_pct": 0.2503132832080257
+          }
+        }
+      },
+      "fresh_movement": {
+        "selected": 651,
+        "labelled": 604,
+        "median_spread_pct": 0.08937,
+        "median_value5": 7535638.25,
+        "capture_rate": 0.16550522648083624,
+        "by_phase": {
+          "all": {
+            "n": 604,
+            "rallies": 95,
+            "rally_rate": 0.15728476821192053,
+            "rally_after_spread_rate": 0.12086092715231789,
+            "median_abs_return_pct": 0.24256050115744054
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 13,
+            "rally_rate": 0.26,
+            "rally_after_spread_rate": 0.22,
+            "median_abs_return_pct": 0.34036422862988025
+          },
+          "morning": {
+            "n": 229,
+            "rallies": 35,
+            "rally_rate": 0.15283842794759825,
+            "rally_after_spread_rate": 0.11790393013100436,
+            "median_abs_return_pct": 0.2853785462481273
+          },
+          "afternoon": {
+            "n": 325,
+            "rallies": 47,
+            "rally_rate": 0.14461538461538462,
+            "rally_after_spread_rate": 0.1076923076923077,
+            "median_abs_return_pct": 0.21645021645021467
+          }
+        }
+      },
+      "renewed_volume": {
+        "selected": 651,
+        "labelled": 600,
+        "median_spread_pct": 0.0869,
+        "median_value5": 5873757.409999998,
+        "capture_rate": 0.1445993031358885,
+        "by_phase": {
+          "all": {
+            "n": 600,
+            "rallies": 83,
+            "rally_rate": 0.13833333333333334,
+            "rally_after_spread_rate": 0.10666666666666667,
+            "median_abs_return_pct": 0.2119163856950823
+          },
+          "opening": {
+            "n": 48,
+            "rallies": 13,
+            "rally_rate": 0.2708333333333333,
+            "rally_after_spread_rate": 0.22916666666666666,
+            "median_abs_return_pct": 0.2837890312074154
+          },
+          "morning": {
+            "n": 227,
+            "rallies": 30,
+            "rally_rate": 0.13215859030837004,
+            "rally_after_spread_rate": 0.09691629955947137,
+            "median_abs_return_pct": 0.2803015658225272
+          },
+          "afternoon": {
+            "n": 325,
+            "rallies": 40,
+            "rally_rate": 0.12307692307692308,
+            "rally_after_spread_rate": 0.09538461538461539,
+            "median_abs_return_pct": 0.18106995884774602
+          }
+        }
+      },
+      "efficient_movement": {
+        "selected": 651,
+        "labelled": 602,
+        "median_spread_pct": 0.08333,
+        "median_value5": 8967207.83,
+        "capture_rate": 0.15505226480836237,
+        "by_phase": {
+          "all": {
+            "n": 602,
+            "rallies": 89,
+            "rally_rate": 0.1478405315614618,
+            "rally_after_spread_rate": 0.1212624584717608,
+            "median_abs_return_pct": 0.23542466597382128
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 16,
+            "rally_rate": 0.32,
+            "rally_after_spread_rate": 0.26,
+            "median_abs_return_pct": 0.5112481914866962
+          },
+          "morning": {
+            "n": 231,
+            "rallies": 35,
+            "rally_rate": 0.15151515151515152,
+            "rally_after_spread_rate": 0.12554112554112554,
+            "median_abs_return_pct": 0.2853785462481273
+          },
+          "afternoon": {
+            "n": 321,
+            "rallies": 38,
+            "rally_rate": 0.11838006230529595,
+            "rally_after_spread_rate": 0.09657320872274143,
+            "median_abs_return_pct": 0.18721056261701285
+          }
+        }
+      },
+      "volume_and_range": {
+        "selected": 651,
+        "labelled": 592,
+        "median_spread_pct": 0.08807,
+        "median_value5": 5637305.819999998,
+        "capture_rate": 0.14634146341463414,
+        "by_phase": {
+          "all": {
+            "n": 592,
+            "rallies": 84,
+            "rally_rate": 0.14189189189189189,
+            "rally_after_spread_rate": 0.1097972972972973,
+            "median_abs_return_pct": 0.2298884752909569
+          },
+          "opening": {
+            "n": 49,
+            "rallies": 15,
+            "rally_rate": 0.30612244897959184,
+            "rally_after_spread_rate": 0.22448979591836735,
+            "median_abs_return_pct": 0.44388958246637245
+          },
+          "morning": {
+            "n": 228,
+            "rallies": 29,
+            "rally_rate": 0.12719298245614036,
+            "rally_after_spread_rate": 0.09649122807017543,
+            "median_abs_return_pct": 0.28246178131762223
+          },
+          "afternoon": {
+            "n": 315,
+            "rallies": 40,
+            "rally_rate": 0.12698412698412698,
+            "rally_after_spread_rate": 0.10158730158730159,
+            "median_abs_return_pct": 0.18009905447997632
+          }
+        }
+      },
+      "compression_expansion": {
+        "selected": 651,
+        "labelled": 597,
+        "median_spread_pct": 0.07728,
+        "median_value5": 5146247.899999999,
+        "capture_rate": 0.12020905923344948,
+        "by_phase": {
+          "all": {
+            "n": 597,
+            "rallies": 69,
+            "rally_rate": 0.11557788944723618,
+            "rally_after_spread_rate": 0.08542713567839195,
+            "median_abs_return_pct": 0.1840349666436758
+          },
+          "opening": {
+            "n": 48,
+            "rallies": 11,
+            "rally_rate": 0.22916666666666666,
+            "rally_after_spread_rate": 0.1875,
+            "median_abs_return_pct": 0.32147148754922417
+          },
+          "morning": {
+            "n": 227,
+            "rallies": 28,
+            "rally_rate": 0.12334801762114538,
+            "rally_after_spread_rate": 0.09251101321585903,
+            "median_abs_return_pct": 0.2383698577470117
+          },
+          "afternoon": {
+            "n": 322,
+            "rallies": 30,
+            "rally_rate": 0.09316770186335403,
+            "rally_after_spread_rate": 0.06521739130434782,
+            "median_abs_return_pct": 0.1471288804701154
+          }
+        }
+      },
+      "liquidity": {
+        "selected": 651,
+        "labelled": 641,
+        "median_spread_pct": 0.04579,
+        "median_value5": 95196975.52,
+        "capture_rate": 0.16898954703832753,
+        "by_phase": {
+          "all": {
+            "n": 641,
+            "rallies": 97,
+            "rally_rate": 0.15132605304212168,
+            "rally_after_spread_rate": 0.13416536661466458,
+            "median_abs_return_pct": 0.22066738428416777
+          },
+          "opening": {
+            "n": 51,
+            "rallies": 7,
+            "rally_rate": 0.13725490196078433,
+            "rally_after_spread_rate": 0.13725490196078433,
+            "median_abs_return_pct": 0.30624263839811317
+          },
+          "morning": {
+            "n": 240,
+            "rallies": 37,
+            "rally_rate": 0.15416666666666667,
+            "rally_after_spread_rate": 0.12916666666666668,
+            "median_abs_return_pct": 0.2633681492872575
+          },
+          "afternoon": {
+            "n": 350,
+            "rallies": 53,
+            "rally_rate": 0.15142857142857144,
+            "rally_after_spread_rate": 0.13714285714285715,
+            "median_abs_return_pct": 0.18119602061025253
+          }
+        }
+      }
+    }
+  },
+  {
+    "day": "2026-09-07",
+    "decision_times": 65,
+    "candidate_rows": 5637,
+    "eligible_rallies": 646,
+    "policies": {
+      "activity": {
+        "selected": 650,
+        "labelled": 597,
+        "median_spread_pct": 0.092265,
+        "median_value5": 16170364.9,
+        "capture_rate": 0.19659442724458204,
+        "by_phase": {
+          "all": {
+            "n": 597,
+            "rallies": 127,
+            "rally_rate": 0.21273031825795644,
+            "rally_after_spread_rate": 0.19765494137353434,
+            "median_abs_return_pct": 0.34907336887535223
+          },
+          "opening": {
+            "n": 47,
+            "rallies": 16,
+            "rally_rate": 0.3404255319148936,
+            "rally_after_spread_rate": 0.3404255319148936,
+            "median_abs_return_pct": 0.5834683954619169
+          },
+          "morning": {
+            "n": 226,
+            "rallies": 49,
+            "rally_rate": 0.2168141592920354,
+            "rally_after_spread_rate": 0.21238938053097345,
+            "median_abs_return_pct": 0.38215599865483174
+          },
+          "afternoon": {
+            "n": 324,
+            "rallies": 62,
+            "rally_rate": 0.19135802469135801,
+            "rally_after_spread_rate": 0.16666666666666666,
+            "median_abs_return_pct": 0.27348923587223184
+          }
+        }
+      },
+      "recent_range": {
+        "selected": 650,
+        "labelled": 589,
+        "median_spread_pct": 0.0973,
+        "median_value5": 9685837.325,
+        "capture_rate": 0.16718266253869968,
+        "by_phase": {
+          "all": {
+            "n": 589,
+            "rallies": 108,
+            "rally_rate": 0.1833616298811545,
+            "rally_after_spread_rate": 0.16808149405772496,
+            "median_abs_return_pct": 0.3412698412698423
+          },
+          "opening": {
+            "n": 48,
+            "rallies": 11,
+            "rally_rate": 0.22916666666666666,
+            "rally_after_spread_rate": 0.22916666666666666,
+            "median_abs_return_pct": 0.6305830242005206
+          },
+          "morning": {
+            "n": 224,
+            "rallies": 45,
+            "rally_rate": 0.20089285714285715,
+            "rally_after_spread_rate": 0.17410714285714285,
+            "median_abs_return_pct": 0.33734476253901025
+          },
+          "afternoon": {
+            "n": 317,
+            "rallies": 52,
+            "rally_rate": 0.1640378548895899,
+            "rally_after_spread_rate": 0.15457413249211358,
+            "median_abs_return_pct": 0.3049710277523543
+          }
+        }
+      },
+      "fresh_movement": {
+        "selected": 650,
+        "labelled": 586,
+        "median_spread_pct": 0.09628,
+        "median_value5": 6147812.210000007,
+        "capture_rate": 0.1563467492260062,
+        "by_phase": {
+          "all": {
+            "n": 586,
+            "rallies": 101,
+            "rally_rate": 0.17235494880546076,
+            "rally_after_spread_rate": 0.15187713310580206,
+            "median_abs_return_pct": 0.2861966723835374
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 9,
+            "rally_rate": 0.18,
+            "rally_after_spread_rate": 0.16,
+            "median_abs_return_pct": 0.39697806469398134
+          },
+          "morning": {
+            "n": 220,
+            "rallies": 41,
+            "rally_rate": 0.18636363636363637,
+            "rally_after_spread_rate": 0.16818181818181818,
+            "median_abs_return_pct": 0.2821075622644664
+          },
+          "afternoon": {
+            "n": 316,
+            "rallies": 51,
+            "rally_rate": 0.16139240506329114,
+            "rally_after_spread_rate": 0.13924050632911392,
+            "median_abs_return_pct": 0.2640879249438566
+          }
+        }
+      },
+      "renewed_volume": {
+        "selected": 650,
+        "labelled": 586,
+        "median_spread_pct": 0.09321499999999999,
+        "median_value5": 5401429.644999996,
+        "capture_rate": 0.12229102167182662,
+        "by_phase": {
+          "all": {
+            "n": 586,
+            "rallies": 79,
+            "rally_rate": 0.1348122866894198,
+            "rally_after_spread_rate": 0.11433447098976109,
+            "median_abs_return_pct": 0.24008835966792264
+          },
+          "opening": {
+            "n": 49,
+            "rallies": 7,
+            "rally_rate": 0.14285714285714285,
+            "rally_after_spread_rate": 0.12244897959183673,
+            "median_abs_return_pct": 0.3177124702144596
+          },
+          "morning": {
+            "n": 224,
+            "rallies": 35,
+            "rally_rate": 0.15625,
+            "rally_after_spread_rate": 0.13392857142857142,
+            "median_abs_return_pct": 0.258828026444069
+          },
+          "afternoon": {
+            "n": 313,
+            "rallies": 37,
+            "rally_rate": 0.1182108626198083,
+            "rally_after_spread_rate": 0.09904153354632587,
+            "median_abs_return_pct": 0.2135231316725994
+          }
+        }
+      },
+      "efficient_movement": {
+        "selected": 650,
+        "labelled": 590,
+        "median_spread_pct": 0.0871,
+        "median_value5": 9099851.35,
+        "capture_rate": 0.15944272445820434,
+        "by_phase": {
+          "all": {
+            "n": 590,
+            "rallies": 103,
+            "rally_rate": 0.17457627118644067,
+            "rally_after_spread_rate": 0.15254237288135594,
+            "median_abs_return_pct": 0.2552539943387888
+          },
+          "opening": {
+            "n": 48,
+            "rallies": 17,
+            "rally_rate": 0.3541666666666667,
+            "rally_after_spread_rate": 0.3541666666666667,
+            "median_abs_return_pct": 0.4601274556928714
+          },
+          "morning": {
+            "n": 228,
+            "rallies": 36,
+            "rally_rate": 0.15789473684210525,
+            "rally_after_spread_rate": 0.15350877192982457,
+            "median_abs_return_pct": 0.2742950113126197
+          },
+          "afternoon": {
+            "n": 314,
+            "rallies": 50,
+            "rally_rate": 0.1592356687898089,
+            "rally_after_spread_rate": 0.12101910828025478,
+            "median_abs_return_pct": 0.20872578108316886
+          }
+        }
+      },
+      "volume_and_range": {
+        "selected": 650,
+        "labelled": 585,
+        "median_spread_pct": 0.092525,
+        "median_value5": 5553722.380000001,
+        "capture_rate": 0.13777089783281735,
+        "by_phase": {
+          "all": {
+            "n": 585,
+            "rallies": 89,
+            "rally_rate": 0.15213675213675212,
+            "rally_after_spread_rate": 0.13333333333333333,
+            "median_abs_return_pct": 0.2501250625312701
+          },
+          "opening": {
+            "n": 49,
+            "rallies": 8,
+            "rally_rate": 0.16326530612244897,
+            "rally_after_spread_rate": 0.14285714285714285,
+            "median_abs_return_pct": 0.42531120331950056
+          },
+          "morning": {
+            "n": 224,
+            "rallies": 41,
+            "rally_rate": 0.18303571428571427,
+            "rally_after_spread_rate": 0.16517857142857142,
+            "median_abs_return_pct": 0.2722211460447044
+          },
+          "afternoon": {
+            "n": 312,
+            "rallies": 40,
+            "rally_rate": 0.1282051282051282,
+            "rally_after_spread_rate": 0.10897435897435898,
+            "median_abs_return_pct": 0.20459570109770953
+          }
+        }
+      },
+      "compression_expansion": {
+        "selected": 650,
+        "labelled": 584,
+        "median_spread_pct": 0.087065,
+        "median_value5": 4440741.615,
+        "capture_rate": 0.12693498452012383,
+        "by_phase": {
+          "all": {
+            "n": 584,
+            "rallies": 82,
+            "rally_rate": 0.1404109589041096,
+            "rally_after_spread_rate": 0.11815068493150685,
+            "median_abs_return_pct": 0.2251686646441542
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 11,
+            "rally_rate": 0.22,
+            "rally_after_spread_rate": 0.2,
+            "median_abs_return_pct": 0.41934724356648134
+          },
+          "morning": {
+            "n": 225,
+            "rallies": 44,
+            "rally_rate": 0.19555555555555557,
+            "rally_after_spread_rate": 0.16444444444444445,
+            "median_abs_return_pct": 0.2712804436942329
+          },
+          "afternoon": {
+            "n": 309,
+            "rallies": 27,
+            "rally_rate": 0.08737864077669903,
+            "rally_after_spread_rate": 0.07119741100323625,
+            "median_abs_return_pct": 0.15783243456530816
+          }
+        }
+      },
+      "liquidity": {
+        "selected": 650,
+        "labelled": 636,
+        "median_spread_pct": 0.054790000000000005,
+        "median_value5": 86676788.82999998,
+        "capture_rate": 0.16563467492260062,
+        "by_phase": {
+          "all": {
+            "n": 636,
+            "rallies": 107,
+            "rally_rate": 0.16823899371069181,
+            "rally_after_spread_rate": 0.1509433962264151,
+            "median_abs_return_pct": 0.2576881003742093
+          },
+          "opening": {
+            "n": 50,
+            "rallies": 14,
+            "rally_rate": 0.28,
+            "rally_after_spread_rate": 0.26,
+            "median_abs_return_pct": 0.5395294856313348
+          },
+          "morning": {
+            "n": 240,
+            "rallies": 40,
+            "rally_rate": 0.16666666666666666,
+            "rally_after_spread_rate": 0.15,
+            "median_abs_return_pct": 0.29578151698844146
+          },
+          "afternoon": {
+            "n": 346,
+            "rallies": 53,
+            "rally_rate": 0.1531791907514451,
+            "rally_after_spread_rate": 0.13583815028901733,
+            "median_abs_return_pct": 0.21197522731539742
+          }
+        }
+      }
+    }
+  },
+  {
+    "day": "2026-09-08",
+    "decision_times": 60,
+    "candidate_rows": 5517,
+    "eligible_rallies": 698,
+    "policies": {
+      "activity": {
+        "selected": 600,
+        "labelled": 575,
+        "median_spread_pct": 0.07416,
+        "median_value5": 23836563.79,
+        "capture_rate": 0.18624641833810887,
+        "by_phase": {
+          "all": {
+            "n": 575,
+            "rallies": 130,
+            "rally_rate": 0.22608695652173913,
+            "rally_after_spread_rate": 0.20695652173913043,
+            "median_abs_return_pct": 0.3455652460095271
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 20,
+            "rally_rate": 0.2898550724637681,
+            "rally_after_spread_rate": 0.2753623188405797,
+            "median_abs_return_pct": 0.4001333777925997
+          },
+          "morning": {
+            "n": 234,
+            "rallies": 54,
+            "rally_rate": 0.23076923076923078,
+            "rally_after_spread_rate": 0.21367521367521367,
+            "median_abs_return_pct": 0.3654665960815817
+          },
+          "afternoon": {
+            "n": 272,
+            "rallies": 56,
+            "rally_rate": 0.20588235294117646,
+            "rally_after_spread_rate": 0.18382352941176472,
+            "median_abs_return_pct": 0.32560120866136355
+          }
+        }
+      },
+      "recent_range": {
+        "selected": 600,
+        "labelled": 557,
+        "median_spread_pct": 0.089615,
+        "median_value5": 14435039.200000001,
+        "capture_rate": 0.17335243553008595,
+        "by_phase": {
+          "all": {
+            "n": 557,
+            "rallies": 121,
+            "rally_rate": 0.21723518850987433,
+            "rally_after_spread_rate": 0.19030520646319568,
+            "median_abs_return_pct": 0.3938730853391692
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 20,
+            "rally_rate": 0.2898550724637681,
+            "rally_after_spread_rate": 0.2608695652173913,
+            "median_abs_return_pct": 0.5356852984145899
+          },
+          "morning": {
+            "n": 225,
+            "rallies": 47,
+            "rally_rate": 0.2088888888888889,
+            "rally_after_spread_rate": 0.19111111111111112,
+            "median_abs_return_pct": 0.38498556304138454
+          },
+          "afternoon": {
+            "n": 263,
+            "rallies": 54,
+            "rally_rate": 0.20532319391634982,
+            "rally_after_spread_rate": 0.17110266159695817,
+            "median_abs_return_pct": 0.3678402522333091
+          }
+        }
+      },
+      "fresh_movement": {
+        "selected": 600,
+        "labelled": 558,
+        "median_spread_pct": 0.08802499999999999,
+        "median_value5": 9717030.59000001,
+        "capture_rate": 0.16189111747851004,
+        "by_phase": {
+          "all": {
+            "n": 558,
+            "rallies": 113,
+            "rally_rate": 0.2025089605734767,
+            "rally_after_spread_rate": 0.17383512544802868,
+            "median_abs_return_pct": 0.3236286567306679
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 20,
+            "rally_rate": 0.2898550724637681,
+            "rally_after_spread_rate": 0.2608695652173913,
+            "median_abs_return_pct": 0.5537555228277036
+          },
+          "morning": {
+            "n": 225,
+            "rallies": 44,
+            "rally_rate": 0.19555555555555557,
+            "rally_after_spread_rate": 0.1688888888888889,
+            "median_abs_return_pct": 0.32231404958678045
+          },
+          "afternoon": {
+            "n": 264,
+            "rallies": 49,
+            "rally_rate": 0.1856060606060606,
+            "rally_after_spread_rate": 0.1553030303030303,
+            "median_abs_return_pct": 0.2885689243253109
+          }
+        }
+      },
+      "renewed_volume": {
+        "selected": 600,
+        "labelled": 556,
+        "median_spread_pct": 0.088725,
+        "median_value5": 7614196.835000001,
+        "capture_rate": 0.16475644699140402,
+        "by_phase": {
+          "all": {
+            "n": 556,
+            "rallies": 115,
+            "rally_rate": 0.2068345323741007,
+            "rally_after_spread_rate": 0.17086330935251798,
+            "median_abs_return_pct": 0.3263106445748343
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 20,
+            "rally_rate": 0.2898550724637681,
+            "rally_after_spread_rate": 0.21739130434782608,
+            "median_abs_return_pct": 0.4825737265415575
+          },
+          "morning": {
+            "n": 223,
+            "rallies": 43,
+            "rally_rate": 0.19282511210762332,
+            "rally_after_spread_rate": 0.16143497757847533,
+            "median_abs_return_pct": 0.32551057909382397
+          },
+          "afternoon": {
+            "n": 264,
+            "rallies": 52,
+            "rally_rate": 0.19696969696969696,
+            "rally_after_spread_rate": 0.16666666666666666,
+            "median_abs_return_pct": 0.28858377765315635
+          }
+        }
+      },
+      "efficient_movement": {
+        "selected": 600,
+        "labelled": 563,
+        "median_spread_pct": 0.075435,
+        "median_value5": 13177994.575,
+        "capture_rate": 0.18481375358166188,
+        "by_phase": {
+          "all": {
+            "n": 563,
+            "rallies": 129,
+            "rally_rate": 0.2291296625222025,
+            "rally_after_spread_rate": 0.19538188277087035,
+            "median_abs_return_pct": 0.29990003332220905
+          },
+          "opening": {
+            "n": 67,
+            "rallies": 16,
+            "rally_rate": 0.23880597014925373,
+            "rally_after_spread_rate": 0.23880597014925373,
+            "median_abs_return_pct": 0.4001333777925997
+          },
+          "morning": {
+            "n": 229,
+            "rallies": 56,
+            "rally_rate": 0.2445414847161572,
+            "rally_after_spread_rate": 0.2096069868995633,
+            "median_abs_return_pct": 0.3095400235250345
+          },
+          "afternoon": {
+            "n": 267,
+            "rallies": 57,
+            "rally_rate": 0.21348314606741572,
+            "rally_after_spread_rate": 0.17228464419475656,
+            "median_abs_return_pct": 0.26420079260238705
+          }
+        }
+      },
+      "volume_and_range": {
+        "selected": 600,
+        "labelled": 549,
+        "median_spread_pct": 0.08922,
+        "median_value5": 7526120.615,
+        "capture_rate": 0.14326647564469913,
+        "by_phase": {
+          "all": {
+            "n": 549,
+            "rallies": 100,
+            "rally_rate": 0.18214936247723132,
+            "rally_after_spread_rate": 0.14754098360655737,
+            "median_abs_return_pct": 0.3005259203606281
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 18,
+            "rally_rate": 0.2608695652173913,
+            "rally_after_spread_rate": 0.21739130434782608,
+            "median_abs_return_pct": 0.507580311226874
+          },
+          "morning": {
+            "n": 223,
+            "rallies": 43,
+            "rally_rate": 0.19282511210762332,
+            "rally_after_spread_rate": 0.15246636771300448,
+            "median_abs_return_pct": 0.32231404958678045
+          },
+          "afternoon": {
+            "n": 257,
+            "rallies": 39,
+            "rally_rate": 0.1517509727626459,
+            "rally_after_spread_rate": 0.1245136186770428,
+            "median_abs_return_pct": 0.23284694194349864
+          }
+        }
+      },
+      "compression_expansion": {
+        "selected": 600,
+        "labelled": 557,
+        "median_spread_pct": 0.083115,
+        "median_value5": 5629892.0,
+        "capture_rate": 0.1174785100286533,
+        "by_phase": {
+          "all": {
+            "n": 557,
+            "rallies": 82,
+            "rally_rate": 0.14721723518850988,
+            "rally_after_spread_rate": 0.12387791741472172,
+            "median_abs_return_pct": 0.23495528270427446
+          },
+          "opening": {
+            "n": 70,
+            "rallies": 14,
+            "rally_rate": 0.2,
+            "rally_after_spread_rate": 0.15714285714285714,
+            "median_abs_return_pct": 0.4667902847091343
+          },
+          "morning": {
+            "n": 225,
+            "rallies": 33,
+            "rally_rate": 0.14666666666666667,
+            "rally_after_spread_rate": 0.12444444444444444,
+            "median_abs_return_pct": 0.23942537909017458
+          },
+          "afternoon": {
+            "n": 262,
+            "rallies": 35,
+            "rally_rate": 0.13358778625954199,
+            "rally_after_spread_rate": 0.11450381679389313,
+            "median_abs_return_pct": 0.18725329084918751
+          }
+        }
+      },
+      "liquidity": {
+        "selected": 600,
+        "labelled": 589,
+        "median_spread_pct": 0.045355,
+        "median_value5": 164535131.595,
+        "capture_rate": 0.13896848137535817,
+        "by_phase": {
+          "all": {
+            "n": 589,
+            "rallies": 97,
+            "rally_rate": 0.16468590831918506,
+            "rally_after_spread_rate": 0.15449915110356535,
+            "median_abs_return_pct": 0.2638439551465144
+          },
+          "opening": {
+            "n": 70,
+            "rallies": 14,
+            "rally_rate": 0.2,
+            "rally_after_spread_rate": 0.18571428571428572,
+            "median_abs_return_pct": 0.370403317533452
+          },
+          "morning": {
+            "n": 240,
+            "rallies": 42,
+            "rally_rate": 0.175,
+            "rally_after_spread_rate": 0.16666666666666666,
+            "median_abs_return_pct": 0.2531589281805968
+          },
+          "afternoon": {
+            "n": 279,
+            "rallies": 41,
+            "rally_rate": 0.14695340501792115,
+            "rally_after_spread_rate": 0.13620071684587814,
+            "median_abs_return_pct": 0.2525252525252486
+          }
+        }
+      }
+    }
+  },
+  {
+    "day": "2026-09-09",
+    "decision_times": 66,
+    "candidate_rows": 5938,
+    "eligible_rallies": 609,
+    "policies": {
+      "activity": {
+        "selected": 660,
+        "labelled": 625,
+        "median_spread_pct": 0.089395,
+        "median_value5": 10770790.100000001,
+        "capture_rate": 0.1921182266009852,
+        "by_phase": {
+          "all": {
+            "n": 625,
+            "rallies": 117,
+            "rally_rate": 0.1872,
+            "rally_after_spread_rate": 0.1632,
+            "median_abs_return_pct": 0.2821670428893919
+          },
+          "opening": {
+            "n": 68,
+            "rallies": 15,
+            "rally_rate": 0.22058823529411764,
+            "rally_after_spread_rate": 0.19117647058823528,
+            "median_abs_return_pct": 0.5136108614681445
+          },
+          "morning": {
+            "n": 234,
+            "rallies": 40,
+            "rally_rate": 0.17094017094017094,
+            "rally_after_spread_rate": 0.15384615384615385,
+            "median_abs_return_pct": 0.2882765615649874
+          },
+          "afternoon": {
+            "n": 323,
+            "rallies": 62,
+            "rally_rate": 0.19195046439628483,
+            "rally_after_spread_rate": 0.16408668730650156,
+            "median_abs_return_pct": 0.2310560310875398
+          }
+        }
+      },
+      "recent_range": {
+        "selected": 660,
+        "labelled": 607,
+        "median_spread_pct": 0.09384,
+        "median_value5": 7990894.130000001,
+        "capture_rate": 0.20361247947454844,
+        "by_phase": {
+          "all": {
+            "n": 607,
+            "rallies": 124,
+            "rally_rate": 0.2042833607907743,
+            "rally_after_spread_rate": 0.17462932454695224,
+            "median_abs_return_pct": 0.2767828069032974
+          },
+          "opening": {
+            "n": 68,
+            "rallies": 19,
+            "rally_rate": 0.27941176470588236,
+            "rally_after_spread_rate": 0.25,
+            "median_abs_return_pct": 0.5780948773716876
+          },
+          "morning": {
+            "n": 221,
+            "rallies": 48,
+            "rally_rate": 0.2171945701357466,
+            "rally_after_spread_rate": 0.19457013574660634,
+            "median_abs_return_pct": 0.3030303030302939
+          },
+          "afternoon": {
+            "n": 318,
+            "rallies": 57,
+            "rally_rate": 0.1792452830188679,
+            "rally_after_spread_rate": 0.14465408805031446,
+            "median_abs_return_pct": 0.22484819206602946
+          }
+        }
+      },
+      "fresh_movement": {
+        "selected": 660,
+        "labelled": 621,
+        "median_spread_pct": 0.092195,
+        "median_value5": 5332380.259999998,
+        "capture_rate": 0.16584564860426929,
+        "by_phase": {
+          "all": {
+            "n": 621,
+            "rallies": 101,
+            "rally_rate": 0.16264090177133655,
+            "rally_after_spread_rate": 0.13526570048309178,
+            "median_abs_return_pct": 0.24549918166940632
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 14,
+            "rally_rate": 0.2028985507246377,
+            "rally_after_spread_rate": 0.17391304347826086,
+            "median_abs_return_pct": 0.4940530649588437
+          },
+          "morning": {
+            "n": 227,
+            "rallies": 42,
+            "rally_rate": 0.18502202643171806,
+            "rally_after_spread_rate": 0.16740088105726872,
+            "median_abs_return_pct": 0.2645871048600368
+          },
+          "afternoon": {
+            "n": 325,
+            "rallies": 45,
+            "rally_rate": 0.13846153846153847,
+            "rally_after_spread_rate": 0.10461538461538461,
+            "median_abs_return_pct": 0.18867924528302993
+          }
+        }
+      },
+      "renewed_volume": {
+        "selected": 660,
+        "labelled": 625,
+        "median_spread_pct": 0.08551500000000001,
+        "median_value5": 6041977.630000001,
+        "capture_rate": 0.18883415435139572,
+        "by_phase": {
+          "all": {
+            "n": 625,
+            "rallies": 115,
+            "rally_rate": 0.184,
+            "rally_after_spread_rate": 0.1376,
+            "median_abs_return_pct": 0.22916666666668029
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 21,
+            "rally_rate": 0.30434782608695654,
+            "rally_after_spread_rate": 0.2608695652173913,
+            "median_abs_return_pct": 0.36089238845145033
+          },
+          "morning": {
+            "n": 233,
+            "rallies": 49,
+            "rally_rate": 0.21030042918454936,
+            "rally_after_spread_rate": 0.15879828326180256,
+            "median_abs_return_pct": 0.2586206896551646
+          },
+          "afternoon": {
+            "n": 323,
+            "rallies": 45,
+            "rally_rate": 0.1393188854489164,
+            "rally_after_spread_rate": 0.09597523219814241,
+            "median_abs_return_pct": 0.19854401058903015
+          }
+        }
+      },
+      "efficient_movement": {
+        "selected": 660,
+        "labelled": 625,
+        "median_spread_pct": 0.07575000000000001,
+        "median_value5": 7907170.9350000005,
+        "capture_rate": 0.17405582922824303,
+        "by_phase": {
+          "all": {
+            "n": 625,
+            "rallies": 106,
+            "rally_rate": 0.1696,
+            "rally_after_spread_rate": 0.144,
+            "median_abs_return_pct": 0.22296544035674826
+          },
+          "opening": {
+            "n": 70,
+            "rallies": 18,
+            "rally_rate": 0.2571428571428571,
+            "rally_after_spread_rate": 0.22857142857142856,
+            "median_abs_return_pct": 0.39304380666289607
+          },
+          "morning": {
+            "n": 228,
+            "rallies": 34,
+            "rally_rate": 0.14912280701754385,
+            "rally_after_spread_rate": 0.12280701754385964,
+            "median_abs_return_pct": 0.2512117095402999
+          },
+          "afternoon": {
+            "n": 327,
+            "rallies": 54,
+            "rally_rate": 0.1651376146788991,
+            "rally_after_spread_rate": 0.14067278287461774,
+            "median_abs_return_pct": 0.18404907975461127
+          }
+        }
+      },
+      "volume_and_range": {
+        "selected": 660,
+        "labelled": 621,
+        "median_spread_pct": 0.082205,
+        "median_value5": 5984142.18,
+        "capture_rate": 0.1625615763546798,
+        "by_phase": {
+          "all": {
+            "n": 621,
+            "rallies": 99,
+            "rally_rate": 0.15942028985507245,
+            "rally_after_spread_rate": 0.12560386473429952,
+            "median_abs_return_pct": 0.21457639659636651
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 19,
+            "rally_rate": 0.2753623188405797,
+            "rally_after_spread_rate": 0.21739130434782608,
+            "median_abs_return_pct": 0.3730579377175358
+          },
+          "morning": {
+            "n": 230,
+            "rallies": 40,
+            "rally_rate": 0.17391304347826086,
+            "rally_after_spread_rate": 0.14782608695652175,
+            "median_abs_return_pct": 0.23222735351148827
+          },
+          "afternoon": {
+            "n": 322,
+            "rallies": 40,
+            "rally_rate": 0.12422360248447205,
+            "rally_after_spread_rate": 0.09006211180124224,
+            "median_abs_return_pct": 0.1847876472171328
+          }
+        }
+      },
+      "compression_expansion": {
+        "selected": 660,
+        "labelled": 626,
+        "median_spread_pct": 0.08015,
+        "median_value5": 4496098.1,
+        "capture_rate": 0.1412151067323481,
+        "by_phase": {
+          "all": {
+            "n": 626,
+            "rallies": 86,
+            "rally_rate": 0.13738019169329074,
+            "rally_after_spread_rate": 0.10223642172523961,
+            "median_abs_return_pct": 0.18284230681419045
+          },
+          "opening": {
+            "n": 68,
+            "rallies": 16,
+            "rally_rate": 0.23529411764705882,
+            "rally_after_spread_rate": 0.19117647058823528,
+            "median_abs_return_pct": 0.33536368953227536
+          },
+          "morning": {
+            "n": 230,
+            "rallies": 37,
+            "rally_rate": 0.1608695652173913,
+            "rally_after_spread_rate": 0.11739130434782609,
+            "median_abs_return_pct": 0.17146970068915302
+          },
+          "afternoon": {
+            "n": 328,
+            "rallies": 33,
+            "rally_rate": 0.10060975609756098,
+            "rally_after_spread_rate": 0.07317073170731707,
+            "median_abs_return_pct": 0.17273010387603427
+          }
+        }
+      },
+      "liquidity": {
+        "selected": 660,
+        "labelled": 658,
+        "median_spread_pct": 0.039325,
+        "median_value5": 130237889.10000001,
+        "capture_rate": 0.13628899835796388,
+        "by_phase": {
+          "all": {
+            "n": 658,
+            "rallies": 83,
+            "rally_rate": 0.12613981762917933,
+            "rally_after_spread_rate": 0.11550151975683891,
+            "median_abs_return_pct": 0.17993833688669802
+          },
+          "opening": {
+            "n": 70,
+            "rallies": 10,
+            "rally_rate": 0.14285714285714285,
+            "rally_after_spread_rate": 0.12857142857142856,
+            "median_abs_return_pct": 0.254992080512062
+          },
+          "morning": {
+            "n": 240,
+            "rallies": 34,
+            "rally_rate": 0.14166666666666666,
+            "rally_after_spread_rate": 0.1375,
+            "median_abs_return_pct": 0.19757677324666045
+          },
+          "afternoon": {
+            "n": 348,
+            "rallies": 39,
+            "rally_rate": 0.11206896551724138,
+            "rally_after_spread_rate": 0.09770114942528736,
+            "median_abs_return_pct": 0.15939843139791132
+          }
+        }
+      }
+    }
+  },
+  {
+    "day": "2026-09-10",
+    "decision_times": 66,
+    "candidate_rows": 6075,
+    "eligible_rallies": 765,
+    "policies": {
+      "activity": {
+        "selected": 660,
+        "labelled": 635,
+        "median_spread_pct": 0.071275,
+        "median_value5": 25913602.2,
+        "capture_rate": 0.1869281045751634,
+        "by_phase": {
+          "all": {
+            "n": 635,
+            "rallies": 143,
+            "rally_rate": 0.2251968503937008,
+            "rally_after_spread_rate": 0.2094488188976378,
+            "median_abs_return_pct": 0.3931663936344476
+          },
+          "opening": {
+            "n": 66,
+            "rallies": 22,
+            "rally_rate": 0.3333333333333333,
+            "rally_after_spread_rate": 0.30303030303030304,
+            "median_abs_return_pct": 0.6630389847020579
+          },
+          "morning": {
+            "n": 232,
+            "rallies": 55,
+            "rally_rate": 0.23706896551724138,
+            "rally_after_spread_rate": 0.21120689655172414,
+            "median_abs_return_pct": 0.42873608019370346
+          },
+          "afternoon": {
+            "n": 337,
+            "rallies": 66,
+            "rally_rate": 0.19584569732937684,
+            "rally_after_spread_rate": 0.18991097922848665,
+            "median_abs_return_pct": 0.32948929159802853
+          }
+        }
+      },
+      "recent_range": {
+        "selected": 660,
+        "labelled": 620,
+        "median_spread_pct": 0.08232500000000001,
+        "median_value5": 16683336.4,
+        "capture_rate": 0.18169934640522875,
+        "by_phase": {
+          "all": {
+            "n": 620,
+            "rallies": 139,
+            "rally_rate": 0.22419354838709676,
+            "rally_after_spread_rate": 0.20161290322580644,
+            "median_abs_return_pct": 0.4133503367650948
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 19,
+            "rally_rate": 0.2753623188405797,
+            "rally_after_spread_rate": 0.2608695652173913,
+            "median_abs_return_pct": 0.6473029045643175
+          },
+          "morning": {
+            "n": 224,
+            "rallies": 60,
+            "rally_rate": 0.26785714285714285,
+            "rally_after_spread_rate": 0.24107142857142858,
+            "median_abs_return_pct": 0.46444946844730883
+          },
+          "afternoon": {
+            "n": 327,
+            "rallies": 60,
+            "rally_rate": 0.1834862385321101,
+            "rally_after_spread_rate": 0.1620795107033639,
+            "median_abs_return_pct": 0.350350350350348
+          }
+        }
+      },
+      "fresh_movement": {
+        "selected": 660,
+        "labelled": 625,
+        "median_spread_pct": 0.08084,
+        "median_value5": 11256480.090000004,
+        "capture_rate": 0.1411764705882353,
+        "by_phase": {
+          "all": {
+            "n": 625,
+            "rallies": 108,
+            "rally_rate": 0.1728,
+            "rally_after_spread_rate": 0.1488,
+            "median_abs_return_pct": 0.29415884577670415
+          },
+          "opening": {
+            "n": 66,
+            "rallies": 9,
+            "rally_rate": 0.13636363636363635,
+            "rally_after_spread_rate": 0.13636363636363635,
+            "median_abs_return_pct": 0.4126200805968483
+          },
+          "morning": {
+            "n": 228,
+            "rallies": 51,
+            "rally_rate": 0.2236842105263158,
+            "rally_after_spread_rate": 0.18859649122807018,
+            "median_abs_return_pct": 0.34025299772842965
+          },
+          "afternoon": {
+            "n": 331,
+            "rallies": 48,
+            "rally_rate": 0.14501510574018128,
+            "rally_after_spread_rate": 0.12386706948640483,
+            "median_abs_return_pct": 0.2476123098691274
+          }
+        }
+      },
+      "renewed_volume": {
+        "selected": 660,
+        "labelled": 617,
+        "median_spread_pct": 0.07965,
+        "median_value5": 8569945.25,
+        "capture_rate": 0.1568627450980392,
+        "by_phase": {
+          "all": {
+            "n": 617,
+            "rallies": 120,
+            "rally_rate": 0.19448946515397084,
+            "rally_after_spread_rate": 0.17341977309562398,
+            "median_abs_return_pct": 0.27304257988338687
+          },
+          "opening": {
+            "n": 68,
+            "rallies": 23,
+            "rally_rate": 0.3382352941176471,
+            "rally_after_spread_rate": 0.3382352941176471,
+            "median_abs_return_pct": 0.6128856612283684
+          },
+          "morning": {
+            "n": 227,
+            "rallies": 48,
+            "rally_rate": 0.21145374449339208,
+            "rally_after_spread_rate": 0.18061674008810572,
+            "median_abs_return_pct": 0.2618453865336656
+          },
+          "afternoon": {
+            "n": 322,
+            "rallies": 49,
+            "rally_rate": 0.15217391304347827,
+            "rally_after_spread_rate": 0.13354037267080746,
+            "median_abs_return_pct": 0.2528001668495372
+          }
+        }
+      },
+      "efficient_movement": {
+        "selected": 660,
+        "labelled": 623,
+        "median_spread_pct": 0.07350499999999999,
+        "median_value5": 14125229.805000005,
+        "capture_rate": 0.1542483660130719,
+        "by_phase": {
+          "all": {
+            "n": 623,
+            "rallies": 118,
+            "rally_rate": 0.18940609951845908,
+            "rally_after_spread_rate": 0.16693418940609953,
+            "median_abs_return_pct": 0.3141113020802444
+          },
+          "opening": {
+            "n": 69,
+            "rallies": 15,
+            "rally_rate": 0.21739130434782608,
+            "rally_after_spread_rate": 0.17391304347826086,
+            "median_abs_return_pct": 0.48808172531213945
+          },
+          "morning": {
+            "n": 227,
+            "rallies": 49,
+            "rally_rate": 0.21585903083700442,
+            "rally_after_spread_rate": 0.1894273127753304,
+            "median_abs_return_pct": 0.3455723542116651
+          },
+          "afternoon": {
+            "n": 327,
+            "rallies": 54,
+            "rally_rate": 0.1651376146788991,
+            "rally_after_spread_rate": 0.14984709480122324,
+            "median_abs_return_pct": 0.2829426030719562
+          }
+        }
+      },
+      "volume_and_range": {
+        "selected": 660,
+        "labelled": 619,
+        "median_spread_pct": 0.08267,
+        "median_value5": 9481329.35,
+        "capture_rate": 0.15163398692810456,
+        "by_phase": {
+          "all": {
+            "n": 619,
+            "rallies": 116,
+            "rally_rate": 0.18739903069466882,
+            "rally_after_spread_rate": 0.1680129240710824,
+            "median_abs_return_pct": 0.28300551860761525
+          },
+          "opening": {
+            "n": 68,
+            "rallies": 21,
+            "rally_rate": 0.3088235294117647,
+            "rally_after_spread_rate": 0.29411764705882354,
+            "median_abs_return_pct": 0.6128856612283684
+          },
+          "morning": {
+            "n": 227,
+            "rallies": 45,
+            "rally_rate": 0.19823788546255505,
+            "rally_after_spread_rate": 0.17180616740088106,
+            "median_abs_return_pct": 0.2702702702702675
+          },
+          "afternoon": {
+            "n": 324,
+            "rallies": 50,
+            "rally_rate": 0.15432098765432098,
+            "rally_after_spread_rate": 0.1388888888888889,
+            "median_abs_return_pct": 0.261321495709943
+          }
+        }
+      },
+      "compression_expansion": {
+        "selected": 660,
+        "labelled": 618,
+        "median_spread_pct": 0.07561,
+        "median_value5": 7130938.664999999,
+        "capture_rate": 0.11241830065359477,
+        "by_phase": {
+          "all": {
+            "n": 618,
+            "rallies": 86,
+            "rally_rate": 0.13915857605177995,
+            "rally_after_spread_rate": 0.11974110032362459,
+            "median_abs_return_pct": 0.2115106362672703
+          },
+          "opening": {
+            "n": 67,
+            "rallies": 16,
+            "rally_rate": 0.23880597014925373,
+            "rally_after_spread_rate": 0.208955223880597,
+            "median_abs_return_pct": 0.44150110375276164
+          },
+          "morning": {
+            "n": 222,
+            "rallies": 31,
+            "rally_rate": 0.13963963963963963,
+            "rally_after_spread_rate": 0.12612612612612611,
+            "median_abs_return_pct": 0.19849437320148544
+          },
+          "afternoon": {
+            "n": 329,
+            "rallies": 39,
+            "rally_rate": 0.11854103343465046,
+            "rally_after_spread_rate": 0.0972644376899696,
+            "median_abs_return_pct": 0.19596864501679745
+          }
+        }
+      },
+      "liquidity": {
+        "selected": 660,
+        "labelled": 659,
+        "median_spread_pct": 0.049125,
+        "median_value5": 127306658.80000001,
+        "capture_rate": 0.15816993464052287,
+        "by_phase": {
+          "all": {
+            "n": 659,
+            "rallies": 121,
+            "rally_rate": 0.18361153262518967,
+            "rally_after_spread_rate": 0.16995447647951442,
+            "median_abs_return_pct": 0.282110852970463
+          },
+          "opening": {
+            "n": 70,
+            "rallies": 20,
+            "rally_rate": 0.2857142857142857,
+            "rally_after_spread_rate": 0.2714285714285714,
+            "median_abs_return_pct": 0.4505421200237003
+          },
+          "morning": {
+            "n": 240,
+            "rallies": 45,
+            "rally_rate": 0.1875,
+            "rally_after_spread_rate": 0.1625,
+            "median_abs_return_pct": 0.2824255001792897
+          },
+          "afternoon": {
+            "n": 349,
+            "rallies": 56,
+            "rally_rate": 0.16045845272206305,
+            "rally_after_spread_rate": 0.15472779369627507,
+            "median_abs_return_pct": 0.24830839903160484
+          }
+        }
+      }
+    }
+  }
+]
