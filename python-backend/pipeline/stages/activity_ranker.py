@@ -55,7 +55,9 @@ class ActivityRanker:
         returns = [state.return_5m_percent for state in eligible]
         market_return = float(median(returns)) if returns else 0.0
         relative_values = sorted(abs(value - market_return) for value in returns)
+        rank_stamp = now.isoformat()
         for state, stock_return in zip(eligible, returns):
+            state.rank_as_of = rank_stamp
             state.volume_percentile = _percentile(volume_values, float(state.volume_pace or 0.0))
             state.volatility_percentile = _percentile(
                 volatility_values, state.realized_volatility_percent
