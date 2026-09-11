@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -57,6 +58,43 @@ def execution(account, coordinator=None, security_id=1, **kwargs):
 
 
 class IndependentExecutionTests(unittest.TestCase):
+    def test_admission_reports_pending_parent_age_without_counting_exit_as_entry(self):
+        account = Account(active=1)
+        created = (datetime.now(timezone.utc) - timedelta(minutes=90)).isoformat()
+        parent = {"securityId": "200", "exchangeSegment": "NSE_EQ", "orderId": "pending",
+                  "orderStatus": "PENDING", "createTime": created, "legName": "NA"}
+        child = {"securityId": "100", "exchangeSegment": "NSE_EQ", "orderId": "exit",
+                 "algoId": "filled-parent", "orderStatus": "PENDING", "legName": "STOP_LOSS_LEG"}
+        account.fetch_order_book = Mock(return_value={"status": "success", "data": [parent, child]})
+        account.fetch_super_orders = Mock(return_value={"status": "success", "data": [
+            {**parent, "legName": "ENTRY_LEG", "algoId": "pending"},
+        ]})
+        coordinator = StockExecutionCoordinator(account_scoped=True)
+        coordinator.record_success({"security_id": 300, "exchange_segment": "BSE_EQ"})
+        details = json.loads(execution(account, coordinator).reserve_analysis_slot())
+        self.assertEqual(details["active_trade_count"], 3)
+        self.assertEqual(details["open_position_count"], 1)
+        self.assertEqual(details["active_order_instrument_count"], 2)
+        self.assertEqual(details["reserved_submission_count"], 1)
+        self.assertEqual(details["occupied_instruments"], ["BSE_EQ:300", "NSE_EQ:100", "NSE_EQ:200"])
+        self.assertEqual(len(details["pending_entries"]), 1)
+        self.assertEqual(details["pending_entries"][0]["order_id"], "pending")
+        self.assertTrue(details["pending_entries"][0]["entry_role_confirmed"])
+        self.assertAlmostEqual(details["pending_entries"][0]["age_seconds"], 5400, delta=5)
+        self.assertIsNotNone(datetime.fromisoformat(details["occupancy_observed_at_utc"]).tzinfo)
+        account.fetch_order_book.assert_called_once()
+        account.fetch_super_orders.assert_called_once()
+
+    def test_pending_entry_without_broker_creation_time_does_not_invent_age(self):
+        account = Account(active=2)
+        account.fetch_order_book = Mock(return_value={"status": "success", "data": [
+            {"securityId": "200", "exchangeSegment": "BSE_EQ", "orderId": "pending", "orderStatus": "PENDING"},
+        ]})
+        details = json.loads(execution(account).reserve_analysis_slot())
+        self.assertIsNone(details["pending_entries"][0]["age_seconds"])
+        self.assertFalse(details["pending_entries"][0]["entry_role_confirmed"])
+        self.assertEqual(details["pending_entries"][0]["instrument"], "BSE_EQ:200")
+
     def test_tier_boundaries_and_invalid_funds(self):
         for capital, expected in [(0, 0), (-1, 0), (float("nan"), 0), (float("inf"), 0), (1999.99, 3), (2000, 5), (5000, 5), (5000.01, 10)]:
             with self.subTest(capital=capital):
