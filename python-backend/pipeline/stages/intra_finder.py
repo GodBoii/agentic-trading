@@ -550,14 +550,17 @@ class IntraFinder:
                 state.session_low = min(state.session_low or official_low, official_low)
         self.full_packet_keys.add(key)
         self._rank_if_due(received_at)
-        self._record_observation(state, packet, received_at)
-        emitted: Optional[Dict[str, Any]] = None
-        if (
+        evaluate_candidate = (
             allow_signals
             and state.is_hot
             and state.activity_rank is not None
             and state.activity_rank <= self.config.intra_finder_setup_rank_limit
-        ):
+        )
+        if evaluate_candidate:
+            state.refresh_candidate_features(received_at)
+        self._record_observation(state, packet, received_at)
+        emitted: Optional[Dict[str, Any]] = None
+        if evaluate_candidate:
             signals = self.setup_engine.evaluate(state, received_at)
             self.candidates_seen += len(signals)
             for signal in sorted(signals, key=_signal_priority):
