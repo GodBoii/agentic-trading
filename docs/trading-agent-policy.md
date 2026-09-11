@@ -1,6 +1,6 @@
 # Trading agent policy
 
-Updated September 7, 2026.
+Updated September 10, 2026.
 
 ## Account capacity
 
@@ -92,6 +92,19 @@ a scanner opinion.
 
 The model has no application-imposed analysis deadline. Event expiry remains an
 admission freshness rule. Final placement fetches current market observations.
+
+The existing initial current-state request now starts after chart rendering and
+runs alongside image uploads. This removes rendering time from quote age without
+adding a broker request. Candle history can still be older than the quote; both
+timestamps remain explicit. Context waits for the request and uploads to finish.
+
+Admission diagnostics include the broker observation time, open-position and
+active-order counts, analysis/submission reservations, occupied instrument keys,
+and pending order ages. `entry_role_confirmed` distinguishes known Super Order
+parents from ordinary unlinked orders whose entry/exit role is not certain. These
+fields use already-fetched account data and do not change admission limits or
+cancel orders. An unfilled accepted entry continues to occupy capacity until the
+broker confirms a terminal state.
 
 Full accounts skip chart and model work. The initial state reuses intraday
 history when that history was just fetched for the charts, avoiding a duplicate
