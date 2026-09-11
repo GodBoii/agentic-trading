@@ -130,6 +130,9 @@ class LiveStockState:
     _samples_ordered: bool = field(default=True, repr=False)
     _rolling_prices: Optional[RollingPrices] = field(default=None, repr=False)
     _price_signature: tuple = field(default=(), repr=False)
+    _derived_second: Optional[int] = field(default=None, repr=False)
+    derived_as_of: Optional[str] = None
+    rank_as_of: Optional[str] = None
 
     volume_pace: Optional[float] = None
     realized_volatility_percent: float = 0.0
@@ -319,7 +322,10 @@ class LiveStockState:
             return []
         bar = self.minute_builder.close_bar()
         self.minute_bars.append(bar)
-        self.minute_builder = MinuteBuilder(minute, price, price, price, price, volume, volume, vwap)
+        # The first packet in this minute includes volume since the previous
+        # packet. Attribute that delta to its received minute rather than lose it.
+        starting_volume = min(volume, self.minute_builder.ending_volume)
+        self.minute_builder = MinuteBuilder(minute, price, price, price, price, starting_volume, volume, vwap)
         return [bar]
 
     def refresh_derived(self, now: datetime) -> None:
@@ -378,6 +384,13 @@ class LiveStockState:
             else 0.0
         )
         self.traded_value_5m = five_minute_value
+        self.derived_as_of = now.isoformat()
+        self._derived_second = int(now_ts)
+
+    def refresh_candidate_features(self, now: datetime) -> None:
+        """Refresh a selected stock once per observed second between rank ticks."""
+        if self._derived_second != int(now.timestamp()):
+            self.refresh_derived(now)
 
     def expected_cumulative_volume(self, now: datetime) -> Optional[float]:
         if not self.median_cumulative_volume:
@@ -454,6 +467,8 @@ class LiveStockState:
     def feature_snapshot(self, now: datetime) -> Dict[str, Any]:
         return {
             "received_at": self.last_packet_at,
+            "derived_as_of": self.derived_as_of,
+            "rank_as_of": self.rank_as_of,
             "last_price": self.latest_price,
             "last_trade_at": self.last_trade_at,
             "last_trade_age_seconds": self.trade_age_seconds(now),
@@ -524,6 +539,9 @@ class LiveStockState:
 
     def restore(self, payload: Dict[str, Any]) -> None:
         self._rolling_prices = None
+        self._derived_second = None
+        self.derived_as_of = None
+        self.rank_as_of = None
         for name in (
             "first_packet_at", "last_packet_at", "last_trade_at", "last_trade_quantity",
             "latest_price", "previous_price", "cumulative_volume", "previous_cumulative_volume",
