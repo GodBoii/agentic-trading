@@ -27,6 +27,15 @@ typed, bounded state containing:
 Packet updates are constant-time. Ranking runs once per second from 09:15 to
 09:30 and once every five seconds afterward.
 
+Selected candidates refresh local features once per observed second between
+rank cycles before setup evaluation. `derived_as_of` identifies that calculation;
+`rank_as_of` identifies the cross-sectional percentile calculation. Cold stocks
+retain the existing rank cadence. Restoring a checkpoint invalidates calculation
+timestamps until a new calculation runs.
+
+The minute builder includes cumulative-volume increments arriving on the first
+packet of a new minute. It excludes the initial observed cumulative total.
+
 ## Activity ranking
 
 The ranker first removes stale, incomplete, circuit-bound or wide-spread states.
@@ -65,6 +74,10 @@ restart does not replace the completed day's status.
 
 See [September 9 implementation and comparisons](../progress/intra-finder-implementation-2026-09-09.md)
 for the evidence behind the retained top-10 policy and remaining latency work.
+
+The [September 10 six-day review](../progress/ranking-research-2026-09-10/findings-and-changes.md)
+retains the same rank formula after testing seven alternatives and documents
+capacity blockers, local feature freshness and quote preparation changes.
 
 ## Setup families
 
