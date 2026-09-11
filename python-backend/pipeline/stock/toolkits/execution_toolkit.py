@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Callable, Dict, Optional
 
@@ -545,6 +546,14 @@ class StockExecutionToolkit(Toolkit):
             return self._failure("account_overlap_recheck_unavailable")
 
         active_security_ids: set[str] = set()
+        open_position_keys: set[str] = set()
+        active_order_keys: set[str] = set()
+        pending_entries: dict[str, Dict[str, Any]] = {}
+        super_parent_ids = {
+            str(row.get("orderId")) for row in self._extract_rows(super_orders_response)
+            if row.get("orderId")
+        }
+        occupancy_observed_at = datetime.now(timezone.utc)
         for row in self._extract_rows(positions_response):
             if str(row.get("productType") or "").upper() != "INTRADAY":
                 continue
@@ -554,6 +563,7 @@ class StockExecutionToolkit(Toolkit):
                 row_security_id = str(row.get("securityId") or row.get("security_id") or "")
                 if row_security_id:
                     active_security_ids.add(self.coordinator.slot_key(row_security_id, row.get("exchangeSegment") or self.exchange_segment))
+                    open_position_keys.add(self.coordinator.slot_key(row_security_id, row.get("exchangeSegment") or self.exchange_segment))
                 if self._matches_security(row):
                     return self._failure("assigned_stock_open_intraday_position_exists")
             except (TypeError, ValueError):
@@ -583,9 +593,42 @@ class StockExecutionToolkit(Toolkit):
                 continue
             row_security_id = str(row.get("securityId") or row.get("security_id") or "")
             if row_security_id:
-                active_security_ids.add(self.coordinator.slot_key(row_security_id, row.get("exchangeSegment") or self.exchange_segment))
+                slot_key = self.coordinator.slot_key(row_security_id, row.get("exchangeSegment") or self.exchange_segment)
+                active_security_ids.add(slot_key)
+                active_order_keys.add(slot_key)
+                # Child exits share the parent's instrument but must not look
+                # like another waiting entry in admission diagnostics.
+                leg_name = str(row.get("legName") or "").upper()
+                algo_id = str(row.get("algoId") or "")
+                order_id = str(row.get("orderId") or "")
+                if (
+                    str(row.get("orderStatus") or "").upper() in active_statuses
+                    and leg_name in {"", "NA", "ENTRY_LEG"}
+                    and algo_id in {"", "0", order_id}
+                    and order_id
+                ):
+                    created_at = str(row.get("createTime") or "")
+                    existing = pending_entries.get(order_id)
+                    if existing is None or created_at and (not existing["created_at"] or created_at < existing["created_at"]):
+                        age_seconds = None
+                        try:
+                            created = datetime.fromisoformat(created_at)
+                            if created.tzinfo is None:
+                                created = created.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+                            age_seconds = max(0.0, (occupancy_observed_at - created).total_seconds())
+                        except ValueError:
+                            pass
+                        pending_entries[order_id] = {
+                            "instrument": slot_key,
+                            "order_id": order_id,
+                            "entry_role_confirmed": order_id in super_parent_ids or leg_name == "ENTRY_LEG",
+                            "transaction_type": row.get("transactionType"),
+                            "created_at": created_at,
+                            "age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+                        }
             if self._matches_security(row):
                 return self._failure("assigned_stock_active_order_exists")
+        broker_security_ids = set(active_security_ids)
         active_security_ids = self.coordinator.active_trade_slots(active_security_ids)
         self._active_trade_slots = active_security_ids
         if self.coordinator.slot_key(self.security_id, self.exchange_segment) in active_security_ids:
@@ -607,14 +650,20 @@ class StockExecutionToolkit(Toolkit):
         self.last_capacity = {
             "active_trade_count": len(active_security_ids),
             "max_concurrent_trades": self.max_concurrent_trades,
+            "occupancy_observed_at_utc": occupancy_observed_at.isoformat(),
+            "open_position_count": len(open_position_keys),
+            "active_order_instrument_count": len(active_order_keys),
+            "reserved_submission_count": len(active_security_ids - broker_security_ids),
+            "analysis_slot_count": len(self.coordinator.analysis_slots),
+            "occupied_instruments": sorted(active_security_ids),
+            "pending_entries": sorted(pending_entries.values(), key=lambda item: item["order_id"]),
         }
         if len(active_security_ids) >= self.max_concurrent_trades:
             return json.dumps(
                 {
                     "status": "blocked",
                     "remarks": "maximum_concurrent_trade_slots_in_use",
-                    "active_trade_count": len(active_security_ids),
-                    "max_concurrent_trades": self.max_concurrent_trades,
+                    **self.last_capacity,
                 },
                 ensure_ascii=True,
             )
