@@ -9,7 +9,7 @@ from typing import Iterable, List, Optional
 from dotenv import load_dotenv
 
 
-DEFAULT_COMMAND_CODE_MODEL_ID = "xiaomi/mimo-v2.5-pro"
+DEFAULT_COMMAND_CODE_MODEL_ID = "deepseek/deepseek-v4.1-flash"
 DEFAULT_MAX_TURNS = 10
 DEFAULT_TIMEOUT_SECONDS = 300
 _ENV_LOADED = False
