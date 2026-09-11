@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from agno.models.groq import Groq
+from agno.models.openrouter import OpenRouter
 from dotenv import load_dotenv
 from agno.tools.hackernews import HackerNewsTools
 from agno.tools.newspaper import NewspaperTools
@@ -7,7 +7,7 @@ from agno.tools.newspaper import NewspaperTools
 load_dotenv()
 
 agent = Agent(
-    model=Groq(id="openai/gpt-oss-120b"),
+    model=OpenRouter(id="deepseek/deepseek-v4.1-flash"),
     tools=[NewspaperTools()],
     debug_mode=True
     )
