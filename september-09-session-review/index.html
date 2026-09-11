@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="September 9 trading audit: every signal, AI start, filled trade and protective order, reconciled with Dhan.">
+  <title>9 September · Signal & execution review</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="data.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to report</a>
+  <header class="topbar">
+    <a class="brand" href="#overview"><span class="monogram">09</span><span>Trade Cognition<small>Session evidence / September 2026</small></span></a>
+    <nav aria-label="Report sections"><a href="#overview">Findings</a><a href="#explorer">Stock charts</a><a href="#audit">Trade audit</a><a href="#sources">Evidence</a></nav>
+    <span class="dated">09 SEP 2026 <span>IST</span></span>
+  </header>
+  <main id="main">
+    <section id="overview" class="overview">
+      <div class="report-heading"><div><p class="eyebrow">Post-market review</p><h1>Signals, decisions<br>and what actually filled.</h1></div><p class="intro">118 stocks. Every signal on its chart.<br>Order protection checked against the broker,<br>with unresolved cases kept visible.</p></div>
+      <div id="metrics" class="metrics" aria-label="Session totals"></div>
+      <div class="verdict"><span class="verdict-label">Entry protection</span><p><strong>26 of 26 submitted orders had matching TP and SL.</strong> Correct configuration did not guarantee an exit. Three filled-order cases need attention.</p><a href="#audit">Inspect all orders <span aria-hidden="true">↘</span></a></div>
+      <div class="findings">
+        <article class="finding critical"><div class="finding-index">01 / OPEN EXPOSURE</div><h2>TCC is not closed.</h2><p>Short 9 on BSE. Long 9 on NSE. The BSE stop and target are cancelled. The NSE buy is a separate position, not a confirmed BSE exit.</p><button data-stock="BSE_EQ|512038">Inspect TCC →</button></article>
+        <article class="finding critical"><div class="finding-index">02 / STOP DID NOT CLOSE</div><h2>Graphite lost ₹78.60.</h2><p>Short entry ₹785; initial SL ₹792. A separate buy closed at ₹863.60. Both protective legs are cancelled. The records do not identify who changed or cancelled them.</p><button data-stock="BSE_EQ|509488">Inspect Graphite →</button></article>
+        <article class="finding caution"><div class="finding-index">03 / STALE ORDER STATE</div><h2>Pashupati still shows pending legs.</h2><p>The short closed at 15:11:29 through a separate market buy. Dhan still lists the target and SL as pending. The position and Super Order need reconciliation.</p><button data-stock="NSE_EQ|757955">Inspect Pashupati →</button></article>
+      </div>
+      <div class="observations"><div><h2>What the day tells us</h2><ul id="observations"></ul></div><div><h2>Where signals stopped</h2><div id="funnel"></div><p class="fine">659 successful dispatches mean delivery to the account workflow, not 659 AI analyses.</p></div></div>
+    </section>
+    <section id="explorer" class="explorer">
+      <div class="section-heading"><div><p class="eyebrow">Every signalled stock</p><h2>Session chart explorer</h2></div><p>Signal → AI start → entry fill → exit</p></div>
+      <div class="explorer-grid">
+        <aside class="stock-sidebar" aria-label="Stock selection">
+          <label for="stock-search">Find a stock</label><input id="stock-search" type="search" placeholder="Name, symbol or security ID" autocomplete="off">
+          <label class="sr-only" for="stock-filter">Stock filter</label><select id="stock-filter"><option value="all">All signalled stocks</option><option value="runs">AI analysed</option><option value="trades">Orders submitted</option><option value="issues">Protection issues</option></select>
+          <p id="stock-count" class="fine" aria-live="polite"></p><div id="stock-list" class="stock-list"></div>
+        </aside>
+        <div class="stock-detail">
+          <div class="stock-title"><div><p id="stock-identity" class="eyebrow"></p><h3 id="stock-name"></h3><p id="stock-meta"></p></div><div class="stock-step"><button id="previous-stock" aria-label="Previous stock">←</button><button id="next-stock" aria-label="Next stock">→</button></div></div>
+          <div id="stock-warning" role="status"></div>
+          <div class="chart-toolbar"><label>View <select id="chart-window"><option value="day">Full session</option><option value="signal">Signal ±15 minutes</option><option value="trade">Selected trade window</option></select></label><label>Candles <select id="chart-interval"><option value="1">1 minute</option><option value="5">5 minutes</option></select></label><label>Trade levels <select id="trade-select"></select></label></div>
+          <div class="legend"><span class="signal-key">◆ Signal</span><span class="ai-key">● AI start</span><span class="entry-key">■ Entry fill</span><span class="exit-key">× Exit fill</span><span class="tp-key">-- Initial TP</span><span class="sl-key">-- Initial SL</span><span class="vwap-key">— VWAP</span></div>
+          <div id="chart" class="chart" aria-live="polite"></div>
+          <p class="chart-note">Candles come from recorded one-second observations. Missing minutes remain gaps. TP/SL lines show the <strong>initial configuration</strong>, not continuous protection. Hover chart marks for timestamps and values.</p>
+          <div id="selected-event" class="selected-event"></div>
+          <div class="events-heading"><h4>Signals for this stock</h4><label><input type="checkbox" id="only-runs"> Only signals that started AI</label></div>
+          <div class="table-scroll signal-table"><table><thead><tr><th>Signal · IST</th><th>Setup</th><th>Price</th><th>AI started · IST</th><th>Delay</th><th>Result</th></tr></thead><tbody id="signal-rows"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+    <section id="audit" class="audit">
+      <div class="section-heading"><div><p class="eyebrow">Broker reconciliation</p><h2>Every submitted order, checked.</h2></div><button id="download-csv">Download audit CSV ↓</button></div>
+      <div class="audit-explainer"><p><strong>23 entries filled; 22 closed on the same exchange.</strong> 12 report an SL exit, 8 a target exit, and 2 closed through separate orders. TCC's BSE short remains open.</p><p>3 submissions never filled: Axtel was rejected; the MCL short and Jaykay order were cancelled. Their cancelled protection is not an unprotected filled position.</p></div>
+      <label class="audit-filter">Show <select id="audit-filter"><option value="all">All 26 submissions</option><option value="issues">Protection issues</option><option value="filled">Filled entries</option><option value="unfilled">Never filled</option></select></label>
+      <div class="table-scroll"><table class="audit-table"><thead><tr><th>Stock / exchange</th><th>Side · qty</th><th>Entry fill</th><th>Initial TP / SL</th><th>SL / TG now</th><th>Protection finding</th><th>Realized ₹</th><th>Inspect</th></tr></thead><tbody id="audit-rows"></tbody></table></div>
+      <div id="order-evidence" class="order-evidence"></div>
+      <div class="position-box"><h3>Unresolved positions at the broker snapshot</h3><div id="open-positions"></div><p>The position key includes the exchange and security ID. Equal and opposite quantities on different exchanges have not been merged or labelled closed.</p><p><strong>Rechecked at 16:26:25 IST:</strong> TCC BSE −9 and NSE +9 remained open; both BSE protective legs remained cancelled. The Forever Order list was empty.</p></div>
+    </section>
+    <section id="sources" class="sources"><div><p class="eyebrow">Read the evidence correctly</p><h2>What is confirmed. What is not.</h2><ul id="limitations"></ul></div><div><h3>Dhan order labels</h3><dl><dt>Green S beside the name</dt><dd>Super Order</dd><dt>SL</dt><dd>Stop-loss exit leg</dd><dt>TG</dt><dd>Target exit leg, also called TP</dd><dt>Red S / green B before the name</dt><dd>Sell / buy side</dd></dl><p>A cancelled SL after a filled target is expected. A pending SL is not proof that an exit has filled.</p><div id="source-links"></div><p id="provenance" class="fine"></p></div></section>
+  </main>
+  <footer>September 9, 2026 · Private local report · No trading actions performed</footer>
+  <noscript>This report needs JavaScript to display the charts. The findings above remain readable; data.json contains the complete audit.</noscript>
+</body>
+</html>
