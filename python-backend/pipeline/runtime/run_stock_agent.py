@@ -794,11 +794,6 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "security_overview",
                 market_data_toolkit.security_overview_payload,
             ),
-            "current_stock_state": context_executor.submit(
-                self._safe_initial_context_component,
-                "current_stock_state",
-                lambda: market_data_toolkit.current_stock_state_payload(force_refresh=cache_used),
-            ),
             "account_overview": context_executor.submit(
                 self._safe_initial_context_component,
                 "account_overview",
@@ -815,7 +810,6 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 daily_frame=context_futures["daily_history"].result(),
             )
             security_overview = context_futures["security_overview"].result()
-            current_stock_state = context_futures["current_stock_state"].result()
             account_overview = context_futures["account_overview"].result()
         finally:
             context_executor.shutdown(wait=True, cancel_futures=True)
@@ -830,13 +824,22 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
         chart_paths = chart_bundle.get("chart_paths_ordered", [])
         if not chart_paths:
             chart_paths = [info["path"] for info in chart_bundle.get("charts", {}).values()]
-        cloud_image_urls = self._upload_chart_images(
-            index + 1,
-            candidate_packet,
-            chart_bundle,
-            chart_paths,
-            run_context or {},
-        )
+        # Fetch the decision quote after rendering so chart work cannot age it.
+        # Uploads and this existing request overlap without adding broker calls.
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="stock-snapshot") as snapshot_executor:
+            snapshot_future = snapshot_executor.submit(
+                self._safe_initial_context_component,
+                "current_stock_state",
+                lambda: market_data_toolkit.current_stock_state_payload(force_refresh=cache_used),
+            )
+            cloud_image_urls = self._upload_chart_images(
+                index + 1,
+                candidate_packet,
+                chart_bundle,
+                chart_paths,
+                run_context or {},
+            )
+            current_stock_state = snapshot_future.result()
         self._emit(
             event_callback,
             {
