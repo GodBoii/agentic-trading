@@ -1066,6 +1066,8 @@ body {
    the text blurry, nudges the neighbouring rows, and crops against the
    panel's overflow:hidden at the top and bottom of a day. */
 .archive-row { position: relative; }
+.card-button.archive-row { display: flex; }
+.archive-row > span:first-child { width: 5.5rem; }
 .archive-row::before {
   content: "";
   position: absolute;

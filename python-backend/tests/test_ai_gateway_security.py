@@ -71,6 +71,24 @@ class _FakeSocket:
 
 
 class AIGatewaySecurityTests(unittest.TestCase):
+    def test_recent_agent_replay_is_user_scoped_and_expires(self) -> None:
+        broadcaster = WebSocketBroadcaster()
+        client = _FakeSocket()
+        broadcaster.clients[client] = "user-1"
+        broadcaster.broadcast({"type": "stock_agent_started", "request_id": "one"}, "user-1")
+        broadcaster.broadcast({"type": "stock_agent_started", "request_id": "secret-two"}, "user-2")
+        client.frames.clear()
+        broadcaster.replay(client, "user-2")
+        self.assertEqual(client.frames, [])
+        broadcaster.replay(client, "user-1")
+        self.assertEqual(len(client.frames), 1)
+        self.assertIn(b'one', client.frames[0])
+        self.assertNotIn(b'secret-two', client.frames[0])
+        client.frames.clear()
+        with patch('pipeline.runtime.run_ai_trading_orchestrator.time.time', return_value=time.time() + 7 * 3600):
+            broadcaster.replay(client, "user-1")
+        self.assertEqual(client.frames, [])
+
     def test_backend_issued_ticket_is_valid_and_user_scoped(self) -> None:
         validator = WebSocketTicketValidator("s" * 32)
         issued = validator.issue("user-from-supabase", 45)

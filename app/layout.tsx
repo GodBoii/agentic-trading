@@ -55,9 +55,11 @@ export const metadata: Metadata = {
     description:
         'Connect your Dhan broker and let AI agents scan the NSE universe, surface intraday opportunities, and execute within your risk limits.',
     applicationName: 'PolyCognition',
+    manifest: '/manifest.webmanifest',
+    appleWebApp: { capable: true, title: 'PolyCognition', statusBarStyle: 'default' },
     icons: {
         icon: '/icon.png',
-        apple: '/icon.png',
+        apple: '/icons/apple-touch-icon.png',
     },
     openGraph: {
         title: 'PolyCognition — AI trading agents for Indian markets',
@@ -74,6 +76,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
     width: 'device-width',
     initialScale: 1,
+    viewportFit: 'cover',
     /**
      * Matches each theme's canvas, so the browser chrome on a phone does not
      * sit as a black band above a paper-coloured page.

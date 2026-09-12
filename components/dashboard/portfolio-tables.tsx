@@ -17,7 +17,7 @@ const OUTCOME_TONE: Record<ReturnType<typeof orderOutcome>, Tone> = {
 export function HoldingsTable({ rows }: { rows: Holding[] }) {
     if (!rows.length) {
         return (
-            <EmptyState
+            <EmptyState minHeight={160} className="portfolio-empty"
                 title="No holdings"
                 detail="Delivery holdings settled into your demat account will be listed here."
             />
@@ -92,7 +92,7 @@ export function HoldingsTable({ rows }: { rows: Holding[] }) {
 export function PositionsTable({ rows }: { rows: Position[] }) {
     if (!rows.length) {
         return (
-            <EmptyState
+            <EmptyState minHeight={160} className="portfolio-empty"
                 title="No positions today"
                 detail="Intraday and carry-forward positions appear here once the first order fills."
             />
@@ -170,7 +170,7 @@ export function PositionsTable({ rows }: { rows: Position[] }) {
 export function OrdersTable({ rows }: { rows: Order[] }) {
     if (!rows.length) {
         return (
-            <EmptyState
+            <EmptyState minHeight={160} className="portfolio-empty"
                 title="No orders today"
                 detail="Today's order book is empty. Orders placed manually or by the agent will appear here."
             />

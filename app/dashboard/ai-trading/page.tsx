@@ -3,8 +3,8 @@
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CapitalControl } from '@/components/agent/capital-control'
-import { AgentConsole } from '@/components/agent/agent-console'
-import { RunSummary } from '@/components/agent/run-summary'
+import { LiveRunBoard } from '@/components/agent/live-run-board'
+
 import { useAgentRunContext } from '@/components/agent/agent-run-provider'
 import { Notice } from '@/components/ui/notice'
 import { CellGrid, Panel } from '@/components/ui/panel'
@@ -44,7 +44,7 @@ function AgentPageContent() {
         )
     }, [requestedView, legacySession, router])
 
-    const { status, events, stream, error } = useAgentRunContext()
+    const { runs, stream, error } = useAgentRunContext()
 
     return (
         <>
@@ -52,8 +52,8 @@ function AgentPageContent() {
                 <p className="dash-label mb-2">Autonomous execution</p>
                 <h1 className="section-title">Agent</h1>
                 <p className="section-lede">
-                    The scanner and Intra-Finder watch the market continuously, so runs start on their own. This is
-                    where you follow one and set the capital it may commit.
+                    Follow concurrent runs, inspect decisions and manage capital. New candidates
+                    appear automatically as the scanner finds them.
                 </p>
             </Reveal>
 
@@ -65,8 +65,8 @@ function AgentPageContent() {
 
             <div className="space-y-4">
                 <CapitalControl />
-                <RunSummary status={status} />
-                <AgentConsole runStatus={status} liveEvents={events} stream={stream} />
+
+                <LiveRunBoard runs={runs} stream={stream} />
             </div>
         </>
     )

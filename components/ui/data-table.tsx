@@ -63,7 +63,19 @@ export function DataTable<T>({
     stickyFirst?: boolean
 }) {
     return (
-        <div className="table-scroll" style={maxHeight ? { maxHeight } : undefined}>
+        <>
+        <ul className="mobile-records" aria-label={caption}>
+            {rows.map((row, index) => <li key={rowKey(row, index)}>
+                <div className="mb-3">{columns[0]?.render(row)}</div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    {columns.slice(1).map((column) => <div key={column.key} className="min-w-0">
+                        <dt className="mb-1 text-xs text-ink-tertiary">{column.header}</dt>
+                        <dd className={cn('text-sm text-ink-secondary', column.direction && DIRECTION_TEXT[column.direction(row)])}>{column.render(row)}</dd>
+                    </div>)}
+                </dl>
+            </li>)}
+        </ul>
+        <div className="desktop-records table-scroll" style={maxHeight ? { maxHeight } : undefined}>
             <table className="data-table" data-sticky-first={stickyFirst || undefined} style={{ minWidth }}>
                 <caption className="sr-only">{caption}</caption>
                 <thead>
@@ -100,6 +112,7 @@ export function DataTable<T>({
                 </tbody>
             </table>
         </div>
+        </>
     )
 }
 

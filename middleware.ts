@@ -4,6 +4,10 @@ import { fetchWithTimeout } from '@/lib/supabase/fetch-with-timeout'
 
 export async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname
+    if (pathname.startsWith('/auth/design-preview') && process.env.NODE_ENV !== 'development') {
+        return new NextResponse('Not found', { status: 404 })
+    }
+    if (['/sw.js', '/offline.html', '/manifest.webmanifest'].includes(pathname)) return NextResponse.next()
 
     // Public routes must remain available even when the auth service is down.
     // Check this before making any network request to Supabase.

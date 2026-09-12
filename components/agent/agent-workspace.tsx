@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -55,11 +56,14 @@ export function AgentWorkspace({
     onBack?: () => void
 }) {
     const state = slotState(slot)
-    const latest = slot.events[slot.events.length - 1]
+    const [activityFilter, setActivityFilter] = useState<'all' | 'tools' | 'analysis'>('all')
+    const activity = slot.events.filter((event) => activityFilter === 'all' || (activityFilter === 'tools'
+        ? event.type.startsWith('stock_agent_tool_call_')
+        : ['stock_agent_thinking', 'stock_agent_response_delta', 'stock_agent_completed', 'stock_agent_failed'].includes(event.type)))
     const running = !slot.complete && !slot.failed && slot.events.length > 0
 
-    const decision = result?.decision || latest?.decision
-    const metadata = result?.agent_metadata || latest?.agent_metadata
+    const decision = result?.decision || [...slot.events].reverse().find((event) => event.decision)?.decision
+    const metadata = result?.agent_metadata || [...slot.events].reverse().find((event) => event.agent_metadata)?.agent_metadata
     const showLifecycle = hasLifecycleEvents(slot.events)
 
     return (
@@ -113,7 +117,10 @@ export function AgentWorkspace({
                 />
                 {slot.events.length ? (
                     <PanelBody>
-                        <EventTimeline events={slot.events} />
+                        <div className="mb-5 flex flex-wrap gap-1" aria-label="Filter activity">
+                            {(['all', 'tools', 'analysis'] as const).map((filter) => <button type="button" key={filter} className="run-filter" aria-pressed={activityFilter === filter} onClick={() => setActivityFilter(filter)}>{filter === 'all' ? 'All activity' : filter === 'tools' ? 'Tool calls' : 'Analysis & outcome'}</button>)}
+                        </div>
+                        {activity.length ? <EventTimeline events={activity} /> : <p className="py-4 text-sm text-ink-secondary">No matching activity yet.</p>}
                     </PanelBody>
                 ) : (
                     <EmptyState

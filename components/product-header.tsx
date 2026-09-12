@@ -7,6 +7,7 @@ import BrandMark from '@/components/brand-mark'
 import { AccountMenu } from '@/components/account/account-menu'
 import { SlidingRail } from '@/components/motion/sliding-rail'
 import { Agent, History, Portfolio } from '@/components/ui/icons'
+import { PwaControls } from '@/components/pwa-controls'
 
 /**
  * The single piece of chrome for the authenticated app.
@@ -62,7 +63,7 @@ export default function ProductHeader({
 
     return (
         <header className="sticky top-0 z-[var(--z-header)] border-b border-line bg-canvas/85 backdrop-blur-xl">
-            <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
+            <div className="product-header-inner mx-auto flex h-14 max-w-[1320px] items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
                 <Link
                     href="/"
                     className="group t-press flex flex-shrink-0 items-center gap-2.5 rounded-lg"
@@ -75,7 +76,7 @@ export default function ProductHeader({
                     {/* The wordmark is the first thing to go at narrow widths:
                         the mark alone still identifies the product, and the
                         space belongs to the nav. */}
-                    <span className="hidden text-[13px] font-medium tracking-[-0.02em] text-ink-primary md:inline">
+                    <span className="product-brand-name hidden text-[13px] font-medium tracking-[-0.02em] text-ink-primary md:inline">
                         PolyCognition
                     </span>
                 </Link>
@@ -84,7 +85,7 @@ export default function ProductHeader({
                     wide, but it is centred rather than left-aligned at desktop
                     widths so the three sections read as the middle of the bar
                     rather than as an appendix to the logo. */}
-                <div className="no-scrollbar -mx-1 flex min-w-0 flex-1 items-center overflow-x-auto px-1 sm:justify-center">
+                <div className="product-nav no-scrollbar -mx-1 flex min-w-0 flex-1 items-center overflow-x-auto px-1 sm:justify-center">
                     <SlidingRail activeKey={active} ariaLabel="Sections">
                         {NAV_ITEMS.map(({ id, label, href, Glyph }) => (
                             <Link
@@ -105,6 +106,7 @@ export default function ProductHeader({
 
                 <div className="flex flex-shrink-0 items-center gap-2">
                     {actions}
+                    <PwaControls />
                     <AccountMenu email={email} />
                 </div>
             </div>

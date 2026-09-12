@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import ProductHeader from '@/components/product-header'
 import { AgentRunProvider } from '@/components/agent/agent-run-provider'
 import { createClient } from '@/lib/supabase/server'
+import './dashboard.css'
 
 /**
  * Shared shell for Portfolio, Agent and Trades.

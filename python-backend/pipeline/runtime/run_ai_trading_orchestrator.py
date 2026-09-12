@@ -45,6 +45,7 @@ class WebSocketBroadcaster:
         self.clients: dict[socket.socket, str] = {}
         self.send_locks: dict[socket.socket, Any] = {}
         self.lock = Lock()
+        self.recent_events: dict[str, list[tuple[float, str]]] = {}
 
     def accept(self, handler: BaseHTTPRequestHandler, user_id: str) -> bool:
         key = handler.headers.get("Sec-WebSocket-Key")
@@ -79,9 +80,35 @@ class WebSocketBroadcaster:
         message = json.dumps(payload, ensure_ascii=True, default=str)
         frame = self._frame(message)
         with self.lock:
+            if str(payload.get("type", "")).startswith(("stock_agent_", "intra_finder_event_")):
+                cutoff = time.time() - 6 * 60 * 60
+                expired_users = [key for key, items in self.recent_events.items() if not items or items[-1][0] <= cutoff]
+                for key in expired_users:
+                    del self.recent_events[key]
+                history = [(at, data) for at, data in self.recent_events.get(user_id, []) if at > cutoff]
+                history.append((time.time(), message))
+                size = 0
+                retained = []
+                for item in reversed(history[-3000:]):
+                    size += len(item[1])
+                    if size > 16 * 1024 * 1024:
+                        break
+                    retained.append(item)
+                self.recent_events[user_id] = list(reversed(retained))
             clients = [client for client, client_user_id in self.clients.items() if client_user_id == user_id]
         for client in clients:
             self._send_frame(client, frame)
+
+    def replay(self, client: socket.socket, user_id: str) -> None:
+        """Replay only the authenticated user's bounded, recent stream."""
+        with self.lock:
+            if self.clients.get(client) != user_id:
+                return
+            history = list(self.recent_events.get(user_id, []))
+        cutoff = time.time() - 6 * 60 * 60
+        for at, message in history:
+            if at > cutoff and not self._send_frame(client, self._frame(message)):
+                break
 
     def send_one(self, client: socket.socket, payload: Dict[str, Any]) -> bool:
         return self._send_frame(client, self._frame(json.dumps(payload, ensure_ascii=True, default=str)))
@@ -1294,6 +1321,7 @@ class AITradingOrchestrator:
                     },
                 )
                 try:
+                    orchestrator.ws.replay(client, user_id)
                     while True:
                         time.sleep(25)
                         if not orchestrator.ws.send_one(

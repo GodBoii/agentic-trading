@@ -2,6 +2,12 @@
 const nextConfig = {
   // Enable React strict mode for development
   reactStrictMode: true,
+  async headers() {
+    return [{ source: '/sw.js', headers: [
+      { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+      { key: 'Service-Worker-Allowed', value: '/' },
+    ] }]
+  },
 
   // Enable SWC minification (faster than Terser)
   swcMinify: true,

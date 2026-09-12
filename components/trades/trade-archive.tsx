@@ -69,7 +69,10 @@ export function TradeArchive({
     onPrefetch: (sessionId: string) => void
     onRetry: () => void
 }) {
-    const groups = useMemo(() => groupSessionsByDate(sessions), [sessions])
+    const [query, setQuery] = useState('')
+    const allGroups = useMemo(() => groupSessionsByDate(sessions), [sessions])
+    const groups = useMemo(() => groupSessionsByDate(sessions.filter((session) =>
+        `${session.title} ${session.request_id}`.toLowerCase().includes(query.trim().toLowerCase()))), [sessions, query])
     const agentTotal = useMemo(() => countAgents(sessions), [sessions])
 
     // `undefined` means "the reader has not picked a day yet", which resolves to
@@ -129,15 +132,20 @@ export function TradeArchive({
                         value={<SpinningCounter value={sessions.length} />}
                         emphasis="primary"
                     />
-                    <StatTile label="Trading days" value={<SpinningCounter value={groups.length} />} />
+                    <StatTile label="Trading days" value={<SpinningCounter value={allGroups.length} />} />
                     <StatTile
                         label="Agents"
                         value={<SpinningCounter value={agentTotal} />}
                         note="One per analysed stock"
                     />
-                    <StatTile label="Most recent" value={formatDateTime(groups[0]?.at)} />
+                    <StatTile label="Most recent" value={formatDateTime(allGroups[0]?.at)} />
                 </CellGrid>
 
+                <div className="run-filters">
+                    <h2 className="text-lg font-medium">Run history</h2>
+                    <input type="search" className="run-search" aria-label="Search archived runs" placeholder="Find a stock or request…" value={query} onChange={(event) => { setQuery(event.target.value); setChosenKey(undefined) }} />
+                </div>
+                {!groups.length && <p className="py-8 text-sm text-ink-secondary">No runs match this search.</p>}
                 <ul className="space-y-3">
                     {groups.map((group) => (
                         <li key={group.key}>

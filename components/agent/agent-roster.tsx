@@ -20,6 +20,7 @@ export interface AgentSlot {
 /** Derive a slot's headline state from its event stream. */
 export function slotState(slot: AgentSlot): { tone: Tone; label: string } {
     if (slot.failed) return { tone: 'negative', label: 'Failed' }
+    if (slot.events.some((event) => event.type === 'stock_agent_no_trade')) return { tone: 'neutral', label: 'No trade' }
     if (slot.complete) return { tone: 'positive', label: 'Completed' }
     if (slot.events.length) return { tone: 'warning', label: 'Running' }
     return { tone: 'neutral', label: 'Queued' }
