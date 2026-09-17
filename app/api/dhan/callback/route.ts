@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getDhanAuthCredentials, saveDhanAccessToken } from '@/lib/dhan/user-credentials'
 import { parseDhanExpiryIso } from '../_utils'
+import { convexAdminMutation } from '@/lib/convex/server'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,9 +24,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=unauthorized_callback', request.url))
   }
 
+  let lease: { supabaseUserId: string; expectedUpdatedAt: string; owner: string } | null = null
   try {
     const credentials = await getDhanAuthCredentials(user.id)
     if (!credentials) return NextResponse.redirect(new URL('/dashboard?error=credentials_missing', request.url))
+    if (request.cookies.get('dhan-consent-revision')?.value !== credentials.updatedAt) {
+      return NextResponse.redirect(new URL('/dashboard?error=credentials_changed', request.url))
+    }
+    lease = { supabaseUserId: user.id, expectedUpdatedAt: credentials.updatedAt, owner: randomUUID() }
+    if (!await convexAdminMutation<boolean>('dhanCredentials:acquireLease', lease)) {
+      return NextResponse.redirect(new URL('/dashboard?error=credentials_changed', request.url))
+    }
 
     const response = await fetch(
       `https://auth.dhan.co/app/consumeApp-consent?tokenId=${encodeURIComponent(tokenId)}`,
@@ -42,12 +52,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard?error=token_exchange_failed', request.url))
     }
 
-    await saveDhanAccessToken(user.id, { accessToken, expiresAt })
+    await saveDhanAccessToken(user.id, { accessToken, expiresAt, expectedUpdatedAt: credentials.updatedAt, clientId, owner: lease.owner })
     // Remove the old Supabase copy after a successful Convex migration.
     await supabase.from('user_trading_keys').delete().eq('user_id', user.id)
-    return NextResponse.redirect(new URL('/dashboard?success=true', request.url))
+    const result = NextResponse.redirect(new URL('/dashboard?success=true', request.url))
+    result.cookies.set('dhan-consent-revision', '', { maxAge: 0, path: '/api/dhan' })
+    return result
   } catch (error) {
-    console.error('Dhan callback failed:', error)
+    console.error('Dhan callback failed')
     return NextResponse.redirect(new URL('/dashboard?error=unexpected', request.url))
+  } finally {
+    if (lease) {
+      await convexAdminMutation('dhanCredentials:finishCheck', { ...lease, authStatus: 'pending' }).catch(() => {
+        console.error('Dhan callback lease release pending')
+      })
+    }
   }
 }
