@@ -1,7 +1,7 @@
 import 'server-only'
 import crypto from 'crypto'
 
-export type DhanCredentialKind = 'api-key' | 'api-secret' | 'access-token'
+export type DhanCredentialKind = 'api-key' | 'api-secret' | 'access-token' | 'pin' | 'totp-secret'
 
 const PREFIX = 'enc:v2:'
 
