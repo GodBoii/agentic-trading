@@ -287,7 +287,7 @@ class MultiStockAgentRunner(MultiStockAnalyzerRunner):
                 "user_id": user_id,
                 "eligible": False,
                 "status_code": "dhan_authorization_or_ip_unavailable",
-                "message": "Reconnect Dhan and whitelist this backend's static IP before enabling live orders.",
+                "message": "Dhan order access is unavailable. Check Profile > Authentication for token and IP status.",
                 "error": f"{type(exc).__name__}: {exc}",
             }
         mode = str(user.get("trade_mode") or ("manual" if user.get("trade_amount") not in (None, "") else "auto")).lower()
