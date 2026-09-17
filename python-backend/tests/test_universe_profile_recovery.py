@@ -1,4 +1,5 @@
 from collections import Counter
+from dataclasses import replace
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -7,6 +8,7 @@ import pandas as pd
 
 from pipeline.config import PipelineConfig
 from pipeline.stages.universe_scanner import UniverseScanner
+from pipeline.services.storage_service import StorageService
 from tests.test_universe_broad_mode import venue_row
 
 
@@ -103,3 +105,33 @@ def test_valid_comparisons_still_allow_more_liquid_venue(tmp_path):
     item._daily_frame = daily
     record, _, _ = item._scan_isin("INE1", rows, {"INE1": "NSE_EQ"})
     assert record.selected_venue.exchange_segment == "BSE_EQ"
+
+
+def test_full_build_publishes_profiles_baselines_and_phase_timings(tmp_path):
+    item = scanner(tmp_path)
+    item.config = replace(item.config, stage1_results_dir=tmp_path / "stage1",
+                          stage1_latest_path=tmp_path / "stage1/latest.json")
+    item.market_time.market_date_str = lambda: NOW.date().isoformat()
+    item.exclusions = []
+    item.corporate_actions = SimpleNamespace(actions_for_date=lambda _day: {"actions": []})
+    item._require_data_access = Mock()
+    master = tmp_path / "master.csv"
+    rows = venue_row()
+    rows["ISIN"] = "INE1"
+    rows.to_csv(master, index=False)
+    item._download_master = lambda _day: (master, {"source": "test", "degraded": False})
+    item._read_and_validate_master = lambda _path: rows
+    item._eligible_venue_rows = lambda frame: frame
+    item._daily_frame = lambda _venue: (history(), None)
+    item._load_captured_live_baselines = lambda: {}
+    item._intraday_baseline = lambda _record: {"status": "ready"}
+
+    result = item.run()
+
+    assert result["summary"]["status"] == "completed"
+    assert result["summary"]["stage1_passed"] == 1
+    assert result["summary"]["baselines_ready"] == 1
+    assert result["summary"]["daily_history_seconds"] >= 0
+    assert result["summary"]["baseline_seconds"] >= 0
+    assert StorageService.load_snapshot(item.config.stage1_latest_path) == result
+    assert len(pd.read_parquet(item.config.stage1_universe_parquet_path(NOW.date().isoformat()))) == 1
