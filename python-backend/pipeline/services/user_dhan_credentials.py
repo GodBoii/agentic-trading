@@ -11,7 +11,24 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from pipeline.config import PipelineConfig
 from pipeline.services.convex_service import ConvexService
-from pipeline.services.dhan_credentials import DhanCredentials
+from pipeline.services.dhan_credentials import DhanCredentials, DhanCredentialStore
+
+
+def require_static_ip_response(response: Any) -> None:
+    data = response.get("data") if isinstance(response, dict) else None
+    if isinstance(data, dict) and isinstance(data.get("data"), dict):
+        data = data["data"]
+    if not isinstance(response, dict) or response.get("status") != "success":
+        code = str(data.get("errorCode") or data.get("error_code") or "") if isinstance(data, dict) else ""
+        if code in {"DH-901", "DH-906", "901", "906"}:
+            raise RuntimeError("user_dhan_invalid_token")
+        raise RuntimeError("user_dhan_order_access_unavailable")
+    if not isinstance(data, dict):
+        raise RuntimeError("user_dhan_order_access_unavailable")
+    detected = str(data.get("detectedIP") or data.get("detectedIp") or "").strip()
+    allowed = {str(data.get("primaryIP") or "").strip(), str(data.get("secondaryIP") or "").strip()}
+    if data.get("ordersAllowed") is not True or not detected or detected not in allowed:
+        raise RuntimeError("user_dhan_static_ip_not_allowed")
 
 
 class UserDhanCredentials:
@@ -21,6 +38,17 @@ class UserDhanCredentials:
         self.config = config or PipelineConfig()
         self._services: dict[str, tuple[str, Any]] = {}
         self._lock = Lock()
+
+    @staticmethod
+    def encrypt(value: str, user_id: str, kind: str) -> str:
+        secret = (os.getenv("DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET") or os.getenv("DHAN_TOKEN_ENCRYPTION_KEY") or "").strip()
+        if not secret:
+            raise RuntimeError("DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET is not configured")
+        nonce = os.urandom(12)
+        encrypted = AESGCM(hashlib.sha256(secret.encode()).digest()).encrypt(nonce, value.encode(), f"dhan:{user_id}:{kind}".encode())
+        def encode(raw: bytes) -> str:
+            return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+        return f"enc:v2:{encode(nonce)}.{encode(encrypted[-16:])}.{encode(encrypted[:-16])}"
 
     @staticmethod
     def _decrypt(value: str, user_id: str, kind: str) -> str:
@@ -82,12 +110,18 @@ class UserDhanCredentials:
 
         normalized = str(user_id or "").strip()
         record = ConvexService.get_dhan_credentials(normalized)
+        if record and record.get("tokenSource") == "scanner" and record.get("accountVerifiedAt"):
+            current = DhanCredentialStore(self.config).load(required=False)
+            if current and current.client_id == record.get("dhanClientId"):
+                # Follow the scanner's single rotation owner immediately, even before Convex synchronization.
+                record = {**record, "encryptedAccessToken": self.encrypt(current.access_token, normalized, "access-token"),
+                          "tokenExpiresAt": current.expires_at, "updatedAt": f"scanner:{current.version}"}
         version = str((record or {}).get("updatedAt") or "")
+        credentials = self._from_record(normalized, record)
         with self._lock:
             cached = self._services.get(normalized)
             if cached and cached[0] == version:
                 return cached[1]
-            credentials = self._from_record(normalized, record)
             service = DhanService(
                 self.config,
                 prefer_gateway=False,
@@ -99,16 +133,5 @@ class UserDhanCredentials:
     def require_order_access(self, user_id: str) -> Any:
         service = self.service(user_id)
         response = service.fetch_static_ips()
-        data = response.get("data") if isinstance(response, dict) else None
-        if isinstance(data, dict) and isinstance(data.get("data"), dict):
-            data = data["data"]
-        if not isinstance(data, dict):
-            raise RuntimeError("user_dhan_order_access_unavailable")
-        detected = str(data.get("detectedIP") or data.get("detectedIp") or "").strip()
-        allowed_ips = {
-            str(data.get("primaryIP") or "").strip(),
-            str(data.get("secondaryIP") or "").strip(),
-        }
-        if data.get("ordersAllowed") is not True or not detected or detected not in allowed_ips:
-            raise RuntimeError("user_dhan_static_ip_not_allowed")
+        require_static_ip_response(response)
         return service
