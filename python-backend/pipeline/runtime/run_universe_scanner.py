@@ -40,7 +40,7 @@ def _run_heavy_scan(timeout_seconds: int) -> int:
         completed = subprocess.run(
             [sys.executable, "-m", "pipeline.runtime.run_universe_scanner_once"],
             check=False,
-            timeout=max(60, timeout_seconds),
+            timeout=max(1, timeout_seconds),
         )
         return int(completed.returncode)
     except subprocess.TimeoutExpired:
@@ -53,6 +53,16 @@ def _should_defer_heavy_scan(
     session: Any,
 ) -> bool:
     return now_time >= premarket_cutoff and not bool(session.is_after_close)
+
+
+def _scan_timeout_seconds(now: datetime, config: PipelineConfig, session: Any) -> int:
+    """Never let a late premarket start push historical work into feed startup."""
+    maximum = max(1, config.stage1_max_run_seconds)
+    if session.is_after_close:
+        return maximum
+    finish = datetime.strptime(config.stage1_premarket_completion_time, "%H:%M").time()
+    deadline = datetime.combine(now.date(), finish, tzinfo=now.tzinfo)
+    return max(0, min(maximum, int((deadline - now).total_seconds())))
 
 
 def main() -> None:
@@ -103,7 +113,12 @@ def main() -> None:
             time.sleep(30)
             continue
 
-        return_code = _run_heavy_scan(config.stage1_max_run_seconds)
+        timeout_seconds = _scan_timeout_seconds(market_time.now(), config, session)
+        if timeout_seconds <= 0:
+            time.sleep(30)
+            continue
+        print(f"Universe Scanner run budget: {timeout_seconds}s.", flush=True)
+        return_code = _run_heavy_scan(timeout_seconds)
         complete = return_code == 0 and _artifact_complete(daily_path, market_date)
         if complete:
             last_run_date = market_date
