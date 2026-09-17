@@ -525,7 +525,7 @@ class DhanResilienceTests(unittest.TestCase):
 
         self.assertEqual(result[2885]["last_price"], 100.0)
 
-    def test_repeated_905_opens_local_historical_circuit(self):
+    def test_repeated_service_failure_opens_local_historical_circuit(self):
         service = object.__new__(DhanService)
         service.config = SimpleNamespace(
             historical_circuit_breaker_threshold=2,
@@ -538,9 +538,9 @@ class DhanResilienceTests(unittest.TestCase):
         response = {
             "status": "failure",
             "remarks": {
-                "error_code": "DH-905",
-                "error_type": "Input_Exception",
-                "error_message": "Missing required fields, bad values for parameters etc.",
+                "error_code": "DH-908",
+                "error_type": "Internal_Server_Error",
+                "error_message": "Server was not able to process API request.",
             },
         }
 
@@ -550,6 +550,27 @@ class DhanResilienceTests(unittest.TestCase):
         blocked = service._historical_circuit_response_if_open()
         self.assertIsNotNone(blocked)
         self.assertEqual(blocked["remarks"]["error_code"], "LOCAL-CIRCUIT-OPEN")
+
+    def test_instrument_errors_do_not_block_other_history_requests(self):
+        service = object.__new__(DhanService)
+        service.rate_condition = Condition()
+        service.config = SimpleNamespace(
+            historical_circuit_breaker_threshold=12,
+            historical_circuit_breaker_cooldown_seconds=300,
+        )
+        service.historical_circuit_condition = Condition()
+        service.historical_failure_signature = None
+        service.historical_consecutive_failures = 0
+        service.historical_circuit_open_until = 0.0
+        for code in ("DH-905", "DH-907", "813", "814"):
+            for _ in range(24):
+                service._record_historical_response({
+                    "status": "failure",
+                    "remarks": {"error_code": code, "error_type": "Input_Exception"},
+                })
+            self.assertIsNone(service._historical_circuit_response_if_open(), code)
+        service._record_historical_response({"status": "success"})
+        self.assertEqual(service.historical_consecutive_failures, 0)
 
     def test_daily_epoch_keeps_ist_calendar_date(self):
         service = object.__new__(DhanService)
