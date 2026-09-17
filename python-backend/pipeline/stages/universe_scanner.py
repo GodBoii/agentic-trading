@@ -10,9 +10,11 @@ import tempfile
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from threading import Event, Thread
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -82,6 +84,27 @@ class UniverseScanner:
             or str(data.get("dataPlan") or "").strip().lower() != "active"
         ):
             raise RuntimeError("Dhan Data API subscription is not active.")
+
+    @contextmanager
+    def _phase_progress(self, phase: str, total: int) -> Iterator[Dict[str, int]]:
+        progress = {"completed": 0}
+        stopped = Event()
+        started = time.monotonic()
+
+        def report() -> None:
+            while not stopped.wait(60):
+                self._log(
+                    f"{phase}: {progress['completed']:,}/{total:,} completed; "
+                    f"elapsed={time.monotonic() - started:.0f}s."
+                )
+
+        thread = Thread(target=report, name="universe-progress", daemon=True)
+        thread.start()
+        try:
+            yield progress
+        finally:
+            stopped.set()
+            thread.join()
 
     @staticmethod
     def _text(value: Any) -> str:
@@ -602,7 +625,10 @@ class UniverseScanner:
             retry_after = self._history_retry_after_seconds(response)
             if retry_after is None:
                 return response
-            time.sleep(min(30.0, max(1.0, retry_after + 0.25)))
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return response
+            time.sleep(min(remaining, max(1.0, retry_after + 0.25)))
         return response
 
     @staticmethod
@@ -614,7 +640,9 @@ class UniverseScanner:
                 "local-rate-limit-cooldown",
                 "local-circuit-open",
                 "dh-805",
+                "dh-904",
                 '"error_code": "805"',
+                '"error_code": "904"',
                 "rate limit",
             )
         )
@@ -803,13 +831,18 @@ class UniverseScanner:
         self._log(
             f"Loading completed daily history and comparing NSE/BSE liquidity with {workers} workers."
         )
-        with ThreadPoolExecutor(max_workers=workers) as executor:
+        history_started = time.monotonic()
+        with (
+            self._phase_progress("Daily history", history_total) as progress,
+            ThreadPoolExecutor(max_workers=workers) as executor,
+        ):
             for _, result in bounded_results(
                 executor, lambda item: self._scan_isin(item[0], item[1], previous_segments),
                 groups, limit=workers * 2,
             ):
                 record, venue_rows, exclusion = result
                 completed_history += 1
+                progress["completed"] = completed_history
                 comparisons.extend(venue_rows)
                 if record:
                     records.append(record)
@@ -822,18 +855,24 @@ class UniverseScanner:
                         f"current survivors={len(records):,}, exclusions={len(historical_exclusions):,}."
                     )
 
+        history_elapsed = time.monotonic() - history_started
         self.captured_live_baselines = self._load_captured_live_baselines()
         baseline_workers = max(1, min(4, workers))
         completed_baselines = 0
         self._log(
             f"Preparing five-minute historical intraday baselines for {len(records):,} survivors."
         )
-        with ThreadPoolExecutor(max_workers=baseline_workers) as executor:
+        baseline_started = time.monotonic()
+        with (
+            self._phase_progress("Intraday baselines", len(records)) as progress,
+            ThreadPoolExecutor(max_workers=baseline_workers) as executor,
+        ):
             for record, baseline in bounded_results(
                 executor, self._intraday_baseline, records, limit=baseline_workers * 2,
             ):
                 record.intraday_baselines = baseline
                 completed_baselines += 1
+                progress["completed"] = completed_baselines
                 if completed_baselines == len(records) or completed_baselines % 100 == 0:
                     ready = sum(
                         (item.intraday_baselines or {}).get("status") == "ready"
@@ -905,6 +944,8 @@ class UniverseScanner:
                 for row in stock_rows
             ),
             "elapsed_seconds": round(time.time() - started, 2),
+            "daily_history_seconds": round(history_elapsed, 2),
+            "baseline_seconds": round(time.monotonic() - baseline_started, 2),
             "filters": {
                 "mode": (
                     "legacy_opportunity_filters"
