@@ -339,7 +339,10 @@ class DhanAuthManager:
         ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
     def run_forever(self) -> None:
+        from pipeline.services.user_dhan_auth_manager import UserDhanAuthManager
+
         Thread(target=self.serve_health, daemon=True).start()
+        Thread(target=UserDhanAuthManager(self.config).run_forever, daemon=True).start()
         interval = max(60, int(os.getenv("DHAN_AUTO_RENEW_CHECK_SECONDS", "900")))
         while True:
             scheduled_0830 = self._daily_verification_due()
