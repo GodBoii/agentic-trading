@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getDhanAuthCredentials, saveDhanAuthCredentials } from '@/lib/dhan/user-credentials'
+import { getDhanAuthCredentials, getStoredDhanCredentials, saveDhanAuthCredentials } from '@/lib/dhan/user-credentials'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,6 +18,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+  }
 
   const input = inputObject(await request.json().catch(() => null))
   const supplied = {
@@ -31,6 +34,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const saved = await getStoredDhanCredentials(user.id)
+    if (saved?.tokenSource === 'scanner') return NextResponse.json({ error: 'This account is managed by the backend authentication service.' }, { status: 409 })
     const credentials = suppliedCount === 3 ? supplied : await getDhanAuthCredentials(user.id)
     if (!credentials) {
       return NextResponse.json({ error: 'Enter your Dhan Client ID, API key and API secret.' }, { status: 409 })
@@ -55,11 +60,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (suppliedCount === 3) await saveDhanAuthCredentials(user.id, credentials)
-    return NextResponse.json({
+    const current = await getStoredDhanCredentials(user.id)
+    if (!current) throw new Error('Credentials missing')
+    const result = NextResponse.json({
       url: `https://auth.dhan.co/login/consentApp-login?consentAppId=${encodeURIComponent(consentAppId)}`,
     })
+    result.cookies.set('dhan-consent-revision', current.updatedAt, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 600, path: '/api/dhan' })
+    return result
   } catch (error) {
-    console.error('Dhan consent initiation failed:', error)
+    console.error('Dhan consent initiation failed')
     return NextResponse.json({ error: 'Unable to start Dhan authentication.' }, { status: 500 })
   }
 }
