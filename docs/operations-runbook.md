@@ -38,7 +38,7 @@
 - Auth manager becomes healthy.
 - Gateway becomes healthy.
 - AI trading gateway becomes healthy before Intra-Finder is allowed to start.
-- Universe Scanner runs at or after 07:00 IST and refreshes the broad tradable
+- Universe Scanner runs at or after 06:00 IST and refreshes the broad tradable
   universe and cached profiles.
 - Intra-Finder accepts a completed last-known-good universe up to four calendar
   days old, so market-open monitoring does not wait for profile refresh.
@@ -49,12 +49,15 @@
 ## Calendar and scheduling
 
 - Every backend service uses `Asia/Calcutta`, with `Asia/Kolkata` as the timezone alias.
-- Universe Scanner runs once on an NSE cash-market trading day at or after 07:00 IST.
+- Universe Scanner runs once on an NSE cash-market trading day at or after 06:00 IST.
 - A missing build may start only before the 07:30 premarket cutoff or after
   market close. A restart during the live session uses the last-known-good
   universe instead of competing with agents for Dhan historical capacity.
-- A heavy scan is terminated after 90 minutes and retried safely; publication
-  happens only after a complete atomic build.
+- Premarket scans must finish by 09:00 IST. Each child gets the smaller of
+  three hours or the time remaining until 09:00. A 07:00 start therefore gets
+  two hours; a restart does not extend the deadline. Post-close scans get up to
+  three hours. Publication still requires a complete build, with atomic snapshot
+  replacement. The existing fallback universe remains available if the child times out.
 - A completed schema-3 artifact prevents a second heavy run that day.
 - A failed build retries after the configured degraded interval.
 - Intra-Finder connects five minutes before the calendar's market open and
@@ -67,6 +70,20 @@
   trading process closed.
 - `MARKET_FORCE_OPEN` and `MARKET_FORCE_CLOSED` are emergency operator overrides.
   Do not use `MARKET_FORCE_OPEN` for an untested special-session timetable.
+
+Historical requests retain the configured four-per-second admission limit.
+Dhan documents five data requests per second and 100,000 per day, separately
+from quotes and orders. The optional Redis limiter enforces both windows; the
+file-based fallback only enforces the short window. See
+[Dhan rate limits](https://dhanhq.co/docs/v2/#rate-limit).
+
+Historical DH-905 input errors get one short retry, then use the existing
+profile fallback rules. They do not open the shared historical circuit.
+Repeated service/network failures can open that circuit; rate-limit failures
+keep the adaptive cooldown. The scanner honors the reported wait within its
+existing ten-minute request retry budget. Daily history and baseline phases
+log progress every minute, including while all workers are waiting. Completed
+run reports include `daily_history_seconds` and `baseline_seconds`.
 
 Check the Stage 2 readiness endpoint:
 
