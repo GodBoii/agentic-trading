@@ -9,6 +9,17 @@ export type StoredDhanCredentials = {
   encryptedApiSecret: string
   encryptedAccessToken?: string
   tokenExpiresAt?: string
+  tokenIssuedAt?: string
+  tokenSource?: string
+  accountVerifiedAt?: string
+  encryptedPin?: string
+  encryptedTotpSecret?: string
+  autoRenew?: boolean
+  authStatus?: string
+  authError?: string
+  lastCheckedAt?: string
+  lastRenewedAt?: string
+  nextRenewalAt?: string
   updatedAt: string
 }
 
@@ -25,6 +36,7 @@ export async function getDhanAuthCredentials(userId: string) {
     clientId: stored.dhanClientId,
     apiKey: decryptDhanCredential(stored.encryptedApiKey, userId, 'api-key'),
     apiSecret: decryptDhanCredential(stored.encryptedApiSecret, userId, 'api-secret'),
+    updatedAt: stored.updatedAt,
   }
 }
 
@@ -54,12 +66,15 @@ export async function saveDhanAuthCredentials(
 
 export async function saveDhanAccessToken(
   userId: string,
-  values: { accessToken: string; expiresAt: string },
+  values: { accessToken: string; expiresAt: string; expectedUpdatedAt: string; clientId: string; owner: string },
 ) {
   await convexAdminMutation('dhanCredentials:setToken', {
     supabaseUserId: userId,
     encryptedAccessToken: encryptDhanCredential(values.accessToken, userId, 'access-token'),
     tokenExpiresAt: values.expiresAt,
+    expectedUpdatedAt: values.expectedUpdatedAt,
+    dhanClientId: values.clientId,
+    owner: values.owner,
     updatedAt: new Date().toISOString(),
   })
 }
