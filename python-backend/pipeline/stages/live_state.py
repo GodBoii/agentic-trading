@@ -180,6 +180,28 @@ class LiveStockState:
             lower_circuit=optional_float(tradability.get("lower_circuit")),
         )
 
+    def refresh_reference_data(self, stock: Dict[str, Any]) -> None:
+        """Apply a scanner refresh without replacing accumulated live state."""
+        refreshed = type(self).from_stock(stock)
+        if refreshed.key != self.key:
+            raise ValueError("Scanner refresh identity does not match live state")
+        for name in (
+            "symbol",
+            "isin",
+            "previous_close",
+            "adv_20_cr",
+            "historical_atr",
+            "historical_atr_percent",
+            "median_cumulative_volume",
+            "median_range_percent",
+            "baseline_interval_minutes",
+            "corporate_action",
+            "upper_circuit",
+            "lower_circuit",
+        ):
+            setattr(self, name, getattr(refreshed, name))
+        self._derived_second = None
+
     def apply_packet(
         self,
         *,

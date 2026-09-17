@@ -208,25 +208,32 @@ class IntraFinder:
         self.security_index = defaultdict(list)
         for key in new_stocks:
             self.security_index[key[1]].append(key)
+        old_states = self.states
+        for key, state in old_states.items():
+            stock = new_stocks.get(key)
+            if stock is not None:
+                state.refresh_reference_data(stock)
         if not same_universe or not self.states:
             if not same_universe:
                 for name in ("opening_recovery_requested", "opening_recovery_attempts", "opening_recovery_retry_at"):
                     collection = getattr(self, name, None)
                     if collection is not None:
                         collection.clear()
-            old_states = self.states
-            self.states = {
-                key: old_states.get(key) or LiveStockState.from_stock(stock)
-                for key, stock in new_stocks.items()
-            }
+            refreshed_states: Dict[InstrumentKey, LiveStockState] = {}
+            for key, stock in new_stocks.items():
+                state = old_states.get(key)
+                if state is None:
+                    state = LiveStockState.from_stock(stock)
+                refreshed_states[key] = state
+            self.states = refreshed_states
             market_date = self.market_time.market_date_str()
             self._restore_runtime_state(market_date)
             self._load_event_state(market_date)
-            restored_states = [state for state in self.states.values() if state.price_samples]
-            if restored_states:
-                now = self.market_time.now()
-                for state in restored_states:
-                    state.refresh_derived(now)
+        observed_states = [state for state in self.states.values() if state.price_samples]
+        if observed_states:
+            now = self.market_time.now()
+            for state in observed_states:
+                state.refresh_derived(now)
         return stocks
 
     def _begin_session(self, market_date: str) -> None:

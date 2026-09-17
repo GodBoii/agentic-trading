@@ -204,6 +204,105 @@ class IntraFinderFlowTests(unittest.TestCase):
             self.assertEqual(len(stocks), 1)
             self.assertEqual(finder.universe_source_date, "2026-08-28")
 
+    def test_universe_reload_refreshes_reference_data_without_losing_live_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = PipelineConfig(
+                stage1_latest_path=root / "latest.json",
+                stage2_results_dir=root / "stage2",
+            )
+            StorageService.save_snapshot(
+                config.stage1_latest_path,
+                {
+                    "stage": "universe_scanner",
+                    "summary": {
+                        "status": "completed",
+                        "market_date": "2026-08-31",
+                        "universe_version": "v2",
+                    },
+                    "stocks": [
+                        {
+                            "isin": "INE1-REFRESHED",
+                            "exchange_segment": "NSE_EQ",
+                            "security_id": 1,
+                            "symbol": "UPDATED",
+                            "historical": {
+                                "previous_close": 101,
+                                "adv_20_cr": 22,
+                                "atr_14": 3,
+                                "atr_percent": 2.5,
+                            },
+                            "intraday_baselines": {
+                                "interval_minutes": 15,
+                                "median_cumulative_volume": {"10:00": 1234},
+                                "median_range_percent_by_minute": {"10:00": 0.7},
+                            },
+                            "corporate_action": {"type": "dividend"},
+                            "tradability": {"upper_circuit": 120, "lower_circuit": 80},
+                        }
+                    ],
+                },
+            )
+            existing = LiveStockState(
+                "NSE_EQ",
+                1,
+                "OLD",
+                "INE1",
+                previous_close=90,
+                median_cumulative_volume={"09:30": 10},
+            )
+            existing.latest_price = 105
+            existing.price_samples.append((1.0, 105.0))
+            existing.setup_state["VOLATILITY_IGNITION"] = {"armed_at": "now"}
+            existing._derived_second = int(
+                datetime.fromisoformat("2026-08-31T10:00:00+05:30").timestamp()
+            )
+            existing.derived_as_of = "stale"
+            finder = IntraFinder.__new__(IntraFinder)
+            finder.config = config
+            finder.market_time = SimpleNamespace(
+                now=lambda: datetime.fromisoformat("2026-08-31T10:00:00+05:30"),
+                market_date_str=lambda: "2026-08-31",
+            )
+            finder.session_market_date = "2026-08-31"
+            finder.universe_version = "v2"
+            finder.universe_source_date = "2026-08-28"
+            finder.universe_payload = {}
+            finder.stocks = {existing.key: {"security_id": 1}}
+            finder.states = {existing.key: existing}
+            finder.opening_recovery_requested = set()
+            finder.opening_recovery_attempts = {}
+            finder.opening_recovery_retry_at = {}
+            finder._restore_runtime_state = lambda _date: None
+            finder._load_event_state = lambda _date: None
+
+            finder.load_universe()
+
+            refreshed = finder.states[existing.key]
+            self.assertIs(refreshed, existing)
+            self.assertEqual(refreshed.symbol, "UPDATED")
+            self.assertEqual(refreshed.isin, "INE1-REFRESHED")
+            self.assertEqual(refreshed.previous_close, 101)
+            self.assertEqual(refreshed.adv_20_cr, 22)
+            self.assertEqual(refreshed.historical_atr, 3)
+            self.assertEqual(refreshed.historical_atr_percent, 2.5)
+            self.assertEqual(refreshed.median_cumulative_volume, {"10:00": 1234.0})
+            self.assertEqual(refreshed.median_range_percent, {"10:00": 0.7})
+            self.assertEqual(refreshed.baseline_interval_minutes, 15)
+            self.assertEqual(refreshed.corporate_action, {"type": "dividend"})
+            self.assertEqual(refreshed.upper_circuit, 120)
+            self.assertEqual(refreshed.lower_circuit, 80)
+            self.assertEqual(refreshed.latest_price, 105)
+            self.assertEqual(list(refreshed.price_samples), [(1.0, 105.0)])
+            self.assertEqual(
+                refreshed.derived_as_of,
+                "2026-08-31T10:00:00+05:30",
+            )
+            self.assertEqual(
+                refreshed.setup_state["VOLATILITY_IGNITION"],
+                {"armed_at": "now"},
+            )
+
     def test_packet_identity_includes_exchange_segment(self) -> None:
         finder = IntraFinder.__new__(IntraFinder)
         finder.stocks = {
