@@ -150,6 +150,26 @@ class BroadUniverseTests(unittest.TestCase):
         self.assertIs(result, response)
         request.assert_called_once_with()
 
+    def test_documented_rate_limit_codes_are_retryable(self) -> None:
+        for code in ("805", "DH-805", "904", "DH-904"):
+            self.assertEqual(UniverseScanner._history_retry_after_seconds(
+                {"status": "failure", "remarks": {"error_code": code}}
+            ), 30.0)
+
+    def test_gateway_circuit_wait_is_not_polled_every_thirty_seconds(self) -> None:
+        scanner = self.scanner()
+        responses = iter([
+            {"status": "failure", "remarks": {
+                "error_code": "LOCAL-CIRCUIT-OPEN",
+                "error_message": "retry available in 300 seconds",
+            }},
+            {"status": "success"},
+        ])
+        with patch("pipeline.stages.universe_scanner.time.sleep") as sleep:
+            result = scanner._fetch_history_resilient(lambda: next(responses))
+        self.assertEqual(result["status"], "success")
+        sleep.assert_called_once_with(300.25)
+
 
 if __name__ == "__main__":
     unittest.main()
