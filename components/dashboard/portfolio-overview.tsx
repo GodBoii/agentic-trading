@@ -68,9 +68,14 @@ export default function PortfolioOverview() {
                     detail={error.message}
                     minHeight={280}
                     action={
+                        <div className="flex flex-wrap justify-center gap-2">
                         <Button variant="subtle" onClick={() => void reload(true)} disabled={refreshing} swapLabel>
                             {refreshing ? 'Retrying' : 'Try again'}
                         </Button>
+                        <Button variant="subtle" onClick={() => window.dispatchEvent(new Event('open-authentication'))}>
+                            Authentication settings
+                        </Button>
+                        </div>
                     }
                 />
             </Panel>
