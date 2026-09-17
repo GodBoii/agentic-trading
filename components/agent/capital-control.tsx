@@ -527,7 +527,7 @@ export function CapitalControl() {
                 {tokenExpired && (
                     <Notice tone="danger">
                         Your broker token has expired. Order dispatch is paused for your account while market
-                        monitoring continues. Reconnect Dhan from the Portfolio screen to resume.
+                        monitoring continues. Check Profile → Authentication to restore broker access.
                     </Notice>
                 )}
                 {!tokenExpired && status && !status.eligible && (
