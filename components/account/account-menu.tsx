@@ -2,179 +2,66 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AppearanceControl } from '@/components/theme/appearance-control'
-import { Dropdown, useDropdown } from '@/components/motion/dropdown'
-import { TextSwap } from '@/components/motion/text-swap'
-import { ChevronUpDown, Policy, SignOut } from '@/components/ui/icons'
+import { Modal } from '@/components/motion/modal'
+import { ChevronUpDown, Close } from '@/components/ui/icons'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/cn'
-import { initialsFor, splitAddress } from './identity'
+import { Button } from '@/components/ui/button'
+import DhanConnect from '@/components/dhan-connect'
+import { initialsFor } from './identity'
 
-const MENU_ID = 'account-menu'
+type Section = 'Account' | 'Authentication' | 'Appearance'
+const sections: Section[] = ['Account', 'Authentication', 'Appearance']
 
-/**
- * The account surface: who is signed in, how the app should look, the legal
- * pages, and the way out.
- *
- * This replaces a truncated email string sitting next to a permanent "Sign out"
- * button in the header. That arrangement had two problems. Sign-out is a rare
- * and mildly destructive action, and it was the most prominent control in the
- * chrome on every screen — the skill's point about progressive disclosure
- * exactly: common actions stay visible, rare ones move into a menu. And there
- * was nowhere to put anything else, so appearance and the legal links had no
- * home at all.
- *
- * Why a popover and not a settings route: everything in here is one field or
- * one link. A page for that is the same mistake as a page for setting one
- * number, and it would be a route nobody visits twice.
- *
- * Semantics: `role="dialog"`, not `role="menu"`. A menu's keyboard contract is
- * "one active item, arrows move between items", and this surface contains a
- * radio group whose own arrow keys would fight it. A labelled dialog says
- * "composite content" and leaves Tab and the radio group's arrows alone.
- *
- * Motion (recipe 05): the surface grows from the trigger's top-right corner —
- * 250ms open from 0.97, 150ms close to 0.99. The origin is the point: it is
- * what makes the panel read as belonging to the tile that opened it. Sign-out
- * swaps its own label in place (recipe 04) while the request is in flight.
- */
 export function AccountMenu({ email }: { email?: string | null }) {
-    const { open, setOpen, toggle, anchor } = useDropdown<HTMLDivElement>()
-    const router = useRouter()
+    const [open, setOpen] = useState(false)
+    const [section, setSection] = useState<Section>('Account')
     const [signingOut, setSigningOut] = useState(false)
-    const trigger = useRef<HTMLButtonElement | null>(null)
-    const surface = useRef<HTMLDivElement | null>(null)
-    /** Only move focus for an open the user caused, never on first mount. */
-    const opened = useRef(false)
-
-    const initials = initialsFor(email)
-    const { local, domain } = splitAddress(email)
-
-    /**
-     * Focus moves into the panel on open and back onto the trigger on close.
-     *
-     * The panel itself takes focus, not its first control. The first control
-     * here would be the appearance radio group — announcing a settings field the
-     * moment the menu opens — and the last is sign-out, which should never be
-     * where focus lands by default. Focusing the labelled container announces
-     * what opened and leaves Tab to do the rest.
-     *
-     * Without the return-focus branch, dismissing with Escape drops focus onto
-     * the document body and a keyboard user restarts from the top of the page.
-     */
+    const [error, setError] = useState('')
+    const router = useRouter()
     useEffect(() => {
-        if (open) {
-            opened.current = true
-            const frame = window.requestAnimationFrame(() => surface.current?.focus())
-            return () => window.cancelAnimationFrame(frame)
-        }
-        if (opened.current) trigger.current?.focus()
-    }, [open])
-
+        const show = () => { setSection('Authentication'); setOpen(true) }
+        window.addEventListener('open-authentication', show)
+        return () => window.removeEventListener('open-authentication', show)
+    }, [])
     const signOut = async () => {
-        setSigningOut(true)
+        setSigningOut(true); setError('')
         try {
-            await createClient().auth.signOut()
-            router.push('/')
-            // `/` renders its auth-dependent copy on the server, so the router
-            // cache would hand back the payload from before sign-out and the
-            // landing page would still offer "Open dashboard". Refresh discards
-            // it and re-renders against the cleared cookie.
-            router.refresh()
-        } finally {
-            setSigningOut(false)
-        }
+            const { error } = await createClient().auth.signOut()
+            if (error) throw error
+            router.push('/'); router.refresh()
+        } catch { setError('Unable to sign out. Try again.') }
+        finally { setSigningOut(false) }
     }
-
-    return (
-        <div ref={anchor} className="relative">
-            <button
-                ref={trigger}
-                type="button"
-                onClick={toggle}
-                aria-haspopup="dialog"
-                aria-expanded={open}
-                aria-controls={open ? MENU_ID : undefined}
-                aria-label={email ? `Account menu for ${email}` : 'Account menu'}
-                className={cn(
-                    't-press flex items-center gap-1.5 rounded-[11px] border p-1 pr-1.5',
-                    'transition-[background-color,border-color] duration-fast ease-smooth',
-                    open
-                        ? 'border-line-strong bg-surface-strong'
-                        : 'border-transparent hover:border-line hover:bg-surface-hover',
-                )}
-            >
-                <span className="identity-tile h-7 w-7 text-[10px]">{initials}</span>
-                <ChevronUpDown size={13} className="text-ink-tertiary" />
-            </button>
-
-            <Dropdown
-                open={open}
-                origin="top-right"
-                role="dialog"
-                ariaLabel="Account"
-                id={MENU_ID}
-                className="pop-surface absolute right-0 top-[calc(100%+8px)] z-[var(--z-overlay)] w-[272px] p-2"
-            >
-                <div ref={surface} tabIndex={-1} className="outline-none">
-                    {/* Identity. The address wraps at the `@` rather than being
-                        truncated: a half-shown address is not an identity, and
-                        this is the one place the full value has to be legible. */}
-                    <div className="menu-group flex items-center gap-2.5 px-1.5 pb-2.5 pt-1">
-                        <span className="identity-tile h-9 w-9 text-[12px]">{initials}</span>
-                        <span className="min-w-0">
-                            <span className="block text-[9px] uppercase tracking-[0.14em] text-ink-tertiary">
-                                Signed in
-                            </span>
-                            {email ? (
-                                <span className="mt-0.5 block break-all font-mono text-[11px] leading-tight text-ink-primary">
-                                    {local}
-                                    <span className="text-ink-tertiary">{domain}</span>
-                                </span>
-                            ) : (
-                                <span className="mt-0.5 block text-[11px] text-ink-tertiary">
-                                    Account details unavailable
-                                </span>
-                            )}
-                        </span>
-                    </div>
-
-                    <div className="menu-group px-1.5 py-2">
-                        <p
-                            id="appearance-label"
-                            className="mb-2 text-[9px] uppercase tracking-[0.14em] text-ink-tertiary"
-                        >
-                            Appearance
-                        </p>
-                        <AppearanceControl labelledBy="appearance-label" />
-                    </div>
-
-                    <nav className="menu-group" aria-label="Policies">
-                        <Link href="/privacy-policy" className="menu-row" onClick={() => setOpen(false)}>
-                            <Policy size={14} className="text-ink-tertiary" />
-                            Privacy policy
-                        </Link>
-                        <Link href="/terms-of-service" className="menu-row" onClick={() => setOpen(false)}>
-                            <Policy size={14} className="text-ink-tertiary" />
-                            Terms of service
-                        </Link>
+    return <>
+        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open} aria-label="Open profile and settings"
+            className="flex min-h-11 items-center gap-2 rounded-xl border border-line px-2 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2">
+            <span className="identity-tile h-7 w-7 text-[10px]">{initialsFor(email)}</span><ChevronUpDown size={13} className="text-ink-secondary" />
+        </button>
+        <Modal open={open} onClose={() => setOpen(false)} labelledBy="profile-title" size="wide">
+            <div className="flex max-h-[min(820px,90dvh)] flex-col overflow-hidden rounded-2xl">
+                <header className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4 sm:px-7">
+                    <div><h2 id="profile-title" className="text-lg font-medium text-ink-primary">Profile & settings</h2><p className="mt-1 text-xs text-ink-secondary">Your account, broker access and preferences</p></div>
+                    <button type="button" onClick={() => setOpen(false)} aria-label="Close profile" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-ink-secondary hover:bg-surface-hover"><Close size={18} /></button>
+                </header>
+                <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+                    <nav aria-label="Profile sections" className="flex shrink-0 gap-1 border-b border-line p-3 sm:w-44 sm:flex-col sm:border-b-0 sm:border-r sm:p-4">
+                        {sections.map(item => <button key={item} type="button" aria-current={item === section ? 'page' : undefined} onClick={() => setSection(item)}
+                            className={'min-h-11 rounded-xl px-3 text-left text-xs sm:text-sm ' + (section === item ? 'bg-surface-strong font-medium text-ink-primary' : 'text-ink-secondary hover:bg-surface-hover')}>{item}</button>)}
                     </nav>
-
-                    <div className="menu-group">
-                        <button
-                            type="button"
-                            data-tone="danger"
-                            className="menu-row"
-                            onClick={() => void signOut()}
-                            disabled={signingOut}
-                        >
-                            <SignOut size={14} />
-                            <TextSwap>{signingOut ? 'Signing out' : 'Sign out'}</TextSwap>
-                        </button>
+                    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-5 sm:p-7">
+                        {open && section === 'Authentication' && <DhanConnect />}
+                        {section === 'Account' && <div className="space-y-6">
+                            <div className="flex items-center gap-4"><span className="identity-tile h-14 w-14 text-lg">{initialsFor(email)}</span><div className="min-w-0"><p className="text-xs text-ink-secondary">Signed in as</p><p className="mt-1 break-all text-sm text-ink-primary">{email || 'Account details unavailable'}</p></div></div>
+                            <div className="border-y border-line py-5"><h3 className="text-sm font-medium">Broker authentication</h3><p className="mt-2 text-sm leading-relaxed text-ink-secondary">Manage your Dhan credentials, automatic renewal and server IP.</p><Button className="mt-4" onClick={() => setSection('Authentication')}>Manage authentication</Button></div>
+                            <div className="flex flex-wrap gap-5 text-xs text-ink-secondary"><Link href="/privacy-policy" onClick={() => setOpen(false)}>Privacy policy</Link><Link href="/terms-of-service" onClick={() => setOpen(false)}>Terms of service</Link></div>
+                            <div><p className="mb-3 text-xs text-ink-secondary">Signing out of the website does not disable backend trading.</p><Button variant="danger" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</Button>{error && <p role="alert" className="mt-3 text-xs text-negative">{error}</p>}</div>
+                        </div>}
+                        {section === 'Appearance' && <div><h3 id="profile-appearance" className="mb-4 text-sm font-medium">Appearance</h3><AppearanceControl labelledBy="profile-appearance" /></div>}
                     </div>
                 </div>
-            </Dropdown>
-        </div>
-    )
+            </div>
+        </Modal>
+    </>
 }
