@@ -1186,7 +1186,7 @@ class DhanService:
                     "error_code": "LOCAL-CIRCUIT-OPEN",
                     "error_type": "Historical_Service_Degraded",
                     "error_message": (
-                        "Historical API circuit is open after repeated DH-905 responses; "
+                        "Historical API circuit is open after repeated service failures; "
                         f"retry available in {max(1, int(remaining))} seconds."
                     ),
                 },
@@ -1204,7 +1204,11 @@ class DhanService:
                 return
 
             code, error_type, message = self._response_error_details(resp)
-            if code not in self.INVALID_IP_ERROR_CODES:
+            # Instrument input/no-data errors must not pause unrelated symbols.
+            # Dhan documents 800, DH-908 and DH-909 as service/network failures.
+            if code not in {"800", "dh-800", "908", "dh-908", "909", "dh-909"}:
+                self.historical_consecutive_failures = 0
+                self.historical_failure_signature = None
                 return
 
             signature = f"{code}|{error_type.lower()}|{message.lower()}"
