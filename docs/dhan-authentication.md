@@ -3,18 +3,45 @@
 ## Separate credential domains
 
 The backend scanner account and website-user trading accounts are different
-credential domains. `dhan-auth-manager` manages only the scanner and paid data
-account used by the backend containers.
+credential domains. `dhan-auth-manager` manages the scanner and paid data
+account, and runs a separate worker for encrypted per-user trading credentials.
 
 For the small trusted user group, each website user enters their own Dhan Client
 ID, API key and API secret once. Next.js encrypts those values with
 `DHAN_USER_CREDENTIALS_ENCRYPTION_SECRET` and stores them in the internal Convex
 `dhanCredentials` table. The browser never receives stored credentials.
 
-The user then completes Dhan's consent login. The callback stores the resulting
-encrypted 24-hour access token in the same Convex record. When it expires, the
-dashboard reuses the saved API credentials to start a fresh Dhan login. There is
-no Vercel cron and no PIN or TOTP storage.
+Profile → Authentication accepts a Dhan Web access token and checks its account
+and expiry through Dhan's profile endpoint before saving. Existing consent login
+remains available as a recovery option. Users can opt into backend renewal and
+provide a PIN and TOTP setup secret. Both are encrypted with user- and field-bound
+AES-GCM, just like the API credentials. Stored secrets are never returned to the
+browser. Website sign-out does not disconnect the broker or stop backend trading.
+
+The user worker rotates at 12 hours, or earlier when fewer than four hours remain.
+It uses RenewToken only for Dhan Web tokens; consent and TOTP tokens use the
+documented PIN/TOTP generation flow. A transient profile failure does not trigger
+rotation. Each account has a Convex lease and conditional publication to prevent
+concurrent workers or stale callbacks from overwriting newer credentials.
+
+When a verified user's Dhan client ID matches the scanner account, the scanner
+remains the only rotation owner. Its token is synchronized into that user's
+encrypted Convex record. Trading consumers follow its runtime version immediately.
+A matching client ID without verified account ownership is insufficient to share
+the scanner token. Other users never use the scanner's credentials for orders.
+
+The worker polls every minute, checks healthy accounts every five minutes, and
+backs off failed checks to a maximum of 15 minutes. Saving credentials changes
+the revision and bypasses the old retry delay. IP rejection and invalid-token
+responses have separate status codes. The settings window shows token expiry,
+next renewal, last check, renewal owner and the last detected backend IP.
+
+New tokens are written to an encrypted publication journal before follow-up
+validation. If Convex publication fails, the worker retries that token instead of
+rotating again. Journals live under
+`python-backend/runtime-data/secrets/user-auth-pending/`, contain ciphertext, and
+are deleted after successful publication. Include that directory in the same
+protected persistent volume as the scanner credential file.
 
 Portfolio routes and live execution use the signed-in user's Dhan access token.
 Market history, quotes, depth and scanner feeds continue to use the global paid
@@ -27,7 +54,7 @@ Each user must create their Dhan API key with the production callback URL:
 https://<app-domain>/api/dhan/callback
 ```
 
-The connection panel reads the backend's latest detected outbound IP from the
+The Authentication section reads the backend's latest detected outbound IP from the
 Convex `orderPlacementStates` record and shows both the IP and callback URL as
 copyable setup values. Users paste the IP into Dhan's static-IP settings and the
 callback URL into their Dhan API-key configuration.
