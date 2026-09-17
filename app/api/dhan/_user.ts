@@ -15,7 +15,7 @@ export async function authenticatedDhanGet(
     const credentials = await getDhanAccessCredentials(user.id)
     if (!credentials) return NextResponse.json({ error: 'Dhan account not connected' }, { status: 404 })
     if (Date.parse(credentials.expiresAt) <= Date.now()) {
-      return NextResponse.json({ error: 'Dhan authorization expired. Reconnect Dhan.' }, { status: 401 })
+      return NextResponse.json({ error: 'Dhan token expired. Check Profile > Authentication for renewal status.' }, { status: 401 })
     }
 
     const response = await fetch(`https://api.dhan.co/v2${path}`, {
