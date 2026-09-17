@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import DhanConnect from '@/components/dhan-connect'
 import PortfolioOverview from '@/components/dashboard/portfolio-overview'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CellGrid, Panel } from '@/components/ui/panel'
@@ -14,6 +13,7 @@ export const dynamic = 'force-dynamic'
 
 /** Broker OAuth failure codes, mapped to something a user can act on. */
 const CONNECT_ERRORS: Record<string, string> = {
+    credentials_changed: 'Authentication changed while you were signing in. Open Profile → Authentication and retry.',
     missing_token: 'Dhan did not return an authentication token. Try connecting again.',
     unauthorized: 'Please sign in before connecting Dhan.',
     server_config: 'The Dhan connection is not configured on the server.',
@@ -75,7 +75,6 @@ function DashboardContent() {
                         Balances, positions and order flow, read straight from your connected Dhan account.
                     </p>
                 </Reveal>
-                <DhanConnect />
             </header>
 
             <PortfolioOverview />
