@@ -112,11 +112,15 @@ class DhanService:
                 runtime_credentials = self.credential_store.load(required=False)
             except CredentialUnavailable:
                 runtime_credentials = None
-        self.client_id, self.access_token, self.credential_source = self._select_credentials(
-            runtime_credentials,
-            env_client_id,
-            env_access_token,
-        )
+        if credentials is not None:
+            # Explicit user credentials must never fall back to a different account's environment token.
+            self.client_id, self.access_token, self.credential_source = credentials.client_id, credentials.access_token, credentials.source
+        else:
+            self.client_id, self.access_token, self.credential_source = self._select_credentials(
+                runtime_credentials,
+                env_client_id,
+                env_access_token,
+            )
         if runtime_credentials:
             self.credential_version = runtime_credentials.version
             self.credential_mtime_ns = self.credential_store.mtime_ns()
