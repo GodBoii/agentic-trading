@@ -79,6 +79,7 @@ export function Modal({
     labelledBy,
     describedBy,
     className,
+    size = 'default',
 }: {
     open: boolean
     onClose: () => void
@@ -86,6 +87,7 @@ export function Modal({
     labelledBy?: string
     describedBy?: string
     className?: string
+    size?: 'default' | 'wide'
 }) {
     const { present, open: shown } = useModal(open)
     const surface = useRef<HTMLDivElement | null>(null)
@@ -209,7 +211,8 @@ export function Modal({
                 aria-describedby={describedBy}
                 tabIndex={-1}
                 className={cn(
-                    't-modal relative w-full max-w-sm rounded-2xl border border-line-strong bg-pop shadow-pop outline-none',
+                    't-modal relative w-full rounded-2xl border border-line-strong bg-pop shadow-pop outline-none',
+                    size === 'wide' ? 'max-w-3xl' : 'max-w-sm',
                     shown && 'is-open',
                     !shown && 'is-closing',
                     className,
