@@ -12,7 +12,7 @@ async function userId() {
   return error ? null : user?.id || null
 }
 
-type OrderPlacementState = { detectedIp?: string }
+type OrderPlacementState = { detectedIp?: string; verifiedAt?: string }
 
 function callbackUrl(request: NextRequest) {
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim()
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     ])
     const setup = {
       staticIp: orderState?.detectedIp || null,
+      ipCheckedAt: orderState?.verifiedAt || null,
       redirectUrl: callbackUrl(request),
     }
     if (!credentials) return NextResponse.json({ connected: false, ...setup })
@@ -41,8 +42,20 @@ export async function GET(request: NextRequest) {
       ...setup,
       dhanClientId: credentials.dhanClientId,
       tokenExpiresAt: credentials.tokenExpiresAt || null,
+      tokenIssuedAt: credentials.tokenIssuedAt || null,
+      autoRenew: credentials.autoRenew === true || credentials.tokenSource === 'scanner',
+      renewalOwner: credentials.tokenSource === 'scanner' ? 'scanner' : 'user',
+      recoveryConfigured: Boolean(credentials.encryptedPin && credentials.encryptedTotpSecret),
+      authStatus: credentials.authStatus || 'pending',
+      authError: credentials.authError || null,
+      lastCheckedAt: credentials.lastCheckedAt || null,
+      lastRenewedAt: credentials.lastRenewedAt || null,
+      nextRenewalAt: credentials.nextRenewalAt || null,
       authorized: Boolean(
         credentials.encryptedAccessToken
+          && credentials.authStatus === 'ready'
+          && credentials.lastCheckedAt
+          && Date.now() - Date.parse(credentials.lastCheckedAt) < 600_000
           && credentials.tokenExpiresAt
           && Date.parse(credentials.tokenExpiresAt) > Date.now(),
       ),
