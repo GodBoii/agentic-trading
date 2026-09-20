@@ -36,9 +36,10 @@ test('settings endpoint encrypts all credentials and returns no secrets',async()
  assert.equal(r.writes[0].args.encryptedPin,'encrypted:pin:user')
  assert.deepEqual(Object.keys(result.body),['success'])
 })
-test('automatic recovery cannot be enabled without recovery credentials',async()=>{
- const r=route();assert.equal((await r.put({...input,pin:'',totpSecret:''})).status,400);assert.equal(r.writes.length,0)
+test('automatic renewal works without optional recovery credentials',async()=>{
+ const r=route();assert.equal((await r.put({...input,pin:'',totpSecret:''})).status,200);assert.equal(r.writes.length,1)
 })
 test('six-digit TOTP code is not accepted as the setup secret',async()=>{
- const r=route();assert.equal((await r.put({...input,totpSecret:'123456'})).status,400)
+ const r=route();const response=await r.put({...input,totpSecret:'123456'});assert.equal(response.status,400)
+ assert.match(response.body.error,/not the six-digit code/)
 })

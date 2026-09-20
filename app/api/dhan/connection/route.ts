@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       tokenExpiresAt: credentials.tokenExpiresAt || null,
       tokenIssuedAt: credentials.tokenIssuedAt || null,
       autoRenew: credentials.autoRenew === true || credentials.tokenSource === 'scanner',
+      renewalConfigured: typeof credentials.autoRenew === 'boolean' || credentials.tokenSource === 'scanner',
       renewalOwner: credentials.tokenSource === 'scanner' ? 'scanner' : 'user',
       recoveryConfigured: Boolean(credentials.encryptedPin && credentials.encryptedTotpSecret),
       authStatus: credentials.authStatus || 'pending',

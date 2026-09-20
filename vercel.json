@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "node scripts/vercel-build.cjs",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }

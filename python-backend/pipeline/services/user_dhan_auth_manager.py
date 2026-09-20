@@ -45,6 +45,7 @@ class UserDhanAuthManager:
         self.owner = str(uuid.uuid4())
         self.failures: dict[str, int] = {}
         self.next_checks: dict[str, float] = {}
+        self.health: dict[str, Any] = {"status": "starting", "last_cycle_at": None, "error": None}
 
     def _pending_path(self, uid: str) -> Path:
         return self.config.backend_dir / "runtime-data" / "secrets" / "user-auth-pending" / f"{hashlib.sha256(uid.encode()).hexdigest()}.json"
@@ -99,7 +100,9 @@ class UserDhanAuthManager:
                     source = "totp"
                 new_token = replacement.get("accessToken")
                 if not isinstance(new_token, str) or not new_token:
-                    return {"authStatus": "action_required", "authError": "renewal_failed_or_recovery_missing"}
+                    recovery = bool(row.get("encryptedPin") and row.get("encryptedTotpSecret"))
+                    reason = "renewal_failed_or_recovery_missing" if recovery else "consent_recovery_required" if source == "consent" else "manual_token_required"
+                    return {"authStatus": "action_required", "authError": reason}
                 # Broker rotation has already happened. Persist the replacement even if the validation read fails.
                 token, issued = new_token, now
                 expiry = parse_expiry(replacement.get("expiryTime")) or now + timedelta(hours=24)
@@ -176,6 +179,9 @@ class UserDhanAuthManager:
         while True:
             try:
                 self.run_once()
+                self.health = {"status": "healthy", "last_cycle_at": datetime.now(timezone.utc).isoformat(), "error": None}
             except Exception as exc:
-                logger.warning("User Dhan scheduler unavailable: %s", type(exc).__name__)
+                reason = "convex_functions_not_deployed" if "Could not find public function" in str(exc) else "scheduler_check_failed"
+                self.health = {**self.health, "status": "unavailable", "error": reason}
+                logger.warning("User Dhan scheduler unavailable: %s", reason)
             time.sleep(60)

@@ -28,18 +28,19 @@ export async function PUT(request: NextRequest) {
   const accessToken = field('accessToken'), pin = field('pin'), totpSecret = field('totpSecret').replace(/\s/g, '').toUpperCase()
   const autoRenew = Reflect.get(input, 'autoRenew') === true
   const clearRecovery = Reflect.get(input, 'clearRecovery') === true
-  const invalid = !/^\d{5,20}$/.test(clientId) || [apiKey, apiSecret, accessToken].some(v => v.length > 8192)
-    || (pin !== '' && !/^\d{6}$/.test(pin)) || (totpSecret !== '' && !/^[A-Z2-7]{16,128}$/.test(totpSecret))
-    || Boolean(pin) !== Boolean(totpSecret) || (clearRecovery && Boolean(pin))
-  if (invalid) return NextResponse.json({ error: 'Check Client ID, the six-digit PIN and the TOTP setup secret. Enter both recovery fields together.' }, { status: 400 })
+  const invalid = !/^\d{5,20}$/.test(clientId) ? 'Client ID must contain 5 to 20 digits.'
+    : [apiKey, apiSecret, accessToken].some(v => v.length > 8192) ? 'An API credential is too long. Check the pasted value.'
+    : pin !== '' && !/^\d{6}$/.test(pin) ? 'Dhan PIN must contain exactly six digits.'
+    : /^\d{6}$/.test(totpSecret) ? 'Enter the fixed TOTP setup secret, not the six-digit code from your authenticator.'
+    : totpSecret !== '' && !/^[A-Z2-7]{16,128}$/.test(totpSecret) ? 'TOTP setup secret must contain 16 to 128 letters A–Z and digits 2–7. Copy the setup key supplied with Dhan’s QR code.'
+    : Boolean(pin) !== Boolean(totpSecret) ? 'Enter both PIN and TOTP setup secret, or leave both blank.'
+    : clearRecovery && Boolean(pin) ? 'Choose either replacing recovery credentials or removing them.' : null
+  if (invalid) return NextResponse.json({ error: invalid }, { status: 400 })
   try {
     const existing = await getStoredDhanCredentials(user.id)
     if (existing && existing.dhanClientId !== clientId) return NextResponse.json({ error: 'Disconnect the current account before changing Client ID.' }, { status: 409 })
     if ((!existing && (!apiKey || !apiSecret || !accessToken)) || Boolean(apiKey) !== Boolean(apiSecret)) {
       return NextResponse.json({ error: 'For first setup, provide API key, API secret and a current Dhan Web access token.' }, { status: 400 })
-    }
-    if (autoRenew && !pin && !(existing?.encryptedPin && existing.encryptedTotpSecret && !clearRecovery) && existing?.tokenSource !== 'scanner') {
-      return NextResponse.json({ error: 'Add PIN and TOTP setup secret to enable automatic recovery.' }, { status: 400 })
     }
     let expiresAt: string | null = null
     if (accessToken) {

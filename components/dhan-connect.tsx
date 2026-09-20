@@ -10,6 +10,7 @@ type Connection = {
     authStatus?: string
     authError?: string | null
     autoRenew?: boolean
+    renewalConfigured?: boolean
     recoveryConfigured?: boolean
     renewalOwner?: string
     lastCheckedAt?: string | null
@@ -32,6 +33,8 @@ const reasons: Record<string, string> = {
     verify_account_once: 'Connect a valid token once to verify ownership of this account.',
     scanner_auth_unavailable: 'The shared account authentication service needs attention.',
     invalid_or_expired_token: 'The broker token is invalid or expired. Update it or reconnect Dhan.',
+    manual_token_required: 'Automatic recovery is not configured. Generate a new access token in Dhan Web and save it here, or reconnect with Dhan.',
+    consent_recovery_required: 'This login token cannot use Dhan Web renewal. Add PIN and the TOTP setup secret for automatic recovery, or supply a Dhan Web access token.',
 }
 
 function CopyValue({ label, value }: { label: string; value?: string | null }) {
@@ -134,9 +137,10 @@ export default function DhanConnect() {
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 border-y border-line py-5 sm:grid-cols-2">
                 {[
                     ['Token expires', timestamp(connection.tokenExpiresAt)],
-                    ['Next renewal', connection.autoRenew ? timestamp(connection.nextRenewalAt) : 'Automatic renewal is off'],
+                    ['Next renewal', connection.autoRenew ? timestamp(connection.nextRenewalAt) : connection.renewalConfigured ? 'Automatic renewal is off' : 'Not configured yet'],
                     ['Last broker check', timestamp(connection.lastCheckedAt)],
-                    ['Renewal', connection.renewalOwner === 'scanner' ? 'Managed with the shared data account' : connection.autoRenew ? 'Every 12 hours, with early expiry checks' : 'Manual'],
+                    ['Renewal', connection.renewalOwner === 'scanner' ? 'Managed with the shared data account' : connection.autoRenew ? 'Every 12 hours, with early expiry checks' : connection.renewalConfigured ? 'Update token here before expiry' : 'Not configured yet'],
+                    ['Recovery after expiry', connection.renewalOwner === 'scanner' ? 'Managed by the backend' : connection.recoveryConfigured && connection.autoRenew ? 'PIN and TOTP setup secret saved' : 'Provide a fresh token if renewal fails'],
                 ].map(([label, value]) => <div key={label}><dt className="text-xs text-ink-secondary">{label}</dt><dd className="mt-1.5 text-sm text-ink-primary">{value}</dd></div>)}
             </dl>
             <p className="text-xs leading-relaxed text-ink-secondary">Trading continues when you close the website or sign out. Dhan must still accept the account’s token and registered IP.</p>
@@ -159,8 +163,10 @@ export default function DhanConnect() {
             </div>
             <label className="block text-xs text-ink-secondary">Dhan Web access token<input name="accessToken" type="password" required={!connection?.connected} autoComplete="new-password" className={inputClass} /><span className="mt-2 block">Generate this in Dhan Web → DhanHQ Trading APIs. Its account and expiry are checked before saving.</span></label>
             {connection?.renewalOwner !== 'scanner' && <>
-                <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={autoRenew} onChange={e => setAutoRenew(e.target.checked)} className="h-4 w-4 accent-current" />Allow automatic renewal and recovery</label>
-                <p className="text-xs leading-relaxed text-ink-secondary">For recovery after an expired or rejected token, save your Dhan PIN and TOTP setup secret. Use the secret from TOTP setup, not the changing six-digit code. These credentials let the backend authenticate while you are offline.</p>
+                <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={autoRenew} onChange={e => setAutoRenew(e.target.checked)} className="h-4 w-4 accent-current" />Renew my access token automatically</label>
+                <p className="text-xs leading-relaxed text-ink-secondary">A valid Dhan Web token can be renewed without PIN or TOTP. If it expires or is rejected and recovery is not configured, create a fresh token in Dhan Web and update it here.</p>
+                <h4 className="text-sm font-medium">Optional recovery after expiry</h4>
+                <p className="text-xs leading-relaxed text-ink-secondary">Save your PIN and the fixed TOTP setup secret to let the backend generate a new token. The setup secret is the key supplied with Dhan’s QR code. Your authenticator and the backend use it to generate changing six-digit codes. Do not enter one of those codes here.</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block text-xs text-ink-secondary">Dhan PIN<input name="pin" type="password" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="new-password" className={inputClass} /></label>
                     <label className="block text-xs text-ink-secondary">TOTP setup secret<input name="totpSecret" type="password" autoComplete="new-password" className={inputClass} /></label>

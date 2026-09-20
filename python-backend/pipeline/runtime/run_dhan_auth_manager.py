@@ -321,11 +321,13 @@ class DhanAuthManager:
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:  # noqa: N802
-                if self.path.rstrip("/") not in {"", "/health", "/ready"}:
+                if self.path.rstrip("/") not in {"", "/health", "/ready", "/users/health"}:
                     self.send_error(HTTPStatus.NOT_FOUND)
                     return
-                status = HTTPStatus.OK if manager.health.get("status") == "healthy" else HTTPStatus.SERVICE_UNAVAILABLE
-                body = json.dumps(manager.health).encode("utf-8")
+                user_health = getattr(getattr(manager, "user_manager", None), "health", {"status": "starting"})
+                payload = user_health if self.path.rstrip("/") == "/users/health" else {**manager.health, "user_auth_worker": user_health}
+                status = HTTPStatus.OK if payload.get("status") == "healthy" else HTTPStatus.SERVICE_UNAVAILABLE
+                body = json.dumps(payload).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -342,7 +344,8 @@ class DhanAuthManager:
         from pipeline.services.user_dhan_auth_manager import UserDhanAuthManager
 
         Thread(target=self.serve_health, daemon=True).start()
-        Thread(target=UserDhanAuthManager(self.config).run_forever, daemon=True).start()
+        self.user_manager = UserDhanAuthManager(self.config)
+        Thread(target=self.user_manager.run_forever, daemon=True).start()
         interval = max(60, int(os.getenv("DHAN_AUTO_RENEW_CHECK_SECONDS", "900")))
         while True:
             scheduled_0830 = self._daily_verification_due()
