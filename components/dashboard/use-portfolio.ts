@@ -82,7 +82,12 @@ export function usePortfolio() {
     useEffect(() => {
         const onConnectionChange = (event: Event) => {
             const detail = (event as CustomEvent<{ connected?: boolean }>).detail
-            if (detail?.connected !== false) return
+            // Saved or reconnected credentials: read the broker again instead
+            // of leaving the "connect Dhan" state up until a manual refresh.
+            if (detail?.connected !== false) {
+                void load(true)
+                return
+            }
             setFunds(null)
             setHoldings([])
             setPositions([])
@@ -92,7 +97,7 @@ export function usePortfolio() {
         }
         window.addEventListener('dhan-connection-change', onConnectionChange)
         return () => window.removeEventListener('dhan-connection-change', onConnectionChange)
-    }, [])
+    }, [load])
 
     const analytics = useMemo(() => {
         const invested = holdings.reduce((sum, item) => sum + item.totalQty * item.avgCostPrice, 0)
