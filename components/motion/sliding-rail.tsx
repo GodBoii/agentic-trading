@@ -55,11 +55,12 @@ export function SlidingRail({
         }
 
         const write = () => {
-            node.style.transform = `translateX(${target.offsetLeft}px)`
+            node.style.transform = `translate(${target.offsetLeft}px, ${target.offsetTop}px)`
             node.style.width = `${target.offsetWidth}px`
+            node.style.height = `${target.offsetHeight}px`
         }
 
-        if (animate) {
+        if (animate && target.offsetWidth > 0) {
             write()
             return
         }
@@ -79,9 +80,11 @@ export function SlidingRail({
     }, [movePill, activeKey])
 
     useEffect(() => {
-        const onResize = () => movePill(false)
-        window.addEventListener('resize', onResize)
-        return () => window.removeEventListener('resize', onResize)
+        const host = rail.current
+        if (!host || typeof ResizeObserver === 'undefined') return
+        const observer = new ResizeObserver(() => movePill(false))
+        observer.observe(host)
+        return () => observer.disconnect()
     }, [movePill])
 
     return (

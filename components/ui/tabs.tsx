@@ -43,11 +43,15 @@ function usePillRail(activeKey: string, getActive: () => HTMLElement | null) {
             if (!target || !node) return
 
             const write = () => {
-                node.style.transform = `translateX(${target.offsetLeft}px)`
+                node.style.transform = `translate(${target.offsetLeft}px, ${target.offsetTop}px)`
                 node.style.width = `${target.offsetWidth}px`
+                node.style.height = `${target.offsetHeight}px`
             }
 
-            if (animate) {
+            // A rail rendered inside a hidden subtree measures as zero. Snap
+            // instead of animating from that, and let the observer below
+            // write the real geometry once the rail has a size.
+            if (animate && target.offsetWidth > 0) {
                 write()
                 return
             }
@@ -69,12 +73,15 @@ function usePillRail(activeKey: string, getActive: () => HTMLElement | null) {
         painted.current = true
     }, [movePill, activeKey])
 
-    // Reflow changes option widths, so the pill has to be re-measured — and
-    // snapped, not animated, since nothing was activated.
+    // Any size change of the rail (window resize, font swap, a parent going
+    // from display:none to visible) re-measures and snaps. A window listener
+    // alone missed the skeleton reveal, which left a zero-width pill behind.
     useEffect(() => {
-        const onResize = () => movePill(false)
-        window.addEventListener('resize', onResize)
-        return () => window.removeEventListener('resize', onResize)
+        const host = pill.current?.parentElement
+        if (!host || typeof ResizeObserver === 'undefined') return
+        const observer = new ResizeObserver(() => movePill(false))
+        observer.observe(host)
+        return () => observer.disconnect()
     }, [movePill])
 
     return pill

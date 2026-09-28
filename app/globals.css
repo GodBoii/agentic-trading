@@ -2121,9 +2121,9 @@ body {
    between the previous and next measured positions. */
 .t-tabs-pill {
   position: absolute;
-  top: 3px;
+  top: 0;
   left: 0;
-  height: 28px;
+  height: 0;
   width: 0;
   background: var(--tabs-pill-bg);
   border: 1px solid var(--dash-border-strong);
@@ -2884,7 +2884,6 @@ body {
     transform: translate(-50%, -50%);
   }
   .t-tab { height: 34px; }
-  .t-tabs-pill { height: 34px; }
 }
 
 /* =====================================================================
