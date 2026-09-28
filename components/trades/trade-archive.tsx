@@ -13,7 +13,7 @@ import { IconSwap } from '@/components/motion/icon-swap'
 import { LearnMoreChevron } from '@/components/motion/learn-more'
 import { SkeletonReveal } from '@/components/motion/skeleton-reveal'
 import { SpinningCounter } from '@/components/motion/number-flow'
-import { formatClock, formatDateTime, formatShortDate, formatWeekday, pluralize } from '@/lib/format'
+import { formatClock, formatShortDate, formatWeekday, pluralize } from '@/lib/format'
 import type { TradeSessionSummary } from './types'
 import { countAgents, groupSessionsByDate, sessionTimestamp } from './utils'
 
@@ -88,10 +88,16 @@ export function TradeArchive({
     if (!loading && !sessions.length) {
         return (
             <Panel>
+                {/* A failed load is not an empty archive. Saying "no runs yet"
+                    after a network error told people their history was gone. */}
                 <EmptyState
-                    title="No saved agent runs yet"
-                    detail="Completed runs are archived here automatically. Once the scanner selects its first candidate, the run and its full analysis will appear."
-                    minHeight={340}
+                    title={error ? 'Trade history did not load' : 'No saved agent runs yet'}
+                    detail={
+                        error
+                            ? `${error} Your saved runs are not affected.`
+                            : 'Each run is saved here when it finishes, with its reasoning and charts.'
+                    }
+                    minHeight={300}
                     action={
                         error ? (
                             <Button variant="subtle" onClick={onRetry} swapLabel>
@@ -138,11 +144,18 @@ export function TradeArchive({
                         value={<SpinningCounter value={agentTotal} />}
                         note="One per analysed stock"
                     />
-                    <StatTile label="Most recent" value={formatDateTime(allGroups[0]?.at)} />
+                    {/* Date as the figure, time as the note. The combined
+                        string did not fit a half-width tile on a phone, and a
+                        date is not a number to animate digit by digit. */}
+                    <StatTile
+                        label="Most recent"
+                        value={allGroups[0] ? <span>{formatShortDate(allGroups[0].at)}</span> : '—'}
+                        note={allGroups[0] ? formatClock(allGroups[0].at, '') : undefined}
+                    />
                 </CellGrid>
 
                 <div className="run-filters">
-                    <h2 className="text-lg font-medium">Run history</h2>
+                    <h2 className="text-lg font-medium tracking-[-0.015em]">Run history</h2>
                     <input type="search" className="run-search" aria-label="Search archived runs" placeholder="Find a stock or request…" value={query} onChange={(event) => { setQuery(event.target.value); setChosenKey(undefined) }} />
                 </div>
                 {!groups.length && <p className="py-8 text-sm text-ink-secondary">No runs match this search.</p>}
@@ -183,6 +196,9 @@ function DayGroup({
     onOpen: (sessionId: string) => void
     onPrefetch: (sessionId: string) => void
 }) {
+    const [limit, setLimit] = useState(ROW_PAGE)
+    const hidden = Math.max(0, sessions.length - limit)
+
     return (
         <Panel as="article">
             <AccordionShell
@@ -193,16 +209,16 @@ function DayGroup({
                 header={
                     <>
                         <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                            <span className="text-[13.5px] font-medium tracking-[-0.02em] text-ink-primary sm:text-[14px]">
+                            <span className="text-[15px] font-medium tracking-[-0.015em] text-ink-primary">
                                 {formatWeekday(at)}
                             </span>
-                            <span className="nums truncate font-mono text-[10px] text-ink-tertiary">
+                            <span className="nums truncate text-[13px] text-ink-tertiary">
                                 {formatShortDate(at)}
                             </span>
                         </span>
 
                         <span className="flex flex-shrink-0 items-center gap-2.5 sm:gap-3.5">
-                            <span className="nums font-mono text-[10px] text-ink-tertiary">
+                            <span className="nums text-[13px] text-ink-tertiary">
                                 {pluralize(sessions.length, 'run')}
                             </span>
                             <AccordionChevron size={15} className="text-ink-tertiary" />
@@ -211,7 +227,7 @@ function DayGroup({
                 }
             >
                 <ul className="border-t border-line">
-                    {sessions.map((session) => (
+                    {sessions.slice(0, limit).map((session) => (
                         <li key={session.session_id} className="border-b border-line last:border-b-0">
                             <RunRow
                                 session={session}
@@ -223,10 +239,31 @@ function DayGroup({
                         </li>
                     ))}
                 </ul>
+                {hidden > 0 && (
+                    <div className="border-t border-line px-4 py-3 sm:px-5">
+                        <Button
+                            size="md"
+                            variant="subtle"
+                            className="w-full sm:w-auto"
+                            disabled={!open}
+                            onClick={() => setLimit((current) => current + ROW_PAGE)}
+                        >
+                            Show {Math.min(ROW_PAGE, hidden)} more
+                            <span className="nums text-ink-tertiary">· {hidden} left</span>
+                        </Button>
+                    </div>
+                )}
             </AccordionShell>
         </Panel>
     )
 }
+
+/**
+ * Rows rendered per step. A busy day had 517 runs, and mounting all of them
+ * (each with its own motion components) inside one accordion made opening the
+ * day stall on a phone.
+ */
+const ROW_PAGE = 60
 
 function RunRow({
     session,
@@ -253,16 +290,16 @@ function RunRow({
             aria-busy={opening}
             className="archive-row card-button group flex min-h-[52px] items-center gap-3 px-4 py-3 disabled:cursor-wait sm:gap-4 sm:px-5"
         >
-            <span className="nums w-[42px] flex-shrink-0 font-mono text-[11px] text-ink-secondary">
+            <span className="nums w-[42px] flex-shrink-0 font-mono text-[13px] text-ink-secondary">
                 {formatClock(sessionTimestamp(session), '—')}
             </span>
 
-            <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-primary">{session.title}</span>
+            <span className="min-w-0 flex-1 truncate text-[15px] text-ink-primary">{session.title}</span>
 
             {/* Only stated when it is a real distinction. "1 agent" on every row
                 of a single-stock archive is a column of noise. */}
             {agents > 1 && (
-                <span className="nums flex-shrink-0 font-mono text-[10px] text-ink-tertiary">
+                <span className="nums flex-shrink-0 text-xs text-ink-tertiary">
                     {pluralize(agents, 'agent')}
                 </span>
             )}
