@@ -105,11 +105,13 @@
     .product-shell .archive-row { gap: 0.75rem; padding-inline: 0.25rem; }
     .product-shell .archive-row > span:first-child { width: 4.75rem; }
 }
+.view-in-next { animation: run-in-next var(--duration-fast) var(--ease-smooth-out) both; }
+.view-in-prev { animation: run-in-prev var(--duration-fast) var(--ease-smooth-out) both; }
 @keyframes run-in-next { from { opacity: 0; transform: translateX(calc(var(--distance-base) * 2)); } to { opacity: 1; transform: none; } }
 @keyframes run-in-prev { from { opacity: 0; transform: translateX(calc(var(--distance-base) * -2)); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
     .run-row, .run-filter { transition: none; }
-    .run-split .run-detail, .run-split .run-list { animation: none !important; }
+    .run-split .run-detail, .run-split .run-list, .view-in-next, .view-in-prev { animation: none !important; }
 }
 @media (max-width: 639px) {
     .desktop-records { display: none; }

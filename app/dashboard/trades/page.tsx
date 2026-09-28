@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SessionDetail } from '@/components/trades/session-detail'
 import { TradeArchive } from '@/components/trades/trade-archive'
@@ -8,7 +8,6 @@ import { useTradeSessions } from '@/components/trades/use-trade-sessions'
 import { Notice } from '@/components/ui/notice'
 import { CellGrid, Panel } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PageSwitch } from '@/components/motion/page-switch'
 import { Reveal } from '@/components/motion/reveal'
 
 /**
@@ -35,24 +34,82 @@ function TradesPageContent() {
         closeSession,
     } = useTradeSessions(deepLinkedSession)
 
-    // Keep the URL in step with the open run so it can be shared or reloaded.
+    /**
+     * Opening a run pushes a history entry, so the phone's back gesture and the
+     * browser back button return to the list instead of leaving Trades.
+     * `pushedFor` remembers which run this page pushed, so the in-page back
+     * button can pop that entry rather than stacking another one.
+     */
+    const pushedFor = useRef<string | null>(null)
+    const listScroll = useRef(0)
+
     useEffect(() => {
+        if (!selected) return
         const url = new URL(window.location.href)
-        if (selected) url.searchParams.set('session', selected.session_id)
-        else url.searchParams.delete('session')
-        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`)
+        if (url.searchParams.get('session') === selected.session_id) return
+        url.searchParams.set('session', selected.session_id)
+        pushedFor.current = selected.session_id
+        window.history.pushState(null, '', `${url.pathname}${url.search}`)
     }, [selected])
 
-    const open = useCallback((sessionId: string) => void openSession(sessionId), [openSession])
+    // Back (gesture, button or in-page) removes `?session`. Close the run when
+    // the param goes from set to unset; a forward navigation that sets it again
+    // is picked up by the deep-link effect inside `useTradeSessions`.
+    const previousParam = useRef(deepLinkedSession)
+    useEffect(() => {
+        const had = previousParam.current
+        previousParam.current = deepLinkedSession
+        if (had && !deepLinkedSession && selected) {
+            pushedFor.current = null
+            closeSession()
+        }
+    }, [deepLinkedSession, selected, closeSession])
+
+    // The list stays mounted while a run is open, so search, the open day and
+    // the scroll position all survive the round trip. Scroll is restored here.
+    const wasOpen = useRef(false)
+    useEffect(() => {
+        if (selected) {
+            wasOpen.current = true
+            return
+        }
+        if (!wasOpen.current) return
+        wasOpen.current = false
+        const top = listScroll.current
+        requestAnimationFrame(() => window.scrollTo({ top }))
+    }, [selected])
+
+    // The list only plays its return slide after a run has been opened;
+    // on first load the route entrance already covers it.
+    const [openedOnce, setOpenedOnce] = useState(false)
+    const open = useCallback(
+        (sessionId: string) => {
+            listScroll.current = window.scrollY
+            setOpenedOnce(true)
+            void openSession(sessionId)
+        },
+        [openSession],
+    )
+
+    const back = useCallback(() => {
+        if (selected && pushedFor.current === selected.session_id) {
+            window.history.back()
+            return
+        }
+        // Arrived by deep link: there is no list entry behind this one to pop.
+        pushedFor.current = null
+        closeSession()
+        const url = new URL(window.location.href)
+        url.searchParams.delete('session')
+        window.history.replaceState(null, '', `${url.pathname}${url.search}`)
+    }, [selected, closeSession])
 
     return (
         <>
             <Reveal immediate as="header" className="mb-6">
-                <p className="dash-label mb-2">History</p>
                 <h1 className="section-title">Trades</h1>
                 <p className="section-lede">
-                    Every archived agent run, grouped by trading day. Open a run for its decision and the full event
-                    log, charts included.
+                    Every archived agent run by trading day, with what each agent read, its reasoning and its charts.
                 </p>
             </Reveal>
 
@@ -62,25 +119,25 @@ function TradesPageContent() {
                 </Notice>
             )}
 
-            {/* Archive ⇄ run detail is a list/detail pair, so it slides
-                (recipe 08): the archive exits left as the run enters from the
-                right, and the reverse on the way back. The direction is what
-                tells the reader they went deeper rather than sideways. */}
-            <PageSwitch
-                page={selected ? 2 : 1}
-                list={
-                    <TradeArchive
-                        sessions={sessions}
-                        loading={listLoading}
-                        error={listError}
-                        openingId={openingId}
-                        onOpen={open}
-                        onPrefetch={prefetchSession}
-                        onRetry={() => void reload()}
-                    />
-                }
-                detail={selected ? <SessionDetail session={selected} onBack={closeSession} /> : null}
-            />
+            {/* List and detail are a pair: the detail slides in from the
+                right, the list back from the left. The list is hidden rather
+                than unmounted so its state survives. */}
+            <div hidden={Boolean(selected)} className={openedOnce ? 'view-in-prev' : undefined}>
+                <TradeArchive
+                    sessions={sessions}
+                    loading={listLoading}
+                    error={listError}
+                    openingId={openingId}
+                    onOpen={open}
+                    onPrefetch={prefetchSession}
+                    onRetry={() => void reload()}
+                />
+            </div>
+            {selected && (
+                <div key={selected.session_id} className="view-in-next">
+                    <SessionDetail session={selected} onBack={back} />
+                </div>
+            )}
         </>
     )
 }
