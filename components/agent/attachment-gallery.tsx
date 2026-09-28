@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Document, External } from '@/components/ui/icons'
+import { Close, Document, External } from '@/components/ui/icons'
+import { Modal } from '@/components/motion/modal'
 import { cn } from '@/lib/cn'
 import { attachmentFileUrl, attachmentImageUrl } from '@/components/ai-trading/utils'
 import type { AgentAttachments, AgentImageCard } from '@/components/ai-trading/types'
@@ -43,7 +44,7 @@ export function AttachmentGallery({ attachments }: { attachments?: AgentAttachme
                 <section>
                     <div className="mb-3 flex items-center justify-between">
                         <p className="dash-label">Charts</p>
-                        <p className="text-[10px] text-ink-tertiary">{count(images.length)} rendered</p>
+                        <p className="text-xs text-ink-tertiary">{count(images.length)} rendered</p>
                     </div>
                     <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {images.map((image, index) => (
@@ -99,71 +100,117 @@ export function AttachmentGallery({ attachments }: { attachments?: AgentAttachme
  * State is per-tile rather than lifted: charts arrive independently and in any
  * order, so a shared "images loading" flag would hold every tile behind the
  * slowest one.
+ *
+ * The tile keeps the chart's own aspect ratio once it loads. A fixed 4:3 box
+ * with object-cover cut the axes off wide matplotlib renders. Tapping opens
+ * the chart in a viewer on this page instead of a raw PNG in a new tab.
  */
 function ChartTile({ image }: { image: AgentImageCard }) {
     const src = attachmentImageUrl(image)
     const label = image.title || image.timeframe || image.filename || 'Chart'
     const [loaded, setLoaded] = useState(false)
     const [failed, setFailed] = useState(false)
+    const [viewing, setViewing] = useState(false)
+    const titleId = useId()
 
-    const meta =
-        [image.date, image.day_type, image.candles ? `${image.candles} candles` : null].filter(Boolean).join(' · ') ||
-        image.filename
+    const meta = [image.date, image.day_type, image.candles ? `${image.candles} candles` : null]
+        .filter(Boolean)
+        .join(' · ')
+    const alt = `${label}${image.date ? ` on ${image.date}` : ''}`
 
     return (
-        <a
-            href={src || undefined}
-            target="_blank"
-            rel="noreferrer"
-            className="t-lift group block overflow-hidden rounded-xl border border-line bg-panel-inset hover:border-line-strong"
-        >
-            {/* The aspect ratio is fixed before the image arrives, so a grid of
-                charts does not reflow as each one lands. */}
-            <div className="relative aspect-[4/3] overflow-hidden bg-black/40">
-                {src && !failed ? (
-                    <>
-                        {/* Pulsing placeholder, cross-faded out as the chart
-                            cross-blurs in — both on the same 400ms reveal
-                            clock, so the swap reads as one motion. */}
-                        <span
-                            aria-hidden
-                            className={cn(
-                                'archive-skeleton absolute inset-0 transition-opacity duration-[400ms] ease-in-out',
-                                loaded ? 'opacity-0' : 'opacity-100',
-                            )}
-                        />
-                        {/* Backend-rendered matplotlib PNGs of arbitrary size;
-                            next/image would add no value over a direct load. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={src}
-                            alt={`${label}${image.date ? ` on ${image.date}` : ''}`}
-                            loading="lazy"
-                            onLoad={() => setLoaded(true)}
-                            onError={() => setFailed(true)}
-                            className={cn(
-                                'h-full w-full object-cover transition-[opacity,filter] duration-[400ms] ease-in-out',
-                                loaded ? 'opacity-100 blur-0' : 'opacity-0 blur-[2px]',
-                            )}
-                        />
-                    </>
-                ) : (
-                    <div className="grid h-full place-items-center font-mono text-[10px] text-ink-tertiary">
-                        Chart unavailable
-                    </div>
-                )}
-            </div>
-            <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-                <div className="min-w-0">
-                    <p className="truncate text-[11.5px] text-ink-primary">{label}</p>
-                    <p className="truncate font-mono text-[9px] text-ink-tertiary">{meta}</p>
+        <>
+            <button
+                type="button"
+                onClick={() => setViewing(true)}
+                disabled={!src || failed}
+                aria-label={`View chart: ${alt}`}
+                className="group block w-full overflow-hidden rounded-xl border border-line bg-panel-inset text-left transition-colors duration-fast ease-smooth hover:border-line-strong disabled:cursor-default"
+            >
+                <div className={cn('relative overflow-hidden bg-black/40', !loaded && 'aspect-[16/10]')}>
+                    {src && !failed ? (
+                        <>
+                            <span
+                                aria-hidden
+                                className={cn(
+                                    'archive-skeleton absolute inset-0 transition-opacity duration-[400ms] ease-in-out',
+                                    loaded ? 'opacity-0' : 'opacity-100',
+                                )}
+                            />
+                            {/* Backend-rendered matplotlib PNGs of arbitrary size;
+                                next/image would add no value over a direct load. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={src}
+                                alt={alt}
+                                loading="lazy"
+                                decoding="async"
+                                onLoad={() => setLoaded(true)}
+                                onError={() => setFailed(true)}
+                                className={cn(
+                                    'block w-full transition-[opacity,filter] duration-[400ms] ease-in-out',
+                                    loaded ? 'h-auto opacity-100 blur-0' : 'absolute inset-0 h-full opacity-0 blur-[2px]',
+                                )}
+                            />
+                        </>
+                    ) : (
+                        <div className="grid aspect-[16/10] place-items-center text-sm text-ink-tertiary">
+                            Chart unavailable
+                        </div>
+                    )}
                 </div>
-                {image.timeframe && (
-                    <Badge size="sm" tone="neutral" className="flex-shrink-0">
-                        {image.timeframe}
-                    </Badge>
-                )}
-            </div>
-        </a>
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                    <div className="min-w-0">
+                        <p className="truncate text-sm text-ink-primary">{label}</p>
+                        {meta && <p className="nums truncate text-xs text-ink-tertiary">{meta}</p>}
+                    </div>
+                    {image.timeframe && (
+                        <Badge size="sm" tone="neutral" className="flex-shrink-0">
+                            {image.timeframe}
+                        </Badge>
+                    )}
+                </div>
+            </button>
+
+            {src && (
+                <Modal open={viewing} onClose={() => setViewing(false)} labelledBy={titleId} size="wide">
+                    <div className="flex max-h-[92dvh] flex-col">
+                        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+                            <div className="min-w-0">
+                                <h2 id={titleId} className="truncate text-[15px] font-medium text-ink-primary">
+                                    {label}
+                                </h2>
+                                {meta && <p className="nums truncate text-xs text-ink-tertiary">{meta}</p>}
+                            </div>
+                            <div className="flex flex-shrink-0 items-center gap-1">
+                                <a
+                                    href={src}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="grid h-11 w-11 place-items-center rounded-xl text-ink-secondary hover:bg-surface-hover"
+                                    aria-label="Open original image"
+                                >
+                                    <External size={17} />
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewing(false)}
+                                    className="grid h-11 w-11 place-items-center rounded-xl text-ink-secondary hover:bg-surface-hover"
+                                    aria-label="Close chart"
+                                >
+                                    <Close size={18} />
+                                </button>
+                            </div>
+                        </header>
+                        {/* Scrolls in both directions, so a wide chart can be
+                            panned on a phone at full resolution. */}
+                        <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-black/60">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={src} alt={alt} className="mx-auto block h-auto max-w-none sm:max-w-full" />
+                        </div>
+                    </div>
+                </Modal>
+            )}
+        </>
     )
 }

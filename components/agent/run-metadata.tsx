@@ -60,7 +60,10 @@ export function RunMetadata({ metadata }: { metadata?: Record<string, unknown> |
             )}
             {reasoning && (
                 <Disclosure label="Reasoning trace">
-                    <div className="max-h-80 overflow-auto">
+                    {/* Long traces get a taller window on large screens;
+                        on a phone the page itself scrolls, which beats a small
+                        box scrolling inside a page that also scrolls. */}
+                    <div className="lg:max-h-[32rem] lg:overflow-auto">
                         <AgentMarkdown>{reasoning}</AgentMarkdown>
                     </div>
                 </Disclosure>
@@ -76,11 +79,9 @@ function MetricRow({ label, entries }: { label: string; entries: [string, unknow
             <dl className="cell-grid grid-cols-2 sm:grid-cols-4">
                 {entries.map(([key, value]) => (
                     <div key={key} className="px-3.5 py-2.5">
-                        <dt className="truncate font-mono text-[9px] uppercase tracking-[0.1em] text-ink-tertiary" title={humanizeKey(key)}>
-                            {humanizeKey(key)}
-                        </dt>
-                        <dd className="nums mt-1 truncate font-mono text-[11.5px] text-ink-primary">
-                            {formatMetric(value)}
+                        <dt className="text-xs leading-snug text-ink-tertiary">{humanizeKey(key)}</dt>
+                        <dd className="nums mt-1 truncate font-mono text-sm text-ink-primary">
+                            {formatMetric(value, key)}
                         </dd>
                     </div>
                 ))}
@@ -100,8 +101,16 @@ function scalarEntries(source: Record<string, unknown> | null): [string, unknown
     )
 }
 
-function formatMetric(value: unknown) {
-    if (typeof value === 'number') return Number.isInteger(value) ? count(value) : value.toFixed(2)
+/** Agno reports durations (`time_to_first_token`, `duration`) in seconds. */
+function isSecondsKey(key: string) {
+    return /(^|_)(time|duration|latency)(_|$)/i.test(key) && !/tokens?$/i.test(key)
+}
+
+function formatMetric(value: unknown, key = '') {
+    if (typeof value === 'number') {
+        if (isSecondsKey(key)) return `${value.toFixed(2)} s`
+        return Number.isInteger(value) ? count(value) : value.toFixed(2)
+    }
     if (typeof value === 'boolean') return value ? 'Yes' : 'No'
     return String(value)
 }
