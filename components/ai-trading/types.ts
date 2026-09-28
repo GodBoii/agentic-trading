@@ -80,6 +80,8 @@ export interface LiveAgentEvent {
 
 export interface AgentResult {
     rank?: number
+    /** Status of the agent's latest saved run, e.g. "completed" or "error". */
+    status?: string | null
     symbol?: string
     display_name?: string
     decision?: Record<string, any>

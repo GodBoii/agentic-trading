@@ -294,22 +294,36 @@ async function queryAgnoTradeSessions(userId: string, tradeSessionId?: string) {
   const columns = tradeSessionId
     ? 'session_id,user_id,metadata,runs,created_at,updated_at'
     : 'session_id,user_id,metadata,created_at,updated_at'
-  let query = client
-    .from(agnoSessionTable)
-    .select(columns)
-    .eq('user_id', userId)
-    .eq('metadata->>stage', 'stock_agent')
-    .order('updated_at', { ascending: false })
-    .limit(1000)
+  // PostgREST caps a single response at 1000 rows. The archive used to stop
+  // there without saying so, which is why the Agents figure read exactly 1000
+  // and older runs vanished. Page through instead, with a hard ceiling so a
+  // runaway account cannot turn one request into an unbounded scan.
+  const rows: JsonRecord[] = []
+  for (let page = 0; page < AGNO_MAX_PAGES; page += 1) {
+    let query = client
+      .from(agnoSessionTable)
+      .select(columns)
+      .eq('user_id', userId)
+      .eq('metadata->>stage', 'stock_agent')
+      .order('updated_at', { ascending: false })
+      .range(page * AGNO_PAGE_SIZE, (page + 1) * AGNO_PAGE_SIZE - 1)
 
-  if (tradeSessionId) {
-    query = query.eq('metadata->>trade_session_id', tradeSessionId)
+    if (tradeSessionId) {
+      query = query.eq('metadata->>trade_session_id', tradeSessionId)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    const batch = Array.isArray(data) ? data as JsonRecord[] : []
+    rows.push(...batch)
+    if (batch.length < AGNO_PAGE_SIZE) break
   }
-
-  const { data, error } = await query
-  if (error) throw error
-  return Array.isArray(data) ? data as JsonRecord[] : []
+  return rows
 }
+
+const AGNO_PAGE_SIZE = 1000
+/** 20,000 agent rows. Far beyond any real archive, but still bounded. */
+const AGNO_MAX_PAGES = 20
 
 function agnoTradeSessionId(row: JsonRecord) {
   const metadataId = String(row.metadata?.trade_session_id || '').trim()
@@ -379,10 +393,12 @@ function agnoRowToAgent(row: JsonRecord, index: number) {
   const images = imageUrls.map((cloudUrl: string, imageIndex: number) => {
     const storagePath = String(storagePaths[imageIndex] || '')
     const filename = storagePath.split('/').pop() || `chart-${imageIndex + 1}.png`
+    const parsed = parseChartFilename(filename)
     return {
       id: `chart-${imageIndex + 1}`,
-      title: chartTitle(filename, imageIndex),
+      title: parsed.title || chartTitle(filename, imageIndex),
       filename,
+      ...(parsed.date ? { date: parsed.date } : {}),
       storage_path: storagePath,
       cloud_url: cloudUrl,
     }
@@ -392,6 +408,9 @@ function agnoRowToAgent(row: JsonRecord, index: number) {
     rank: Number(metadata.rank || index + 1),
     symbol: metadata.symbol || null,
     display_name: metadata.display_name || metadata.symbol || `Agent ${index + 1}`,
+    // The agent's own outcome, so the archive can show a failed agent as
+    // failed instead of inferring "completed" from the row existing.
+    status: latestAgnoStatus(row) || null,
     decision: null,
     attachments: { images, files: [] },
     agent_metadata: {
@@ -410,11 +429,27 @@ function orderAgnoRows(rows: JsonRecord[]) {
   return [...rows].sort((a, b) => Number(a.metadata?.rank || 0) - Number(b.metadata?.rank || 0))
 }
 
+/**
+ * Status of one agent row: the status of its latest run. Earlier attempts
+ * are history. Counting them marked a session failed when a retry had
+ * already completed.
+ */
+function latestAgnoStatus(row: JsonRecord) {
+  const runs = Array.isArray(row.runs) ? row.runs : []
+  const latest = runs[runs.length - 1]
+  return latest ? String(latest.status || '').toLowerCase() : ''
+}
+
+function isFailedStatus(status: string) {
+  return status === 'error' || status === 'failed' || status === 'cancelled'
+}
+
 function aggregateAgnoStatus(rows: JsonRecord[]) {
-  const statuses = rows.flatMap((row) => Array.isArray(row.runs) ? row.runs.map((run: JsonRecord) => String(run.status || '').toLowerCase()) : [])
-  if (statuses.some((status) => status === 'error' || status === 'failed' || status === 'cancelled')) return 'failed'
-  if (statuses.length && statuses.every((status) => status === 'completed')) return 'completed'
-  return statuses.length ? 'running' : 'unknown'
+  const statuses = rows.map(latestAgnoStatus).filter(Boolean)
+  if (!statuses.length) return 'unknown'
+  if (statuses.every((status) => status === 'completed')) return 'completed'
+  if (statuses.some(isFailedStatus)) return 'failed'
+  return 'running'
 }
 
 function earliestTimestamp(values: any[]) {
@@ -431,6 +466,22 @@ function timestampToMs(value: any) {
   if (typeof value === 'number' && Number.isFinite(value)) return value > 1e12 ? value : value * 1000
   const parsed = Date.parse(String(value || ''))
   return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Chart files are named `<symbol>-<yyyy-mm-dd>-<view>.png`, for example
+ * `tgv-sraac-2026-09-25-momentum-volatility.png`. The symbol is already the
+ * agent's heading, so the caption keeps only the view ("Momentum volatility")
+ * and the date goes to the meta line.
+ */
+function parseChartFilename(filename: string) {
+  const match = filename.replace(/\.png$/i, '').match(/(\d{4}-\d{2}-\d{2})[-_](.+)$/)
+  if (!match) return { title: '', date: '' }
+  const words = match[2].replace(/[-_]+/g, ' ').trim()
+  return {
+    title: words ? words.charAt(0).toUpperCase() + words.slice(1) : '',
+    date: match[1],
+  }
 }
 
 function chartTitle(filename: string, index: number) {

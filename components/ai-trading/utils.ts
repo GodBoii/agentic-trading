@@ -110,6 +110,12 @@ export function attachmentFileUrl(file: AgentFileCard) {
     )
 }
 
+/** Terminal failure statuses a saved agent run can carry. */
+export function isFailedRunStatus(status: string | null | undefined) {
+    const value = String(status || '').toLowerCase()
+    return value === 'error' || value === 'failed' || value === 'cancelled'
+}
+
 /**
  * Resolve the event stream for one agent slot: live events when present,
  * otherwise the persisted timeline plus a synthesized completion event. This is
@@ -135,15 +141,23 @@ export function mergedEventsForRank(
         }))
     }
 
-    if (completed && !events.some((event) => event.type === 'stock_agent_completed')) {
+    const terminal = events.some((event) => event.type === 'stock_agent_completed' || event.type === 'stock_agent_failed')
+    if (completed && !terminal) {
+        // A saved result is not proof of success. Archived rows carry the
+        // status of their last run, and a failed one must read as failed,
+        // not get a green check because the row exists.
+        const failed = isFailedRunStatus(completed.status)
         return coalesceAgentEvents([
             ...events,
             {
-                type: 'stock_agent_completed',
+                type: failed ? 'stock_agent_failed' : 'stock_agent_completed',
                 rank,
                 symbol: completed.symbol,
                 display_name: completed.display_name,
-                message: 'Completed from latest saved status.',
+                message: failed
+                    ? `The saved run ended with status "${completed.status}".`
+                    : 'Loaded from the saved result.',
+                ...(failed ? { error: `Run status: ${completed.status}` } : {}),
                 decision: completed.decision,
                 attachments: completed.attachments,
                 agent_metadata: completed.agent_metadata || undefined,

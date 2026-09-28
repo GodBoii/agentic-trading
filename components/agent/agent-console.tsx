@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Panel, PanelHeader } from '@/components/ui/panel'
 import { PageSwitch } from '@/components/motion/page-switch'
 import { count } from '@/lib/format'
-import { agentDisplayName, agentSlotRanks, mergedEventsForRank } from '@/components/ai-trading/utils'
+import { agentDisplayName, agentSlotRanks, isFailedRunStatus, mergedEventsForRank } from '@/components/ai-trading/utils'
 import type { AgentResult, AgentRunStatus, LiveAgentEvent, StreamState } from '@/components/ai-trading/types'
 import { AgentRoster, type AgentSlot } from './agent-roster'
 import { AgentWorkspace } from './agent-workspace'
@@ -72,8 +72,12 @@ export function AgentConsole({
                 rank,
                 name: agentDisplayName(latest || persisted, `Agent ${rank}`),
                 events,
-                complete: latest?.type === 'stock_agent_completed' || Boolean(persisted),
-                failed: latest?.type === 'stock_agent_failed',
+                // A persisted row counts as finished, but finished is not the
+                // same as succeeded: its saved status decides which.
+                complete:
+                    latest?.type === 'stock_agent_completed' ||
+                    (Boolean(persisted) && !isFailedRunStatus(persisted?.status)),
+                failed: latest?.type === 'stock_agent_failed' || isFailedRunStatus(persisted?.status),
             }
         })
     }, [liveEvents, results, runStatus])
