@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import ProductHeader from '@/components/product-header'
+import { BottomNav } from '@/components/bottom-nav'
 import { AgentRunProvider } from '@/components/agent/agent-run-provider'
 import { createClient } from '@/lib/supabase/server'
 import './dashboard.css'
@@ -31,10 +32,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             </a>
             <ProductHeader email={user?.email} />
             <AgentRunProvider>
-                <main id="main" className="mx-auto max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 sm:pt-8 lg:px-8">
+                <main id="main" className="mx-auto max-w-[1320px] px-4 pb-20 pt-5 sm:px-6 sm:pt-8 lg:px-8">
                     {children}
                 </main>
             </AgentRunProvider>
+            <BottomNav />
         </div>
     )
 }

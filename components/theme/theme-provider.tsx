@@ -71,6 +71,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const root = document.documentElement
         root.setAttribute(THEME_ATTR, resolved)
         root.setAttribute(THEME_CHOICE_ATTR, choice)
+        // The metadata theme-color follows the OS setting only. Picking Light
+        // on a dark phone left the status bar black above a paper page, so the
+        // tags are rewritten to the canvas of the theme actually applied.
+        const canvas = getComputedStyle(root).getPropertyValue('--dash-canvas').trim()
+        if (canvas) {
+            document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+                meta.content = canvas
+            })
+        }
     }, [choice, resolved])
 
     // Enable the colour cross-fade only after the first paint has landed, so

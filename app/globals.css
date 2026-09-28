@@ -44,6 +44,8 @@
   /* Structure. Canvas, panel, inset: one warm ramp where each step is a real
      elevation change rather than a decorative tint. */
   --dash-canvas: #0C0B0A;
+  /* The canvas as a channel triplet, for translucent chrome over content. */
+  --canvas-rgb: 12 11 10;
   --dash-panel: #141210;
   --dash-panel-inset: #100F0D;
   /* The surface a floating layer paints on: tooltips, menus, dialogs. One
@@ -134,6 +136,7 @@
   --dash-warning-rgb: 138 96 16;
 
   --dash-canvas: #F1EDE6;
+  --canvas-rgb: 241 237 230;
   --dash-panel: #FCFAF6;
   --dash-panel-inset: #F5F1EA;
   --dash-pop: #FFFDF9;

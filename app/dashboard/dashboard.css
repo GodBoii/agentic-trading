@@ -37,7 +37,7 @@
 .run-filter:hover, .run-row:hover { background: var(--fill-hover); }
 .run-search { width: min(100%, 18rem); min-height: 44px; padding: 0.625rem 0.75rem; background: transparent; border: 1px solid var(--dash-border-strong); border-radius: 6px; font-size: 0.8125rem; }
 .run-split { display: grid; grid-template-columns: minmax(240px, 0.85fr) minmax(0, 2fr); border-block: 1px solid var(--dash-border-strong); align-items: start; }
-.run-list { min-width: 0; position: sticky; top: 72px; max-height: calc(100dvh - 100px); overflow-y: auto; overscroll-behavior: contain; }
+.run-list { min-width: 0; position: sticky; top: calc(56px + env(safe-area-inset-top)); max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain; }
 .run-row { width: 100%; text-align: left; padding: 1rem 0.875rem; border-bottom: 1px solid var(--dash-border); border-inline-start: 3px solid transparent; transition: background var(--duration-quick) var(--ease-smooth-out); }
 .run-row[aria-pressed="true"] { background: var(--fill-soft); border-inline-start-color: var(--accent); }
 .run-detail { min-width: 0; border-inline-start: 1px solid var(--dash-border); padding: 1.25rem 0 1.25rem 1.75rem; }
@@ -55,8 +55,7 @@
     .run-back { display: inline-flex; align-items: center; }
     .run-search { width: 100%; }
     .product-shell .panel-header { flex-wrap: wrap; }
-    .product-shell main { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
-    .product-shell .t-tab { min-height: 44px; }
+    .product-shell .t-tab { min-height: 40px; }
     .product-shell .archive-row { gap: 0.75rem; padding-inline: 0.25rem; }
     .product-shell .archive-row > span:first-child { width: 4.75rem; }
 }
@@ -68,10 +67,94 @@
     .mobile-records { display: block; }
     .mobile-records > li { padding-block: 1.25rem; border-bottom: 1px solid var(--dash-border); }
     .mobile-records dd > .ml-auto { margin-left: 0; }
-    .mobile-records small { display: block; margin-top: 0.25rem; font-size: 0.6875rem; }
-    .product-header-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; height: auto; row-gap: 0; padding-block: 0.25rem; }
-    .product-brand-name { display: inline; }
-    .product-nav { grid-row: 2; grid-column: 1 / -1; margin: 0; padding: 0; overflow: visible; }
-    .product-nav > * { width: 100%; justify-content: space-around; }
-    .product-nav .t-tab { flex: 1; justify-content: center; }
+    .mobile-records small { display: block; margin-top: 0.25rem; font-size: 0.75rem; }
+}
+
+/* ── App chrome ──
+   The header and tab bar pad for the device safe areas. With
+   viewport-fit=cover the installed app draws edge to edge, so without this the
+   status bar sits on top of the brand and the home indicator on top of the
+   tabs. */
+.chrome-glass {
+    background: rgb(var(--canvas-rgb) / 0.86);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    backdrop-filter: blur(16px) saturate(1.3);
+}
+.product-header { padding-top: env(safe-area-inset-top); }
+.product-header-inner {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+.bottom-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: var(--z-header);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    background: rgb(var(--canvas-rgb) / 0.9);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    backdrop-filter: blur(16px) saturate(1.3);
+    border-top: 1px solid var(--dash-border);
+}
+.bottom-nav-list { display: flex; height: 60px; }
+.bottom-nav-link {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--dash-text-muted);
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--duration-quick) var(--ease-smooth-out);
+}
+.bottom-nav-link[aria-current="page"] { color: var(--dash-text); }
+/* The active section gets a filled lozenge behind its icon. It grows from the
+   icon's own width, so the change reads as the tab lighting up rather than a
+   highlight arriving from somewhere else. */
+.bottom-nav-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 28px;
+}
+.bottom-nav-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: var(--fill-strong);
+    opacity: 0;
+    transform: scaleX(0.5);
+    transition:
+        opacity var(--duration-fast) var(--ease-smooth-out),
+        transform var(--duration-fast) var(--ease-smooth-out);
+}
+.bottom-nav-link[aria-current="page"] .bottom-nav-icon::before { opacity: 1; transform: scaleX(1); }
+.bottom-nav-icon > svg { position: relative; }
+.bottom-nav-label { font-size: 0.75rem; font-weight: 500; letter-spacing: -0.005em; }
+.bottom-nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 12px; }
+
+@media (max-width: 767px) {
+    /* Room for the tab bar plus the home indicator, so the last row of content
+       can scroll clear of it. */
+    .product-shell main { padding-bottom: calc(60px + 2rem + env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bottom-nav-link, .bottom-nav-icon::before { transition: none; }
+}
+
+/* Section change. Small travel and no blur: this plays on every tab tap, so it
+   has to stay out of the way. */
+.route-enter { animation: route-enter var(--duration-fast) var(--ease-smooth-out) both; }
+@keyframes route-enter {
+    from { opacity: 0; transform: translateY(var(--distance-base)); }
+    to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .route-enter { animation: none; }
 }
