@@ -2,12 +2,12 @@
 
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { AgentSwitch } from '@/components/agent/agent-switch'
 import { CapitalControl } from '@/components/agent/capital-control'
 import { LiveRunBoard } from '@/components/agent/live-run-board'
-
 import { useAgentRunContext } from '@/components/agent/agent-run-provider'
 import { Notice } from '@/components/ui/notice'
-import { CellGrid, Panel } from '@/components/ui/panel'
+import { Panel } from '@/components/ui/panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Reveal } from '@/components/motion/reveal'
 
@@ -49,11 +49,10 @@ function AgentPageContent() {
     return (
         <>
             <Reveal immediate as="header" className="mb-6">
-                <p className="dash-label mb-2">Autonomous execution</p>
                 <h1 className="section-title">Agent</h1>
                 <p className="section-lede">
-                    Follow concurrent runs, inspect decisions and manage capital. New candidates
-                    appear automatically as the scanner finds them.
+                    Turn the agent on or off, set how much each trade may use, and follow runs as the scanner
+                    picks stocks.
                 </p>
             </Reveal>
 
@@ -64,6 +63,7 @@ function AgentPageContent() {
             )}
 
             <div className="space-y-4">
+                <AgentSwitch />
                 <CapitalControl />
 
                 <LiveRunBoard runs={runs} stream={stream} />
@@ -77,8 +77,7 @@ function AgentFallback() {
     return (
         <>
             <div className="mb-6">
-                <Skeleton className="h-2.5 w-36" />
-                <Skeleton className="mt-3 h-8 w-32" delay={40} />
+                <Skeleton className="h-8 w-32" delay={40} />
                 <Skeleton className="mt-3 h-2.5 w-80 max-w-full" delay={80} />
             </div>
             <div className="space-y-4">
@@ -91,14 +90,6 @@ function AgentFallback() {
                         </div>
                     </div>
                 </Panel>
-                <CellGrid className="grid-cols-2 lg:grid-cols-4">
-                    {[0, 1, 2, 3].map((item) => (
-                        <div key={item} className="px-4 py-3.5">
-                            <Skeleton className="h-2.5 w-20" delay={item * 40} />
-                            <Skeleton className="mt-3 h-3.5 w-24" delay={item * 40} />
-                        </div>
-                    ))}
-                </CellGrid>
                 <Panel>
                     <div className="panel-body">
                         <Skeleton className="h-48 w-full" />

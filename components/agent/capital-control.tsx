@@ -17,6 +17,7 @@ import { SuccessCheck } from '@/components/motion/success-check'
 import { formatDateTime, money } from '@/lib/format'
 import { autoSlotAmount, fixedSlotCount, tradeSlotLimit } from '@/lib/trade-sizing'
 import type { Funds } from '@/components/dashboard/types'
+import { TRADING_CONFIG_EVENT } from './agent-switch'
 
 interface TradingKeys {
     token_expiry: string | null
@@ -172,6 +173,23 @@ export function CapitalControl() {
         void loadBalance()
     }, [])
 
+    // The agent switch writes the same record. Re-read the stored status after
+    // it changes so the badge and summary here stay true; the typed amount and
+    // mode are left alone so an edit in progress is not overwritten.
+    useEffect(() => {
+        const onChange = (event: Event) => {
+            if ((event as CustomEvent<{ source?: string }>).detail?.source === 'capital') return
+            void fetch('/api/ai-trading/config', { cache: 'no-store' })
+                .then((response) => (response.ok ? response.json() : null))
+                .then((next: AmountStatus | null) => {
+                    if (next) setStatus(next)
+                })
+                .catch(() => undefined)
+        }
+        window.addEventListener(TRADING_CONFIG_EVENT, onChange)
+        return () => window.removeEventListener(TRADING_CONFIG_EVENT, onChange)
+    }, [])
+
     const save = async (nextMode: SizingMode, nextAmount: number | null) => {
         try {
             setSaving(true)
@@ -191,6 +209,7 @@ export function CapitalControl() {
             // will want back if they switch to a fixed cap again.
             if (payload.trade_amount) setTradeAmount(String(payload.trade_amount))
             setSaved(true)
+            window.dispatchEvent(new CustomEvent(TRADING_CONFIG_EVENT, { detail: { source: 'capital' } }))
         } catch (saveError) {
             setError(saveError instanceof Error ? saveError.message : 'Could not save your trading amount setting.')
             amount.trigger()
