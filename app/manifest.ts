@@ -11,5 +11,10 @@ export default function manifest(): MetadataRoute.Manifest {
             { src: '/icons/app-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
             { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Long-press on the home-screen icon jumps straight to a section.
+        shortcuts: [
+            { name: 'Agent runs', short_name: 'Agent', url: '/dashboard/ai-trading', icons: [{ src: '/icons/app-192.png', sizes: '192x192' }] },
+            { name: 'Trade history', short_name: 'Trades', url: '/dashboard/trades', icons: [{ src: '/icons/app-192.png', sizes: '192x192' }] },
+        ],
     }
 }

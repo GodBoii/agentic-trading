@@ -1,4 +1,23 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0C0B0A"><title>Offline · PolyCognition</title>
-<style>body{margin:0;background:#0c0b0a;color:#f6f2ec;font:16px/1.6 system-ui;min-height:100dvh;display:grid;place-items:center}main{max-width:30rem;padding:2rem}p{color:#b9b5b0}a{display:inline-block;padding:.75rem 1rem;background:#f6f2ec;color:#0c0b0a;border-radius:6px;text-decoration:none}a:focus-visible{outline:3px solid #6e9fd4;outline-offset:4px}</style></head>
-<body><main><p>PolyCognition</p><h1>You are offline</h1><p>Reconnect to see current balances and agent activity. This app cannot confirm the trading system's status while offline.</p><a href="/dashboard">Try again</a></main></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0C0B0A"><title>Offline · PolyCognition</title>
+<script>
+// Same key the app writes, so the offline screen matches the theme the user picked.
+try {
+  var choice = localStorage.getItem('polycognition.appearance');
+  var dark = choice === 'dark' || (choice !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]').content = dark ? '#0C0B0A' : '#F1EDE6';
+} catch (e) {}
+</script>
+<style>
+:root{--bg:#0c0b0a;--fg:#f6f2ec;--muted:rgb(246 242 236/.62);--solid:#f6f2ec;--solid-fg:#0c0b0a;--accent:#6e9fd4}
+[data-theme="light"]{--bg:#f1ede6;--fg:#1a1714;--muted:rgb(26 23 20/.64);--solid:#1f1b17;--solid-fg:#faf7f1;--accent:#2f6293}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,sans-serif;min-height:100dvh;display:grid;place-items:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:30rem;padding:2rem}
+h1{font-size:1.75rem;line-height:1.2;letter-spacing:-.02em;margin:.25rem 0 .75rem;font-weight:600}
+p{color:var(--muted);margin:0 0 1.5rem}
+.brand{font-size:.875rem;margin:0}
+a{display:inline-flex;align-items:center;min-height:44px;padding:0 1.125rem;background:var(--solid);color:var(--solid-fg);border-radius:10px;text-decoration:none;font-weight:500}
+a:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+</style></head>
+<body><main><p class="brand">PolyCognition</p><h1>You are offline</h1><p>Balances and agent activity need a connection. The app cannot confirm what the trading system is doing until you are back online.</p><a href="/dashboard">Try again</a></main></body></html>

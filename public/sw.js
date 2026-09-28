@@ -1,5 +1,5 @@
 /* Only the public offline screen is cached. Account pages and APIs always use the network. */
-const CACHE = 'polycognition-offline-v1'
+const CACHE = 'polycognition-offline-v2'
 self.addEventListener('install', (event) => {
     event.waitUntil(caches.open(CACHE).then((cache) => cache.add('/offline.html')))
 })
