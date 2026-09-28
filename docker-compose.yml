@@ -153,6 +153,10 @@ services:
     command: python -m pipeline.runtime.run_ai_trading_orchestrator
     environment:
       MARKET_DATA_GATEWAY_URL: http://market-data-gateway:8010
+      OPENROUTER_TEXT_MODEL_ID: deepseek/deepseek-v4.1-flash
+      OPENROUTER_MULTIMODAL_MODEL_ID: deepseek/deepseek-v4.1-flash
+      REGIME_MODEL_ID: deepseek/deepseek-v4.1-flash
+      COMMAND_CODE_CLI_MODEL_ID: deepseek/deepseek-v4.1-flash
       STOCK_AGENT_DEBUG: "1"
       DHAN_DAILY_VERIFICATION_TIME_IST: "08:30"
     depends_on:
