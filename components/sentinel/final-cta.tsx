@@ -1,6 +1,5 @@
 'use client'
 
-import { BorderBeam } from '@/components/motion/border-beam'
 import { Reveal } from '@/components/motion/reveal'
 import { PrimaryCta, SecondaryCta } from './cta'
 
@@ -17,14 +16,9 @@ import { PrimaryCta, SecondaryCta } from './cta'
  * had already followed. The section did not read the session at all, unlike the
  * nav and hero, which each read it separately.
  *
- * Motion. The copy uses texts reveal (recipe 18). The primary action carries a
- * breathing border beam, the single most emphasised control on the site and the
- * only animated edge on the page.
- *
- * `pulse` rather than the traveling beam: a glow orbiting a button reads as a
- * loading state, which is the wrong signal on an action nobody has pressed yet.
- * Breathing reads as "this is the thing to press". Strength is held at 0.55 so
- * it registers peripherally without becoming the loudest element in view.
+ * Motion. The copy uses texts reveal (recipe 18). The action is a plain solid
+ * button: the page already has one primary action per section, and a pulsing
+ * border only made it look like it was loading.
  */
 export default function FinalCta({ signedIn }: { signedIn: boolean }) {
     return (
@@ -45,16 +39,9 @@ export default function FinalCta({ signedIn }: { signedIn: boolean }) {
                             while the button inside stays shrink-wrapped, so the
                             beam drew a wide empty frame reaching off to the right
                             of the control it was meant to outline. */}
-                        <BorderBeam
-                            mode="pulse"
-                            tone="accent"
-                            strength={0.55}
-                            className="inline-flex self-start rounded-lg"
-                        >
-                            <PrimaryCta href={signedIn ? '/dashboard' : '/signup'}>
-                                {signedIn ? 'Open dashboard' : 'Get started'}
-                            </PrimaryCta>
-                        </BorderBeam>
+                        <PrimaryCta href={signedIn ? '/dashboard' : '/signup'}>
+                            {signedIn ? 'Open dashboard' : 'Get started'}
+                        </PrimaryCta>
                         {!signedIn && <SecondaryCta href="/login">Sign in</SecondaryCta>}
                     </div>
                 </Reveal>

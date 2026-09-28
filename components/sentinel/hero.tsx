@@ -41,10 +41,6 @@ export default function Hero({ signedIn }: { signedIn: boolean }) {
             {/* Static, subtle top glow. Deliberately not animated: a moving
                 gradient behind the headline competes with the copy reveal. */}
             <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-spotlight" />
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-grid bg-grid-fade opacity-60"
-            />
 
             {/*
              * `my-auto` on the child rather than `justify-center` on the parent.
@@ -57,12 +53,12 @@ export default function Hero({ signedIn }: { signedIn: boolean }) {
              */}
             <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
                 <Reveal immediate className="my-auto">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent">
+                    <p className="text-sm font-medium text-ink-tertiary">
                         AI trading agents for Indian markets
                     </p>
 
                     <h1
-                        className="mt-6 max-w-[52rem] font-display font-medium leading-[1.02] tracking-[-0.035em]"
+                        className="mt-5 max-w-[56rem] text-balance font-display font-medium leading-[1.02] tracking-[-0.035em]"
                         style={{ fontSize: 'clamp(2.5rem, 1.4rem + 4.4vw, 4.75rem)' }}
                     >
                         Read the reasoning before the money moves.

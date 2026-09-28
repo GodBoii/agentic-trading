@@ -46,7 +46,7 @@ export default function DecisionEngine() {
         >
             <div className="mx-auto max-w-6xl">
                 <Reveal margin="-15%" className="max-w-2xl">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent">How it works</p>
+                    <p className="text-sm font-medium text-ink-tertiary">How it works</p>
                     <h2 className="mt-5 max-w-3xl font-display text-[30px] font-medium leading-[1.08] tracking-[-0.03em] sm:text-[44px]">
                         From connection to execution in three steps.
                     </h2>
@@ -59,20 +59,13 @@ export default function DecisionEngine() {
                     {STEPS.map((step, index) => (
                         <li
                             key={step.num}
-                            className={`group relative border-t border-line-strong pt-6 ${lineClass(index)}`}
+                            className={`relative border-t border-line-strong pt-6 ${lineClass(index)}`}
                         >
-                            {/* The rule above each step draws itself in as the
-                                step arrives, so the row reads as a progression
-                                rather than three finished columns. */}
-                            <span
-                                aria-hidden
-                                className="absolute -top-px left-0 h-px w-0 bg-accent/70 transition-[width] duration-[500ms] ease-smooth group-hover:w-full"
-                            />
-                            <span className="font-mono text-[11px] tracking-[0.18em] text-accent">{step.num}</span>
+                            <span className="nums font-mono text-sm text-ink-tertiary">{step.num}</span>
                             <h3 className="mt-3 font-display text-[17px] font-medium tracking-[-0.02em]">
                                 {step.title}
                             </h3>
-                            <p className="mt-3 text-[13.5px] leading-relaxed text-ink-secondary">{step.description}</p>
+                            <p className="mt-3 text-[15px] leading-relaxed text-ink-secondary">{step.description}</p>
                         </li>
                     ))}
                 </ol>
