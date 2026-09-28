@@ -84,7 +84,9 @@ export default function PortfolioOverview() {
 
     const tabs: TabItem<Tab>[] = [
         { id: 'holdings', label: 'Holdings', count: holdings.length },
-        { id: 'positions', label: 'Positions', count: analytics.openPositions.length },
+        // Counts what the table lists. The table shows closed positions too,
+        // so counting only open ones made the tab and its rows disagree.
+        { id: 'positions', label: 'Positions', count: positions.length },
         { id: 'orders', label: 'Orders', count: orders.length },
     ]
 
@@ -92,7 +94,7 @@ export default function PortfolioOverview() {
         <SkeletonReveal loading={loading} skeleton={<PortfolioSkeleton />} label="Loading portfolio" flow>
             <section aria-label="Portfolio data" className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                    <p className="text-[11px] text-ink-tertiary">
+                    <p className="text-xs text-ink-tertiary">
                         {updatedAt ? (
                             <>
                                 Live broker data · updated{' '}
@@ -143,6 +145,7 @@ export default function PortfolioOverview() {
                             value={funds ? money(funds.availabelBalance) : '—'}
                             note={funds ? `${money(funds.withdrawableBalance)} withdrawable` : undefined}
                             emphasis="primary"
+                            className="col-span-2 lg:col-span-1"
                         />
                         <StatTile
                             label="Invested value"
@@ -183,14 +186,28 @@ export default function PortfolioOverview() {
                                     : undefined
                             }
                             note={funds ? `of ${compactMoney(funds.sodLimit)} limit` : undefined}
-                            className="col-span-2 lg:col-span-1"
                         />
                     </CellGrid>
 
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <CapitalPanel funds={funds} analytics={analytics} />
-                        <AllocationPanel holdings={holdings} analytics={analytics} />
-                    </div>
+                    {/* Each insight renders only when it has something to
+                        show. An empty account used to get two full section
+                        headings over one line of "nothing here" each. */}
+                    {(analytics.capitalSegments.length > 0 || analytics.allocationSegments.length > 0) && (
+                        <div
+                            className={
+                                analytics.capitalSegments.length > 0 && analytics.allocationSegments.length > 0
+                                    ? 'grid gap-4 lg:grid-cols-2'
+                                    : 'grid gap-4'
+                            }
+                        >
+                            {analytics.capitalSegments.length > 0 && (
+                                <CapitalPanel funds={funds} analytics={analytics} />
+                            )}
+                            {analytics.allocationSegments.length > 0 && (
+                                <AllocationPanel holdings={holdings} analytics={analytics} />
+                            )}
+                        </div>
+                    )}
 
                     {/* Rendered only when there is something to plot — an empty chart
                         frame communicates nothing and costs a screenful. */}
@@ -206,8 +223,9 @@ export default function PortfolioOverview() {
                             onChange={setTab}
                             ariaLabel="Portfolio records"
                             panelId={PANEL_ID}
+                            className="t-tabs-fill sm:!inline-flex sm:!w-auto"
                         />
-                        <p className="hidden text-[10px] text-ink-tertiary sm:block">
+                        <p className="hidden text-xs text-ink-tertiary sm:block">
                             {tab === 'holdings' && 'Settled and pending delivery quantities'}
                             {tab === 'positions' && 'Realized and open profit per position'}
                             {tab === 'orders' && "Today's order book with fill progress"}

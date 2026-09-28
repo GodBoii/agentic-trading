@@ -21,7 +21,7 @@ export function CapitalPanel({ funds, analytics }: Pick<PortfolioState, 'funds' 
                 // with a per-trade limit.
                 title="Fund deployment"
                 actions={
-                    <span className="nums font-mono text-[11px] text-ink-secondary">
+                    <span className="nums font-mono text-xs text-ink-secondary">
                         {percent(analytics.marginUse)} of limit
                     </span>
                 }
@@ -36,7 +36,7 @@ export function CapitalPanel({ funds, analytics }: Pick<PortfolioState, 'funds' 
             </PanelBody>
             {funds && (
                 <PanelFooter>
-                    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-[10px] text-ink-tertiary">
+                    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-tertiary">
                         <div className="flex gap-1.5">
                             <dt>Start-of-day limit</dt>
                             <dd className="nums font-mono text-ink-secondary">{money(funds.sodLimit)}</dd>
@@ -70,7 +70,7 @@ export function AllocationPanel({ holdings, analytics }: Pick<PortfolioState, 'h
                 title="Concentration by invested value"
                 description="Weights are calculated at average cost, not live market value."
                 actions={
-                    <span className="nums font-mono text-[11px] text-ink-secondary">
+                    <span className="nums font-mono text-xs text-ink-secondary">
                         {count(holdings.length)} {holdings.length === 1 ? 'name' : 'names'}
                     </span>
                 }
@@ -85,7 +85,7 @@ export function AllocationPanel({ holdings, analytics }: Pick<PortfolioState, 'h
             </PanelBody>
             {largest && total > 0 && (
                 <PanelFooter>
-                    <p className="text-[10px] text-ink-tertiary">
+                    <p className="text-xs text-ink-tertiary">
                         Largest position{' '}
                         <span className="text-ink-secondary">{largest.label}</span> at{' '}
                         <span className="nums font-mono text-ink-secondary">
@@ -109,7 +109,7 @@ export function PositionPnlPanel({ analytics }: Pick<PortfolioState, 'analytics'
                 label="Positions"
                 title="Profit and loss by position"
                 actions={
-                    <span className="nums font-mono text-[11px] text-ink-secondary">
+                    <span className="nums font-mono text-xs text-ink-secondary">
                         {signedMoney(realized + unrealized)}
                     </span>
                 }
@@ -118,7 +118,7 @@ export function PositionPnlPanel({ analytics }: Pick<PortfolioState, 'analytics'
                 <DivergingBars items={positionPnl} formatValue={signedMoney} />
             </PanelBody>
             <PanelFooter>
-                <dl className="flex flex-wrap gap-x-6 gap-y-1 text-[10px] text-ink-tertiary">
+                <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-tertiary">
                     <div className="flex gap-1.5">
                         <dt>Realized</dt>
                         <dd className="nums font-mono text-ink-secondary">{signedMoney(realized)}</dd>
@@ -145,7 +145,7 @@ export function OrderFlowPanel({ orders, analytics }: Pick<PortfolioState, 'orde
                 label="Order flow"
                 title="When today's orders were placed"
                 actions={
-                    <span className="nums font-mono text-[11px] text-ink-secondary">
+                    <span className="nums font-mono text-xs text-ink-secondary">
                         {percent(analytics.fillRate, 0)} filled
                     </span>
                 }
@@ -158,7 +158,7 @@ export function OrderFlowPanel({ orders, analytics }: Pick<PortfolioState, 'orde
                     <LegendCount tone="positive" label="Filled" value={analytics.filledOrders.length} />
                     <LegendCount tone="warning" label="Working" value={analytics.workingOrders.length} />
                     <LegendCount tone="negative" label="Rejected" value={analytics.failedOrders.length} />
-                    <span className="ml-auto text-[10px] text-ink-tertiary">
+                    <span className="ml-auto text-xs text-ink-tertiary">
                         {count(orders.length)} orders · {compactMoney(analytics.exposure)} exposure
                     </span>
                 </div>
@@ -177,7 +177,7 @@ function LegendCount({
     value: number
 }) {
     return (
-        <span className="flex items-center gap-2 text-[10px] text-ink-tertiary">
+        <span className="flex items-center gap-2 text-xs text-ink-tertiary">
             <StatusDot tone={tone} />
             {label}
             <span className="nums font-mono text-ink-secondary">{value}</span>

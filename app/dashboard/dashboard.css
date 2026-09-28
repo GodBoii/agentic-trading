@@ -1,30 +1,38 @@
-/* Data sections share the page canvas. Frames are reserved for floating controls. */
+/* ── Surfaces ──
+   Data is grouped on one quiet surface per section: a single step up from the
+   canvas, a hairline edge, no drop shadow. The previous shell stripped every
+   frame and separated sections with full-width rules, which on a phone put a
+   line every 150–200px and left nothing visibly grouped. */
 .product-shell {
-    --dash-text-secondary: rgb(var(--ink-rgb) / 0.74);
-    --dash-text-muted: rgb(var(--ink-rgb) / 0.60);
+    --dash-text-secondary: rgb(var(--ink-rgb) / 0.72);
+    --dash-text-muted: rgb(var(--ink-rgb) / 0.52);
 }
 .product-shell .panel {
-    border: 0;
-    border-top: 1px solid var(--dash-border-strong);
-    border-radius: 0;
-    background: transparent;
+    border-radius: 16px;
     box-shadow: none;
 }
 .product-shell .panel::before { display: none; }
-.product-shell .panel-header { padding: 1.25rem 0 0.875rem; border-bottom: 0; }
-.product-shell .panel-body { padding: 0.75rem 0 1.25rem; }
-.product-shell .panel-footer { padding: 0.75rem 0; background: transparent; }
-.product-shell .cell-grid {
-    border: 0;
-    border-block: 1px solid var(--dash-border-strong);
-    border-radius: 0;
-    background: transparent;
-    gap: 0;
+.product-shell .panel-header { padding: 1rem 1.125rem 0.5rem; border-bottom: 0; }
+.product-shell .panel-body { padding: 0.5rem 1.125rem 1.125rem; }
+.product-shell .panel-footer { padding: 0.75rem 1.125rem; background: transparent; }
+.product-shell .cell-grid { border-radius: 16px; }
+.product-shell .section-title { font-size: clamp(1.625rem, 1.3rem + 1.4vw, 2.125rem); }
+.product-shell .section-lede { max-width: 44rem; font-size: 0.875rem; }
+/* Labels are plain sentence case in the body face. The uppercase mono
+   eyebrow on every figure was the loudest template tell on the page. */
+.product-shell .dash-label {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    text-transform: none;
 }
-.product-shell .cell-grid > * { background: transparent; }
-.product-shell .section-title { font-size: clamp(1.75rem, 3vw, 2.25rem); }
-.product-shell .section-lede { max-width: 44rem; }
-.product-shell .dash-label { text-transform: none; letter-spacing: 0.025em; }
+@media (max-width: 639px) {
+    .product-shell .section-head { margin-bottom: 1rem; }
+    .product-shell .section-lede { display: none; }
+    .product-shell .panel-header { padding: 0.875rem 1rem 0.375rem; }
+    .product-shell .panel-body { padding: 0.375rem 1rem 1rem; }
+    .product-shell .panel-footer { padding: 0.75rem 1rem; }
+}
 .product-shell .agent-markdown { font-size: 0.875rem; line-height: 1.75; }
 .product-shell .portfolio-empty { padding-block: 1.5rem; }
 .product-shell .portfolio-empty [aria-hidden] { display: none; }
@@ -41,7 +49,6 @@
 .run-row { width: 100%; text-align: left; padding: 1rem 0.875rem; border-bottom: 1px solid var(--dash-border); border-inline-start: 3px solid transparent; transition: background var(--duration-quick) var(--ease-smooth-out); }
 .run-row[aria-pressed="true"] { background: var(--fill-soft); border-inline-start-color: var(--accent); }
 .run-detail { min-width: 0; border-inline-start: 1px solid var(--dash-border); padding: 1.25rem 0 1.25rem 1.75rem; }
-.run-detail > .space-y-4 > .panel:first-of-type { border-top: 0; }
 .run-back { display: none; min-height: 44px; color: var(--accent); margin-bottom: 0.75rem; }
 .run-row:focus-visible, .run-filter:focus-visible, .run-back:focus-visible, .run-search:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .pwa-message { position: absolute; top: 100%; inset-inline-end: 1rem; width: min(24rem, calc(100vw - 2rem)); background: var(--dash-pop); border: 1px solid var(--dash-border-strong); border-radius: 8px; padding: 1rem; font-size: 0.8125rem; box-shadow: var(--shadow-pop); }
@@ -65,7 +72,7 @@
 @media (max-width: 639px) {
     .desktop-records { display: none; }
     .mobile-records { display: block; }
-    .mobile-records > li { padding-block: 1.25rem; border-bottom: 1px solid var(--dash-border); }
+    .mobile-records > li { padding: 1rem; border-top: 1px solid var(--dash-border); }
     .mobile-records dd > .ml-auto { margin-left: 0; }
     .mobile-records small { display: block; margin-top: 0.25rem; font-size: 0.75rem; }
 }

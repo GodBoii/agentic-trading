@@ -71,12 +71,12 @@ export function PanelHeader({
     return (
         <header className={cn('panel-header', className)}>
             <div className="min-w-0">
-                {label && <p className="dash-label mb-1">{label}</p>}
-                <h3 id={titleId} className="truncate text-[13px] font-medium tracking-[-0.02em] text-ink-primary">
+                {label && <p className="dash-label mb-0.5">{label}</p>}
+                <h3 id={titleId} className="truncate text-[15px] font-medium tracking-[-0.015em] text-ink-primary">
                     {title}
                 </h3>
                 {description && (
-                    <p className="mt-1 max-w-prose text-[11px] leading-relaxed text-ink-tertiary">{description}</p>
+                    <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink-tertiary">{description}</p>
                 )}
             </div>
             {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}

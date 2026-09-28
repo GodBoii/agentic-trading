@@ -48,25 +48,31 @@ export function StatTile({
     meter?: { value: number; tone?: 'accent' | 'positive' | 'negative' | 'warning' }
     className?: string
 }) {
+    // A missing figure is shown as a quiet dash at body size. At display size
+    // a column of large dashes looked like a broken page rather than an empty
+    // account.
+    const empty = value === '—'
+
     return (
         <div className={cn('p-4 sm:p-5', className)}>
             <div className="flex items-start justify-between gap-3">
                 <p className="dash-label">{label}</p>
                 {trailing && (
-                    <span className="nums flex-shrink-0 font-mono text-[10px] text-ink-secondary">{trailing}</span>
+                    <span className="nums flex-shrink-0 font-mono text-xs text-ink-secondary">{trailing}</span>
                 )}
             </div>
             <p
                 className={cn(
-                    'dash-metric nums mt-3 truncate',
-                    emphasis === 'primary' ? 'text-[22px]' : 'text-[18px]',
-                    DIRECTION_TEXT[direction],
+                    'dash-metric nums mt-2 truncate',
+                    empty
+                        ? 'text-base text-ink-tertiary'
+                        : cn(emphasis === 'primary' ? 'text-[26px] sm:text-[28px]' : 'text-xl', DIRECTION_TEXT[direction]),
                 )}
             >
-                {typeof value === 'string' ? <NumberFlow value={value} /> : value}
+                {typeof value === 'string' && !empty ? <NumberFlow value={value} /> : value}
             </p>
             {meter && <Meter className="mt-3" value={meter.value} tone={meter.tone} />}
-            {note && <p className="mt-1.5 truncate text-[10px] text-ink-tertiary">{note}</p>}
+            {note && <p className="mt-1 truncate text-xs text-ink-tertiary">{note}</p>}
         </div>
     )
 }
