@@ -733,11 +733,9 @@ body {
   border-radius: 999px;
   border: 1px solid var(--dash-border);
   background: var(--fill-subtle);
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--dash-text-secondary);
   white-space: nowrap;
 }

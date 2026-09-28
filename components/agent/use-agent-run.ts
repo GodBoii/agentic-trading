@@ -7,6 +7,7 @@ import type { AgentRunStatus, StreamState } from '@/components/ai-trading/types'
 
 const POLL_INTERVAL_MS = 8_000
 const RECONNECT_DELAY_MS = 2_500
+const RECONNECT_MAX_DELAY_MS = 30_000
 
 /**
  * Owns the live agent run: status polling plus the event WebSocket.
@@ -93,11 +94,24 @@ export function useAgentRun(active: boolean) {
         let socket: WebSocket | null = null
         let closedByCleanup = false
 
+        // Backs off from 2.5s to 30s. A fixed 2.5s retry hammered the ticket
+        // endpoint for as long as the backend was down.
+        let attempts = 0
         const reconnect = () => {
             if (closedByCleanup) return
             setStream('reconnecting')
-            reconnectTimer.current = setTimeout(() => void connect(), RECONNECT_DELAY_MS)
+            const delay = Math.min(RECONNECT_MAX_DELAY_MS, RECONNECT_DELAY_MS * 2 ** attempts)
+            attempts += 1
+            reconnectTimer.current = setTimeout(() => void connect(), delay)
         }
+        // Coming back online should not wait out a long backoff.
+        const onOnline = () => {
+            if (closedByCleanup || (socket && socket.readyState <= WebSocket.OPEN)) return
+            if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+            attempts = 0
+            void connect()
+        }
+        window.addEventListener('online', onOnline)
 
         const connect = async () => {
             const baseUrl = websocketUrl()
@@ -115,7 +129,10 @@ export function useAgentRun(active: boolean) {
                     throw new Error(`WebSocket ticket request failed (${ticketResponse.status})`)
                 }
                 const { ticket } = await ticketResponse.json()
-                if (!ticket || closedByCleanup) return
+                if (closedByCleanup) return
+                // Previously a response without a ticket returned here and
+                // left the stream on "connecting" with no retry scheduled.
+                if (!ticket) throw new Error('WebSocket ticket response had no ticket')
                 const url = new URL(baseUrl)
                 url.searchParams.set('ticket', String(ticket))
                 socket = new WebSocket(url.toString())
@@ -126,7 +143,10 @@ export function useAgentRun(active: boolean) {
                 return
             }
 
-            socket.onopen = () => setStream('live')
+            socket.onopen = () => {
+                attempts = 0
+                setStream('live')
+            }
             socket.onerror = () => setStream('fallback')
             socket.onclose = () => {
                 reconnect()
@@ -152,6 +172,7 @@ export function useAgentRun(active: boolean) {
         void connect()
         return () => {
             closedByCleanup = true
+            window.removeEventListener('online', onOnline)
             if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
             socket?.close()
         }

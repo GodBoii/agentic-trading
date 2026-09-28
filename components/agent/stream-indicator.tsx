@@ -2,7 +2,7 @@
 
 import { StatusChip, type Tone } from '@/components/ui/badge'
 import { Tooltip } from '@/components/motion/tooltip'
-import { ThinkingOrb, type OrbState } from '@/components/motion/thinking-orb'
+import type { OrbState } from '@/components/motion/thinking-orb'
 import type { StreamState } from '@/components/ai-trading/types'
 
 /**
@@ -65,18 +65,13 @@ const STREAM_META: Record<
 export function StreamIndicator({ state }: { state: StreamState }) {
     const meta = STREAM_META[state]
 
+    // One pulsing dot for every in-progress state. The dotted orb squeezed
+    // into a 10px chip read as a loading glitch, not as "retrying".
     return (
         <Tooltip label={meta.hint} align="end">
-            {meta.orb ? (
-                <span className="product-chip">
-                    <ThinkingOrb state={meta.orb} size={20} className="-my-0.5 -ml-0.5 text-warning" />
-                    {meta.label}
-                </span>
-            ) : (
-                <StatusChip tone={meta.tone} pulse={meta.pulse}>
-                    {meta.label}
-                </StatusChip>
-            )}
+            <StatusChip tone={meta.tone} pulse={meta.pulse || Boolean(meta.orb)}>
+                {meta.label}
+            </StatusChip>
         </Tooltip>
     )
 }
