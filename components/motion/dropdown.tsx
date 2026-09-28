@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { motionMs } from './tokens'
+
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 export type DropdownOrigin =
     | 'top-left'
@@ -74,10 +76,28 @@ export function Dropdown({
         }
     }, [open, present])
 
+    // Keep the surface inside the viewport. An anchored panel wider than the
+    // space beside its trigger used to hang off the left edge of a phone.
+    // `translate` is independent of `transform`, so the open/close scale on
+    // `.t-dropdown` keeps working.
+    const surface = useRef<HTMLDivElement | null>(null)
+    useIsomorphicLayoutEffect(() => {
+        const node = surface.current
+        if (!node || !present) return
+        node.style.translate = ''
+        const rect = node.getBoundingClientRect()
+        const gutter = 8
+        const overflowLeft = gutter - rect.left
+        const overflowRight = rect.right - (window.innerWidth - gutter)
+        const shift = overflowLeft > 0 ? overflowLeft : overflowRight > 0 ? -overflowRight : 0
+        if (shift) node.style.translate = `${Math.round(shift)}px 0`
+    }, [present])
+
     if (!present) return null
 
     return (
         <div
+            ref={surface}
             id={id}
             role={role === 'none' ? undefined : role}
             aria-label={ariaLabel}

@@ -55,7 +55,7 @@ export function ThemeMenu({ className }: { className?: string }) {
                 aria-controls={open ? MENU_ID : undefined}
                 aria-label="Appearance"
                 className={cn(
-                    't-press t-tap grid h-8 w-8 place-items-center rounded-lg border text-ink-secondary',
+                    't-press t-tap grid h-10 w-10 place-items-center rounded-lg border text-ink-secondary',
                     'transition-[color,background-color,border-color] duration-fast ease-smooth',
                     open
                         ? 'border-line-strong bg-surface-strong text-ink-primary'
@@ -85,7 +85,7 @@ export function ThemeMenu({ className }: { className?: string }) {
                 className="pop-surface absolute right-0 top-[calc(100%+8px)] z-[var(--z-overlay)] w-[228px] p-2"
             >
                 <div ref={surface} tabIndex={-1} className="outline-none">
-                    <p id="appearance-menu-label" className="mb-2 px-1.5 text-[9px] uppercase tracking-[0.14em] text-ink-tertiary">
+                    <p id="appearance-menu-label" className="mb-2 px-1.5 text-xs text-ink-tertiary">
                         Appearance
                     </p>
                     {/*

@@ -30,7 +30,7 @@ export function PrimaryCta({
         <Link
             href={href}
             className={cn(
-                'group t-press inline-flex items-center justify-center gap-1.5 rounded-lg bg-solid px-6 py-3 text-sm font-medium text-solid-fg',
+                'group t-press inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-solid px-6 py-3 text-sm font-medium text-solid-fg',
                 'transition-[background-color,box-shadow] duration-fast ease-smooth',
                 'hover:bg-solid-hover hover:shadow-solid',
                 className,
@@ -55,7 +55,7 @@ export function SecondaryCta({
         <Link
             href={href}
             className={cn(
-                'group t-press inline-flex items-center justify-center gap-1.5 rounded-lg border border-line-strong px-6 py-3 text-sm font-medium text-ink-secondary',
+                'group t-press inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-line-strong px-6 py-3 text-sm font-medium text-ink-secondary',
                 'transition-[color,border-color,background-color] duration-fast ease-smooth',
                 'hover:border-line-strong hover:bg-surface-hover hover:text-ink-primary',
                 className,
