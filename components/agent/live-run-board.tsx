@@ -8,7 +8,8 @@ import { agentDisplayName, coalesceAgentEvents, eventTitle } from '@/components/
 import { formatTime } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { AgentWorkspace } from './agent-workspace'
-import { StreamIndicator } from './stream-indicator'
+import { StreamIndicator, streamHint } from './stream-indicator'
+import { ArrowLeft, ChevronRight } from '@/components/ui/icons'
 import type { AgentSlot } from './agent-roster'
 
 type Filter = 'all' | 'running' | 'failed' | 'finished'
@@ -38,24 +39,36 @@ export function LiveRunBoard({ runs, stream }: { runs: Record<string, LiveRun>; 
     const selected = rows.find((row) => row.key === selectedKey)
     const runningCount = rows.filter((row) => row.state === 'running').length
 
+    const degraded = stream !== 'live' && stream !== 'connecting' && stream !== 'paused'
+
     return (
         <section aria-label="Live agent runs" className="live-runs">
             <header className="run-board-heading">
-                <div><h2 className="text-xl font-medium">Agent runs</h2>
-                    <p className="mt-1 text-sm text-ink-secondary">{runningCount} active · {rows.length} observed this session</p></div>
+                <div className="min-w-0">
+                    <h2 className="text-lg font-medium tracking-[-0.015em]">Agent runs</h2>
+                    <p className="mt-0.5 text-sm text-ink-secondary">
+                        <span className="nums">{runningCount}</span> active · <span className="nums">{rows.length}</span> seen this session
+                    </p>
+                </div>
                 <StreamIndicator state={stream} />
             </header>
-            {stream !== 'live' && <p className="mb-4 text-sm text-warning" role="status">Live updates are {stream === 'connecting' ? 'connecting' : 'unavailable'}. Displayed activity may be out of date.</p>}
+            {/* Same wording as the chip's tooltip, so the two never disagree
+                about what state the stream is in. */}
+            {degraded && (
+                <p className="mb-4 text-sm text-ink-secondary" role="status">
+                    {streamHint(stream)} Activity below may be behind.
+                </p>
+            )}
             <div className="run-filters">
-                <div className="flex flex-wrap gap-1" aria-label="Filter runs">
+                <div className="run-filter-rail no-scrollbar" role="group" aria-label="Filter runs">
                     {(['all', 'running', 'failed', 'finished'] satisfies Filter[]).map((value) => (
                         <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="run-filter">
                             {value === 'all' ? 'All' : value === 'running' ? 'Active' : value === 'failed' ? 'Failed' : 'Finished'}
-                            <span className="ml-2 nums">{value === 'all' ? rows.length : rows.filter((row) => row.state === value).length}</span>
+                            <span className="run-filter-count nums">{value === 'all' ? rows.length : rows.filter((row) => row.state === value).length}</span>
                         </button>
                     ))}
                 </div>
-                <input type="search" aria-label="Search runs by stock or request" placeholder="Find a stock or request…" value={query} onChange={(event) => setQuery(event.target.value)} className="run-search" />
+                <input type="search" aria-label="Search runs by stock or request" placeholder="Search stock or request" value={query} onChange={(event) => setQuery(event.target.value)} className="run-search" />
             </div>
             <div className="run-split" data-detail={Boolean(selected)}>
                 <aside className="run-list" aria-label="Choose an agent run">
@@ -69,13 +82,13 @@ export function LiveRunBoard({ runs, stream }: { runs: Record<string, LiveRun>; 
                                 <span className="mt-2 flex justify-between gap-3 text-xs text-ink-tertiary"><span className="truncate">{row.run.id}</span><time className="shrink-0 nums">{formatTime(row.run.updatedAt)}</time></span>
                             </button>
                         </li>
-                    })}</ul> : <div className="py-10 px-3"><h3 className="font-medium">{rows.length ? 'No matching runs' : 'Waiting for agent activity'}</h3><p className="mt-2 text-sm text-ink-secondary">{rows.length ? 'Try another stock or filter.' : 'New candidates appear here automatically when the scanner starts a run.'}</p></div>}
-                    <Link href="/dashboard/trades" className="inline-block px-3 py-4 text-sm text-accent">View archived runs →</Link>
+                    })}</ul> : <div className="px-4 py-10"><h3 className="text-[15px] font-medium">{rows.length ? 'No matching runs' : 'No runs yet this session'}</h3><p className="mt-1.5 max-w-sm text-sm text-ink-secondary">{rows.length ? 'Try another stock or filter.' : 'When the scanner picks a stock, its agent shows up here and streams what it reads and decides.'}</p></div>}
+                    <Link href="/dashboard/trades" className="run-archive-link t-press">Archived runs<ChevronRight size={14} /></Link>
                 </aside>
                 <div className="run-detail">
                     {selected ? <>
-                        <button ref={backButton} type="button" className="run-back" onClick={() => { setSelectedKey(null); requestAnimationFrame(() => selectionButton.current?.focus()) }}>← All runs · {runningCount} active</button>
-                        <p className="mb-3 break-all text-xs text-ink-tertiary">Request {selected.run.id}</p>
+                        <button ref={backButton} type="button" className="run-back" onClick={() => { setSelectedKey(null); requestAnimationFrame(() => selectionButton.current?.focus()) }}><ArrowLeft size={16} />All runs</button>
+                        <p className="mb-3 break-all font-mono text-xs text-ink-tertiary">Request {selected.run.id}</p>
                         <AgentWorkspace key={selected.key} slot={selected.slot} />
                     </> : <div className="py-12 text-center"><h3 className="font-medium">{rows.length ? 'Select a run to follow its activity' : 'Ready for the next candidate'}</h3><p className="mx-auto mt-2 max-w-sm text-sm text-ink-secondary">Decisions, tool calls and charts stay together for each agent.</p></div>}
                 </div>

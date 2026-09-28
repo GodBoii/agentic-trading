@@ -311,7 +311,7 @@ export function CapitalControl() {
                                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <span
                                             id="capital-title"
-                                            className="text-[12.5px] font-medium tracking-[-0.015em] text-ink-primary"
+                                            className="text-[15px] font-medium tracking-[-0.015em] text-ink-primary"
                                         >
                                             Capital per trade
                                         </span>
@@ -331,12 +331,12 @@ export function CapitalControl() {
                                             {!configured ? 'Not saved' : savedMode === 'auto' ? 'Auto' : 'Fixed'}
                                         </Badge>
                                     </span>
-                                    <span className="mt-1 block text-[11px] leading-relaxed text-ink-tertiary">
+                                    <span className="mt-1 block text-[13px] leading-relaxed text-ink-secondary">
                                         {summary}
                                     </span>
                                 </span>
-                                <span className="flex flex-shrink-0 items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-ink-tertiary">
-                                    <span className="hidden sm:inline">{expanded ? 'Close' : 'Adjust'}</span>
+                                <span className="flex flex-shrink-0 items-center gap-1.5 text-[13px] text-ink-tertiary">
+                                    <span className="hidden min-[400px]:inline">{expanded ? 'Close' : 'Adjust'}</span>
                                     <AccordionChevron size={14} />
                                 </span>
                             </>
@@ -347,8 +347,9 @@ export function CapitalControl() {
                                 <p id="sizing-mode-label" className="dash-label">
                                     Sizing mode
                                 </p>
-                                <div className="mt-2">
+                                <div className="mt-2 max-w-sm">
                                     <SegmentedChoice
+                                        className="t-tabs-fill"
                                         items={MODES}
                                         value={mode}
                                         onChange={changeMode}
@@ -381,7 +382,7 @@ export function CapitalControl() {
                                     ariaLabel="Fixed amount"
                                     panelClassName="px-2 py-1.5"
                                 >
-                                    <div className={`${amount.wrapClass} max-w-[260px]`}>
+                                    <div className={`${amount.wrapClass} w-full max-w-sm`}>
                                         <label htmlFor="trade-amount" className="dash-label">
                                             Margin per trade
                                         </label>
@@ -469,13 +470,12 @@ export function CapitalControl() {
                                 </div>
                             </dl>
 
-                            <p id="trade-amount-hint" className="max-w-prose text-[11px] leading-relaxed text-ink-tertiary">
+                            <p id="trade-amount-hint" className="max-w-prose text-[13px] leading-relaxed text-ink-tertiary">
                                 {mode === 'auto'
-                                    ? 'Auto splits account capital across 3 trades below ₹2,000, 5 through ₹5,000, or 10 above ₹5,000. Available margin is checked again before each order.'
-                                    : 'Fixed caps the broker margin any single trade may use. The concurrent figure is what your current balance supports.'}{' '}
-                                Dhan decides the live margin either way, exposure is capped at{' '}
-                                {status?.max_leverage || 5}x, and stop-risk sizing can reduce the quantity further.
-                                Saving does not start a scan.
+                                    ? 'Auto splits account capital into 3 trades under ₹2,000, 5 up to ₹5,000, and 10 above that. Margin is checked again before each order.'
+                                    : 'Fixed caps the margin one trade may use. Concurrent positions is what your balance covers at that cap.'}{' '}
+                                Dhan sets the live margin, exposure stays under {status?.max_leverage || 5}x, and stop
+                                distance can cut the quantity further. Saving does not start a scan.
                             </p>
 
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -492,10 +492,10 @@ export function CapitalControl() {
                                     it, and it clears on the next edit. */}
                                 {saved && <SuccessCheck size={16} className="text-positive" />}
                                 {pending && !saving && !saved && (
-                                    <span className="text-[10px] text-ink-tertiary">Not saved yet</span>
+                                    <span className="text-xs text-ink-tertiary">Not saved yet</span>
                                 )}
                                 {status?.amount_updated_at_utc && !pending && (
-                                    <span className="text-[10px] text-ink-tertiary">
+                                    <span className="text-xs text-ink-tertiary">
                                         Last changed{' '}
                                         <span className="font-mono">
                                             {formatDateTime(status.amount_updated_at_utc)}
@@ -509,7 +509,7 @@ export function CapitalControl() {
                                    inside the Fixed branch, which meant an Auto
                                    save that failed said nothing at all. */}
                                 {mode === 'auto' && error && (
-                                    <span role="alert" className="text-[11px] text-negative">
+                                    <span role="alert" className="text-xs text-negative">
                                         {error}
                                     </span>
                                 )}

@@ -3011,23 +3011,22 @@ html:not([data-theme-choice]) .theme-glyph[data-for="system"],
    nested a bordered card inside a padded well inside a panel in order to show
    three figures. */
 .figure-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem 1.5rem;
+}
+@media (min-width: 640px) {
+  .figure-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .figure-row > div { min-width: 0; }
 .figure-row dt {
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
   color: var(--dash-text-muted);
-  white-space: nowrap;
 }
 .figure-row dd {
-  margin-top: 0.1875rem;
+  margin-top: 0.125rem;
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   font-variant-numeric: tabular-nums slashed-zero;
   color: var(--dash-text);
 }
