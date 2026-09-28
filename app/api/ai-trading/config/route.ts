@@ -61,9 +61,18 @@ function orderPlacementResponse(state: OrderPlacementState | null) {
   }
 }
 
+/**
+ * `enabled` is the agent on/off switch; `configured` means a sizing choice has
+ * been saved. They used to be the same field, so switching the agent off would
+ * also have reported the capital setting as never saved.
+ */
 function responseFor(entry: TradingConfiguration | null, orderPlacement: OrderPlacementState | null) {
+  return { ...sizingResponseFor(entry, orderPlacement), enabled: Boolean(entry?.enabled) }
+}
+
+function sizingResponseFor(entry: TradingConfiguration | null, orderPlacement: OrderPlacementState | null) {
   const sizingPolicy = { trade_slot_policy: 'account_capital_tiers', max_leverage: maxLeverage }
-  const configured = Boolean(entry?.enabled)
+  const configured = Boolean(entry?.enabled || entry?.amountUpdatedAt)
   const mode = entry?.tradeMode || 'auto'
   if (mode === 'auto') return {
     configured,
@@ -135,11 +144,17 @@ export async function POST(request: NextRequest) {
 
   const now = new Date().toISOString()
   try {
+    // The first save turns the agent on, as it always has. After that, saving
+    // a new amount keeps the on/off switch where the user left it: changing the
+    // size of trades is not a request to start trading again.
+    const existing = await convexAdminQuery<TradingConfiguration | null>('tradingConfigurations:get', {
+      supabaseUserId: user.id,
+    })
     const entry = await convexAdminMutation<TradingConfiguration>(
       'tradingConfigurations:upsert',
       {
         supabaseUserId: user.id,
-        enabled: true,
+        enabled: existing?.amountUpdatedAt ? Boolean(existing.enabled) : true,
         tradeMode: automatic ? 'auto' : 'manual',
         ...(automatic ? { clearTradeAmount: true } : { tradeAmount: amount }),
         amountUpdatedAt: now,
