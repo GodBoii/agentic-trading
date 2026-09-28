@@ -42,7 +42,7 @@ export default function Nav({ signedIn }: { signedIn: boolean }) {
                     <BrandMark className="h-7 w-7 flex-shrink-0" priority />
                     {/* The mark alone identifies the product on the narrowest
                         phones; the space goes to the call to action. */}
-                    <span className="hidden truncate font-display text-[15px] font-medium tracking-[-0.02em] min-[400px]:inline">
+                    <span className="hidden truncate font-display text-[15px] font-medium tracking-[-0.02em] min-[360px]:inline">
                         PolyCognition
                     </span>
                 </Link>
