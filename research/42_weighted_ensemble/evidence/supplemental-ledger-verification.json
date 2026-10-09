@@ -1,0 +1,47 @@
+{
+  "total_rows": 12279,
+  "columns": 34,
+  "original_evidence_unchanged": true,
+  "checks": [
+    {
+      "file": "2026-08-24-receipt_proxy.parquet",
+      "rows": 2887,
+      "pass": true
+    },
+    {
+      "file": "2026-08-24-recent_trade.parquet",
+      "rows": 0,
+      "pass": true
+    },
+    {
+      "file": "2026-08-25-receipt_proxy.parquet",
+      "rows": 2980,
+      "pass": true
+    },
+    {
+      "file": "2026-08-25-recent_trade.parquet",
+      "rows": 31,
+      "pass": true
+    },
+    {
+      "file": "2026-08-31-receipt_proxy.parquet",
+      "rows": 3178,
+      "pass": true
+    },
+    {
+      "file": "2026-08-31-recent_trade.parquet",
+      "rows": 0,
+      "pass": true
+    },
+    {
+      "file": "2026-09-01-receipt_proxy.parquet",
+      "rows": 3203,
+      "pass": true
+    },
+    {
+      "file": "2026-09-01-recent_trade.parquet",
+      "rows": 0,
+      "pass": true
+    }
+  ]
+}

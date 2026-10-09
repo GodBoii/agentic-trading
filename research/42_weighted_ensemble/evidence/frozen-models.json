@@ -1,0 +1,247 @@
+{
+  "receipt_proxy": {
+    "base_fit_dates": [
+      "2026-08-19",
+      "2026-08-20"
+    ],
+    "base_rows": 7343,
+    "evaluation_used_for_normalization_or_weights": false,
+    "feature_dependency_sha256": "a035a4b77b977e0d59dc62cd5f3bee9e3a845cb8ec6aeeeb37b34db04183c399",
+    "inputs": [
+      {
+        "date": "2026-08-19",
+        "input_sha256": "1aea1eb6642ad074a9d83f30d3e2ed5584c6bfb65ff860678f9829baff2297b0",
+        "rejected_future_intervals": 88,
+        "samples": 3393,
+        "x_sha256": "f6bf06a5689047de74a1c4039bfaaf52e359593b4d480129600defc732c69dbf",
+        "y_sha256": "57c722dade210c374b07d61172675b9886dcc54440a5e6f4dff3490ddd5ba4fe"
+      },
+      {
+        "date": "2026-08-20",
+        "input_sha256": "9a50945b67702024587c5c9ee5a1ed7e3f39a61b6bb18336c7bcfc9e663b82a7",
+        "rejected_future_intervals": 98,
+        "samples": 3950,
+        "x_sha256": "22dec7575e5f4e7526baa6eef08d3ff75b6c3f53458f4e3c40e9356c908b7f2b",
+        "y_sha256": "edff2d37a348346564e1f7fa77938cd6021e63c0bd1a2874ec3b243ee50008d0"
+      },
+      {
+        "date": "2026-08-21",
+        "input_sha256": "d7662f3c77d50365462aaf4ef76fd6d76ab574ea45a4fdffc55dcc1747e15ad2",
+        "rejected_future_intervals": 47,
+        "samples": 3940,
+        "x_sha256": "8a490299ea0066f3a2dcf9cb5e2d70f59d4671aca78495bc3c72cf6386082921",
+        "y_sha256": "c9eb80549953316c78310131ced72a256ec994a005fd650f7bab8dd9499c7867"
+      }
+    ],
+    "model": {
+      "constant_net": [
+        -12.365641720926964,
+        -12.12069839623215
+      ],
+      "joint": {
+        "coefficients": [
+          [
+            -12.365641720926936,
+            -12.12069839623219
+          ],
+          [
+            0.6953037907632046,
+            -0.7149155058240144
+          ],
+          [
+            -0.1430423592747047,
+            0.1523630250246622
+          ],
+          [
+            -0.11334435339690235,
+            0.09959733932238297
+          ],
+          [
+            0.3546390998015468,
+            -0.28193474939298474
+          ],
+          [
+            -0.695530615151854,
+            -0.7831786902553154
+          ]
+        ],
+        "columns": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "mean": [
+          -0.03277932930355764,
+          -0.03219001136268881,
+          -1.9928556560145108,
+          0.03087033392671114,
+          1.8814560647909018
+        ],
+        "scale": [
+          2.986104204870523,
+          5.982612694340906,
+          39.726734275271895,
+          0.4378012779444588,
+          1.1843507459968
+        ]
+      },
+      "mode": "receipt_proxy",
+      "specialists": [
+        {
+          "coefficients": [
+            [
+              -12.365641720926936,
+              -12.12069839623219
+            ],
+            [
+              0.6927533231619076,
+              -0.66537082446779
+            ],
+            [
+              -0.19577883479747135,
+              0.17589204843890732
+            ]
+          ],
+          "columns": [
+            0,
+            1
+          ],
+          "mean": [
+            -0.03277932930355764,
+            -0.03219001136268881
+          ],
+          "scale": [
+            2.986104204870523,
+            5.982612694340906
+          ]
+        },
+        {
+          "coefficients": [
+            [
+              -12.365641720926936,
+              -12.12069839623219
+            ],
+            [
+              -0.21770349102637368,
+              0.06021430938226762
+            ]
+          ],
+          "columns": [
+            2
+          ],
+          "mean": [
+            -1.9928556560145108
+          ],
+          "scale": [
+            39.726734275271895
+          ]
+        },
+        {
+          "coefficients": [
+            [
+              -12.365641720926936,
+              -12.12069839623219
+            ],
+            [
+              0.33272534583261837,
+              -0.19875752073333294
+            ]
+          ],
+          "columns": [
+            3
+          ],
+          "mean": [
+            0.03087033392671114
+          ],
+          "scale": [
+            0.4378012779444588
+          ]
+        },
+        {
+          "coefficients": [
+            [
+              -12.365641720926936,
+              -12.12069839623219
+            ],
+            [
+              -0.7387343469838122,
+              -0.7435156226430134
+            ]
+          ],
+          "columns": [
+            4
+          ],
+          "mean": [
+            1.8814560647909018
+          ],
+          "scale": [
+            1.1843507459968
+          ]
+        }
+      ],
+      "training_dates": [
+        "2026-08-19",
+        "2026-08-20",
+        "2026-08-21"
+      ],
+      "weights": [
+        0.0,
+        0.0,
+        0.1432550857004737,
+        0.8567449142995263
+      ]
+    },
+    "preregistration_sha256": "80560437757c0baa2b271b6c6b416db2a9a691351078ac79b912f95add3c9053",
+    "status": "fitted",
+    "weight_fit_dates": [
+      "2026-08-21"
+    ],
+    "weight_rows": 3940,
+    "weights_fit_on_base_training_predictions": false
+  },
+  "recent_trade": {
+    "base_fit_dates": [
+      "2026-08-19",
+      "2026-08-20"
+    ],
+    "base_rows": 0,
+    "evaluation_used_for_normalization_or_weights": false,
+    "feature_dependency_sha256": "a035a4b77b977e0d59dc62cd5f3bee9e3a845cb8ec6aeeeb37b34db04183c399",
+    "inputs": [
+      {
+        "date": "2026-08-19",
+        "input_sha256": "1aea1eb6642ad074a9d83f30d3e2ed5584c6bfb65ff860678f9829baff2297b0",
+        "rejected_future_intervals": 0,
+        "samples": 0,
+        "x_sha256": "989eb3393a13ff7ebbf036091a2cc26314528f8acddcd8b35ce2e30ff1b30b41",
+        "y_sha256": "1f64673779413bef9a029dc55b8d5d14cb3039370b90148a649a5baa4584a2b2"
+      },
+      {
+        "date": "2026-08-20",
+        "input_sha256": "9a50945b67702024587c5c9ee5a1ed7e3f39a61b6bb18336c7bcfc9e663b82a7",
+        "rejected_future_intervals": 0,
+        "samples": 0,
+        "x_sha256": "989eb3393a13ff7ebbf036091a2cc26314528f8acddcd8b35ce2e30ff1b30b41",
+        "y_sha256": "1f64673779413bef9a029dc55b8d5d14cb3039370b90148a649a5baa4584a2b2"
+      },
+      {
+        "date": "2026-08-21",
+        "input_sha256": "d7662f3c77d50365462aaf4ef76fd6d76ab574ea45a4fdffc55dcc1747e15ad2",
+        "rejected_future_intervals": 28,
+        "samples": 6,
+        "x_sha256": "fc8fa992eaa5e4e26617888159b40e3b5a19db30127bdd4cc2a2d9020bf84fdc",
+        "y_sha256": "9b3af07c4a11da6cdfa8f5d830055636e5c153f49df15aed934a2f630a3dceea"
+      }
+    ],
+    "model": null,
+    "preregistration_sha256": "80560437757c0baa2b271b6c6b416db2a9a691351078ac79b912f95add3c9053",
+    "status": "insufficient_training",
+    "weight_fit_dates": [
+      "2026-08-21"
+    ],
+    "weight_rows": 6,
+    "weights_fit_on_base_training_predictions": false
+  }
+}

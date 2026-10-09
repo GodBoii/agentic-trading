@@ -1,0 +1,131 @@
+{
+  "checks": [
+    {
+      "date": "2026-08-24",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "receipt_proxy",
+      "rejected_future_intervals": 210,
+      "rows": 2887,
+      "samples": 2887
+    },
+    {
+      "date": "2026-08-24",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "recent_trade",
+      "rejected_future_intervals": 0,
+      "rows": 0,
+      "samples": 0
+    },
+    {
+      "date": "2026-08-25",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "receipt_proxy",
+      "rejected_future_intervals": 71,
+      "rows": 2980,
+      "samples": 2980
+    },
+    {
+      "date": "2026-08-25",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "recent_trade",
+      "rejected_future_intervals": 14,
+      "rows": 31,
+      "samples": 31
+    },
+    {
+      "date": "2026-08-31",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "receipt_proxy",
+      "rejected_future_intervals": 630,
+      "rows": 3178,
+      "samples": 3178
+    },
+    {
+      "date": "2026-08-31",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "recent_trade",
+      "rejected_future_intervals": 0,
+      "rows": 0,
+      "samples": 0
+    },
+    {
+      "date": "2026-09-01",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "receipt_proxy",
+      "rejected_future_intervals": 74,
+      "rows": 3203,
+      "samples": 3203
+    },
+    {
+      "date": "2026-09-01",
+      "diagnostics_exact_match": true,
+      "feature_order_exact_match": true,
+      "mode": "recent_trade",
+      "rejected_future_intervals": 0,
+      "rows": 0,
+      "samples": 0
+    }
+  ],
+  "files": [
+    {
+      "file": "2026-08-24-receipt_proxy.parquet",
+      "rows": 2887,
+      "sha256": "b4dc8268e6a50ab6426da9e37c2f2259fbc5b9fb894e0844630ebd023ffd4f3e"
+    },
+    {
+      "file": "2026-08-24-recent_trade.parquet",
+      "rows": 0,
+      "sha256": "d76b562fc4a418ee7f4f24fc133e951bb5cfaaa0fb61a5fd829b8fd355ecf757"
+    },
+    {
+      "file": "2026-08-25-receipt_proxy.parquet",
+      "rows": 2980,
+      "sha256": "f8ee27e69899ee18ddec4300edf202ae6e766767d5392dce4b5d94eff2bbc25f"
+    },
+    {
+      "file": "2026-08-25-recent_trade.parquet",
+      "rows": 31,
+      "sha256": "20cb93c6d2cf76a10ff90c696113b2a867d251e932a1517b0cc3a9c6850932fd"
+    },
+    {
+      "file": "2026-08-31-receipt_proxy.parquet",
+      "rows": 3178,
+      "sha256": "0580b9dcdc129e61b86dadddfe0d8c63ae985b4adacdee6a986f5b5a8242213c"
+    },
+    {
+      "file": "2026-08-31-recent_trade.parquet",
+      "rows": 0,
+      "sha256": "d76b562fc4a418ee7f4f24fc133e951bb5cfaaa0fb61a5fd829b8fd355ecf757"
+    },
+    {
+      "file": "2026-09-01-receipt_proxy.parquet",
+      "rows": 3203,
+      "sha256": "1928f2ba2db6a4d34db7ba72adb92d2a2c9aa5d1abf5a49957bf62e92b4981b8"
+    },
+    {
+      "file": "2026-09-01-recent_trade.parquet",
+      "rows": 0,
+      "sha256": "d76b562fc4a418ee7f4f24fc133e951bb5cfaaa0fb61a5fd829b8fd355ecf757"
+    }
+  ],
+  "original_evidence_sha256": "c600dfab4cc4fa56769a0765bf60857ef50236017eab48cba103ef77e6bfe09a",
+  "original_evidence_unchanged": true,
+  "refit_or_tuning": false,
+  "script_sha256": "b188dc704ac202db3577f76b714926f415808eb33a02fbfbcf0d623c4426f7c3",
+  "semantics": [
+    "one row per complete future-label interval, with all seven variant forecasts",
+    "null strict-mode forecasts mean no fitted model, not predicted zero return",
+    "labels use original fixed-notional 60-second aggressive execution proxy",
+    "row intervals do not include account admission, target/stop or size constraints",
+    "future-label completeness filters this audit ledger, never the causal trading policy",
+    "initial strategy, run, models and evaluation evidence remain untouched"
+  ],
+  "total_rows": 12279
+}

@@ -1,0 +1,10 @@
+{
+  "track": "42_weighted_ensemble",
+  "run": "initial-v1",
+  "policy_session_replays": 56,
+  "closed_trades": 0,
+  "unresolved_sessions": [],
+  "source_and_input_fingerprints": "pass",
+  "accounting": "pass",
+  "promotion_eligible": false
+}
