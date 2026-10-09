@@ -1,0 +1,4 @@
+runs/
+*-log.txt
+test-results.txt
+upstream/*.txt

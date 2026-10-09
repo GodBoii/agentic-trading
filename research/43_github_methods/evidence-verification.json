@@ -1,0 +1,401 @@
+{
+  "verified": true,
+  "replays": 42,
+  "upstream_files": 7,
+  "source_sha256": "751fae20357e94fe8e508825e05b534b9a6680d54ccc538d106af2b02fbe73e9",
+  "session_ledger_checks": [
+    {
+      "session": "2026-08-19-cusum_continuation-receipt_proxy",
+      "trades": 21,
+      "verified": true
+    },
+    {
+      "session": "2026-08-19-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-19-kalman_cusum_agreement-receipt_proxy",
+      "trades": 13,
+      "verified": true
+    },
+    {
+      "session": "2026-08-19-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-19-kalman_trend-receipt_proxy",
+      "trades": 23,
+      "verified": true
+    },
+    {
+      "session": "2026-08-19-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-20-cusum_continuation-receipt_proxy",
+      "trades": 26,
+      "verified": true
+    },
+    {
+      "session": "2026-08-20-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-20-kalman_cusum_agreement-receipt_proxy",
+      "trades": 6,
+      "verified": true
+    },
+    {
+      "session": "2026-08-20-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-20-kalman_trend-receipt_proxy",
+      "trades": 12,
+      "verified": true
+    },
+    {
+      "session": "2026-08-20-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-21-cusum_continuation-receipt_proxy",
+      "trades": 26,
+      "verified": true
+    },
+    {
+      "session": "2026-08-21-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-21-kalman_cusum_agreement-receipt_proxy",
+      "trades": 12,
+      "verified": true
+    },
+    {
+      "session": "2026-08-21-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-21-kalman_trend-receipt_proxy",
+      "trades": 23,
+      "verified": true
+    },
+    {
+      "session": "2026-08-21-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-24-cusum_continuation-receipt_proxy",
+      "trades": 19,
+      "verified": true
+    },
+    {
+      "session": "2026-08-24-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-24-kalman_cusum_agreement-receipt_proxy",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-24-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-24-kalman_trend-receipt_proxy",
+      "trades": 2,
+      "verified": true
+    },
+    {
+      "session": "2026-08-24-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-25-cusum_continuation-receipt_proxy",
+      "trades": 29,
+      "verified": true
+    },
+    {
+      "session": "2026-08-25-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-25-kalman_cusum_agreement-receipt_proxy",
+      "trades": 13,
+      "verified": true
+    },
+    {
+      "session": "2026-08-25-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-25-kalman_trend-receipt_proxy",
+      "trades": 22,
+      "verified": true
+    },
+    {
+      "session": "2026-08-25-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-31-cusum_continuation-receipt_proxy",
+      "trades": 19,
+      "verified": true
+    },
+    {
+      "session": "2026-08-31-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-31-kalman_cusum_agreement-receipt_proxy",
+      "trades": 5,
+      "verified": true
+    },
+    {
+      "session": "2026-08-31-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-08-31-kalman_trend-receipt_proxy",
+      "trades": 10,
+      "verified": true
+    },
+    {
+      "session": "2026-08-31-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-09-01-cusum_continuation-receipt_proxy",
+      "trades": 24,
+      "verified": true
+    },
+    {
+      "session": "2026-09-01-cusum_continuation-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-09-01-kalman_cusum_agreement-receipt_proxy",
+      "trades": 10,
+      "verified": true
+    },
+    {
+      "session": "2026-09-01-kalman_cusum_agreement-recent_trade",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "session": "2026-09-01-kalman_trend-receipt_proxy",
+      "trades": 13,
+      "verified": true
+    },
+    {
+      "session": "2026-09-01-kalman_trend-recent_trade",
+      "trades": 0,
+      "verified": true
+    }
+  ],
+  "metrics": [
+    {
+      "variant": "cusum_continuation",
+      "mode": "recent_trade",
+      "period": "all",
+      "sessions": 7,
+      "trades": 0,
+      "net_wins": 0,
+      "net_win_rate": null,
+      "gross_pnl": 0,
+      "fees": 0,
+      "net_pnl": 0,
+      "expectancy": null,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 0
+    },
+    {
+      "variant": "cusum_continuation",
+      "mode": "recent_trade",
+      "period": "after_development",
+      "sessions": 4,
+      "trades": 0,
+      "net_wins": 0,
+      "net_win_rate": null,
+      "gross_pnl": 0,
+      "fees": 0,
+      "net_pnl": 0,
+      "expectancy": null,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 0
+    },
+    {
+      "variant": "cusum_continuation",
+      "mode": "receipt_proxy",
+      "period": "all",
+      "sessions": 7,
+      "trades": 164,
+      "net_wins": 32,
+      "net_win_rate": 0.1951219512195122,
+      "gross_pnl": -4924.56,
+      "fees": 12715.76,
+      "net_pnl": -17640.32,
+      "expectancy": -107.56,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 7
+    },
+    {
+      "variant": "cusum_continuation",
+      "mode": "receipt_proxy",
+      "period": "after_development",
+      "sessions": 4,
+      "trades": 91,
+      "net_wins": 14,
+      "net_win_rate": 0.15384615384615385,
+      "gross_pnl": -2944.11,
+      "fees": 7120.09,
+      "net_pnl": -10064.2,
+      "expectancy": -110.6,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 4
+    },
+    {
+      "variant": "kalman_cusum_agreement",
+      "mode": "recent_trade",
+      "period": "all",
+      "sessions": 7,
+      "trades": 0,
+      "net_wins": 0,
+      "net_win_rate": null,
+      "gross_pnl": 0,
+      "fees": 0,
+      "net_pnl": 0,
+      "expectancy": null,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 0
+    },
+    {
+      "variant": "kalman_cusum_agreement",
+      "mode": "recent_trade",
+      "period": "after_development",
+      "sessions": 4,
+      "trades": 0,
+      "net_wins": 0,
+      "net_win_rate": null,
+      "gross_pnl": 0,
+      "fees": 0,
+      "net_pnl": 0,
+      "expectancy": null,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 0
+    },
+    {
+      "variant": "kalman_cusum_agreement",
+      "mode": "receipt_proxy",
+      "period": "all",
+      "sessions": 7,
+      "trades": 59,
+      "net_wins": 10,
+      "net_win_rate": 0.1694915254237288,
+      "gross_pnl": -2714.89,
+      "fees": 4364.86,
+      "net_pnl": -7079.75,
+      "expectancy": -120.0,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 1
+    },
+    {
+      "variant": "kalman_cusum_agreement",
+      "mode": "receipt_proxy",
+      "period": "after_development",
+      "sessions": 4,
+      "trades": 28,
+      "net_wins": 2,
+      "net_win_rate": 0.07142857142857142,
+      "gross_pnl": -2529.89,
+      "fees": 2177.53,
+      "net_pnl": -4707.42,
+      "expectancy": -168.12,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 1
+    },
+    {
+      "variant": "kalman_trend",
+      "mode": "recent_trade",
+      "period": "all",
+      "sessions": 7,
+      "trades": 0,
+      "net_wins": 0,
+      "net_win_rate": null,
+      "gross_pnl": 0,
+      "fees": 0,
+      "net_pnl": 0,
+      "expectancy": null,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 0
+    },
+    {
+      "variant": "kalman_trend",
+      "mode": "recent_trade",
+      "period": "after_development",
+      "sessions": 4,
+      "trades": 0,
+      "net_wins": 0,
+      "net_win_rate": null,
+      "gross_pnl": 0,
+      "fees": 0,
+      "net_pnl": 0,
+      "expectancy": null,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 0
+    },
+    {
+      "variant": "kalman_trend",
+      "mode": "receipt_proxy",
+      "period": "all",
+      "sessions": 7,
+      "trades": 105,
+      "net_wins": 26,
+      "net_win_rate": 0.24761904761904763,
+      "gross_pnl": -3246.39,
+      "fees": 7471.42,
+      "net_pnl": -10717.81,
+      "expectancy": -102.07,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 3
+    },
+    {
+      "variant": "kalman_trend",
+      "mode": "receipt_proxy",
+      "period": "after_development",
+      "sessions": 4,
+      "trades": 47,
+      "net_wins": 9,
+      "net_win_rate": 0.19148936170212766,
+      "gross_pnl": -2565.32,
+      "fees": 3583.1,
+      "net_pnl": -6148.42,
+      "expectancy": -130.82,
+      "incomplete_sessions": 0,
+      "daily_loss_halts": 2
+    }
+  ],
+  "metric_semantics": "net trade win rate, not calibrated prediction accuracy"
+}

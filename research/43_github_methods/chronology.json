@@ -1,0 +1,11 @@
+{
+  "source_retrieved_utc": "2026-10-09T00:58:35.477015+00:00",
+  "plan_written_utc": "2026-10-09T01:00:19.871450+00:00",
+  "first_session_summary_utc": "2026-10-09T01:00:22.759279+00:00",
+  "last_session_summary_utc": "2026-10-09T01:02:35.250063+00:00",
+  "aggregate_written_utc": "2026-10-09T01:02:35.255494+00:00",
+  "verified_utc": "2026-10-09T01:03:42.809592+00:00",
+  "frozen_hypotheses_sha256": "3f713436bdc3433878891064d33de0daea2436853cb1b182bae2c5d4d561695f",
+  "frozen_source_sha256": "751fae20357e94fe8e508825e05b534b9a6680d54ccc538d106af2b02fbe73e9",
+  "limitations": "filesystem timestamps are descriptive, not tamper-proof; analyze.py was added after initial replay started"
+}

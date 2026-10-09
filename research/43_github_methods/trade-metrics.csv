@@ -1,0 +1,13 @@
+variant,mode,period,sessions,trades,net_wins,net_win_rate,gross_pnl,fees,net_pnl,expectancy,incomplete_sessions,daily_loss_halts
+cusum_continuation,recent_trade,all,7,0,0,,0.0,0.0,0.0,,0,0
+cusum_continuation,recent_trade,after_development,4,0,0,,0.0,0.0,0.0,,0,0
+cusum_continuation,receipt_proxy,all,7,164,32,0.1951219512195122,-4924.56,12715.76,-17640.32,-107.56,0,7
+cusum_continuation,receipt_proxy,after_development,4,91,14,0.15384615384615385,-2944.11,7120.09,-10064.2,-110.6,0,4
+kalman_cusum_agreement,recent_trade,all,7,0,0,,0.0,0.0,0.0,,0,0
+kalman_cusum_agreement,recent_trade,after_development,4,0,0,,0.0,0.0,0.0,,0,0
+kalman_cusum_agreement,receipt_proxy,all,7,59,10,0.1694915254237288,-2714.89,4364.86,-7079.75,-120.0,0,1
+kalman_cusum_agreement,receipt_proxy,after_development,4,28,2,0.07142857142857142,-2529.89,2177.53,-4707.42,-168.12,0,1
+kalman_trend,recent_trade,all,7,0,0,,0.0,0.0,0.0,,0,0
+kalman_trend,recent_trade,after_development,4,0,0,,0.0,0.0,0.0,,0,0
+kalman_trend,receipt_proxy,all,7,105,26,0.24761904761904763,-3246.39,7471.42,-10717.81,-102.07,0,3
+kalman_trend,receipt_proxy,after_development,4,47,9,0.19148936170212766,-2565.32,3583.1,-6148.42,-130.82,0,2
