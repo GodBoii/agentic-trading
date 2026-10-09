@@ -1,0 +1,80 @@
+{
+  "shared_engine_runs": [
+    {
+      "track": "41_ssrn_4631351",
+      "run": "initial-v1",
+      "policy_session_replays": 28,
+      "closed_trades": 307,
+      "unresolved_sessions": [
+        {
+          "date": "2026-08-21",
+          "variant": "vwap_direction",
+          "mode": "recent_trade",
+          "positions": [
+            {
+              "exit_pending": false,
+              "last_usable_quote_us": 1787299979853367,
+              "mark_age_seconds": 6419.941577,
+              "quantity": 76,
+              "security_id": 2885,
+              "side": "SHORT"
+            },
+            {
+              "exit_pending": false,
+              "last_usable_quote_us": 1787299980735281,
+              "mark_age_seconds": 6419.059663,
+              "quantity": 306,
+              "security_id": 5097,
+              "side": "SHORT"
+            }
+          ],
+          "pending_entries": 0
+        }
+      ],
+      "source_and_input_fingerprints": "pass",
+      "accounting": "pass",
+      "promotion_eligible": false
+    },
+    {
+      "track": "42_weighted_ensemble",
+      "run": "initial-v1",
+      "policy_session_replays": 56,
+      "closed_trades": 0,
+      "unresolved_sessions": [],
+      "source_and_input_fingerprints": "pass",
+      "accounting": "pass",
+      "promotion_eligible": false
+    },
+    {
+      "track": "43_github_methods",
+      "run": "initial-v1",
+      "policy_session_replays": 42,
+      "closed_trades": 328,
+      "unresolved_sessions": [],
+      "source_and_input_fingerprints": "pass",
+      "accounting": "pass",
+      "promotion_eligible": false
+    }
+  ],
+  "new_policy_session_replays": 126,
+  "candle_diagnostic": {
+    "kind": "independent_compounding_candle_sleeves",
+    "checked_daily_rows": 34704,
+    "checked_trade_rows": 126515,
+    "unique_eligible_instrument_days": 5784,
+    "input_files_verified": 35,
+    "per_order_fees": "pass",
+    "source_input_fingerprints_and_accounting": "pass",
+    "promotion_eligible": false
+  },
+  "daily_forecast": {
+    "kind": "daily_bar_forecast_and_reference_price_diagnostic",
+    "prediction_rows": 2709,
+    "evaluation_dates": 387,
+    "input_files_verified": 7,
+    "feature_chronology_and_fingerprints": "pass",
+    "promotion_eligible": false
+  },
+  "promotion_eligible": false,
+  "interpretation": "Checks verify saved arithmetic, provenance and coverage, not true fills or predictive significance"
+}
