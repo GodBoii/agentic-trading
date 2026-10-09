@@ -1,0 +1,49 @@
+{
+  "shared_rows": 277704,
+  "sequence_shape": [
+    277704,
+    30,
+    5
+  ],
+  "phases": {
+    "evaluation": {
+      "dates": 384,
+      "rows": 96747
+    },
+    "training": {
+      "dates": 485,
+      "rows": 119238
+    },
+    "validation": {
+      "dates": 245,
+      "rows": 61719
+    }
+  },
+  "unique_original_inputs": 92,
+  "source_hashes_and_all_target_intervals": "pass",
+  "tracks": [
+    {
+      "track": "46_horizons_trees",
+      "exact_planned_account_outputs": 57,
+      "agent_verification_sha256": "f53cc7d767e92563a2f4c0aab246bb2c57c4720b97e587cbed61100e54601fbe"
+    },
+    {
+      "track": "47_sequence_network",
+      "exact_planned_account_outputs": 66,
+      "independent_audit_sha256": "03c1970a5ff5b4208f2bb808824b1108e8a6df71784d18e12b444cec65aa9627"
+    },
+    {
+      "track": "48_controlled_adaptation",
+      "exact_planned_account_outputs": 104,
+      "independent_verification_sha256": "f4908271dbf333389e0223c72319b2980f0c7275782e562342d24357a02cf2fd"
+    },
+    {
+      "track": "49_feature_ablation",
+      "exact_planned_account_outputs": 60,
+      "strengthened_verification_sha256": "4c5569597cc50a9b93a97cf9d866f60bc2d4dd86a437750e6c73493f4f47eb22"
+    }
+  ],
+  "account_evaluations_with_saved_ledgers": 287,
+  "interpretation": "Scenario and yearly comparisons overlap; not independent observations. Shadow-selector utility calls are separate.",
+  "promotion_eligible": false
+}

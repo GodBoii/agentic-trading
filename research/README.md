@@ -8,6 +8,8 @@ The first batch contains **39 frozen variants and 492 policy/session account rep
 
 The [October 9 GitHub, SSRN and weighted-prediction batch](prediction_research_2026_10_09/README.md) adds tracks 41-44, with **12 common-engine variants and 126 replays**, giving 51 variants and 618 initial common-engine replays across both batches. Its longer candle-rule and daily-history studies are separate diagnostics. That batch tested the supplied VWAP paper, equal/learned forecast blends, Kalman/CUSUM combinations and nonlinear daily models. No combination established a useful live edge.
 
+The [model, parameter and feature batch](model_research_2026_10_09/README.md) adds tracks45-49. A shared277,704-row minute dataset supports parameter/horizon searches, boosted trees, actualGRU/MLP training, controlled monthly adaptation and feature comparisons. Its287saved candle-account evaluations are separate from the earlier common-engine replay count. No tested model established a reliable later-period edge; sparse positive outcomes and validation selection failures are retained explicitly.
+
 No track is approved for live trading. Receipt-proxy results assume quote usability that our recordings do not verify. Strict results often have insufficient eligible observations. All historical dates were previously inspected, so none is a pristine final holdout.
 
 The strict gate checks stored trade-age and health fields. It is not independent proof of quote freshness or correct historical decoder timezone semantics. Track15 investigates those timestamp assumptions.

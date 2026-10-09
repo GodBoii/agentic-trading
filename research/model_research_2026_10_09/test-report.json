@@ -1,0 +1,10 @@
+{
+  "compilation": "pass",
+  "date": "2026-10-09",
+  "elapsed_seconds": 14.47,
+  "previous_tests": 215,
+  "new_tests": 42,
+  "tests": 257,
+  "result": "pass",
+  "command": "python -m pytest --import-mode=importlib -q <all research track tests directories> research/43_github_methods/test_strategy.py research/46_horizons_trees/test_methods.py"
+}
