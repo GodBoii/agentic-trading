@@ -22,4 +22,8 @@ Several higher-cost scenarios have smaller losses or positive totals. Increasing
 
 Three focused tests pass for nested feature comparisons, saved coefficient reproduction and train-only scaler immutability. The separate verifier reconstructs every saved ridge forecast from immutable numeric parameters and reconciles all accounts, fees, delayed fill timing, non-overlapping stock positions and slot/capital limits.
 
+Independent review identified two gaps in the initial verifier, although the existing evidence was complete. Version2 now requires all six prediction files and sixty account ledgers, compares frozen model/input fingerprints and reconciles saved result totals and RMSE with the row evidence. A corruption test confirms that missing prediction or trade files fail. The earlier verification report is preserved.
+
+Peer residuals are linear combinations of own and peer returns. Adding redundant columns can also change the effective regularization under fixed ridge alpha. This comparison therefore cannot attribute every small change solely to new information.
+
 The feature and account assumptions are shared with track45: current-survivor selection, conditional complete-session coverage, unknown candle timestamp/adjustment provenance, peer proxy rather than actual market/sector data, and candle-price execution without bid/ask capacity. Each account date starts fresh; totals do not compound or estimate annual returns. No production or live order setting changed.

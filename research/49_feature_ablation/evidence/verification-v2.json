@@ -1,0 +1,15 @@
+{
+  "dataset_artifacts": {
+    "rows.parquet": "a5722d668f9ccc4b930550e2a5ceae05797fbeed11359316883e7ed25d6d2412",
+    "selection-freeze.json": "7745853b112d1bed5e51605a78cd2042ccb28d633dba2e70df3afa19c386098e",
+    "sequence.npy": "06df7e7bd7ebafe0cfd35c3df1284d3d6d92d50f6d412214b6a9a6b845751ca0"
+  },
+  "exact_planned_coverage_and_saved_result_reconciliation": "pass",
+  "largest_prediction_error_bps": 7.105427357601002e-15,
+  "models_sha256": "016f971cc0981b376ce243e92080f729675e3b37c26dcb90bf56520644bd84cc",
+  "numeric_predictions_reproduced": 1901592,
+  "promotion_eligible": false,
+  "source_model_ledger_checks": "pass",
+  "trade_rows": 1264,
+  "verified_accounts": 60
+}
