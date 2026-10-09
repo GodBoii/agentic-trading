@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nifty 50 · Archive chart explorer</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1119;--panel:#111b26;--line:#293646;--text:#e5edf5;--muted:#aab8c5;--accent:#4bd5ac;--warn:#efc46a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 "Segoe UI",sans-serif}button,select,input{font:inherit}button,select,input{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:10px 12px;min-height:44px}button{cursor:pointer}button:hover{border-color:var(--accent)}:focus-visible{outline:2px solid var(--accent);outline-offset:3px}a{color:var(--accent)}header{border-bottom:1px solid var(--line);padding:22px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px}h1{font-size:24px;line-height:1.25;letter-spacing:-.6px;margin:3px 0}h2{font-size:21px;line-height:1.3;margin:4px 0 9px}h3{font-size:15px;margin:0 0 12px}.eyebrow{font:11px/1.5 Consolas,monospace;letter-spacing:1.6px;color:var(--accent);text-transform:uppercase}.muted{color:var(--muted)}header p{margin:7px 0 0;font-size:13px}label{font-size:12px;color:var(--muted);display:grid;gap:5px}.workspace{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1800px;margin:auto}aside{padding:24px 18px;border-right:1px solid var(--line);align-self:start;position:sticky;top:0;max-height:100dvh;overflow:auto}aside input{width:100%;font-size:13px}nav{margin-top:20px}nav h3{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1.3px;margin:20px 10px 7px}nav button{width:100%;text-align:left;background:transparent;border:1px solid transparent;padding:9px 10px;font-size:13px;min-height:41px;display:flex;gap:12px;align-items:baseline}nav button span{color:var(--muted);font:11px Consolas,monospace}nav button[aria-current="true"]{background:#182c2b;color:var(--accent);border-color:#285b4d}main{padding:24px 30px 48px;min-width:0}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-block:1px solid var(--line);margin-bottom:24px}.metric{padding:14px 16px;border-right:1px solid var(--line)}.metric:first-child{padding-left:0}.metric:last-child{border:0}.metric strong{display:block;font:20px/1.5 Consolas,monospace;font-variant-numeric:tabular-nums}.metric span{color:var(--muted);font-size:11px}.chart-heading{display:flex;justify-content:space-between;gap:20px;align-items:start}.chart-heading p{margin:0;color:var(--muted);font-size:14px}.actions{display:flex;gap:8px}.actions button{font-size:12px;white-space:nowrap}.plot-shell{border:1px solid var(--line);margin-top:20px;background:var(--panel);border-radius:6px;min-width:0;overflow:hidden}#plot{height:490px;min-width:0}.method{padding:15px 20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);max-height:180px;overflow:auto}.method strong{color:var(--text)}.notice{margin-top:18px;padding:12px 15px;border-left:2px solid var(--warn);background:#1c201f;color:#d9d2bd;font-size:12px}.below{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:30px}.below p,.below li{font-size:13px;color:var(--muted)}.below ul{padding-left:18px}.below h3{border-bottom:1px solid var(--line);padding-bottom:10px}.below details{font-size:12px;color:var(--muted);margin-top:12px}.below pre{white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;font-size:11px}footer{padding-top:25px;font-size:11px;color:var(--muted)}#status{min-height:20px;font-size:12px;color:var(--warn)}.mobile-picker{display:none}#error{color:#f28b82;padding:16px}#empty-search{font-size:13px;color:var(--muted);padding:15px 10px}.skip{position:absolute;left:10px;top:-80px}.skip:focus{top:10px;background:var(--panel);padding:12px;z-index:5}
+@media(min-width:1500px){#plot{height:570px}}
+@media(max-width:900px){header{padding:20px}.workspace{grid-template-columns:220px minmax(0,1fr)}aside{padding:20px 10px}main{padding:20px 18px}.chart-heading{display:block}.actions{margin-top:15px}.below{grid-template-columns:1fr;gap:15px}.metric{padding:12px 8px}.metric strong{font-size:17px}}
+@media(max-width:680px){header{align-items:start;flex-direction:column;gap:15px}h1{font-size:22px}header label,header select{width:100%}.workspace{display:block}aside{display:none}main{padding:16px 12px}.mobile-picker{display:grid;margin-bottom:18px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric:nth-child(2){border-right:0}.metric:nth-child(3){padding-left:0;border-top:1px solid var(--line)}.metric:nth-child(4){border-top:1px solid var(--line)}#plot{height:390px}.method{padding:12px}.actions button{min-height:44px}.below{margin-top:25px}}
+</style>
+<script>/*__PLOTLY__*/</script>
+</head>
+<body>
+<a href="#main" class="skip">Skip to chart</a>
+<header><div><div class="eyebrow">Market recordings / Nifty 50 futures &amp; options</div><h1>Archive chart explorer</h1><p class="muted">One recording, many ways to read it. Historical data, all times IST.</p></div><label>Recorded session<select id="session"></select></label></header>
+<div class="workspace">
+<aside aria-label="Chart library"><label for="search">Find a chart<input id="search" type="search" placeholder="Try depth, RSI, options…"></label><nav id="catalog" aria-label="Chart types"></nav><p id="empty-search" hidden>No matching charts.</p></aside>
+<main id="main" tabindex="-1">
+<label class="mobile-picker">Chart type<select id="mobile-chart"></select></label>
+<section class="metrics" aria-label="Recording summary" id="metrics"></section>
+<div class="chart-heading"><div><div class="eyebrow" id="category"></div><h2 id="title"></h2><p id="question"></p></div><div class="actions"><button id="previous" aria-label="Previous chart">←</button><button id="next" aria-label="Next chart">→</button><button id="export">Save PNG</button><button id="csv">Chart data CSV</button></div></div>
+<div id="status" role="status" aria-live="polite"></div>
+<section class="plot-shell" aria-labelledby="title"><div id="plot" role="img" aria-label="Interactive market chart"></div><div id="error" hidden></div><div class="method"><strong>How to read this chart. </strong><span id="method"></span></div></section>
+<div class="notice" id="coverage"></div>
+<div class="below"><section><h3>What this recording can tell us</h3><p id="available"></p><p>Drag inside a chart to zoom. Double-click to reset. Click a legend item to hide a series, or double-click it to isolate one. Image and CSV exports use the current chart.</p><details><summary>Source files, validation and hashes</summary><pre id="provenance"></pre></details></section><section><h3>Charts that need more data</h3><ul><li>Exact footprint, bid/ask trade delta and exact volume profile need a complete trade tape with aggressor classification.</li><li>Spot/futures basis and constituent breadth need synchronised Nifty spot and weighted constituent prices.</li><li>IV smile, term structure, Greeks and VIX comparisons need reliable IV inputs, spot, rates, expiry timing and wider expiry coverage.</li><li>Dealer gamma exposure needs positioning assumptions. OI alone cannot identify who holds each side.</li><li>News overlays need time-stamped historical news.</li></ul></section></div>
+<footer>Methods follow the saved packet fields and documented <a href="https://dhanhq.co/docs/v2/live-market-feed/" target="_blank" rel="noreferrer">Dhan feed</a> and <a href="https://dhanhq.co/docs/v2/full-market-depth/" target="_blank" rel="noreferrer">depth formats</a>. Charts render locally with <a href="https://plotly.com/python/" target="_blank" rel="noreferrer">Plotly</a>. No live connection is required.</footer>
+</main></div>
+<script id="archive-data" type="application/json">/*__DATA__*/</script>
+<script>
+"use strict";
+const archive=JSON.parse(document.getElementById("archive-data").textContent);
+const el=id=>document.getElementById(id);
+let session=archive.sessions.find(s=>s.date===archive.default)||archive.sessions[0];
+let selected="candles";
+let rendering=false;
+const config={responsive:true,displaylogo:false,scrollZoom:false,modeBarButtonsToRemove:["select2d","lasso2d","autoScale2d"],toImageButtonOptions:{format:"png",scale:2}};
+const baseLayout={paper_bgcolor:"#111b26",plot_bgcolor:"#111b26",font:{family:"Segoe UI, sans-serif",color:"#aab8c5",size:12},margin:{l:70,r:28,t:26,b:75},legend:{orientation:"h",y:-.2,x:0,font:{size:11}},hoverlabel:{bgcolor:"#1c2938",font:{color:"#e5edf5"}},hovermode:"closest",bargap:.15,showlegend:true};
+function current(){return session.charts.find(c=>c.id===selected)||session.charts[0];}
+function catalog(){
+  const filter=el("search").value.toLowerCase().trim();
+  el("catalog").replaceChildren();el("mobile-chart").replaceChildren();
+  let category="";let visible=0;
+  session.charts.forEach((chart,index)=>{
+    const option=document.createElement("option");option.value=chart.id;option.textContent=`${String(index+1).padStart(2,"0")} · ${chart.title}`;el("mobile-chart").append(option);
+    if(!`${chart.title} ${chart.category} ${chart.question}`.toLowerCase().includes(filter))return;
+    visible++;
+    if(category!==chart.category){category=chart.category;const heading=document.createElement("h3");heading.textContent=category;el("catalog").append(heading);}
+    const button=document.createElement("button");button.type="button";button.dataset.chart=chart.id;button.setAttribute("aria-current",String(chart.id===selected));
+    const number=document.createElement("span");number.textContent=String(index+1).padStart(2,"0");button.append(number,document.createTextNode(chart.title));
+    button.addEventListener("click",()=>select(chart.id));el("catalog").append(button);
+  });
+  el("empty-search").hidden=visible>0;el("mobile-chart").value=selected;
+}
+async function select(id){
+  if(rendering)return;
+  selected=id;const chart=current();rendering=true;
+  el("status").textContent="Rendering chart…";el("error").hidden=true;
+  for(const name of ["session","mobile-chart","export","csv"])el(name).disabled=true;
+  el("title").textContent=chart.title;el("category").textContent=`${chart.category} / ${session.charts.indexOf(chart)+1} of ${session.charts.length}`;
+  el("question").textContent=chart.question;el("method").textContent=chart.method;
+  document.querySelectorAll("[data-chart]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.chart===selected)));
+  el("mobile-chart").value=selected;
+  const idx=session.charts.indexOf(chart);el("previous").disabled=idx===0;el("next").disabled=idx===session.charts.length-1;
+  const layout={...baseLayout,...chart.layout,uirevision:`${session.date}-${chart.id}`,xaxis:{...chart.layout.xaxis,title:{text:chart.layout.xaxis.title},gridcolor:"#243140",zerolinecolor:"#425266",rangeslider:{visible:false}},yaxis:{...chart.layout.yaxis,title:{text:chart.layout.yaxis.title},gridcolor:"#243140",zerolinecolor:"#425266",automargin:true}};
+  try{await Plotly.react("plot",chart.data,layout,config);el("plot").setAttribute("aria-label",`${chart.title}. ${chart.question}`);el("status").textContent="";}
+  catch(error){el("error").hidden=false;el("error").textContent=`Could not render ${chart.title}: ${error.message}`;el("status").textContent="Chart failed to render.";}
+  finally{rendering=false;for(const name of ["session","mobile-chart","export","csv"])el(name).disabled=false;}
+}
+async function changeSession(){
+  session=archive.sessions.find(s=>s.date===el("session").value);
+  if(!session.charts.some(c=>c.id===selected))selected="candles";
+  const s=session.stats;
+  el("metrics").replaceChildren();
+  for(const [value,label] of [[session.charts.length,"Chart views"],[`${s.minutes} / 375`,"Minutes with packets"],[s.depth,"Paired depth snapshots"],[s.expiry||"None","Captured option expiry"]]){
+    const div=document.createElement("div");div.className="metric";const strong=document.createElement("strong");strong.textContent=value;const span=document.createElement("span");span.textContent=label;div.append(strong,span);el("metrics").append(div);
+  }
+  el("coverage").textContent=`Recorded ${s.first}–${s.last} IST · ${s.complete} complete minutes · ${s.partial} partial minutes · ${s.missing} missing minutes · ${s.resets} feed resets. Futures security ID ${s.instruments.join(", ")}. Rolling indicators restart after incomplete minutes and gaps.`;
+  el("available").textContent=`${s.packets.toLocaleString()} accepted futures packets, ${s.depth} instrument-matched depth snapshots and ${s.options.toLocaleString()} fresh option minute quotes. Price, activity, OI and liquidity charts describe the captured interval. Options show only the captured strikes and the displayed expiry.`;
+  el("provenance").textContent=JSON.stringify({source:session.source,audit:session.audit},null,2);
+  catalog();await select(selected);
+}
+for(const s of archive.sessions){const option=document.createElement("option");option.value=s.date;option.textContent=s.date;el("session").append(option);}
+el("session").value=session.date;
+el("session").addEventListener("change",()=>{if(!rendering)void changeSession();});
+el("mobile-chart").addEventListener("change",()=>select(el("mobile-chart").value));
+el("search").addEventListener("input",catalog);
+el("previous").addEventListener("click",()=>{const i=session.charts.indexOf(current());if(i>0)void select(session.charts[i-1].id);});
+el("next").addEventListener("click",()=>{const i=session.charts.indexOf(current());if(i<session.charts.length-1)void select(session.charts[i+1].id);});
+el("export").addEventListener("click",async()=>{try{await Plotly.downloadImage("plot",{format:"png",filename:`nifty-${session.date}-${selected}`,width:1500,height:850,scale:2});}catch(e){el("status").textContent=`Image export failed: ${e.message}`;}});
+function csvCell(value){return `"${String(value??"").replaceAll('"','""')}"`;}
+el("csv").addEventListener("click",()=>{
+  const chart=current();const rows=[["series","x","y","z","open","high","low","close"]];
+  for(const trace of chart.data){
+    if(trace.type==="heatmap"){trace.y.forEach((y,j)=>trace.x.forEach((x,i)=>rows.push([trace.name||chart.title,x,y,trace.z[j][i],"","","",""])));}
+    else{trace.x.forEach((x,i)=>rows.push([trace.name||chart.title,x,trace.y?.[i]??"","",trace.open?.[i]??"",trace.high?.[i]??"",trace.low?.[i]??"",trace.close?.[i]??""]));}
+  }
+  const blob=new Blob([rows.map(r=>r.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`nifty-${session.date}-${selected}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+void changeSession();
+</script></body></html>
