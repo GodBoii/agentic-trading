@@ -1,0 +1,16 @@
+{
+  "model": "Training-only StandardScaler and ridge alpha100, identical rows and targets for every feature set",
+  "training": ["2022-01-01", "2023-12-31"],
+  "validation": ["2024-01-01", "2024-12-31"],
+  "evaluation": ["2025-01-01", "2026-12-31"],
+  "horizons": [5, 15, 30],
+  "price": ["ret1", "ret5", "ret15", "ret30", "vol30", "vwapdev", "efficiency30", "body_bps", "range_bps", "session_return"],
+  "volume_extra": ["volume_local_ratio", "same_slot_rvol"],
+  "peer_extra": ["peer_return5", "peer_return15", "peer_return30", "residual_return5", "residual_return15", "residual_return30"],
+  "full_extra": ["overnight_gap", "minute_sin", "minute_cos"],
+  "admission_net_bps": 2,
+  "costs_per_leg_bps": [2, 5],
+  "selection": "No validation selection or retuning. Every predefined feature set reported. Validation metrics descriptive only.",
+  "promotion_eligible": false,
+  "limitations": ["VWAP already uses cumulative volume; the price baseline is price-derived plus VWAP, not a volume-free control", "Peer basket is a stock proxy, not synchronized true index or sector data", "Candle-reference account assumptions and coverage selection bias inherited from45"]
+}
