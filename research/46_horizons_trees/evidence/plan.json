@@ -1,0 +1,22 @@
+{
+  "created_utc": "2026-10-09T05:37:40.729062+00:00",
+  "promotion_eligible": false,
+  "runtime": {
+    "numpy": "2.4.5",
+    "pandas": "3.0.3",
+    "python": "3.13.3",
+    "sklearn": "1.8.0"
+  },
+  "source_hashes": {
+    "research/45_market_dataset/__init__.py": "109c8b4ba371182518bb8b593b7096d15e7e0cae8dde0aad7f844e05bbf6ca8b",
+    "research/45_market_dataset/account.py": "95d978984d7a33f5588e90822ab6a770089d741572ddcb12e11d88a1902e169c",
+    "research/45_market_dataset/dataset.py": "780105df9d4800b920843081e30991bfb48a0deea90a8ec097dd033f40f5b40d",
+    "research/46_horizons_trees/__init__.py": "5faf3324f1baf31a757781b11a305c612669a456cc78c91364636a28f5a4fa56",
+    "research/46_horizons_trees/methods.py": "2596a314a279106340667d3e02d511e039c9155d9e39fef9cdffa6fe14f2205f",
+    "research/46_horizons_trees/run.py": "4f1eff364fc5f13fcac933e96633026d16085605a3ad1c75d710c6198f33a0d1",
+    "research/46_horizons_trees/test_methods.py": "07497b7d7cc9de109bd29497460dd520da62f5067f3c9719d17fdd9cc8383ab4",
+    "research/46_horizons_trees/verify.py": "d1442029010462f26a87f655cf62c025632f18cf44f55dd4df91613d735440b4",
+    "research/intraday_lab/costs.py": "a95a123656efb110f4ef753524327a2665428af24060691ea3f13ab135b49e9f"
+  },
+  "specification_sha256": "74cbe882708aad18e19a278212e63e93e77442ae8a6063e0e455aaeb888c1897"
+}

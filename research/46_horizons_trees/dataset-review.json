@@ -1,0 +1,15 @@
+{
+  "shared_rows_verified": 277704,
+  "sequence_shape_verified": [277704, 30, 5],
+  "actual_prefix_checks": [
+    {"security_id": 15083, "date": "2024-01-01", "future_mutation_from_index": 200, "past_features_and_sequence_unchanged": true},
+    {"security_id": 25, "date": "2024-01-01", "future_mutation_from_index": 200, "past_features_and_sequence_unchanged": true}
+  ],
+  "all_row_checks": {
+    "decision_to_entry_delay_exactly_one_minute": true,
+    "horizon_exit_intervals_exact": true,
+    "gross_labels_recomputed_from_open_references": true,
+    "no_duplicate_decision_instrument_identity": true
+  },
+  "source_review": "Forward features, prior-only volume baseline, synchronized leave-one-out peers and delayed label references confirmed. Full-day eligibility is ex-post data conditioning; last eligible prior close may span an omitted session. Original timestamp bucket semantics, corporate actions, point-in-time membership and executable fill capacity remain unverified."
+}

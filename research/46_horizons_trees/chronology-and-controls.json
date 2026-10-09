@@ -1,0 +1,27 @@
+{
+  "posthoc_descriptive_check": true,
+  "freeze_utc": "2026-10-09T05:39:18.357716+00:00",
+  "first_test_prediction_file_utc": "2026-10-09T05:39:25.728052+00:00",
+  "freeze_precedes_test_prediction_files": true,
+  "direction_baseline_controls": [
+    {
+      "horizon": 5,
+      "nonzero_target_rows": 92578,
+      "frozen_training_mean_sign": -1,
+      "training_mean_direction_accuracy": 0.5191082114541252
+    },
+    {
+      "horizon": 15,
+      "nonzero_target_rows": 94391,
+      "frozen_training_mean_sign": -1,
+      "training_mean_direction_accuracy": 0.5180154887648187
+    },
+    {
+      "horizon": 30,
+      "nonzero_target_rows": 95155,
+      "frozen_training_mean_sign": -1,
+      "training_mean_direction_accuracy": 0.5235037570280069
+    }
+  ],
+  "selection_changed": false
+}

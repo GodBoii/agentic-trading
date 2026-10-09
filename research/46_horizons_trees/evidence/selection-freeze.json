@@ -1,0 +1,131 @@
+{
+  "created_utc": "2026-10-09T05:39:18.357716+00:00",
+  "features": [
+    "ret1",
+    "ret5",
+    "ret15",
+    "ret30",
+    "vol30",
+    "vwapdev",
+    "efficiency30",
+    "body_bps",
+    "range_bps",
+    "volume_local_ratio",
+    "session_return",
+    "same_slot_rvol",
+    "overnight_gap",
+    "peer_return5",
+    "peer_return15",
+    "peer_return30",
+    "residual_return5",
+    "residual_return15",
+    "residual_return30",
+    "minute_sin",
+    "minute_cos"
+  ],
+  "model_states": [
+    {
+      "file": "model-h5-ridge.json",
+      "sha256": "8a2338b599477e3179ed2050e2a3846f99c0c8ca0103b1f3eadc2bc571245c12"
+    },
+    {
+      "file": "model-h5-boosting.npz",
+      "sha256": "c602ce202aec4182fe98ee5fa95a6561d424c00f9e86df00262ee520d6108d3a"
+    },
+    {
+      "file": "model-h15-ridge.json",
+      "sha256": "e7526d777e320ab99059b6540dc3769c0cf2268437ee1003c94f0a266fd57425"
+    },
+    {
+      "file": "model-h15-boosting.npz",
+      "sha256": "5439e58718ec9c38ef01a64b701fc4a31eb2aa2eda6f089839304069eda93f4e"
+    },
+    {
+      "file": "model-h30-ridge.json",
+      "sha256": "a1c89a2c503830eb27c3ff5ea217f033fdb1951eb93a62f8cfbb7ed65b684335"
+    },
+    {
+      "file": "model-h30-boosting.npz",
+      "sha256": "b03ec31801e7ef829768c6d91d971bec0a51b071febbf7426244bfe05588c419"
+    }
+  ],
+  "selection_controls": 9,
+  "selections": [
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "momentum",
+      "horizon": 5,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "ridge",
+      "horizon": 5,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "boosting",
+      "horizon": 5,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "momentum",
+      "horizon": 15,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "ridge",
+      "horizon": 15,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "boosting",
+      "horizon": 15,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "momentum",
+      "horizon": 30,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "ridge",
+      "horizon": 30,
+      "net_pnl": 0.0,
+      "trades": 0
+    },
+    {
+      "abstain": true,
+      "candidate_id": "no_trade",
+      "family": "boosting",
+      "horizon": 30,
+      "net_pnl": 0.0,
+      "trades": 0
+    }
+  ],
+  "specification_sha256": "74cbe882708aad18e19a278212e63e93e77442ae8a6063e0e455aaeb888c1897",
+  "test_inspected_during_selection": false,
+  "validation_controls_sha256": "af340a9cb444e9d2e8b627697062341c170e3ceb1c1a1d29c268a75d87dd954c",
+  "validation_trials_sha256": "a2ca54f6493747f52df5bb0f1d16f118c013cf6ce0324258f9e063853d84e40d"
+}

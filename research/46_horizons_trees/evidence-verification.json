@@ -1,0 +1,336 @@
+{
+  "account_checks": [
+    {
+      "stem": "test-h15-boosting-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h15-boosting-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h15-momentum-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h15-momentum-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h15-ridge-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h15-ridge-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h30-boosting-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h30-boosting-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h30-momentum-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h30-momentum-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h30-ridge-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h30-ridge-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h5-boosting-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h5-boosting-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h5-momentum-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h5-momentum-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h5-ridge-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "test-h5-ridge-cost5",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15-no-trade-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_boosting_t10-cost2",
+      "trades": 91,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_boosting_t20-cost2",
+      "trades": 52,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_boosting_t30-cost2",
+      "trades": 32,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_momentum_l15_t10-cost2",
+      "trades": 4808,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_momentum_l15_t20-cost2",
+      "trades": 4406,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_momentum_l30_t10-cost2",
+      "trades": 4753,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_momentum_l30_t20-cost2",
+      "trades": 4504,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_momentum_l5_t10-cost2",
+      "trades": 4129,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_momentum_l5_t20-cost2",
+      "trades": 2906,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_ridge_t10-cost2",
+      "trades": 18,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_ridge_t20-cost2",
+      "trades": 5,
+      "verified": true
+    },
+    {
+      "stem": "validation-h15_ridge_t30-cost2",
+      "trades": 1,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30-no-trade-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_boosting_t10-cost2",
+      "trades": 187,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_boosting_t20-cost2",
+      "trades": 70,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_boosting_t30-cost2",
+      "trades": 36,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_momentum_l15_t10-cost2",
+      "trades": 3776,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_momentum_l15_t20-cost2",
+      "trades": 3495,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_momentum_l30_t10-cost2",
+      "trades": 3832,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_momentum_l30_t20-cost2",
+      "trades": 3700,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_momentum_l5_t10-cost2",
+      "trades": 3296,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_momentum_l5_t20-cost2",
+      "trades": 2411,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_ridge_t10-cost2",
+      "trades": 31,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_ridge_t20-cost2",
+      "trades": 8,
+      "verified": true
+    },
+    {
+      "stem": "validation-h30_ridge_t30-cost2",
+      "trades": 7,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5-no-trade-cost2",
+      "trades": 0,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_boosting_t10-cost2",
+      "trades": 73,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_boosting_t20-cost2",
+      "trades": 29,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_boosting_t30-cost2",
+      "trades": 13,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_momentum_l15_t10-cost2",
+      "trades": 5544,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_momentum_l15_t20-cost2",
+      "trades": 5306,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_momentum_l30_t10-cost2",
+      "trades": 5517,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_momentum_l30_t20-cost2",
+      "trades": 5467,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_momentum_l5_t10-cost2",
+      "trades": 4865,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_momentum_l5_t20-cost2",
+      "trades": 3544,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_ridge_t10-cost2",
+      "trades": 2,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_ridge_t20-cost2",
+      "trades": 1,
+      "verified": true
+    },
+    {
+      "stem": "validation-h5_ridge_t30-cost2",
+      "trades": 1,
+      "verified": true
+    }
+  ],
+  "forecast_checks": [
+    {
+      "boosting_max_error": 0.0,
+      "horizon": 5,
+      "phase": "validation",
+      "ridge_max_error": 2.6645352591003757e-15,
+      "rows": 61719
+    },
+    {
+      "boosting_max_error": 0.0,
+      "horizon": 5,
+      "phase": "test",
+      "ridge_max_error": 6.661338147750939e-16,
+      "rows": 96747
+    },
+    {
+      "boosting_max_error": 0.0,
+      "horizon": 15,
+      "phase": "validation",
+      "ridge_max_error": 3.552713678800501e-15,
+      "rows": 61719
+    },
+    {
+      "boosting_max_error": 0.0,
+      "horizon": 15,
+      "phase": "test",
+      "ridge_max_error": 1.7763568394002505e-15,
+      "rows": 96747
+    },
+    {
+      "boosting_max_error": 0.0,
+      "horizon": 30,
+      "phase": "validation",
+      "ridge_max_error": 5.329070518200751e-15,
+      "rows": 61719
+    },
+    {
+      "boosting_max_error": 0.0,
+      "horizon": 30,
+      "phase": "test",
+      "ridge_max_error": 1.7763568394002505e-15,
+      "rows": 96747
+    }
+  ],
+  "frozen_selection_before_test": "2026-10-09T05:39:18.357716+00:00",
+  "minimum_test_file_mtime": 1791524365.728052,
+  "verified": true
+}

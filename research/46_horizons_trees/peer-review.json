@@ -1,0 +1,21 @@
+{
+  "review_scope": "Read-only source, tests and selected actual-data inference checks for neighboring research tracks",
+  "track_47_sequence_network": {
+    "material_bugs_found": 0,
+    "tests_passed": 10,
+    "actual_train_scaler_recomputed_rows": 119238,
+    "saved_scaler_numeric_equality": true,
+    "safe_checkpoints_loaded": 6,
+    "actual_test_forecasts_reproduced_per_checkpoint": 32,
+    "forecast_comparison_tolerance_rtol_atol": [0.000001, 0.000001],
+    "prefix_inference_checked_per_checkpoint": true,
+    "review_findings": "Train-only scaler and target normalization, forward per-window GRU, validation-only checkpoint and variant selection, and safe checkpoint loading were consistent with the declared study. Whole-session dataset labels stay within each date phase."
+  },
+  "track_48_controlled_adaptation": {
+    "material_bugs_found": 0,
+    "pytest_tests_passed": 7,
+    "review_findings": "Weighted ridge equations, mature-label filtering, prevalidation shadow fitting, actual-incumbent unseen validation guard, fixed within-month coefficients, retention and deployment-refit distinction were consistent with the declared study.",
+    "minor_documentation_note": "hypotheses.json method labels 'rolling_12 month_monthly' and 'recency_90 date_monthly' contain spaces; executable identifiers use underscores."
+  },
+  "files_edited_in_reviewed_tracks": 0
+}

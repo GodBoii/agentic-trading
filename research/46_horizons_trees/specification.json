@@ -1,0 +1,40 @@
+{
+  "study": "bounded_momentum_ridge_histogram_boosting_horizon_comparison",
+  "dataset": "research/45_market_dataset, root-owned shared manifest and account engine",
+  "horizons_minutes": [5, 15, 30],
+  "momentum_lookbacks_minutes": [5, 15, 30],
+  "momentum_entry_thresholds_bps": [10.0, 20.0],
+  "learned_entry_thresholds_bps": [10.0, 20.0, 30.0],
+  "ridge_alpha": 100.0,
+  "boosting": {
+    "loss": "squared_error",
+    "learning_rate": 0.05,
+    "max_iter": 100,
+    "max_leaf_nodes": 8,
+    "max_depth": 3,
+    "min_samples_leaf": 100,
+    "l2_regularization": 10.0,
+    "early_stopping": false,
+    "random_state": 46
+  },
+  "training_dates": ["2022-01-01", "2023-12-31"],
+  "validation_dates": ["2024-01-01", "2024-12-31"],
+  "test_dates": ["2025-01-01", "2026-12-31"],
+  "selection": "validation net simulated-account PnL at 2 bps extra adverse cost per leg; lexicographic candidate-ID tie break; no-trade is eligible",
+  "minimum_validation_trades": 100,
+  "selection_groups": "one momentum candidate, one ridge threshold, one boosting threshold per horizon; nine separate frozen policies",
+  "validation_entry_trials": 36,
+  "validation_no_trade_controls": 9,
+  "test_costs_per_leg_bps": [2.0, 5.0],
+  "test_entry_policy_count": 9,
+  "model_training": "train-only models and scaling; no refit after validation; no test tuning",
+  "label": "decision after completed minute t; one full-minute reaction delay; entry at open t+2 and exit at open t+2+h; simple gross return bps",
+  "threshold_semantics": "net forecast margin after decision-time estimated round-trip fees and two adverse-cost legs; account helper performs gating",
+  "promotion_eligible": false,
+  "limitations": [
+    "Universe consists of current locally available stocks; historical membership unverified",
+    "Candle reference fills and fee sensitivity do not verify depth, real spread, margin or shortability",
+    "Validation-selected policies are one bounded study and remain subject to selection bias",
+    "Test history is locally available data, not guaranteed pristine"
+  ]
+}
