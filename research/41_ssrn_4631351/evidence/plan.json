@@ -1,0 +1,332 @@
+{
+  "dates": [
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21",
+    "2026-08-24",
+    "2026-08-25",
+    "2026-08-31",
+    "2026-09-01"
+  ],
+  "input_hashes": {
+    "2026-08-19": "1aea1eb6642ad074a9d83f30d3e2ed5584c6bfb65ff860678f9829baff2297b0",
+    "2026-08-20": "9a50945b67702024587c5c9ee5a1ed7e3f39a61b6bb18336c7bcfc9e663b82a7",
+    "2026-08-21": "d7662f3c77d50365462aaf4ef76fd6d76ab574ea45a4fdffc55dcc1747e15ad2",
+    "2026-08-24": "705e6cd20320d3bef29592651316e0d4d01256525b9ee5997ee89e8a00da7db4",
+    "2026-08-25": "458dab3021d72169c0eb9d2da507c5ee2c51523e819b108b0bbade71da2e2c4d",
+    "2026-08-31": "5f683aaa0de242656372c0f146f2c228463addc0c4336c87e0b54db0635f02e9",
+    "2026-09-01": "d6f6aefd64f880b7cfc1cbf303c1f442181b62bc2bb645c46f287eb7c1367bb5"
+  },
+  "limitations": [
+    "previously inspected historical data; no pristine holdout",
+    "downsampled observations; source quote age unverified",
+    "all-or-none aggressive fill proxy; no queue or calibrated impact",
+    "many hypotheses tested; selected maximum is biased",
+    "pending orders and account loss limits apply to all tracks"
+  ],
+  "phases": {
+    "2026-08-19": "development",
+    "2026-08-20": "development",
+    "2026-08-21": "development",
+    "2026-08-24": "validation_diagnostic",
+    "2026-08-25": "validation_diagnostic",
+    "2026-08-31": "historical_audit",
+    "2026-09-01": "historical_audit"
+  },
+  "promotion_eligible": false,
+  "runtime": {
+    "pandas": "3.0.3",
+    "python": "3.13.3"
+  },
+  "source_sha256": "668d2b375bd912bb94d0b5484fa3468030d1277add75db2f189ecba565c1e5f7",
+  "track": "41_ssrn_4631351",
+  "universe": {
+    "path": "C:\\Users\\prajw\\Downloads\\Trader\\python-backend\\results\\stage1\\2026-08-18\\universe.json",
+    "requested_count": 12,
+    "selected": [
+      {
+        "adv_20_cr": 1642.8226,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 4963,
+        "symbol": "ICICI BANK LTD."
+      },
+      {
+        "adv_20_cr": 1487.37,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 1594,
+        "symbol": "INFOSYS LIMITED"
+      },
+      {
+        "adv_20_cr": 1465.9949,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 2885,
+        "symbol": "RELIANCE INDUSTRIES LTD"
+      },
+      {
+        "adv_20_cr": 1323.4414,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 10604,
+        "symbol": "BHARTI AIRTEL LIMITED"
+      },
+      {
+        "adv_20_cr": 1319.5632,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 2955,
+        "symbol": "KALYAN JEWELLERS IND LTD"
+      },
+      {
+        "adv_20_cr": 1163.2391,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 3045,
+        "symbol": "STATE BANK OF INDIA"
+      },
+      {
+        "adv_20_cr": 1039.2394,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 317,
+        "symbol": "BAJAJ FINANCE LIMITED"
+      },
+      {
+        "adv_20_cr": 996.7148,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 5097,
+        "symbol": "ETERNAL LIMITED"
+      },
+      {
+        "adv_20_cr": 916.6857,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 759291,
+        "symbol": "BLUESTONE JEWEL LFSTL LTD"
+      },
+      {
+        "adv_20_cr": 855.0365,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 11536,
+        "symbol": "TATA CONSULTANCY SERV LT"
+      },
+      {
+        "adv_20_cr": 835.8609,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 5900,
+        "symbol": "AXIS BANK LIMITED"
+      },
+      {
+        "adv_20_cr": 816.8303,
+        "exchange_segment": "NSE_EQ",
+        "security_id": 18520,
+        "symbol": "CUPID LIMITED"
+      }
+    ],
+    "selection": "descending prior-universe ADV; ID tie break",
+    "sha256": "cc5bb9ed379e35e7b7073301efeadc1bbdfabb579b16511ffb5fd6d7f5107e32",
+    "source_date": "2026-08-18"
+  },
+  "variants": [
+    {
+      "execution": {
+        "aggregate_depth_fraction": 0.1,
+        "entry_cutoff_second": 53700,
+        "entry_start_second": 34500,
+        "extra_slippage_bps": 1.0,
+        "flatten_second": 55200,
+        "latency_ms": 250,
+        "maximum_daily_loss": 2500.0,
+        "maximum_entry_drift_bps": 5.0,
+        "maximum_position_value": 100000.0,
+        "maximum_positions": 3,
+        "order_ttl_seconds": 15,
+        "risk_per_trade": 500.0,
+        "starting_equity": 500000.0
+      },
+      "mode": "recent_trade",
+      "name": "vwap_direction",
+      "parameters": {
+        "combination": null,
+        "completed_bar_seconds": 60,
+        "exit_rules": "shared fixed target, stop, horizon; no VWAP reversal exit",
+        "hypotheses_sha256": "db6e2c28d4cf783374ed2461eee6747ecfc3a8a35f98e3dfe4bd8dd26ce2c9ea",
+        "paper_sha256": "47137abd00730dd6970d5d6409b3908342d63d75ecfc9cf2badc7d206f6905c8",
+        "replication_status": "Explicit NSE adaptation. Not an exact replication of the paper.",
+        "vwap_source": "vendor field at final observation of completed midpoint bar"
+      },
+      "policy": {
+        "confirmation_move_bps": 3.0,
+        "confirmation_seconds": 60,
+        "cooldown_seconds": 600,
+        "cost_reserve_bps": 5.0,
+        "freshness_mode": "recent_trade",
+        "horizon_seconds": 300,
+        "lookback_seconds": 300,
+        "maximum_gap_seconds": 15.0,
+        "maximum_move_bps": 100.0,
+        "maximum_spread_bps": 5.0,
+        "maximum_trade_age_seconds": 5.0,
+        "minimum_move_bps": 15.0,
+        "name": "vwap_direction",
+        "require_cost_room": false,
+        "require_vwap_alignment": false,
+        "stop_bps": 15.0,
+        "target_bps": 30.0,
+        "version": 1
+      }
+    },
+    {
+      "execution": {
+        "aggregate_depth_fraction": 0.1,
+        "entry_cutoff_second": 53700,
+        "entry_start_second": 34500,
+        "extra_slippage_bps": 1.0,
+        "flatten_second": 55200,
+        "latency_ms": 250,
+        "maximum_daily_loss": 2500.0,
+        "maximum_entry_drift_bps": 5.0,
+        "maximum_position_value": 100000.0,
+        "maximum_positions": 3,
+        "order_ttl_seconds": 15,
+        "risk_per_trade": 500.0,
+        "starting_equity": 500000.0
+      },
+      "mode": "receipt_proxy",
+      "name": "vwap_direction",
+      "parameters": {
+        "combination": null,
+        "completed_bar_seconds": 60,
+        "exit_rules": "shared fixed target, stop, horizon; no VWAP reversal exit",
+        "hypotheses_sha256": "db6e2c28d4cf783374ed2461eee6747ecfc3a8a35f98e3dfe4bd8dd26ce2c9ea",
+        "paper_sha256": "47137abd00730dd6970d5d6409b3908342d63d75ecfc9cf2badc7d206f6905c8",
+        "replication_status": "Explicit NSE adaptation. Not an exact replication of the paper.",
+        "vwap_source": "vendor field at final observation of completed midpoint bar"
+      },
+      "policy": {
+        "confirmation_move_bps": 3.0,
+        "confirmation_seconds": 60,
+        "cooldown_seconds": 600,
+        "cost_reserve_bps": 5.0,
+        "freshness_mode": "receipt_proxy",
+        "horizon_seconds": 300,
+        "lookback_seconds": 300,
+        "maximum_gap_seconds": 15.0,
+        "maximum_move_bps": 100.0,
+        "maximum_spread_bps": 5.0,
+        "maximum_trade_age_seconds": 5.0,
+        "minimum_move_bps": 15.0,
+        "name": "vwap_direction",
+        "require_cost_room": false,
+        "require_vwap_alignment": false,
+        "stop_bps": 15.0,
+        "target_bps": 30.0,
+        "version": 1
+      }
+    },
+    {
+      "execution": {
+        "aggregate_depth_fraction": 0.1,
+        "entry_cutoff_second": 53700,
+        "entry_start_second": 34500,
+        "extra_slippage_bps": 1.0,
+        "flatten_second": 55200,
+        "latency_ms": 250,
+        "maximum_daily_loss": 2500.0,
+        "maximum_entry_drift_bps": 5.0,
+        "maximum_position_value": 100000.0,
+        "maximum_positions": 3,
+        "order_ttl_seconds": 15,
+        "risk_per_trade": 500.0,
+        "starting_equity": 500000.0
+      },
+      "mode": "recent_trade",
+      "name": "vwap_momentum_confirmed",
+      "parameters": {
+        "combination": {
+          "completed_closes": 6,
+          "efficiency": "abs(C_t - C_t-5) / sum(abs(C_i - C_i-1))",
+          "minimum_efficiency": 0.3,
+          "minimum_same_direction_five_minute_return_bps": 8.0,
+          "minimum_same_direction_latest_minute_return_bps": 0.0,
+          "weight_learning": "None. Fixed confirmation filter, no estimated accuracy claim."
+        },
+        "completed_bar_seconds": 60,
+        "exit_rules": "shared fixed target, stop, horizon; no VWAP reversal exit",
+        "hypotheses_sha256": "db6e2c28d4cf783374ed2461eee6747ecfc3a8a35f98e3dfe4bd8dd26ce2c9ea",
+        "paper_sha256": "47137abd00730dd6970d5d6409b3908342d63d75ecfc9cf2badc7d206f6905c8",
+        "replication_status": "Explicit NSE adaptation. Not an exact replication of the paper.",
+        "vwap_source": "vendor field at final observation of completed midpoint bar"
+      },
+      "policy": {
+        "confirmation_move_bps": 3.0,
+        "confirmation_seconds": 60,
+        "cooldown_seconds": 600,
+        "cost_reserve_bps": 5.0,
+        "freshness_mode": "recent_trade",
+        "horizon_seconds": 300,
+        "lookback_seconds": 300,
+        "maximum_gap_seconds": 15.0,
+        "maximum_move_bps": 100.0,
+        "maximum_spread_bps": 5.0,
+        "maximum_trade_age_seconds": 5.0,
+        "minimum_move_bps": 15.0,
+        "name": "vwap_momentum_confirmed",
+        "require_cost_room": false,
+        "require_vwap_alignment": false,
+        "stop_bps": 15.0,
+        "target_bps": 30.0,
+        "version": 1
+      }
+    },
+    {
+      "execution": {
+        "aggregate_depth_fraction": 0.1,
+        "entry_cutoff_second": 53700,
+        "entry_start_second": 34500,
+        "extra_slippage_bps": 1.0,
+        "flatten_second": 55200,
+        "latency_ms": 250,
+        "maximum_daily_loss": 2500.0,
+        "maximum_entry_drift_bps": 5.0,
+        "maximum_position_value": 100000.0,
+        "maximum_positions": 3,
+        "order_ttl_seconds": 15,
+        "risk_per_trade": 500.0,
+        "starting_equity": 500000.0
+      },
+      "mode": "receipt_proxy",
+      "name": "vwap_momentum_confirmed",
+      "parameters": {
+        "combination": {
+          "completed_closes": 6,
+          "efficiency": "abs(C_t - C_t-5) / sum(abs(C_i - C_i-1))",
+          "minimum_efficiency": 0.3,
+          "minimum_same_direction_five_minute_return_bps": 8.0,
+          "minimum_same_direction_latest_minute_return_bps": 0.0,
+          "weight_learning": "None. Fixed confirmation filter, no estimated accuracy claim."
+        },
+        "completed_bar_seconds": 60,
+        "exit_rules": "shared fixed target, stop, horizon; no VWAP reversal exit",
+        "hypotheses_sha256": "db6e2c28d4cf783374ed2461eee6747ecfc3a8a35f98e3dfe4bd8dd26ce2c9ea",
+        "paper_sha256": "47137abd00730dd6970d5d6409b3908342d63d75ecfc9cf2badc7d206f6905c8",
+        "replication_status": "Explicit NSE adaptation. Not an exact replication of the paper.",
+        "vwap_source": "vendor field at final observation of completed midpoint bar"
+      },
+      "policy": {
+        "confirmation_move_bps": 3.0,
+        "confirmation_seconds": 60,
+        "cooldown_seconds": 600,
+        "cost_reserve_bps": 5.0,
+        "freshness_mode": "receipt_proxy",
+        "horizon_seconds": 300,
+        "lookback_seconds": 300,
+        "maximum_gap_seconds": 15.0,
+        "maximum_move_bps": 100.0,
+        "maximum_spread_bps": 5.0,
+        "maximum_trade_age_seconds": 5.0,
+        "minimum_move_bps": 15.0,
+        "name": "vwap_momentum_confirmed",
+        "require_cost_room": false,
+        "require_vwap_alignment": false,
+        "stop_bps": 15.0,
+        "target_bps": 30.0,
+        "version": 1
+      }
+    }
+  ]
+}

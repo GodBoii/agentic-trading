@@ -1,0 +1,23 @@
+{
+  "frozen_before_evaluation": true,
+  "paper": "ssrn-4631351.pdf",
+  "paper_sha256": "47137abd00730dd6970d5d6409b3908342d63d75ecfc9cf2badc7d206f6905c8",
+  "objective": "Compare a completed-minute vendor-VWAP directional entry with the same entry confirmed by causal five-minute momentum and path efficiency.",
+  "replication_status": "Explicit NSE adaptation. Not an exact replication of the paper.",
+  "variants": ["vwap_direction", "vwap_momentum_confirmed"],
+  "formula": "deviation_bps = 10000 * (completed_bar_midpoint_close / completed_bar_vendor_vwap - 1); side = sign(deviation_bps)",
+  "combination": {
+    "completed_closes": 6,
+    "minimum_same_direction_five_minute_return_bps": 8.0,
+    "minimum_same_direction_latest_minute_return_bps": 0.0,
+    "minimum_efficiency": 0.3,
+    "efficiency": "abs(C_t - C_t-5) / sum(abs(C_i - C_i-1))",
+    "weight_learning": "None. Fixed confirmation filter, no estimated accuracy claim."
+  },
+  "shared_policy": {"target_bps": 30.0, "stop_bps": 15.0, "horizon_seconds": 300, "cooldown_seconds": 600},
+  "modes": ["recent_trade", "receipt_proxy"],
+  "dates": ["2026-08-19", "2026-08-20", "2026-08-21", "2026-08-24", "2026-08-25", "2026-08-31", "2026-09-01"],
+  "selection": "Same prior-date 12-stock universe as research/common, no re-selection.",
+  "success_criterion": "Positive aggregate cost-adjusted PnL in both validation_diagnostic and historical_audit phases with complete sessions; receipt-proxy success alone cannot qualify for deployment.",
+  "restrictions": "Do not tune thresholds after observing results. Existing dates were previously inspected, so no pristine holdout."
+}

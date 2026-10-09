@@ -1,0 +1,38 @@
+{
+  "frozen_before_evaluation": true,
+  "selection": "First six NSE intraday_1m folders sorted by integer security ID, selected before performance evaluation.",
+  "security_ids": [
+    4,
+    7,
+    13,
+    22,
+    25,
+    34
+  ],
+  "variants": [
+    "vwap_direction",
+    "vwap_momentum_confirmed"
+  ],
+  "slippage_bps_per_side": [
+    0.0,
+    1.0,
+    5.0
+  ],
+  "primary_slippage_bps_per_side": 1.0,
+  "starting_equity_per_independent_sleeve_inr": 100000.0,
+  "session_rule": "Exactly 375 unique minute buckets 09:15..15:29 IST; positive finite valid OHLC, nonnegative volume and positive day volume. Invalid sessions excluded without filling gaps.",
+  "vwap": "cumsum(((high+low+close)/3)*volume)/cumsum(volume), reset each session; this is the paper's candle approximation.",
+  "baseline": "At minute t+1 open, target sign of close_t minus VWAP_t. Reverse on completed close crossing VWAP, flatten at last regular candle close. Exact equality or zero cumulative volume means flat.",
+  "combination": "Same target, except flat unless five-minute return agrees with direction by at least8bps, latest minute return agrees strictly, and five-minute path efficiency>=0.3. Requires six completed candles. This fixed filter is an extension, not the paper.",
+  "sizing": "Integer shares using available sleeve equity, fully collateralized without leverage, fee allowance included. Positions remain unchanged while target direction unchanged.",
+  "costs": "research.intraday_lab.costs current frozen NSE cash intraday tariff applied to all historical dates as a stress assumption, not historical contract notes. Slippage adverse on every entry/exit. No spread, quotes, impact or order book available in candles.",
+  "chronology": {
+    "exploratory": "through 2024-12-31",
+    "later_diagnostic": "2025-01-01 onward"
+  },
+  "interpretation": "No pristine holdout claim, no live eligibility. Coverage uses ex-post full-day availability and causes selection bias. Compare fixed primary1bps case, retain all stresses and all six names.",
+  "success_criterion": "Primary1bps aggregate net positive in later diagnostic, positive in at least4 of6 independent sleeves, and positive in5bps stress. This criterion alone never establishes live tradability.",
+  "hypotheses_sha256": "d7e4fb2ad66fbe113d269887fd8e19a233b1afcff1fca5293ff5f7d41a7017d8",
+  "source_sha256": "41e850db72334dc2e87398334169b239fb2f7a9b564178441daed767fb7c4de1",
+  "fee_source_sha256": "a95a123656efb110f4ef753524327a2665428af24060691ea3f13ab135b49e9f"
+}

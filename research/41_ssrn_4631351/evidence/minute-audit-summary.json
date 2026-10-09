@@ -1,0 +1,13 @@
+{
+  "rule": "Exactly 375 unique regular minute buckets 09:15..15:29 IST, positive finite consistent OHLC, nonnegative volume, positive session volume. Floor recorded timestamp seconds to its minute, timestamp candle labeling remains unverified.",
+  "full_local_audit_sha256": "ddcd2c1d6f6160b164d6622daae8aff4b38b841ee09dd27f24c115cfe11145d9",
+  "eligible_instruments": 73,
+  "file_count": 327,
+  "totals": {
+    "instrument_days": 60399,
+    "incomplete_or_invalid_instrument_days": 16517,
+    "files": 327,
+    "rows": 21723341,
+    "complete_375_bar_instrument_days": 43882
+  }
+}

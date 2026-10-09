@@ -1,0 +1,6 @@
+/runs/
+/candle-runs/
+/paper-extracted.txt
+/minute-data-audit.json
+__pycache__/
+*.pyc

@@ -1,0 +1,1336 @@
+{
+  "security_id": 34,
+  "accepted_days": 635,
+  "excluded_days": [
+    {
+      "date": "2021-07-26",
+      "rows": 311,
+      "unique_minutes": 311,
+      "valid": true
+    },
+    {
+      "date": "2021-07-27",
+      "rows": 307,
+      "unique_minutes": 307,
+      "valid": true
+    },
+    {
+      "date": "2021-07-28",
+      "rows": 324,
+      "unique_minutes": 324,
+      "valid": true
+    },
+    {
+      "date": "2021-07-29",
+      "rows": 290,
+      "unique_minutes": 290,
+      "valid": true
+    },
+    {
+      "date": "2021-07-30",
+      "rows": 298,
+      "unique_minutes": 298,
+      "valid": true
+    },
+    {
+      "date": "2021-08-03",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2021-08-04",
+      "rows": 292,
+      "unique_minutes": 292,
+      "valid": true
+    },
+    {
+      "date": "2021-08-05",
+      "rows": 297,
+      "unique_minutes": 297,
+      "valid": true
+    },
+    {
+      "date": "2021-08-09",
+      "rows": 291,
+      "unique_minutes": 291,
+      "valid": false
+    },
+    {
+      "date": "2021-08-10",
+      "rows": 288,
+      "unique_minutes": 288,
+      "valid": true
+    },
+    {
+      "date": "2021-08-11",
+      "rows": 291,
+      "unique_minutes": 291,
+      "valid": true
+    },
+    {
+      "date": "2021-08-12",
+      "rows": 302,
+      "unique_minutes": 302,
+      "valid": true
+    },
+    {
+      "date": "2021-08-13",
+      "rows": 304,
+      "unique_minutes": 304,
+      "valid": true
+    },
+    {
+      "date": "2021-08-16",
+      "rows": 314,
+      "unique_minutes": 314,
+      "valid": true
+    },
+    {
+      "date": "2021-08-17",
+      "rows": 305,
+      "unique_minutes": 305,
+      "valid": true
+    },
+    {
+      "date": "2021-08-18",
+      "rows": 290,
+      "unique_minutes": 290,
+      "valid": true
+    },
+    {
+      "date": "2021-08-20",
+      "rows": 297,
+      "unique_minutes": 297,
+      "valid": true
+    },
+    {
+      "date": "2021-08-23",
+      "rows": 298,
+      "unique_minutes": 298,
+      "valid": true
+    },
+    {
+      "date": "2021-08-24",
+      "rows": 297,
+      "unique_minutes": 296,
+      "valid": true
+    },
+    {
+      "date": "2021-08-25",
+      "rows": 299,
+      "unique_minutes": 299,
+      "valid": true
+    },
+    {
+      "date": "2021-08-26",
+      "rows": 303,
+      "unique_minutes": 302,
+      "valid": true
+    },
+    {
+      "date": "2021-08-27",
+      "rows": 302,
+      "unique_minutes": 302,
+      "valid": true
+    },
+    {
+      "date": "2021-08-30",
+      "rows": 296,
+      "unique_minutes": 296,
+      "valid": true
+    },
+    {
+      "date": "2021-08-31",
+      "rows": 291,
+      "unique_minutes": 290,
+      "valid": true
+    },
+    {
+      "date": "2021-09-01",
+      "rows": 322,
+      "unique_minutes": 322,
+      "valid": true
+    },
+    {
+      "date": "2021-09-02",
+      "rows": 196,
+      "unique_minutes": 196,
+      "valid": true
+    },
+    {
+      "date": "2021-09-03",
+      "rows": 304,
+      "unique_minutes": 304,
+      "valid": true
+    },
+    {
+      "date": "2021-09-06",
+      "rows": 299,
+      "unique_minutes": 299,
+      "valid": true
+    },
+    {
+      "date": "2021-09-07",
+      "rows": 296,
+      "unique_minutes": 296,
+      "valid": true
+    },
+    {
+      "date": "2021-09-08",
+      "rows": 305,
+      "unique_minutes": 304,
+      "valid": true
+    },
+    {
+      "date": "2021-09-09",
+      "rows": 217,
+      "unique_minutes": 216,
+      "valid": true
+    },
+    {
+      "date": "2021-09-13",
+      "rows": 305,
+      "unique_minutes": 305,
+      "valid": true
+    },
+    {
+      "date": "2021-09-14",
+      "rows": 305,
+      "unique_minutes": 305,
+      "valid": true
+    },
+    {
+      "date": "2021-09-15",
+      "rows": 103,
+      "unique_minutes": 103,
+      "valid": true
+    },
+    {
+      "date": "2021-09-16",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2021-09-17",
+      "rows": 285,
+      "unique_minutes": 285,
+      "valid": true
+    },
+    {
+      "date": "2021-09-20",
+      "rows": 356,
+      "unique_minutes": 356,
+      "valid": true
+    },
+    {
+      "date": "2021-09-21",
+      "rows": 354,
+      "unique_minutes": 354,
+      "valid": true
+    },
+    {
+      "date": "2021-09-22",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2021-09-23",
+      "rows": 341,
+      "unique_minutes": 341,
+      "valid": true
+    },
+    {
+      "date": "2021-09-24",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2021-09-27",
+      "rows": 365,
+      "unique_minutes": 365,
+      "valid": true
+    },
+    {
+      "date": "2021-09-28",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2021-09-29",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2021-09-30",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2021-10-01",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2021-10-04",
+      "rows": 343,
+      "unique_minutes": 343,
+      "valid": true
+    },
+    {
+      "date": "2021-10-05",
+      "rows": 365,
+      "unique_minutes": 365,
+      "valid": true
+    },
+    {
+      "date": "2021-10-06",
+      "rows": 369,
+      "unique_minutes": 369,
+      "valid": true
+    },
+    {
+      "date": "2021-10-07",
+      "rows": 356,
+      "unique_minutes": 356,
+      "valid": true
+    },
+    {
+      "date": "2021-10-08",
+      "rows": 342,
+      "unique_minutes": 342,
+      "valid": true
+    },
+    {
+      "date": "2021-10-11",
+      "rows": 355,
+      "unique_minutes": 355,
+      "valid": true
+    },
+    {
+      "date": "2021-10-12",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2021-10-13",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2021-10-14",
+      "rows": 364,
+      "unique_minutes": 364,
+      "valid": true
+    },
+    {
+      "date": "2021-10-18",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2021-10-19",
+      "rows": 360,
+      "unique_minutes": 360,
+      "valid": true
+    },
+    {
+      "date": "2021-10-20",
+      "rows": 365,
+      "unique_minutes": 365,
+      "valid": true
+    },
+    {
+      "date": "2021-10-21",
+      "rows": 354,
+      "unique_minutes": 354,
+      "valid": true
+    },
+    {
+      "date": "2021-10-22",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2021-10-25",
+      "rows": 366,
+      "unique_minutes": 366,
+      "valid": true
+    },
+    {
+      "date": "2021-10-26",
+      "rows": 353,
+      "unique_minutes": 353,
+      "valid": true
+    },
+    {
+      "date": "2021-10-27",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2021-10-28",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2021-10-29",
+      "rows": 353,
+      "unique_minutes": 353,
+      "valid": true
+    },
+    {
+      "date": "2021-11-01",
+      "rows": 368,
+      "unique_minutes": 368,
+      "valid": true
+    },
+    {
+      "date": "2021-11-02",
+      "rows": 355,
+      "unique_minutes": 355,
+      "valid": true
+    },
+    {
+      "date": "2021-11-03",
+      "rows": 353,
+      "unique_minutes": 353,
+      "valid": true
+    },
+    {
+      "date": "2021-11-04",
+      "rows": 44,
+      "unique_minutes": 44,
+      "valid": true
+    },
+    {
+      "date": "2021-11-08",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2021-11-09",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2021-11-10",
+      "rows": 373,
+      "unique_minutes": 373,
+      "valid": true
+    },
+    {
+      "date": "2021-11-12",
+      "rows": 367,
+      "unique_minutes": 367,
+      "valid": true
+    },
+    {
+      "date": "2021-11-16",
+      "rows": 364,
+      "unique_minutes": 364,
+      "valid": true
+    },
+    {
+      "date": "2021-11-17",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2021-11-18",
+      "rows": 367,
+      "unique_minutes": 367,
+      "valid": true
+    },
+    {
+      "date": "2021-11-22",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2021-11-23",
+      "rows": 367,
+      "unique_minutes": 367,
+      "valid": true
+    },
+    {
+      "date": "2021-11-24",
+      "rows": 346,
+      "unique_minutes": 346,
+      "valid": true
+    },
+    {
+      "date": "2021-11-25",
+      "rows": 367,
+      "unique_minutes": 367,
+      "valid": true
+    },
+    {
+      "date": "2021-11-26",
+      "rows": 369,
+      "unique_minutes": 369,
+      "valid": true
+    },
+    {
+      "date": "2021-11-29",
+      "rows": 365,
+      "unique_minutes": 365,
+      "valid": true
+    },
+    {
+      "date": "2021-11-30",
+      "rows": 355,
+      "unique_minutes": 355,
+      "valid": true
+    },
+    {
+      "date": "2021-12-01",
+      "rows": 368,
+      "unique_minutes": 368,
+      "valid": true
+    },
+    {
+      "date": "2021-12-02",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2021-12-03",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2021-12-06",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2021-12-07",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2021-12-08",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2021-12-09",
+      "rows": 340,
+      "unique_minutes": 340,
+      "valid": true
+    },
+    {
+      "date": "2021-12-10",
+      "rows": 341,
+      "unique_minutes": 341,
+      "valid": true
+    },
+    {
+      "date": "2021-12-13",
+      "rows": 364,
+      "unique_minutes": 364,
+      "valid": true
+    },
+    {
+      "date": "2021-12-14",
+      "rows": 349,
+      "unique_minutes": 349,
+      "valid": true
+    },
+    {
+      "date": "2021-12-15",
+      "rows": 353,
+      "unique_minutes": 353,
+      "valid": true
+    },
+    {
+      "date": "2021-12-16",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2021-12-17",
+      "rows": 370,
+      "unique_minutes": 370,
+      "valid": true
+    },
+    {
+      "date": "2021-12-20",
+      "rows": 357,
+      "unique_minutes": 357,
+      "valid": true
+    },
+    {
+      "date": "2021-12-21",
+      "rows": 353,
+      "unique_minutes": 353,
+      "valid": true
+    },
+    {
+      "date": "2021-12-22",
+      "rows": 357,
+      "unique_minutes": 357,
+      "valid": true
+    },
+    {
+      "date": "2021-12-23",
+      "rows": 340,
+      "unique_minutes": 340,
+      "valid": true
+    },
+    {
+      "date": "2021-12-24",
+      "rows": 368,
+      "unique_minutes": 368,
+      "valid": true
+    },
+    {
+      "date": "2021-12-27",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2021-12-28",
+      "rows": 343,
+      "unique_minutes": 343,
+      "valid": true
+    },
+    {
+      "date": "2021-12-29",
+      "rows": 327,
+      "unique_minutes": 327,
+      "valid": true
+    },
+    {
+      "date": "2021-12-30",
+      "rows": 346,
+      "unique_minutes": 346,
+      "valid": true
+    },
+    {
+      "date": "2021-12-31",
+      "rows": 361,
+      "unique_minutes": 361,
+      "valid": true
+    },
+    {
+      "date": "2022-01-03",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2022-01-04",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2022-01-05",
+      "rows": 354,
+      "unique_minutes": 354,
+      "valid": true
+    },
+    {
+      "date": "2022-01-06",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2022-01-07",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2022-01-10",
+      "rows": 358,
+      "unique_minutes": 358,
+      "valid": true
+    },
+    {
+      "date": "2022-01-11",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-01-12",
+      "rows": 353,
+      "unique_minutes": 353,
+      "valid": true
+    },
+    {
+      "date": "2022-01-13",
+      "rows": 349,
+      "unique_minutes": 349,
+      "valid": true
+    },
+    {
+      "date": "2022-01-14",
+      "rows": 342,
+      "unique_minutes": 342,
+      "valid": true
+    },
+    {
+      "date": "2022-01-17",
+      "rows": 341,
+      "unique_minutes": 341,
+      "valid": true
+    },
+    {
+      "date": "2022-01-18",
+      "rows": 369,
+      "unique_minutes": 369,
+      "valid": true
+    },
+    {
+      "date": "2022-01-19",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2022-01-20",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2022-01-21",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2022-01-24",
+      "rows": 349,
+      "unique_minutes": 349,
+      "valid": true
+    },
+    {
+      "date": "2022-01-25",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2022-01-27",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2022-01-28",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-01-31",
+      "rows": 346,
+      "unique_minutes": 346,
+      "valid": true
+    },
+    {
+      "date": "2022-02-01",
+      "rows": 348,
+      "unique_minutes": 348,
+      "valid": true
+    },
+    {
+      "date": "2022-02-02",
+      "rows": 340,
+      "unique_minutes": 340,
+      "valid": true
+    },
+    {
+      "date": "2022-02-03",
+      "rows": 346,
+      "unique_minutes": 346,
+      "valid": true
+    },
+    {
+      "date": "2022-02-04",
+      "rows": 348,
+      "unique_minutes": 348,
+      "valid": true
+    },
+    {
+      "date": "2022-02-07",
+      "rows": 358,
+      "unique_minutes": 358,
+      "valid": true
+    },
+    {
+      "date": "2022-02-08",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2022-02-09",
+      "rows": 340,
+      "unique_minutes": 340,
+      "valid": true
+    },
+    {
+      "date": "2022-02-10",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2022-02-11",
+      "rows": 373,
+      "unique_minutes": 373,
+      "valid": true
+    },
+    {
+      "date": "2022-02-14",
+      "rows": 355,
+      "unique_minutes": 355,
+      "valid": true
+    },
+    {
+      "date": "2022-02-15",
+      "rows": 356,
+      "unique_minutes": 356,
+      "valid": true
+    },
+    {
+      "date": "2022-02-16",
+      "rows": 348,
+      "unique_minutes": 348,
+      "valid": true
+    },
+    {
+      "date": "2022-02-17",
+      "rows": 357,
+      "unique_minutes": 357,
+      "valid": true
+    },
+    {
+      "date": "2022-02-18",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-02-21",
+      "rows": 366,
+      "unique_minutes": 366,
+      "valid": true
+    },
+    {
+      "date": "2022-02-22",
+      "rows": 362,
+      "unique_minutes": 362,
+      "valid": true
+    },
+    {
+      "date": "2022-02-23",
+      "rows": 355,
+      "unique_minutes": 355,
+      "valid": true
+    },
+    {
+      "date": "2022-02-24",
+      "rows": 360,
+      "unique_minutes": 360,
+      "valid": true
+    },
+    {
+      "date": "2022-02-25",
+      "rows": 369,
+      "unique_minutes": 369,
+      "valid": true
+    },
+    {
+      "date": "2022-02-28",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-03-02",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2022-03-03",
+      "rows": 336,
+      "unique_minutes": 336,
+      "valid": true
+    },
+    {
+      "date": "2022-03-07",
+      "rows": 358,
+      "unique_minutes": 358,
+      "valid": true
+    },
+    {
+      "date": "2022-03-08",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2022-03-09",
+      "rows": 322,
+      "unique_minutes": 322,
+      "valid": true
+    },
+    {
+      "date": "2022-03-10",
+      "rows": 357,
+      "unique_minutes": 357,
+      "valid": true
+    },
+    {
+      "date": "2022-03-11",
+      "rows": 348,
+      "unique_minutes": 348,
+      "valid": true
+    },
+    {
+      "date": "2022-03-14",
+      "rows": 341,
+      "unique_minutes": 341,
+      "valid": true
+    },
+    {
+      "date": "2022-03-15",
+      "rows": 333,
+      "unique_minutes": 333,
+      "valid": true
+    },
+    {
+      "date": "2022-03-16",
+      "rows": 340,
+      "unique_minutes": 340,
+      "valid": true
+    },
+    {
+      "date": "2022-03-17",
+      "rows": 360,
+      "unique_minutes": 360,
+      "valid": true
+    },
+    {
+      "date": "2022-03-21",
+      "rows": 358,
+      "unique_minutes": 358,
+      "valid": true
+    },
+    {
+      "date": "2022-03-22",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2022-03-23",
+      "rows": 337,
+      "unique_minutes": 337,
+      "valid": true
+    },
+    {
+      "date": "2022-03-24",
+      "rows": 334,
+      "unique_minutes": 334,
+      "valid": true
+    },
+    {
+      "date": "2022-03-25",
+      "rows": 329,
+      "unique_minutes": 329,
+      "valid": true
+    },
+    {
+      "date": "2022-03-28",
+      "rows": 349,
+      "unique_minutes": 349,
+      "valid": true
+    },
+    {
+      "date": "2022-03-29",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-03-30",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2022-03-31",
+      "rows": 355,
+      "unique_minutes": 355,
+      "valid": true
+    },
+    {
+      "date": "2022-04-01",
+      "rows": 356,
+      "unique_minutes": 356,
+      "valid": true
+    },
+    {
+      "date": "2022-04-04",
+      "rows": 365,
+      "unique_minutes": 365,
+      "valid": true
+    },
+    {
+      "date": "2022-04-05",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2022-04-06",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2022-04-07",
+      "rows": 336,
+      "unique_minutes": 336,
+      "valid": true
+    },
+    {
+      "date": "2022-04-08",
+      "rows": 343,
+      "unique_minutes": 343,
+      "valid": true
+    },
+    {
+      "date": "2022-04-09",
+      "rows": 42,
+      "unique_minutes": 42,
+      "valid": true
+    },
+    {
+      "date": "2022-04-11",
+      "rows": 354,
+      "unique_minutes": 354,
+      "valid": true
+    },
+    {
+      "date": "2022-04-12",
+      "rows": 364,
+      "unique_minutes": 364,
+      "valid": true
+    },
+    {
+      "date": "2022-04-13",
+      "rows": 366,
+      "unique_minutes": 366,
+      "valid": true
+    },
+    {
+      "date": "2022-04-18",
+      "rows": 365,
+      "unique_minutes": 365,
+      "valid": true
+    },
+    {
+      "date": "2022-04-19",
+      "rows": 357,
+      "unique_minutes": 357,
+      "valid": true
+    },
+    {
+      "date": "2022-04-20",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2022-04-21",
+      "rows": 297,
+      "unique_minutes": 297,
+      "valid": true
+    },
+    {
+      "date": "2022-04-22",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2022-04-25",
+      "rows": 350,
+      "unique_minutes": 350,
+      "valid": true
+    },
+    {
+      "date": "2022-04-26",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2022-04-27",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2022-04-28",
+      "rows": 339,
+      "unique_minutes": 339,
+      "valid": true
+    },
+    {
+      "date": "2022-04-29",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2022-05-02",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-05-04",
+      "rows": 351,
+      "unique_minutes": 351,
+      "valid": true
+    },
+    {
+      "date": "2022-05-05",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2022-05-06",
+      "rows": 359,
+      "unique_minutes": 359,
+      "valid": true
+    },
+    {
+      "date": "2022-05-09",
+      "rows": 356,
+      "unique_minutes": 356,
+      "valid": true
+    },
+    {
+      "date": "2022-05-10",
+      "rows": 348,
+      "unique_minutes": 348,
+      "valid": true
+    },
+    {
+      "date": "2022-05-11",
+      "rows": 358,
+      "unique_minutes": 358,
+      "valid": true
+    },
+    {
+      "date": "2022-05-12",
+      "rows": 356,
+      "unique_minutes": 356,
+      "valid": true
+    },
+    {
+      "date": "2022-05-13",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2022-05-16",
+      "rows": 341,
+      "unique_minutes": 341,
+      "valid": true
+    },
+    {
+      "date": "2022-05-17",
+      "rows": 352,
+      "unique_minutes": 352,
+      "valid": true
+    },
+    {
+      "date": "2022-05-18",
+      "rows": 360,
+      "unique_minutes": 360,
+      "valid": true
+    },
+    {
+      "date": "2022-05-19",
+      "rows": 347,
+      "unique_minutes": 347,
+      "valid": true
+    },
+    {
+      "date": "2022-05-20",
+      "rows": 358,
+      "unique_minutes": 358,
+      "valid": true
+    },
+    {
+      "date": "2022-05-23",
+      "rows": 366,
+      "unique_minutes": 366,
+      "valid": true
+    },
+    {
+      "date": "2022-05-24",
+      "rows": 343,
+      "unique_minutes": 343,
+      "valid": true
+    },
+    {
+      "date": "2022-05-25",
+      "rows": 345,
+      "unique_minutes": 345,
+      "valid": true
+    },
+    {
+      "date": "2022-05-26",
+      "rows": 339,
+      "unique_minutes": 339,
+      "valid": true
+    },
+    {
+      "date": "2022-05-27",
+      "rows": 367,
+      "unique_minutes": 367,
+      "valid": true
+    },
+    {
+      "date": "2022-06-23",
+      "rows": 369,
+      "unique_minutes": 369,
+      "valid": true
+    },
+    {
+      "date": "2022-07-01",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2022-11-23",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2023-04-27",
+      "rows": 372,
+      "unique_minutes": 372,
+      "valid": true
+    },
+    {
+      "date": "2023-07-14",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2024-03-02",
+      "rows": 106,
+      "unique_minutes": 106,
+      "valid": true
+    },
+    {
+      "date": "2024-05-18",
+      "rows": 107,
+      "unique_minutes": 107,
+      "valid": true
+    },
+    {
+      "date": "2024-08-05",
+      "rows": 366,
+      "unique_minutes": 366,
+      "valid": true
+    },
+    {
+      "date": "2024-09-13",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2024-10-11",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2024-10-31",
+      "rows": 370,
+      "unique_minutes": 370,
+      "valid": true
+    },
+    {
+      "date": "2024-11-06",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2024-12-31",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    }
+  ],
+  "source_files": [
+    {
+      "path": "context\\stocks-data\\NSE\\34\\intraday_1m\\2021.parquet",
+      "sha256": "89b2b0b003a5851e52200c9246cc15cb74c16bc69c653c3a3b13f2329459abe8"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\34\\intraday_1m\\2022.parquet",
+      "sha256": "7d3f7487c90b06d094f0987435636d95dc483b7dd0a29d4a390faffbf93a9635"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\34\\intraday_1m\\2023.parquet",
+      "sha256": "4f8fbe59d7a8776f7d7fc09b05dd6a958d4aad18a53a2f4d8861fdb91b11355b"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\34\\intraday_1m\\2024.parquet",
+      "sha256": "886a08d2a0db309f1321c2c99836861fa24873b32c844d974fb9287c3a0b40e3"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\34\\intraday_1m\\2025.parquet",
+      "sha256": "037b7f3805ad53902dfa25354fe242c9107847aa03efb94619e05921957bae9a"
+    }
+  ]
+}

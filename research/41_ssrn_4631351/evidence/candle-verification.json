@@ -1,0 +1,13 @@
+{
+  "verified": true,
+  "daily_ledger_rows": 34704,
+  "trade_ledger_rows": 126515,
+  "checks": [
+    "frozen_source_hash",
+    "frozen_specification_hash",
+    "trade_fee_accounting",
+    "next_bar_execution_indexes",
+    "daily_trade_reconciliation",
+    "sleeve_capital_continuity"
+  ]
+}

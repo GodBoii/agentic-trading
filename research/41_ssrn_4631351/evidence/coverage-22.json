@@ -1,0 +1,266 @@
+{
+  "security_id": 22,
+  "accepted_days": 1200,
+  "excluded_days": [
+    {
+      "date": "2021-07-30",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2021-08-04",
+      "rows": 277,
+      "unique_minutes": 277,
+      "valid": true
+    },
+    {
+      "date": "2021-08-05",
+      "rows": 285,
+      "unique_minutes": 285,
+      "valid": true
+    },
+    {
+      "date": "2021-08-07",
+      "rows": 167,
+      "unique_minutes": 167,
+      "valid": true
+    },
+    {
+      "date": "2021-08-09",
+      "rows": 284,
+      "unique_minutes": 284,
+      "valid": true
+    },
+    {
+      "date": "2021-08-10",
+      "rows": 298,
+      "unique_minutes": 298,
+      "valid": true
+    },
+    {
+      "date": "2021-08-11",
+      "rows": 273,
+      "unique_minutes": 273,
+      "valid": true
+    },
+    {
+      "date": "2021-08-12",
+      "rows": 284,
+      "unique_minutes": 284,
+      "valid": true
+    },
+    {
+      "date": "2021-08-13",
+      "rows": 278,
+      "unique_minutes": 278,
+      "valid": true
+    },
+    {
+      "date": "2021-08-16",
+      "rows": 287,
+      "unique_minutes": 287,
+      "valid": true
+    },
+    {
+      "date": "2021-08-17",
+      "rows": 317,
+      "unique_minutes": 317,
+      "valid": true
+    },
+    {
+      "date": "2021-08-18",
+      "rows": 292,
+      "unique_minutes": 292,
+      "valid": true
+    },
+    {
+      "date": "2021-08-20",
+      "rows": 283,
+      "unique_minutes": 283,
+      "valid": true
+    },
+    {
+      "date": "2021-08-23",
+      "rows": 280,
+      "unique_minutes": 280,
+      "valid": true
+    },
+    {
+      "date": "2021-08-24",
+      "rows": 276,
+      "unique_minutes": 276,
+      "valid": true
+    },
+    {
+      "date": "2021-08-25",
+      "rows": 280,
+      "unique_minutes": 280,
+      "valid": true
+    },
+    {
+      "date": "2021-08-26",
+      "rows": 288,
+      "unique_minutes": 288,
+      "valid": true
+    },
+    {
+      "date": "2021-08-27",
+      "rows": 282,
+      "unique_minutes": 282,
+      "valid": true
+    },
+    {
+      "date": "2021-08-30",
+      "rows": 302,
+      "unique_minutes": 302,
+      "valid": true
+    },
+    {
+      "date": "2021-08-31",
+      "rows": 280,
+      "unique_minutes": 280,
+      "valid": true
+    },
+    {
+      "date": "2021-09-01",
+      "rows": 252,
+      "unique_minutes": 246,
+      "valid": true
+    },
+    {
+      "date": "2021-09-02",
+      "rows": 254,
+      "unique_minutes": 254,
+      "valid": true
+    },
+    {
+      "date": "2021-09-03",
+      "rows": 344,
+      "unique_minutes": 344,
+      "valid": true
+    },
+    {
+      "date": "2021-09-06",
+      "rows": 308,
+      "unique_minutes": 308,
+      "valid": true
+    },
+    {
+      "date": "2021-09-07",
+      "rows": 285,
+      "unique_minutes": 285,
+      "valid": true
+    },
+    {
+      "date": "2021-09-08",
+      "rows": 276,
+      "unique_minutes": 276,
+      "valid": true
+    },
+    {
+      "date": "2021-09-09",
+      "rows": 197,
+      "unique_minutes": 197,
+      "valid": true
+    },
+    {
+      "date": "2021-09-13",
+      "rows": 284,
+      "unique_minutes": 284,
+      "valid": true
+    },
+    {
+      "date": "2021-09-14",
+      "rows": 283,
+      "unique_minutes": 283,
+      "valid": true
+    },
+    {
+      "date": "2021-09-15",
+      "rows": 206,
+      "unique_minutes": 206,
+      "valid": true
+    },
+    {
+      "date": "2021-09-17",
+      "rows": 280,
+      "unique_minutes": 280,
+      "valid": true
+    },
+    {
+      "date": "2021-11-04",
+      "rows": 38,
+      "unique_minutes": 38,
+      "valid": true
+    },
+    {
+      "date": "2022-01-27",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2022-04-09",
+      "rows": 247,
+      "unique_minutes": 247,
+      "valid": true
+    },
+    {
+      "date": "2022-04-30",
+      "rows": 172,
+      "unique_minutes": 172,
+      "valid": true
+    },
+    {
+      "date": "2022-11-23",
+      "rows": 374,
+      "unique_minutes": 374,
+      "valid": true
+    },
+    {
+      "date": "2024-03-02",
+      "rows": 106,
+      "unique_minutes": 106,
+      "valid": true
+    },
+    {
+      "date": "2024-05-18",
+      "rows": 107,
+      "unique_minutes": 107,
+      "valid": true
+    },
+    {
+      "date": "2025-10-21",
+      "rows": 60,
+      "unique_minutes": 60,
+      "valid": true
+    }
+  ],
+  "source_files": [
+    {
+      "path": "context\\stocks-data\\NSE\\22\\intraday_1m\\2021.parquet",
+      "sha256": "8128e81795c4e5b9cb8cb71ad64959ec186545577ae8e529e847ca4d018457ca"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\22\\intraday_1m\\2022.parquet",
+      "sha256": "a756f7a254c36649f5be632c45fa783155bd9c1e5b23d46142b9181e5e1bff7b"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\22\\intraday_1m\\2023.parquet",
+      "sha256": "fc59004730691a5ef43fa70a46ebd14e5d573df12f1446a2f4525e2da122db81"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\22\\intraday_1m\\2024.parquet",
+      "sha256": "12563f66d2280670bdf3d0fc1b2c60aca27ee46a7882ce234b3ddb555fc2aa4d"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\22\\intraday_1m\\2025.parquet",
+      "sha256": "1d6d71396560d4b99c31b27fa47cd5109d54d89dbe2856dbbc64000fc403505e"
+    },
+    {
+      "path": "context\\stocks-data\\NSE\\22\\intraday_1m\\2026.parquet",
+      "sha256": "eb9d05bdd0eb94655570bca8b826f75cf85f74998dcae3006937732c3defcf8f"
+    }
+  ]
+}
