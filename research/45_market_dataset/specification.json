@@ -1,0 +1,17 @@
+{
+  "cohort_count": 12,
+  "selection_year": 2022,
+  "minimum_selection_sessions": 150,
+  "selection": "Descending 2022 median daily sum of typical candle price times volume, among complete eligible regular sessions. Numeric security ID breaks ties. Current survivor/download coverage limitation.",
+  "dates": {"training": ["2022-01-01", "2023-12-31"], "validation": ["2024-01-01", "2024-12-31"], "evaluation": ["2025-01-01", "2026-12-31"]},
+  "horizons_minutes": [5, 15, 30],
+  "decision_minutes": [585, 600, 615, 630, 645, 660, 675, 690, 705, 720, 735, 750, 765, 780, 795, 810, 825, 840, 855, 870, 885],
+  "decision_semantics": "Completed minute identified by start bucket t. Features available at t+1 minute boundary. Entry reference open at t+2 minutes, a full minute later; exit open at entry+h minutes.",
+  "session_admission": "Exactly 375 unique minute buckets09:15..15:29IST, finite consistent positive OHLC/nonnegative volume/positive session total; timestamp seconds floored and weekend excluded. Ex-post full-day admission creates coverage selection bias.",
+  "sequence": {"length": 30, "channels": ["return1_bps", "body_bps", "range_bps", "log1p_volume_to_prior30_mean", "vwap_deviation_bps"]},
+  "relative_volume": "Each same-minute volume divided by mean of up to20strictly prior eligible sessions, minimum5. No current or future session in baseline.",
+  "context": "Equal-weight leave-one-out synchronized stock peers, minimum4, using only current completed-minute returns. This is a peer proxy, not an index/sector or tradable hedge.",
+  "account": {"starting_equity": 500000, "maximum_positions": 3, "maximum_notional": 100000, "daily_realized_loss_halt": 2500, "cost_per_leg_bps": [2, 5], "default_net_edge_gate_bps": 2},
+  "promotion_eligible": false,
+  "limitations": ["No bid/ask, original trade events, quote age or size capacity in historical candles", "Corporate actions and original candle timestamp labeling unverified", "Current survivor universe and ex-post full-session availability bias", "Current frozen NSE tariff on earlier years is a counterfactual sensitivity", "No untouched final-holdout claim for previously available history"]
+}
