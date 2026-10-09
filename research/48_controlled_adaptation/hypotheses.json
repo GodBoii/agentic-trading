@@ -1,0 +1,50 @@
+{
+  "frozen_before_evaluation": true,
+  "dataset": "research.45_market_dataset.dataset/account shared API; FEATURES_CONTEXT21columns and same cohort/account rules for all branches",
+  "primary_horizon_minutes": 15,
+  "additional_horizons_if_available": [
+    5,
+    30
+  ],
+  "selector_horizons": [
+    15
+  ],
+  "evaluation_cost_bps_per_side": [
+    2.0,
+    5.0
+  ],
+  "shadow_selection_cost_bps_per_side": 2.0,
+  "net_edge_entry_threshold_bps": 2.0,
+  "methods": [
+    "static_ridge",
+    "expanding_monthly",
+    "rolling_12 month_monthly",
+    "recency_90 date_monthly",
+    "controlled_selector"
+  ],
+  "ridge_alpha": 1.0,
+  "feature_scaling": "Training-weighted mean and standard deviation only; constant columns scale 1; intercept not penalized; all coefficients fixed within deployed month",
+  "static_train": "2022-01-01 through 2023-12-31, target label available strictly before 2024-01-01",
+  "expanding": "All rows from 2022 onward with label_end strictly before deployment month",
+  "rolling": "Rows dated on/after deployment month minus 12 calendar months; labels available strictly before deployment month",
+  "recency": "All available rows, each weight exp(-log(2)*observed_trading_date_age/90), newest date age 0",
+  "selector": {
+    "validation_trading_dates": 60,
+    "eligible_validation_dates_start": "2024-01-01",
+    "initial_champion_method": "static_ridge",
+    "schedule": "Monthly boundary only, first eligible boundary after 60 prior dates from 2024 onward",
+    "shadow_fit": "Every candidate trained on labels ending strictly before the first validation date. Historical validation spans the latest 60 observed trading dates ending strictly before deployment month.",
+    "incumbent_comparison": "Score the ACTUAL immutable deployed incumbent on the full 60 date validation block only if incumbent's final training label ends strictly before that block. Otherwise retain current coefficients and log waiting_unseen 60 date_validation. This means controlled updates can occur less often than monthly; every boundary still logs a decision.",
+    "static_shadow": "Uses original 2022-23 training subset available at shadow cutoff; selector begins only when cutoff is 2024 or later so full static training precedes validation.",
+    "switch_rule": "Candidate shadow must lower validation MAE by at least 1 percent versus actual incumbent, with validation net utility per opportunity nonnegative and no worse than incumbent. Candidate may use the same method with newer coefficients. Choose lowest MAE qualifying candidate; deterministic declared method order breaks ties. No qualifying challenger means keep the actual model unchanged.",
+    "utility": "Exact shared account_replay net PnL divided by validation opportunity rows, with 2 bpsperleg and 2 bps estimated net entry gate. Same historical validation rows for all candidates.",
+    "deployment_refit": "Chosen method refits on all eligible history according to its declared window, up to but excluding deployment month. Static model stays immutable. Switching logs distinguish shadow model and final deployment model hashes."
+  },
+  "splits": {
+    "fit": "2022-2023",
+    "validation": "2024",
+    "historical_test": "2025-2026"
+  },
+  "selection": "No post-test hyperparameter tuning, fixed ridge alpha/windows/half-life/gate. Earlier realized labels may update future deployed-month models, never same-month model. Offline replay only.",
+  "success": "Later-period cost-adjusted account PnL improvement against static and persistent direction/MAE improvement across later years; report allmethods, no live eligibility."
+}

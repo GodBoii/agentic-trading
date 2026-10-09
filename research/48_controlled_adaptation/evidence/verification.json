@@ -1,0 +1,19 @@
+{
+  "verified": true,
+  "deployments": 403,
+  "model_snapshots": 357,
+  "controlled_boundaries": 31,
+  "accepted_switches": 0,
+  "account_evaluations": 104,
+  "checks": [
+    "frozen_code",
+    "model_snapshot_hashes",
+    "training_label_maturity",
+    "actual_incumbent_holdout",
+    "challenger_holdout",
+    "no_refit_after_rejected_switch",
+    "error_and_nonnegative_cost_gate",
+    "delayed_execution",
+    "fee_and_daily_accounting"
+  ]
+}
