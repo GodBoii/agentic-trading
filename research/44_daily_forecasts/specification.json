@@ -1,0 +1,21 @@
+{
+  "experiment_kind": "daily_history_forecast_and_bar_price_diagnostic",
+  "security_ids": [4963, 1594, 2885, 10604, 3045, 11536, 5900],
+  "universe_reason": "Seven established large stocks from the existing frozen quote research cohort, selected before new outcome inspection. Conditional survivor sample, not historical point-in-time selection.",
+  "training_target_dates": ["2012-01-01", "2022-12-31"],
+  "weight_fit_target_dates": ["2023-01-01", "2024-12-31"],
+  "evaluation_target_dates": ["2025-01-01", "2026-12-31"],
+  "target": "Next available session open-to-close simple return in basis points",
+  "features_available": "Prior session completed daily bar; no target-day feature is used",
+  "ridge_alpha": 100.0,
+  "forest": {"n_estimators": 120, "max_depth": 4, "min_samples_leaf": 200, "max_features": 0.7, "random_state": 41, "n_jobs": 1},
+  "ensemble_members": ["momentum_ridge", "reversal_ridge", "forest"],
+  "weights": "Equal weights or normalized inverse calibration MSE, frozen after 2024. No validation tuning.",
+  "diagnostic_entry_threshold_bps": 15.0,
+  "diagnostic_max_positions": 5,
+  "diagnostic_notional_per_position": 100000.0,
+  "diagnostic_extra_cost_per_leg_bps": [2.0, 5.0, 10.0],
+  "fees": "Existing frozen 2026-09-30 NSE intraday model applied counterfactually to all evaluation dates",
+  "promotion_eligible": false,
+  "limitations": ["Daily open/close are idealized reference prices, not verified achievable fills or broker square-off prices", "No intraday stop, margin, shortability, queue, depth or actual spread evidence", "Corporate-action adjustment and historical universe membership are unverified", "Single static chronological split; no claim of independent or untouched final holdout"]
+}

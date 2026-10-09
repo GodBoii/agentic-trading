@@ -1,0 +1,276 @@
+{
+  "bar_price_diagnostics": [
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 0,
+      "fees": 0,
+      "gross_pnl": 0,
+      "live_fill_claim": false,
+      "model": "momentum_ridge",
+      "net_pnl": 0,
+      "trades": 0
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 0,
+      "fees": 0,
+      "gross_pnl": 0,
+      "live_fill_claim": false,
+      "model": "momentum_ridge",
+      "net_pnl": 0,
+      "trades": 0
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 0,
+      "fees": 0,
+      "gross_pnl": 0,
+      "live_fill_claim": false,
+      "model": "momentum_ridge",
+      "net_pnl": 0,
+      "trades": 0
+    },
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 8,
+      "fees": 908.37,
+      "gross_pnl": 8827.872600000079,
+      "live_fill_claim": false,
+      "model": "reversal_ridge",
+      "net_pnl": 7919.50260000008,
+      "trades": 11
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 8,
+      "fees": 908.37,
+      "gross_pnl": 8176.981500000159,
+      "live_fill_claim": false,
+      "model": "reversal_ridge",
+      "net_pnl": 7268.611500000159,
+      "trades": 11
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 8,
+      "fees": 908.38,
+      "gross_pnl": 7092.163000000193,
+      "live_fill_claim": false,
+      "model": "reversal_ridge",
+      "net_pnl": 6183.783000000193,
+      "trades": 11
+    },
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 9,
+      "fees": 908.51,
+      "gross_pnl": 9805.44928000009,
+      "live_fill_claim": false,
+      "model": "full_ridge",
+      "net_pnl": 8896.93928000009,
+      "trades": 11
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 9,
+      "fees": 908.49,
+      "gross_pnl": 9153.62320000018,
+      "live_fill_claim": false,
+      "model": "full_ridge",
+      "net_pnl": 8245.13320000018,
+      "trades": 11
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 9,
+      "fees": 908.51,
+      "gross_pnl": 8067.246400000175,
+      "live_fill_claim": false,
+      "model": "full_ridge",
+      "net_pnl": 7158.736400000174,
+      "trades": 11
+    },
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 13,
+      "fees": 1074.47,
+      "gross_pnl": -6048.357519999933,
+      "live_fill_claim": false,
+      "model": "forest",
+      "net_pnl": -7122.827519999933,
+      "trades": 13
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 13,
+      "fees": 1074.44,
+      "gross_pnl": -6824.9937999998765,
+      "live_fill_claim": false,
+      "model": "forest",
+      "net_pnl": -7899.433799999877,
+      "trades": 13
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 13,
+      "fees": 1074.45,
+      "gross_pnl": -8119.387599999886,
+      "live_fill_claim": false,
+      "model": "forest",
+      "net_pnl": -9193.837599999886,
+      "trades": 13
+    },
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 2,
+      "fees": 165.29000000000002,
+      "gross_pnl": 232.44864000002258,
+      "live_fill_claim": false,
+      "model": "equal_ensemble",
+      "net_pnl": 67.15864000002261,
+      "trades": 2
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 2,
+      "fees": 165.29000000000002,
+      "gross_pnl": 113.12160000002336,
+      "live_fill_claim": false,
+      "model": "equal_ensemble",
+      "net_pnl": -52.1683999999766,
+      "trades": 2
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 2,
+      "fees": 165.29000000000002,
+      "gross_pnl": -85.7567999999751,
+      "live_fill_claim": false,
+      "model": "equal_ensemble",
+      "net_pnl": -251.04679999997518,
+      "trades": 2
+    },
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 2,
+      "fees": 165.29000000000002,
+      "gross_pnl": 232.44864000002258,
+      "live_fill_claim": false,
+      "model": "weighted_ensemble",
+      "net_pnl": 67.15864000002261,
+      "trades": 2
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 2,
+      "fees": 165.29000000000002,
+      "gross_pnl": 113.12160000002336,
+      "live_fill_claim": false,
+      "model": "weighted_ensemble",
+      "net_pnl": -52.1683999999766,
+      "trades": 2
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 2,
+      "fees": 165.29000000000002,
+      "gross_pnl": -85.7567999999751,
+      "live_fill_claim": false,
+      "model": "weighted_ensemble",
+      "net_pnl": -251.04679999997518,
+      "trades": 2
+    },
+    {
+      "cost_per_leg_bps": 2.0,
+      "days_with_positions": 0,
+      "fees": 0,
+      "gross_pnl": 0,
+      "live_fill_claim": false,
+      "model": "training_mean",
+      "net_pnl": 0,
+      "trades": 0
+    },
+    {
+      "cost_per_leg_bps": 5.0,
+      "days_with_positions": 0,
+      "fees": 0,
+      "gross_pnl": 0,
+      "live_fill_claim": false,
+      "model": "training_mean",
+      "net_pnl": 0,
+      "trades": 0
+    },
+    {
+      "cost_per_leg_bps": 10.0,
+      "days_with_positions": 0,
+      "fees": 0,
+      "gross_pnl": 0,
+      "live_fill_claim": false,
+      "model": "training_mean",
+      "net_pnl": 0,
+      "trades": 0
+    }
+  ],
+  "experiment_kind": "daily_history_forecast_and_bar_price_diagnostic",
+  "forecast_metrics": {
+    "equal_ensemble": {
+      "direction_accuracy": 0.5259259259259259,
+      "direction_rows": 2700,
+      "mae_bps": 92.02527269760617,
+      "r2_vs_training_mean": 0.0006340484938930357,
+      "rmse_bps": 122.46346945904513,
+      "rows": 2709
+    },
+    "forest": {
+      "direction_accuracy": 0.5125925925925926,
+      "direction_rows": 2700,
+      "mae_bps": 92.12888752589078,
+      "r2_vs_training_mean": 0.0005060563860773692,
+      "rmse_bps": 122.47131135906596,
+      "rows": 2709
+    },
+    "full_ridge": {
+      "direction_accuracy": 0.5103703703703704,
+      "direction_rows": 2700,
+      "mae_bps": 92.0707449438577,
+      "r2_vs_training_mean": 0.00020297208132757927,
+      "rmse_bps": 122.48987891464655,
+      "rows": 2709
+    },
+    "momentum_ridge": {
+      "direction_accuracy": 0.5277777777777778,
+      "direction_rows": 2700,
+      "mae_bps": 91.97620084399132,
+      "r2_vs_training_mean": 0.0013020631203324307,
+      "rmse_bps": 122.42253297123912,
+      "rows": 2709
+    },
+    "reversal_ridge": {
+      "direction_accuracy": 0.5270370370370371,
+      "direction_rows": 2700,
+      "mae_bps": 92.05431921194013,
+      "r2_vs_training_mean": -0.0011944461776287607,
+      "rmse_bps": 122.57545119546872,
+      "rows": 2709
+    },
+    "training_mean": {
+      "direction_accuracy": 0.5248148148148148,
+      "direction_rows": 2700,
+      "mae_bps": 92.00582790741933,
+      "r2_vs_training_mean": 0.0,
+      "rmse_bps": 122.50231182016053,
+      "rows": 2709
+    },
+    "weighted_ensemble": {
+      "direction_accuracy": 0.5259259259259259,
+      "direction_rows": 2700,
+      "mae_bps": 92.02525387011136,
+      "r2_vs_training_mean": 0.000634155977218942,
+      "rmse_bps": 122.46346287347887,
+      "rows": 2709
+    }
+  },
+  "manifest_sha256": "470a98b585ad403e82ca74f2ba61b0b2cfa9dbbf6578737d0dc6c6697621397f",
+  "model_freeze_sha256": "b1f6c36ffffeb99a5fe184782baf5ac29eee1a1343ec901af3ad8b5b233f9d89",
+  "promotion_eligible": false
+}

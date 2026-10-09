@@ -1,0 +1,105 @@
+{
+  "cohort": {
+    "calibration": {
+      "dates": 495,
+      "end": "2024-12-31",
+      "large_overnight_gap_rows": 0,
+      "rows": 3465,
+      "start": "2023-01-02"
+    },
+    "evaluation": {
+      "dates": 387,
+      "end": "2026-07-24",
+      "large_overnight_gap_rows": 0,
+      "rows": 2709,
+      "start": "2025-01-01"
+    },
+    "training": {
+      "dates": 2727,
+      "end": "2022-12-30",
+      "large_overnight_gap_rows": 0,
+      "rows": 19089,
+      "start": "2012-01-02"
+    }
+  },
+  "experiment_kind": "daily_history_forecast_and_bar_price_diagnostic",
+  "inputs": [
+    {
+      "first_date": "2003-09-05",
+      "history_resets": 0,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/4963/daily.parquet",
+      "rows": 5684,
+      "sha256": "20030a10177e30b55f9390087b360fa6ea972fc8c5cf8eabe997660be56b2abc"
+    },
+    {
+      "first_date": "2003-09-05",
+      "history_resets": 0,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/1594/daily.parquet",
+      "rows": 5684,
+      "sha256": "7a34bf7776e762391cd1d51aa71f270d8fd764132f1f772498951b712ddff40b"
+    },
+    {
+      "first_date": "2002-01-01",
+      "history_resets": 1,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/2885/daily.parquet",
+      "rows": 6106,
+      "sha256": "7f9b3487471309895a0d6a0d4c246a8aba69506256b972f30aab85f7113f68d5"
+    },
+    {
+      "first_date": "2002-02-15",
+      "history_resets": 0,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/10604/daily.parquet",
+      "rows": 6073,
+      "sha256": "43869d2cd0e8782ca90bced298481688bf66a35db57964bf6fdf65fb58f746c1"
+    },
+    {
+      "first_date": "2003-09-05",
+      "history_resets": 0,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/3045/daily.parquet",
+      "rows": 5684,
+      "sha256": "47672296b4e2d8d4895d76e9606d10806ee5fb97e83476bb55a9340dc2f49c9d"
+    },
+    {
+      "first_date": "2004-08-25",
+      "history_resets": 0,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/11536/daily.parquet",
+      "rows": 5437,
+      "sha256": "db46b7bc5cd4701ab653f2fa713c4e83f6d74e2712a042ef05aefa31fdb5c5a3"
+    },
+    {
+      "first_date": "2002-01-01",
+      "history_resets": 0,
+      "invalid_rows": 0,
+      "last_date": "2026-07-24",
+      "path": "context/stocks-data/NSE/5900/daily.parquet",
+      "rows": 6106,
+      "sha256": "2f8ced5d39430737264131a2ef467b981389dd0789498b8e851d8552ca982ddd"
+    }
+  ],
+  "promotion_eligible": false,
+  "runtime": {
+    "numpy": "2.4.5",
+    "pandas": "3.0.3",
+    "python": "3.13.3",
+    "sklearn": "1.8.0"
+  },
+  "source_hashes": {
+    "research/44_daily_forecasts/__init__.py": "147b31c741118b62057abfe533985e3050ebb9ac21e61c83207a1c44e74eadb7",
+    "research/44_daily_forecasts/methods.py": "9ad3012a266c3cd838f8094b8acb6e905c6b6246e347a7e7c8e42ba1171c69b6",
+    "research/44_daily_forecasts/run.py": "c72b81c216450eff33b9b52a39fed9d2ade791ab8980a8ee15eeabf7cac40ab1",
+    "research/intraday_lab/costs.py": "a95a123656efb110f4ef753524327a2665428af24060691ea3f13ab135b49e9f"
+  },
+  "specification_sha256": "1997562e2bbe2215957150a6a0baae562225a0452042e85adf32efd06d4c4da3"
+}
