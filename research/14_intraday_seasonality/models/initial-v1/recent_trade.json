@@ -1,0 +1,20 @@
+{
+  "coverage_counts": {
+    "complete_slots": 0,
+    "observed_slots": 420,
+    "rejected_slots": 420
+  },
+  "freshness_mode": "recent_trade",
+  "input_hashes": {
+    "2026-08-19": "1aea1eb6642ad074a9d83f30d3e2ed5584c6bfb65ff860678f9829baff2297b0",
+    "2026-08-20": "9a50945b67702024587c5c9ee5a1ed7e3f39a61b6bb18336c7bcfc9e663b82a7",
+    "2026-08-21": "d7662f3c77d50365462aaf4ef76fd6d76ab574ea45a4fdffc55dcc1747e15ad2"
+  },
+  "records": [],
+  "three_session_estimates": 0,
+  "training_dates": [
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21"
+  ]
+}

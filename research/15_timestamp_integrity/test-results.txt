@@ -1,0 +1,22 @@
+test_aware_trade_datetime_preserves_signed_microseconds (test_normalizer.NormalizerTests.test_aware_trade_datetime_preserves_signed_microseconds) ... ok
+test_bare_clock_retains_unknown_date_and_timezone (test_normalizer.NormalizerTests.test_bare_clock_retains_unknown_date_and_timezone) ... ok
+test_binary_full_preserves_epoch_and_wire_hash (test_normalizer.NormalizerTests.test_binary_full_preserves_epoch_and_wire_hash) ... ok
+test_capture_and_packet_identity_must_match (test_normalizer.NormalizerTests.test_capture_and_packet_identity_must_match) ... ok
+test_crossed_book_fails_closed (test_normalizer.NormalizerTests.test_crossed_book_fails_closed) ... ok
+test_frozen_observation_cannot_mutate (test_normalizer.NormalizerTests.test_frozen_observation_cannot_mutate) ... ok
+test_invented_quote_time_field_does_not_create_source_provenance (test_normalizer.NormalizerTests.test_invented_quote_time_field_does_not_create_source_provenance) ... ok
+test_malformed_time_and_numbers_rejected (test_normalizer.NormalizerTests.test_malformed_time_and_numbers_rejected) ... ok
+test_missing_trade_time_preserved (test_normalizer.NormalizerTests.test_missing_trade_time_preserved) ... ok
+test_naive_receipt_fails_closed (test_normalizer.NormalizerTests.test_naive_receipt_fails_closed) ... ok
+test_negative_offset_is_preserved_for_explicit_epoch (test_normalizer.NormalizerTests.test_negative_offset_is_preserved_for_explicit_epoch) ... ok
+test_short_wire_and_non_full_packets_rejected (test_normalizer.NormalizerTests.test_short_wire_and_non_full_packets_rejected) ... ok
+test_timezone_sensitivities_are_separate_from_default (test_normalizer.NormalizerTests.test_timezone_sensitivities_are_separate_from_default) ... ok
+test_top_quantity_stays_distinct_from_five_level_sum (test_normalizer.NormalizerTests.test_top_quantity_stays_distinct_from_five_level_sum) ... ok
+test_unknown_scope_is_not_promoted_to_complete_capture (test_normalizer.NormalizerTests.test_unknown_scope_is_not_promoted_to_complete_capture) ... ok
+test_unsorted_prices_and_fractional_quantities_rejected (test_normalizer.NormalizerTests.test_unsorted_prices_and_fractional_quantities_rejected) ... ok
+test_zero_top_quantity_rejected (test_normalizer.NormalizerTests.test_zero_top_quantity_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.012s
+
+OK

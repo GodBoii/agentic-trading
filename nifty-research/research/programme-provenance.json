@@ -1,0 +1,169 @@
+{
+  "verified_on": "2026-10-02",
+  "completed_topics": 12,
+  "studies": [
+    {
+      "id": "01",
+      "folder": "01_depth_forecast_baseline",
+      "report": "research\\01_depth_forecast_baseline\\artifacts\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "artifacts\\evidence-gates.json": "b53b151254174353bee84bd7dd87890cb09e3ae9ca5a3fa8a03aabb0c54d4db4",
+        "artifacts\\forecast-results.json": "f41c1b3c2455405783e3edd082dd142f75e0225adb6f680a7d8c3ae807d96466",
+        "artifacts\\historical-agent-evidence.json": "35bde00e5ba8ed611c234839831e401d1f794c87f33d5be188754eacbd87608a",
+        "artifacts\\manifest.json": "da89c2c7a59f4f0a824eca910aa87bafa8d01ef4994940d8d7bc09cdbeaebf13",
+        "artifacts\\option-replay-ledger.json": "81a60e248f8144bbc83de3e131678f663bfa78f796e13187a5af3691c049e73e",
+        "artifacts\\option-replay-results.json": "e4d0a43a56d50b68c8f81ee24124513080d6d8e6676541e60d4760cea60ec8b0",
+        "artifacts\\provenance.json": "e10a5d33ed8637d13eb1ebd6c8db90dcd3c9f7f1bd1779b5ec468d59bc48dc95",
+        "artifacts\\report.md": "fb177b37c2174fb7ebaea67e644d603bb4b177c64d878384d0c30b7c3f7119e2"
+      }
+    },
+    {
+      "id": "02",
+      "folder": "02_orderbook_horizons",
+      "report": "research\\02_orderbook_horizons\\artifacts\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "04c49389a89b7447b0775bdb3c0cf36dc6a2b972911ffbd5f47afac976a6f8a5",
+        "test_study.py": "baa30e9a9bd8b1e6081414d35a908c178627109290837d5c99c3b7e1dbf0953e",
+        "artifacts\\results.json": "5ee4bcce2e9b71043ab8bd41bdb15e865b8dcd27a023a72283115600f327985c",
+        "artifacts\\report.md": "86f3228b4e5c9944dfa4dbddd94d77b8791e699bd10961ea966fd4d9d77d29ee"
+      }
+    },
+    {
+      "id": "03",
+      "folder": "03_volatility_premiums",
+      "report": "research\\03_volatility_premiums\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "ff8ebd3433f52d1e91e6d4085186d0a8dd915cca1ae830b26fb86d2a03c66fdf",
+        "test_study.py": "27acea26b5e37fb83eea9e4e646a3938270895b3a6633735fe675e2b5cbbc5a0",
+        "artifacts\\results.json": "85a9964c80f54882bfab2f30ff26ce1f7e0066e5ecffe0cf18beac0a957bd886",
+        "report.md": "47b44143bdf59e283f0c547dd76bb3c86ed9f83d8da2f72eec4190fefa7218bc"
+      }
+    },
+    {
+      "id": "04",
+      "folder": "04_options_hedging",
+      "report": "research\\04_options_hedging\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "f94f32206cb292e393b3aa07aee7a073061bd7ce1c87a63c8ba31733ca84e443",
+        "test_study.py": "cef4ca590e24fe3acfe1412f7b1e458ddaae3228b132a6769ca8a471369694c4",
+        "artifacts\\ledger.json": "599c3add58d02d548625a39b8165c2b0401149726455d42cde21a44100380c4b",
+        "artifacts\\paired-hedge-comparisons.json": "86330807060df18d00ee5af9081710f7094aba29c084aee4d4f522d3f2380baf",
+        "artifacts\\provenance.json": "7c7c72edce1f8affaf1d6f18d9d115e0c02e7d576b038b88e509bd5b6a342921",
+        "artifacts\\results.json": "a2c1a14d950da930ddf10f70ef52f0141fd259b89140db33067cca146a63ebe0",
+        "artifacts\\synthetic-hedging.json": "2807eb60958e439cdb69b7a4f4884bfa3a1704e936b5dd7844e2c96bfde8a300",
+        "report.md": "9ce1bac0b6b48e622d1adeaa1cc416d4406240b1e54322a8e0697e83c5683ec5"
+      }
+    },
+    {
+      "id": "05",
+      "folder": "05_indicator_patterns",
+      "report": "research\\05_indicator_patterns\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "c583cb48953b06197b5f2ddba446eb93309c8e8392287c9b861098b390cd2682",
+        "test_study.py": "8f13eb6a3007dbdf375313fb671058d4af160c953eaf477c7ea73ed4c662569f",
+        "artifacts\\results.json": "05e6f9650953cfb90612a6b328960c7820db6c4017c39a57be092b9d59f7e32a",
+        "report.md": "c3fc6cc30b69a3b8f2425782d655ddc26f5443e766f5d6b64aecd6faef69fbdc"
+      }
+    },
+    {
+      "id": "06",
+      "folder": "06_dependence_and_selection",
+      "report": "research\\06_dependence_and_selection\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "83f6ed126176c2ac60ee9414520c046e40e1a30c80d3a6e58f06043da298b109",
+        "test_study.py": "e609fbf2c8ea83ee39558ed5f439945820e5deaa322702b210a4fed50e60c2d8",
+        "artifacts\\results.json": "4287a5ba2b693b6b05c99eea8d97093280af77d63344931cfcc04f9c4e00e9ee",
+        "report.md": "d86e83a6aa0bf99b09f1803e464cfae35706098124ff7148aa3a5f1f4c7f7e3d"
+      }
+    },
+    {
+      "id": "07",
+      "folder": "07_statistical_regimes",
+      "report": "research\\07_statistical_regimes\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "933356d85ff289b7e9cc863880e9449872baa083812b0d119819c5407de917a8",
+        "test_study.py": "3cdcf66c89c262ecdcd518b1ef6d41685a6735cc21c821b7bfa242904a1910ab",
+        "artifacts\\results.json": "6a7865258fdd2e093ad0d47ceefc2ddbc60962f850394a370f20e8b87e324f06",
+        "report.md": "b90745eebc0ce40decd6f2b7fa855038f0a1707299998dbe24018d0cbaa972bc"
+      }
+    },
+    {
+      "id": "08",
+      "folder": "08_exit_policies",
+      "report": "research\\08_exit_policies\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "8d288323d711db949c319a0dce9e441c9a6609115bbc7ce30889808c78c8bcbb",
+        "test_exits.py": "4ac2610238f657f0b3ffde02d0ecbacac1febe0376074322be6391e2ca420a3a",
+        "artifacts\\ledger.json": "19e6984650f5ea579eb6fe78ee570c422b4585a2163938161a63446ccbd43093",
+        "artifacts\\paired-comparisons.json": "d2076bfff215bec2db41558493fc34ed745911cc771dd58fa39a59ac0e7258f8",
+        "artifacts\\provenance.json": "7c7c72edce1f8affaf1d6f18d9d115e0c02e7d576b038b88e509bd5b6a342921",
+        "artifacts\\results.json": "2e9de32fc62d28d08dd0daa9a17dd8a97a29cfc823942271c45505893b79a4bd",
+        "report.md": "64a79ec1c78e730119c2fc2999b430f10fe783aadb02aa6f307a16f6ec531bdd"
+      }
+    },
+    {
+      "id": "09",
+      "folder": "09_liquidity_persistence",
+      "report": "research\\09_liquidity_persistence\\artifacts\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "d2f4d0b81606f9e1471a0a95bb7daadab580849c4b558df41bd8e19db3770048",
+        "test_study.py": "1eed8791f5de74daf8dde88d5bad2583236d7fcf9f36d8356048e8e3120b26d4",
+        "artifacts\\cache-provenance.json": "9e9d4284f9648f009618703c2e2e9b62cd21066a147ededb03c34afa81a2502d",
+        "artifacts\\results.json": "8d305ade794730026aff31379227490a8d0031ab8f149dadabf6b816ca0d922a",
+        "artifacts\\source-audits.json": "6d96cf1861483ced7274e2f818476f04d94d44cfada79e7f59b7f81da751321a",
+        "artifacts\\report.md": "8187d715b497f2092a523e7f9403818147988d323ec1938f10b339c45a013299"
+      }
+    },
+    {
+      "id": "10",
+      "folder": "10_execution_sensitivity",
+      "report": "research\\10_execution_sensitivity\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "00d8b9902f267c35518eb77b49785a01135f3d82e1604b779ae283215ef58eca",
+        "test_study.py": "6eb6a2e1fe7910b15477e403b17d330fd49e356f30eda68dd649365020421bb0",
+        "artifacts\\ledger.json": "b74037edf677819e246050ecadb367d5e38e102df3a6df29c2993e5531e6be05",
+        "artifacts\\results.json": "378507f6b3c01cb8b2a3cf043aff2e53d5c681ed6ebcc9a8a5d7374fb79f9376",
+        "report.md": "09ff37e0c9644cc64ab7f2a7af22c478942cb333abf78e665d84b74cd7de66f1"
+      }
+    },
+    {
+      "id": "11",
+      "folder": "11_one_minute_option_transfer",
+      "report": "research\\11_one_minute_option_transfer\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "294ba3450b4a4b2aa409633799fb88301edcf5a0b85f276a4c1c5df1391f78a8",
+        "test_study.py": "6199389f791c519e8d11eb6a0abad72ae808494286f7e4b55e54e0de6b94a41e",
+        "artifacts\\ledger.json": "28ad9677bcf8e5a2d1134ea4940d5a4aa5b6d2e3d027cace24f194d96dcd57a5",
+        "artifacts\\results.json": "de7c17d5c240a7eaa7085ac0f6a5228376020c0ea5c06727253d6762f7d8ca61",
+        "report.md": "b7b1789a8529ddb652a65dc6aca01ec4c560caca69c7c9e7944dfb013a6d07cd"
+      }
+    },
+    {
+      "id": "12",
+      "folder": "12_expiry_premium_mechanics",
+      "report": "research\\12_expiry_premium_mechanics\\report.md",
+      "status": "completed",
+      "files_sha256": {
+        "study.py": "5b5502c9e9db334e952e9037406496337f8dc55e09744dfbeef9ad2feafa23dc",
+        "test_study.py": "e3624081eabe605fc5ec57f39f2985042020d0d8c0a1f290f474883341643a24",
+        "artifacts\\results.json": "14c779b34f49a75016dbbd25c3d8414330911a66ae8e153c31cc49b1d6e6e923",
+        "report.md": "e471d5a5f7883904156d119520a7c86e831cca95bb65c636a71807aa225f6c09"
+      }
+    }
+  ],
+  "baseline_snapshot_hashes_match": true,
+  "baseline_artifact_hashes_match": true,
+  "frozen_shared_hashes_match": true,
+  "frozen_model_coefficients_unchanged": true
+}

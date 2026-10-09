@@ -1,0 +1,15 @@
+test_breakout_uses_frozen_range_and_only_one_signal (test_strategy.OpeningTests.test_breakout_uses_frozen_range_and_only_one_signal) ... ok
+test_direction_filter_blocks_opposite_breakout (test_strategy.OpeningTests.test_direction_filter_blocks_opposite_breakout) ... ok
+test_gap_invalidates_range (test_strategy.OpeningTests.test_gap_invalidates_range) ... ok
+test_invalid_observation_invalidates_opening_range (test_strategy.OpeningTests.test_invalid_observation_invalidates_opening_range) ... ok
+test_late_start_cannot_fabricate_opening_range (test_strategy.OpeningTests.test_late_start_cannot_fabricate_opening_range) ... ok
+test_no_entry_before_opening_range_complete (test_strategy.OpeningTests.test_no_entry_before_opening_range_complete) ... ok
+test_out_of_order_after_range_is_rejected (test_strategy.OpeningTests.test_out_of_order_after_range_is_rejected) ... ok
+test_short_breakout (test_strategy.OpeningTests.test_short_breakout) ... ok
+test_unknown_vwap_does_not_pass_filter (test_strategy.OpeningTests.test_unknown_vwap_does_not_pass_filter) ... ok
+test_wide_spread_blocks_breakout (test_strategy.OpeningTests.test_wide_spread_blocks_breakout) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.021s
+
+OK

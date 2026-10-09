@@ -1,0 +1,173 @@
+{
+  "checks": [
+    {
+      "date": "2026-08-19",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-19",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-19",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-19",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-20",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-20",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-20",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-20",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-21",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-21",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-21",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-21",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-24",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-24",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-24",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-24",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-25",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-25",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-25",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-25",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-31",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-31",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-31",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-08-31",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-09-01",
+      "mode": "receipt_proxy",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-09-01",
+      "mode": "receipt_proxy",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-09-01",
+      "mode": "recent_trade",
+      "variant": "double_distances_60_30_300",
+      "raw_policy_reason_counts_equal": true
+    },
+    {
+      "date": "2026-09-01",
+      "mode": "recent_trade",
+      "variant": "short_time_30_15_60",
+      "raw_policy_reason_counts_equal": true
+    }
+  ],
+  "note": "Actual-session reason counts match; behavioral test checks the complete synthetic raw signal sequence. Admission differs across accounts."
+}

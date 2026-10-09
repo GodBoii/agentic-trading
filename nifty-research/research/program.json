@@ -1,0 +1,132 @@
+{
+  "started_on": "2026-10-01",
+  "timezone": "Asia/Calcutta",
+  "mode": "offline_exploratory",
+  "execution_available": false,
+  "concurrent_agent_slots": 4,
+  "studies": [
+    {
+      "id": "01",
+      "folder": "01_depth_forecast_baseline",
+      "topic": "Chronological depth forecast and directional options",
+      "runner": "baseline",
+      "status": "completed",
+      "report": "artifacts/report.md"
+    },
+    {
+      "id": "02",
+      "folder": "02_orderbook_horizons",
+      "topic": "Order-flow imbalance, queue imbalance, microprice and horizons",
+      "status": "completed",
+      "runner": "study.py",
+      "registered_trials": 40,
+      "report": "artifacts/report.md",
+      "family_comparisons": 28
+    },
+    {
+      "id": "03",
+      "folder": "03_volatility_premiums",
+      "topic": "Realised variance, EWMA/HAR, parity IV and premium decay",
+      "status": "completed",
+      "runner": "study.py",
+      "registered_variance_trials": 30,
+      "report": "report.md",
+      "premium_quote_age_settings": 2
+    },
+    {
+      "id": "04",
+      "folder": "04_options_hedging",
+      "topic": "Straddles, strangles, spreads, iron structures and hedge costs",
+      "status": "completed",
+      "runner": "study.py",
+      "registered_trials": 36,
+      "synthetic_trials": 15,
+      "report": "report.md"
+    },
+    {
+      "id": "05",
+      "folder": "05_indicator_patterns",
+      "topic": "RSI, Bollinger, EMA, Donchian, opening range and reversal",
+      "runner": "study.py",
+      "status": "completed",
+      "registered_trials": 18,
+      "report": "report.md",
+      "reviewed_on": "2026-10-02"
+    },
+    {
+      "id": "06",
+      "folder": "06_dependence_and_selection",
+      "topic": "Day dependence, overfitting, multiplicity and selection bias",
+      "status": "completed",
+      "runner": "study.py",
+      "registered_comparisons": 3,
+      "synthetic_search_settings": 4,
+      "report": "report.md"
+    },
+    {
+      "id": "07",
+      "folder": "07_statistical_regimes",
+      "topic": "Autoregression, variance ratios and regime-dependent signals",
+      "status": "completed",
+      "runner": "study.py",
+      "report": "report.md",
+      "registered_trials": 39,
+      "reviewed_on": "2026-10-02"
+    },
+    {
+      "id": "08",
+      "folder": "08_exit_policies",
+      "topic": "Time, stop, target and thesis exits with sampled path risk",
+      "status": "completed",
+      "runner": "study.py",
+      "report": "report.md",
+      "registered_trials": 36
+    },
+    {
+      "id": "09",
+      "folder": "09_liquidity_persistence",
+      "topic": "Time-weighted persistent near-price liquidity",
+      "status": "completed",
+      "runner": "study.py",
+      "report": "artifacts/report.md",
+      "registered_response_trials": 33,
+      "paired_control_comparisons": 54,
+      "review_status": "corrected_and_verified",
+      "reviewed_on": "2026-10-02"
+    },
+    {
+      "id": "10",
+      "folder": "10_execution_sensitivity",
+      "topic": "Latency, quote age and slippage robustness",
+      "status": "completed",
+      "runner": "study.py",
+      "registered_replays": 24,
+      "cost_scenarios": 72,
+      "report": "report.md",
+      "reviewed_on": "2026-10-02"
+    },
+    {
+      "id": "11",
+      "folder": "11_one_minute_option_transfer",
+      "topic": "Forecast-horizon-matched option economic translation",
+      "runner": "study.py",
+      "report": "report.md",
+      "status": "completed",
+      "registered_trials": 18,
+      "completed_on": "2026-10-02"
+    },
+    {
+      "id": "12",
+      "folder": "12_expiry_premium_mechanics",
+      "topic": "Expiry-distance premium behaviour and bid/ask option shape",
+      "runner": "study.py",
+      "report": "report.md",
+      "status": "completed",
+      "completed_on": "2026-10-02",
+      "quote_shape_checks": 243308
+    }
+  ],
+  "completed_empirical_topics": 12,
+  "note": "Configuration counts, hypothesis comparisons, quote sensitivities and synthetic scenarios are different units. Never sum them into an independent sample count.",
+  "reviewed_on": "2026-10-02"
+}

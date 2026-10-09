@@ -1,0 +1,9 @@
+{
+  "source_snapshot_hash_valid": true,
+  "all_seven_input_hashes_valid": true,
+  "policy_session_replays": 42,
+  "complete_sessions": 42,
+  "unresolved_positions": 0,
+  "pending_entries": 0,
+  "summary_accounting_balances": true
+}

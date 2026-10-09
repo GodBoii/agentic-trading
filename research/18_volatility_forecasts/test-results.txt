@@ -1,0 +1,17 @@
+test_all_models_seed_same_history_then_diverge_by_recursion (test_model.VarianceTests.test_all_models_seed_same_history_then_diverge_by_recursion) ... ok
+test_completed_bar_excludes_next_minute_first_tick (test_model.VarianceTests.test_completed_bar_excludes_next_minute_first_tick) ... ok
+test_ewma_recursion (test_model.VarianceTests.test_ewma_recursion) ... ok
+test_flat_returns_floor_forecasts_preserve_zero_outcomes (test_model.VarianceTests.test_flat_returns_floor_forecasts_preserve_zero_outcomes) ... ok
+test_future_change_does_not_change_prior_forecast (test_model.VarianceTests.test_future_change_does_not_change_prior_forecast) ... ok
+test_gap_and_unknown_freshness_invalidate_minute (test_model.VarianceTests.test_gap_and_unknown_freshness_invalidate_minute) ... ok
+test_invalid_bar_resets_pending_and_full_warmup (test_model.VarianceTests.test_invalid_bar_resets_pending_and_full_warmup) ... ok
+test_invalid_variances_and_decays_rejected (test_model.VarianceTests.test_invalid_variances_and_decays_rejected) ... ok
+test_late_first_and_missing_last_receipt_invalidate_bar (test_model.VarianceTests.test_late_first_and_missing_last_receipt_invalidate_bar) ... ok
+test_loss_formula_and_zero_target_are_finite (test_model.VarianceTests.test_loss_formula_and_zero_target_are_finite) ... ok
+test_missing_minute_resets_history (test_model.VarianceTests.test_missing_minute_resets_history) ... ok
+test_timestamp_order_and_instrument_identity_rejected (test_model.VarianceTests.test_timestamp_order_and_instrument_identity_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.003s
+
+OK

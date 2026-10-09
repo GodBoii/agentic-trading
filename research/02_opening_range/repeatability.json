@@ -1,0 +1,26 @@
+{
+  "date": "2026-08-25",
+  "mode": "receipt_proxy",
+  "input_hash_equal": true,
+  "comparisons": [
+    {
+      "summary": "summary-2026-08-25-orb15-receipt_proxy.json",
+      "accounting_and_counters_equal": true,
+      "trade_file_bytes_equal": true
+    },
+    {
+      "summary": "summary-2026-08-25-orb15_vwap-receipt_proxy.json",
+      "accounting_and_counters_equal": true,
+      "trade_file_bytes_equal": true
+    },
+    {
+      "summary": "summary-2026-08-25-orb30_direction-receipt_proxy.json",
+      "accounting_and_counters_equal": true,
+      "trade_file_bytes_equal": true
+    }
+  ],
+  "result": "passed",
+  "excluded_summary_fields": [
+    "replay_seconds"
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "status": "post_selection_frozen_research_only",
+  "frozen_on": "2026-10-01",
+  "execution_available": false,
+  "source_sha256": "e367e26e5b3d4c16751ba2396bebcdf32a6407e0c0373405db96bd29240e90be",
+  "feature_code_sha256": "04c49389a89b7447b0775bdb3c0cf36dc6a2b972911ffbd5f47afac976a6f8a5",
+  "training_dates": [
+    "2026-06-24",
+    "2026-07-28",
+    "2026-07-29",
+    "2026-07-31",
+    "2026-08-03",
+    "2026-08-04",
+    "2026-08-10",
+    "2026-08-11",
+    "2026-08-12",
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21"
+  ],
+  "training_rows": 2592,
+  "last_training_label_at": "2026-08-21T10:00:00+00:00",
+  "horizon_minutes": 1,
+  "models": {
+    "price": {
+      "features": [
+        "ret_1_bps",
+        "ret_5_bps",
+        "rv_5_bps",
+        "range_5_bps",
+        "log_volume",
+        "minutes_from_open"
+      ],
+      "mean": [
+        -0.005848717686692189,
+        0.040666369949030924,
+        1.3254878722165235,
+        4.7345663706638,
+        8.348253162291524,
+        190.10378086419752
+      ],
+      "scale": [
+        1.5546772631081252,
+        3.5238079419831805,
+        0.824226843036882,
+        2.6478585421991276,
+        0.9316345787098893,
+        103.42886318040765
+      ],
+      "coefficients": [
+        0.015456575386773834,
+        0.004744568956880075,
+        0.0016783919185140081,
+        -0.004635071053690329,
+        -0.03444499726891205,
+        -0.011409755736640248
+      ],
+      "intercept": -0.005531807565702985
+    },
+    "price_near": {
+      "features": [
+        "ret_1_bps",
+        "ret_5_bps",
+        "rv_5_bps",
+        "range_5_bps",
+        "log_volume",
+        "minutes_from_open",
+        "imbalance_5",
+        "imbalance_points_5",
+        "imbalance_points_10",
+        "imbalance_weighted"
+      ],
+      "mean": [
+        -0.005848717686692189,
+        0.040666369949030924,
+        1.3254878722165235,
+        4.7345663706638,
+        8.348253162291524,
+        190.10378086419752,
+        -0.0030037460875983043,
+        -0.023075338547139262,
+        -0.008824692381497015,
+        -0.1001603467091099
+      ],
+      "scale": [
+        1.5546772631081252,
+        3.5238079419831805,
+        0.824226843036882,
+        2.6478585421991276,
+        0.9316345787098893,
+        103.42886318040765,
+        0.41945559581481584,
+        0.6249074420857442,
+        0.5410782046387145,
+        0.2593702414303375
+      ],
+      "coefficients": [
+        0.029945904486259996,
+        0.08547721444686339,
+        -0.01811149358010562,
+        -0.03274593957837543,
+        -0.03592814449216441,
+        -0.0527978459388611,
+        -0.06325631115276366,
+        0.20996349144768545,
+        0.14596552569797533,
+        0.035133972473962494
+      ],
+      "intercept": -0.005531807565702982
+    }
+  },
+  "selection_history": "Selected after examining 28 additions/horizon comparisons; Holm p 0.0547",
+  "prospective_protocol": {
+    "earliest_unviewed_date": "2026-10-02",
+    "minimum_regular_sessions": 30,
+    "sample": "At least 300 accepted complete minutes per session, fixed checks from study02",
+    "cohort": "Common finite-feature cohort, six-minute complete history, fresh backward depth and continuous future labels",
+    "training": "No refitting, threshold changes or feature changes during prospective phase",
+    "primary_comparison": "Daily paired MSE improvement of price_near against frozen price model",
+    "secondary_comparison": "RMSE against zero-return reference, descriptive direction accuracy",
+    "inference": "Report all sessions and failed predictions; day-block interval, no interim selection or early-win stopping",
+    "economic_validation": "Separate option price/cost/size replay required; forecast improvement is not trading approval",
+    "data_collection": "Not enabled by this script; fresh data must be explicitly collected and timestamped"
+  }
+}

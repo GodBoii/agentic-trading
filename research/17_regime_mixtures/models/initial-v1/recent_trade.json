@@ -1,0 +1,31 @@
+{
+  "feature_counts": {
+    "between_evaluations": 8262,
+    "incomplete_bar": 154,
+    "unusable_observation": 607510,
+    "warming_bar": 1126,
+    "warming_features": 23
+  },
+  "input_hashes": {
+    "2026-08-19": "1aea1eb6642ad074a9d83f30d3e2ed5584c6bfb65ff860678f9829baff2297b0",
+    "2026-08-20": "9a50945b67702024587c5c9ee5a1ed7e3f39a61b6bb18336c7bcfc9e663b82a7",
+    "2026-08-21": "d7662f3c77d50365462aaf4ef76fd6d76ab574ea45a4fdffc55dcc1747e15ad2"
+  },
+  "iterations": 30,
+  "minimum_rows": 200,
+  "mode": "recent_trade",
+  "rows": 0,
+  "rows_per_day": {
+    "2026-08-19": 0,
+    "2026-08-20": 0,
+    "2026-08-21": 0
+  },
+  "seed": 17,
+  "status": "insufficient_training_day",
+  "training_dates": [
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21"
+  ],
+  "variance_floor": 0.01
+}

@@ -1,0 +1,20 @@
+test_missing_next_quote_leaves_counterfactual_unresolved (test_paired.PairedExitTests.test_missing_next_quote_leaves_counterfactual_unresolved) ... ok
+test_pre_entry_price_does_not_trigger_exit (test_paired.PairedExitTests.test_pre_entry_price_does_not_trigger_exit) ... ok
+test_same_entry_short_uses_ask_to_exit (test_paired.PairedExitTests.test_same_entry_short_uses_ask_to_exit) ... ok
+test_same_exit_matches_account_engine_without_portfolio_loss_actions (test_paired.PairedExitTests.test_same_exit_matches_account_engine_without_portfolio_loss_actions) ... ok
+test_time_exit_preserves_fixed_quantity_and_waits_for_later_quote (test_paired.PairedExitTests.test_time_exit_preserves_fixed_quantity_and_waits_for_later_quote) ... ok
+test_costs_larger_than_target_are_explicitly_impossible (test_strategy.ExitMathTests.test_costs_larger_than_target_are_explicitly_impossible) ... ok
+test_costs_raise_required_success (test_strategy.ExitMathTests.test_costs_raise_required_success) ... ok
+test_exit_changes_preserve_raw_entry_sequence (test_strategy.ExitMathTests.test_exit_changes_preserve_raw_entry_sequence) ... ok
+test_exit_spec_rejects_fractional_or_negative_horizon (test_strategy.ExitMathTests.test_exit_spec_rejects_fractional_or_negative_horizon) ... ok
+test_invalid_probabilities_and_distances_rejected (test_strategy.ExitMathTests.test_invalid_probabilities_and_distances_rejected) ... ok
+test_stop_gap_can_exceed_nominal_stop_loss (test_strategy.ExitMathTests.test_stop_gap_can_exceed_nominal_stop_loss) ... ok
+test_target_fills_at_later_quote_not_at_barrier (test_strategy.ExitMathTests.test_target_fills_at_later_quote_not_at_barrier) ... ok
+test_threshold_sets_expected_payoff_to_zero (test_strategy.ExitMathTests.test_threshold_sets_expected_payoff_to_zero) ... ok
+test_time_exit_is_requested_then_fills_later (test_strategy.ExitMathTests.test_time_exit_is_requested_then_fills_later) ... ok
+test_two_to_one_without_costs_needs_one_third_success (test_strategy.ExitMathTests.test_two_to_one_without_costs_needs_one_third_success) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.007s
+
+OK

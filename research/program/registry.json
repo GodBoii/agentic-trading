@@ -1,0 +1,609 @@
+[
+  {
+    "id": 1,
+    "topic": "Deterministic momentum foundation",
+    "folder": "intraday_lab",
+    "purpose": "shared causal replay, fees, reservations and first baseline",
+    "status": "foundation tested",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "findings": [
+      "intraday_lab\\findings-2026-09-30.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 2,
+    "topic": "Opening-range breakout",
+    "folder": "02_opening_range",
+    "purpose": "opening discovery and directional continuation",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "02_opening_range\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 3,
+    "topic": "Mean reversion",
+    "folder": "03_mean_reversion",
+    "purpose": "rolling zscore, VWAP fade and OU admissibility",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": [
+          {
+            "variant": "rolling_zscore_fade",
+            "mode": "receipt_proxy",
+            "incomplete_sessions": 1
+          }
+        ]
+      }
+    ],
+    "findings": [
+      "03_mean_reversion\\findings-2026-10-01.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 4,
+    "topic": "Order-book snapshot proxies",
+    "folder": "04_microstructure",
+    "purpose": "aggregate imbalance, depth changes and weighted quotes",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "04_microstructure\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 5,
+    "topic": "Cross-sectional relative movement",
+    "folder": "05_relative_value",
+    "purpose": "causal peer residual continuation and reversal",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "05_relative_value\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 6,
+    "topic": "Volatility compression",
+    "folder": "06_volatility_compression",
+    "purpose": "Bollinger width and compressed-range expansion",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "06_volatility_compression\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 7,
+    "topic": "Indicators and candle patterns",
+    "folder": "07_indicator_patterns",
+    "purpose": "RSI recross, Bollinger continuation and wick rejection",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": [
+          {
+            "variant": "wick_rejection",
+            "mode": "receipt_proxy",
+            "incomplete_sessions": 1
+          }
+        ]
+      }
+    ],
+    "findings": [
+      "07_indicator_patterns\\findings-2026-10-01.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 8,
+    "topic": "Frozen numerical forecasting",
+    "folder": "08_statistical_models",
+    "purpose": "ridge executable-return and logistic profit baselines",
+    "status": "tested diagnostic",
+    "account_replays": 24,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v2",
+        "account_replays": 24,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "08_statistical_models\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 9,
+    "topic": "Variance-ratio regimes",
+    "folder": "09_variance_ratio",
+    "purpose": "serial-dependence descriptors and adaptive direction",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "09_variance_ratio\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 10,
+    "topic": "VWAP pullback state machines",
+    "folder": "10_vwap_pullback",
+    "purpose": "impulse, later touch, and later recovery",
+    "status": "tested diagnostic",
+    "account_replays": 28,
+    "variants": 2,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 28,
+        "variants": 2,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "10_vwap_pullback\\findings-2026-10-01.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 11,
+    "topic": "Exit mathematics",
+    "folder": "11_exit_math",
+    "purpose": "account exit sensitivities and same-entry counterfactuals",
+    "status": "tested diagnostic",
+    "account_replays": 42,
+    "variants": 3,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 42,
+        "variants": 3,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "11_exit_math\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 12,
+    "topic": "Execution and cost sensitivities",
+    "folder": "12_execution_costs",
+    "purpose": "delay, slippage, depth footprint and no-trade control",
+    "status": "tested diagnostic",
+    "account_replays": 56,
+    "variants": 4,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 56,
+        "variants": 4,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "12_execution_costs\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 13,
+    "topic": "Fixed-pair spread models",
+    "folder": "13_pairs_cointegration",
+    "purpose": "prior-declared pair, OLS/AR1 descriptors and hedge feasibility",
+    "status": "data/math diagnostic",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "findings": [
+      "13_pairs_cointegration\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 14,
+    "topic": "Intraday time-of-day information",
+    "folder": "14_intraday_seasonality",
+    "purpose": "frozen earlier-session half-hour return information",
+    "status": "tested diagnostic",
+    "account_replays": 16,
+    "variants": 2,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 16,
+        "variants": 2,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "14_intraday_seasonality\\findings-2026-10-01.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 15,
+    "topic": "Raw-packet timestamp integrity",
+    "folder": "15_timestamp_integrity",
+    "purpose": "quote/trade provenance, signed clock offsets and depth quantities",
+    "status": "data/math diagnostic",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "findings": [
+      "15_timestamp_integrity\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 16,
+    "topic": "Relative-volume surprises",
+    "folder": "16_relative_volume",
+    "purpose": "past-session same-time volume baselines and arrival availability",
+    "status": "tested diagnostic",
+    "account_replays": 16,
+    "variants": 2,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 16,
+        "variants": 2,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "16_relative_volume\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 17,
+    "topic": "Regime mixture models",
+    "folder": "17_regime_mixtures",
+    "purpose": "causal probabilistic regimes with frozen development estimates",
+    "status": "tested diagnostic",
+    "account_replays": 16,
+    "variants": 2,
+    "runs": [
+      {
+        "run": "initial-v1",
+        "account_replays": 16,
+        "variants": 2,
+        "incomplete_comparisons": []
+      }
+    ],
+    "findings": [
+      "17_regime_mixtures\\findings-2026-10-01.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 18,
+    "topic": "Realized volatility forecasting",
+    "folder": "18_volatility_forecasts",
+    "purpose": "EWMA/GARCH baselines and cost-adjusted opportunity windows",
+    "status": "data/math diagnostic",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "findings": [
+      "18_volatility_forecasts\\findings.md"
+    ],
+    "promotion_eligible": false
+  },
+  {
+    "id": 19,
+    "topic": "Kalman state estimation",
+    "folder": "19_kalman_state",
+    "purpose": "online fair-value filtering and innovation-based signals",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 20,
+    "topic": "CUSUM event detection",
+    "folder": "20_cusum_events",
+    "purpose": "sequential change detection without future boundary selection",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 21,
+    "topic": "Alternative event bars",
+    "folder": "21_event_bars",
+    "purpose": "time, volume, value and imbalance sampling comparisons",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 22,
+    "topic": "Price impact descriptors",
+    "folder": "22_impact_descriptors",
+    "purpose": "Kyle-style response measures with explicit sampling limits",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 23,
+    "topic": "Post-fill adverse selection",
+    "folder": "23_adverse_selection",
+    "purpose": "markouts and toxicity features against calibrated fills",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 24,
+    "topic": "Passive queue models",
+    "folder": "24_passive_queues",
+    "purpose": "conservative queue simulation after appropriate event data exists",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 25,
+    "topic": "Participation and impact",
+    "folder": "25_participation_impact",
+    "purpose": "size capacity and market-impact sensitivity experiments",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 26,
+    "topic": "Cross-instrument lead and lag",
+    "folder": "26_lead_lag",
+    "purpose": "timestamp-safe market/sector response timing",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 27,
+    "topic": "Opening-to-closing momentum",
+    "folder": "27_session_momentum",
+    "purpose": "early-session information for later-session returns",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 28,
+    "topic": "News arrival filters",
+    "folder": "28_news_arrival",
+    "purpose": "structured event availability and post-announcement behavior",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 29,
+    "topic": "Auction and gap mechanics",
+    "folder": "29_auction_gaps",
+    "purpose": "opening auction evidence and causal gap continuation/rejection",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 30,
+    "topic": "ETF and constituent residuals",
+    "folder": "30_etf_residuals",
+    "purpose": "basket pricing and realistic hedge execution",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 31,
+    "topic": "Futures basis",
+    "folder": "31_futures_basis",
+    "purpose": "contract-aware fair-value residuals and two-leg costs",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 32,
+    "topic": "Options volatility surfaces",
+    "folder": "32_options_volatility",
+    "purpose": "surface consistency and expiry-specific feasibility",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 33,
+    "topic": "Hedged volatility trading",
+    "folder": "33_delta_hedging",
+    "purpose": "gamma/vega exposures with discrete hedge costs",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 34,
+    "topic": "Tree model baselines",
+    "folder": "34_boosted_trees",
+    "purpose": "frozen tabular models and proper chronological labels",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 35,
+    "topic": "Temporal neural networks",
+    "folder": "35_temporal_models",
+    "purpose": "sequence forecasting versus simple baselines on adequate data",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 36,
+    "topic": "Model calibration and abstention",
+    "folder": "36_calibration",
+    "purpose": "reliability, uncertainty and no-trade decisions",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 37,
+    "topic": "Reinforcement-learning simulation",
+    "folder": "37_rl_simulation",
+    "purpose": "simulator validation before policy reward optimization",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 38,
+    "topic": "Latency and decay",
+    "folder": "38_signal_decay",
+    "purpose": "measured information-age budgets and delayed opportunity curves",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 39,
+    "topic": "Fault and recovery experiments",
+    "folder": "39_fault_recovery",
+    "purpose": "submission uncertainty, partial fills, duplicate events and restart",
+    "status": "queued",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "promotion_eligible": false
+  },
+  {
+    "id": 40,
+    "topic": "Multiple-hypothesis audit",
+    "folder": "40_multiple_testing",
+    "purpose": "selection effects, sample limits and explicit diagnostic assumptions",
+    "status": "data/math diagnostic",
+    "account_replays": 0,
+    "variants": 0,
+    "runs": [],
+    "findings": [
+      "40_multiple_testing\\findings.md"
+    ],
+    "promotion_eligible": false
+  }
+]

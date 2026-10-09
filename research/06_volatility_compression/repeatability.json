@@ -1,0 +1,26 @@
+{
+  "date": "2026-08-25",
+  "mode": "receipt_proxy",
+  "input_hash_equal": true,
+  "comparisons": [
+    {
+      "summary": "summary-2026-08-25-bollinger_absolute15-receipt_proxy.json",
+      "accounting_and_counters_equal": true,
+      "trade_file_bytes_equal": true
+    },
+    {
+      "summary": "summary-2026-08-25-bollinger_relative-receipt_proxy.json",
+      "accounting_and_counters_equal": true,
+      "trade_file_bytes_equal": true
+    },
+    {
+      "summary": "summary-2026-08-25-compressed_range5-receipt_proxy.json",
+      "accounting_and_counters_equal": true,
+      "trade_file_bytes_equal": true
+    }
+  ],
+  "result": "passed",
+  "excluded_summary_fields": [
+    "replay_seconds"
+  ]
+}
