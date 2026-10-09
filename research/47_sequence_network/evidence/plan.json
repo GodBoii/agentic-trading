@@ -1,0 +1,861 @@
+{
+  "account_module": "research.45_market_dataset.account",
+  "account_source_sha256": "95d978984d7a33f5588e90822ab6a770089d741572ddcb12e11d88a1902e169c",
+  "context_names": [
+    "ret1",
+    "ret5",
+    "ret15",
+    "ret30",
+    "vol30",
+    "vwapdev",
+    "efficiency30",
+    "body_bps",
+    "range_bps",
+    "volume_local_ratio",
+    "session_return",
+    "same_slot_rvol",
+    "overnight_gap",
+    "peer_return5",
+    "peer_return15",
+    "peer_return30",
+    "residual_return5",
+    "residual_return15",
+    "residual_return30",
+    "minute_sin",
+    "minute_cos"
+  ],
+  "context_sha256": "a5adce4d60d19658b6c57dc5e12d3dbba1f9a179e75cdc75c32b5c6f1966caa2",
+  "cost_per_leg_bps": [
+    2,
+    5,
+    10
+  ],
+  "dataset_manifest": {
+    "artifacts": {
+      "rows.parquet": "a5722d668f9ccc4b930550e2a5ceae05797fbeed11359316883e7ed25d6d2412",
+      "selection-freeze.json": "7745853b112d1bed5e51605a78cd2042ccb28d633dba2e70df3afa19c386098e",
+      "sequence.npy": "06df7e7bd7ebafe0cfd35c3df1284d3d6d92d50f6d412214b6a9a6b845751ca0"
+    },
+    "coverage": [
+      {
+        "constructed_rows": 23394,
+        "eligible_full_sessions": 1119,
+        "observed_regular_sessions": 1122,
+        "security_id": 15083
+      },
+      {
+        "constructed_rows": 23394,
+        "eligible_full_sessions": 1119,
+        "observed_regular_sessions": 1122,
+        "security_id": 25
+      },
+      {
+        "constructed_rows": 23394,
+        "eligible_full_sessions": 1119,
+        "observed_regular_sessions": 1122,
+        "security_id": 3563
+      },
+      {
+        "constructed_rows": 22806,
+        "eligible_full_sessions": 1091,
+        "observed_regular_sessions": 1093,
+        "security_id": 10217
+      },
+      {
+        "constructed_rows": 23394,
+        "eligible_full_sessions": 1119,
+        "observed_regular_sessions": 1122,
+        "security_id": 22
+      },
+      {
+        "constructed_rows": 22575,
+        "eligible_full_sessions": 1080,
+        "observed_regular_sessions": 1083,
+        "security_id": 6066
+      },
+      {
+        "constructed_rows": 23163,
+        "eligible_full_sessions": 1108,
+        "observed_regular_sessions": 1122,
+        "security_id": 13
+      },
+      {
+        "constructed_rows": 23352,
+        "eligible_full_sessions": 1117,
+        "observed_regular_sessions": 1122,
+        "security_id": 30108
+      },
+      {
+        "constructed_rows": 23373,
+        "eligible_full_sessions": 1118,
+        "observed_regular_sessions": 1122,
+        "security_id": 7
+      },
+      {
+        "constructed_rows": 23394,
+        "eligible_full_sessions": 1119,
+        "observed_regular_sessions": 1122,
+        "security_id": 21614
+      },
+      {
+        "constructed_rows": 22512,
+        "eligible_full_sessions": 1079,
+        "observed_regular_sessions": 1122,
+        "security_id": 17903
+      },
+      {
+        "constructed_rows": 22953,
+        "eligible_full_sessions": 1098,
+        "observed_regular_sessions": 1122,
+        "security_id": 5385
+      }
+    ],
+    "dataset_source_sha256": "780105df9d4800b920843081e30991bfb48a0deea90a8ec097dd033f40f5b40d",
+    "features_context": [
+      "ret1",
+      "ret5",
+      "ret15",
+      "ret30",
+      "vol30",
+      "vwapdev",
+      "efficiency30",
+      "body_bps",
+      "range_bps",
+      "volume_local_ratio",
+      "session_return",
+      "same_slot_rvol",
+      "overnight_gap",
+      "peer_return5",
+      "peer_return15",
+      "peer_return30",
+      "residual_return5",
+      "residual_return15",
+      "residual_return30",
+      "minute_sin",
+      "minute_cos"
+    ],
+    "features_price": [
+      "ret1",
+      "ret5",
+      "ret15",
+      "ret30",
+      "vol30",
+      "vwapdev",
+      "efficiency30",
+      "body_bps",
+      "range_bps",
+      "volume_local_ratio",
+      "session_return"
+    ],
+    "inputs": [
+      {
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2022.parquet",
+        "sha256": "a3f37ee8c6a9241342354459797390f2f7892fe93921ea7d4f8534e66d991914"
+      },
+      {
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2023.parquet",
+        "sha256": "b1020f1a69de84f7f50d40691ae15f7627d9c14c11ed5fae6e2afcf251d678a6"
+      },
+      {
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2024.parquet",
+        "sha256": "3beb584083e95dd1d8ee91b233716791015966dd7acfa2baf295e8a16ab2ff51"
+      },
+      {
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2025.parquet",
+        "sha256": "2a5dd46857c0a1308166bfc3d28d16d3f24bb8e5889c3c54a8a9df74e54458df"
+      },
+      {
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2026.parquet",
+        "sha256": "4bf3bd588b5db5e257339e98736984bb14f30429c196352a499525e32bcde148"
+      },
+      {
+        "path": "context/stocks-data/NSE/25/intraday_1m/2022.parquet",
+        "sha256": "18c47ed037fddb0d7ac50fc0c1944ae05c48b11e486876142f3f8ef6ac8865eb"
+      },
+      {
+        "path": "context/stocks-data/NSE/25/intraday_1m/2023.parquet",
+        "sha256": "485a96c4b7df25f87f0b9439435f7e37264ec34fd7f9254cdf1608560266fb1d"
+      },
+      {
+        "path": "context/stocks-data/NSE/25/intraday_1m/2024.parquet",
+        "sha256": "3197dc66b88ba1833a0a94b627a4a2fba7de33552ad3c6168e5a387e325abee3"
+      },
+      {
+        "path": "context/stocks-data/NSE/25/intraday_1m/2025.parquet",
+        "sha256": "c19e7631b520b5a5a7bb845941b6ad48631aafd5886f9fc098a786dcc9547457"
+      },
+      {
+        "path": "context/stocks-data/NSE/25/intraday_1m/2026.parquet",
+        "sha256": "9348aa66d140aded29ebe0f07a38bc239b8c19ee04563ed64768b3e67dfee342"
+      },
+      {
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2022.parquet",
+        "sha256": "4f7085dc35ba2560df4df76bc6a46aa5323d9db9778672d385ff0d77ec7d1a2d"
+      },
+      {
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2023.parquet",
+        "sha256": "86c86dda109e1524a80bd1b25674a14d8f4bef5f9c3d64211a6775fc1757b3e9"
+      },
+      {
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2024.parquet",
+        "sha256": "ce20fe6b73e5506a4ad09dc8fbb4793b4fb1cae75436b09dcb1beb43635e6623"
+      },
+      {
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2025.parquet",
+        "sha256": "7f022d0c9d003a99d2caefef016a61d90d0d29619d99c81f46190e05c4471a6e"
+      },
+      {
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2026.parquet",
+        "sha256": "6055e7cde49e1ae7ff16be2e7bf7fb216f9c90801b2476199b83eec58f30b59d"
+      },
+      {
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2022.parquet",
+        "sha256": "81fd3f22123d24cc797a5766eee3bccd7ece414f8807e07aecaece54aa8ea8d4"
+      },
+      {
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2023.parquet",
+        "sha256": "df2429ca0724c57e24ea434ab3ffadc478db98c3d491cd0f25b5a07a7f5b7cd9"
+      },
+      {
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2024.parquet",
+        "sha256": "e91f800a741d822fcd3a86ca9c82a77ba1f1cc9e2658adf4949bdd9e26dc3e6c"
+      },
+      {
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2025.parquet",
+        "sha256": "b735a0a62166e0d3ba35d3bb7c890e75feb3b3ff161c4f0354c98dd239296350"
+      },
+      {
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2026.parquet",
+        "sha256": "63122aa2a5bc13ecf4f58df0441c49f6e9c5b8fa92df86d86df387083f0abdd2"
+      },
+      {
+        "path": "context/stocks-data/NSE/22/intraday_1m/2022.parquet",
+        "sha256": "a756f7a254c36649f5be632c45fa783155bd9c1e5b23d46142b9181e5e1bff7b"
+      },
+      {
+        "path": "context/stocks-data/NSE/22/intraday_1m/2023.parquet",
+        "sha256": "fc59004730691a5ef43fa70a46ebd14e5d573df12f1446a2f4525e2da122db81"
+      },
+      {
+        "path": "context/stocks-data/NSE/22/intraday_1m/2024.parquet",
+        "sha256": "12563f66d2280670bdf3d0fc1b2c60aca27ee46a7882ce234b3ddb555fc2aa4d"
+      },
+      {
+        "path": "context/stocks-data/NSE/22/intraday_1m/2025.parquet",
+        "sha256": "1d6d71396560d4b99c31b27fa47cd5109d54d89dbe2856dbbc64000fc403505e"
+      },
+      {
+        "path": "context/stocks-data/NSE/22/intraday_1m/2026.parquet",
+        "sha256": "eb9d05bdd0eb94655570bca8b826f75cf85f74998dcae3006937732c3defcf8f"
+      },
+      {
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2022.parquet",
+        "sha256": "be6f6f90a6da44eaa94b10f955e846970e474c23f24a611719a045cf8be212e7"
+      },
+      {
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2023.parquet",
+        "sha256": "199572bd51b9770643d0fba06bff58a001a78a51b6bd394028384babb0f18187"
+      },
+      {
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2024.parquet",
+        "sha256": "78d9fcc7c5b11f88877df902560a46910ee296c9491bd8b83cbb004fb06553b5"
+      },
+      {
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2025.parquet",
+        "sha256": "353ce12d4120bb78c99b81f2dd3910d8c7dcd75c4c4df4e9111e7921e60df1d6"
+      },
+      {
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2026.parquet",
+        "sha256": "d115906efa961d51f367d2bb090c38d4b31f61a580cbb66a8197ee4f36920768"
+      },
+      {
+        "path": "context/stocks-data/NSE/13/intraday_1m/2022.parquet",
+        "sha256": "d7f13aea21c0bb80fe005e7259092191f8d5694331542a0ca21dd010ad9aacc4"
+      },
+      {
+        "path": "context/stocks-data/NSE/13/intraday_1m/2023.parquet",
+        "sha256": "179c027b1f500a36a05d6984fbb2b9af174bffd931aec5b2fceb968a0edca174"
+      },
+      {
+        "path": "context/stocks-data/NSE/13/intraday_1m/2024.parquet",
+        "sha256": "9eec67725c211867203e7e50d18a605ea907e3b7a90b5fcbf459004a16e69b5a"
+      },
+      {
+        "path": "context/stocks-data/NSE/13/intraday_1m/2025.parquet",
+        "sha256": "3331a5a214311e54e304249b800400fd6c1452a176faaf6246f4e61a36034979"
+      },
+      {
+        "path": "context/stocks-data/NSE/13/intraday_1m/2026.parquet",
+        "sha256": "74053c256e4be52c2d32369f413770fbd25800db3c9540e5692e3973ea53649b"
+      },
+      {
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2022.parquet",
+        "sha256": "8e9477a3a0d2b8c2a5f28798423a2acf9e3dd9bdfe94dcf679c0890e3f131f21"
+      },
+      {
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2023.parquet",
+        "sha256": "f0e44db22924e40d4d98c4dd9cb2a9950d9c0866881cc7055234894b3f81bdac"
+      },
+      {
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2024.parquet",
+        "sha256": "734366847cc35e8e6ae9d92c926fc1c57d8441acf0cdc7922b8251b114a4e321"
+      },
+      {
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2025.parquet",
+        "sha256": "7dc4bd9cb0853f526362a45c17e996afc9bc50a17d9546d3cc91d98a4711a996"
+      },
+      {
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2026.parquet",
+        "sha256": "95de56c3a065e9d49abbf9afee0c1882a4f0d170325c8c68bedd830f39b5a63b"
+      },
+      {
+        "path": "context/stocks-data/NSE/7/intraday_1m/2022.parquet",
+        "sha256": "2b15d35c782fe3684595c2504349c10a23b4be2e250588057cc69fb098d3ca9c"
+      },
+      {
+        "path": "context/stocks-data/NSE/7/intraday_1m/2023.parquet",
+        "sha256": "456e1f43d2a33582f265191eee58fcd5ce6dcc855ec93646e1e6c4a4b17dea6c"
+      },
+      {
+        "path": "context/stocks-data/NSE/7/intraday_1m/2024.parquet",
+        "sha256": "dc57fec483eabb7b1189977bc5c5eaa5ac0bceb0cfaf498553c730b1ef265977"
+      },
+      {
+        "path": "context/stocks-data/NSE/7/intraday_1m/2025.parquet",
+        "sha256": "0d064ffb4e631361b9f1c0144e1f2d71fbeac6eefa2168746cb84689c3241cd7"
+      },
+      {
+        "path": "context/stocks-data/NSE/7/intraday_1m/2026.parquet",
+        "sha256": "96bb92e57129d0bac3ed807d13db268b8d669be46d68c0b8b8e42726a6364b46"
+      },
+      {
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2022.parquet",
+        "sha256": "9901deaa7b1312905272a02087067f41c39fc4f3fe9f495ff3fa55e60606b57e"
+      },
+      {
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2023.parquet",
+        "sha256": "1322f6bbb13907ac15a5bcfb67c698b2a386ca123f66864f3c452886826a3d7d"
+      },
+      {
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2024.parquet",
+        "sha256": "e71b86a85b9bb5d579b3a665481f01e45f5bbfd9130fb568c97b482098c9b69f"
+      },
+      {
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2025.parquet",
+        "sha256": "4ad8aa13321a53c2c9796675a6aa0f4810aa86c581a91cfb65f6bee7b651d9a9"
+      },
+      {
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2026.parquet",
+        "sha256": "e8f2a05483262e24b4ce088524ce7e753ff047d68d91dd55b6fd3fc3e99ea466"
+      },
+      {
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2022.parquet",
+        "sha256": "84afe678fdc900a83434c4668b452c8df42e3188fe76d706a31a2edece51b5b8"
+      },
+      {
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2023.parquet",
+        "sha256": "002c6175eff32792180ada5149b1f9df95612523655c3226a65655f9b8bd1182"
+      },
+      {
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2024.parquet",
+        "sha256": "466562fa83950017051b079740dec56ad3b0e89752a372fb89cb4716719a5f6c"
+      },
+      {
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2025.parquet",
+        "sha256": "ba8a5a36283ce4a878ebd828f643ecc435f8177d84bd6da9d437bb5d1f2e6ac9"
+      },
+      {
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2026.parquet",
+        "sha256": "a683907de99916e0458ba0b55c54edbb4e503a9a9104c8365c8c27166bdeac7a"
+      },
+      {
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2022.parquet",
+        "sha256": "2ac8c245780597605f004f83f2c306fd3e65f71d86fbd09961e90373e80ad183"
+      },
+      {
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2023.parquet",
+        "sha256": "d6444e25c0da695fd48b8b9200607ccea15a3efc5a038c8649021d808fdd03e4"
+      },
+      {
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2024.parquet",
+        "sha256": "37f01b26649eb9017553fbbf2ed56206faeb580063688e0f4685f285b215568a"
+      },
+      {
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2025.parquet",
+        "sha256": "ea7e96b2bdefc1fbc3299d6f679c67a113651c24a55a3ba5e5b583df67491907"
+      },
+      {
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2026.parquet",
+        "sha256": "989f2920f4c1b67f4d3dc5e667e7d692e61bafa05cbb0db47f97579305c18643"
+      }
+    ],
+    "phases": {
+      "evaluation": {
+        "dates": 384,
+        "rows": 96747
+      },
+      "training": {
+        "dates": 485,
+        "rows": 119238
+      },
+      "validation": {
+        "dates": 245,
+        "rows": 61719
+      }
+    },
+    "promotion_eligible": false,
+    "rows_before_peer_admission": 277704,
+    "selected": [
+      {
+        "median_turnover": 4064584673.916666,
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2022.parquet",
+        "security_id": 15083,
+        "sessions": 245,
+        "sha256": "a3f37ee8c6a9241342354459797390f2f7892fe93921ea7d4f8534e66d991914"
+      },
+      {
+        "median_turnover": 3746270504.433333,
+        "path": "context/stocks-data/NSE/25/intraday_1m/2022.parquet",
+        "security_id": 25,
+        "sessions": 245,
+        "sha256": "18c47ed037fddb0d7ac50fc0c1944ae05c48b11e486876142f3f8ef6ac8865eb"
+      },
+      {
+        "median_turnover": 2281351285.3833337,
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2022.parquet",
+        "security_id": 3563,
+        "sessions": 245,
+        "sha256": "4f7085dc35ba2560df4df76bc6a46aa5323d9db9778672d385ff0d77ec7d1a2d"
+      },
+      {
+        "median_turnover": 1261789401.7833333,
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2022.parquet",
+        "security_id": 10217,
+        "sessions": 217,
+        "sha256": "81fd3f22123d24cc797a5766eee3bccd7ece414f8807e07aecaece54aa8ea8d4"
+      },
+      {
+        "median_turnover": 970955520.3666667,
+        "path": "context/stocks-data/NSE/22/intraday_1m/2022.parquet",
+        "security_id": 22,
+        "sessions": 245,
+        "sha256": "a756f7a254c36649f5be632c45fa783155bd9c1e5b23d46142b9181e5e1bff7b"
+      },
+      {
+        "median_turnover": 950076715.7833333,
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2022.parquet",
+        "security_id": 6066,
+        "sessions": 206,
+        "sha256": "be6f6f90a6da44eaa94b10f955e846970e474c23f24a611719a045cf8be212e7"
+      },
+      {
+        "median_turnover": 716931043.95,
+        "path": "context/stocks-data/NSE/13/intraday_1m/2022.parquet",
+        "security_id": 13,
+        "sessions": 234,
+        "sha256": "d7f13aea21c0bb80fe005e7259092191f8d5694331542a0ca21dd010ad9aacc4"
+      },
+      {
+        "median_turnover": 632994516.9166667,
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2022.parquet",
+        "security_id": 30108,
+        "sessions": 244,
+        "sha256": "8e9477a3a0d2b8c2a5f28798423a2acf9e3dd9bdfe94dcf679c0890e3f131f21"
+      },
+      {
+        "median_turnover": 521730437.1083333,
+        "path": "context/stocks-data/NSE/7/intraday_1m/2022.parquet",
+        "security_id": 7,
+        "sessions": 244,
+        "sha256": "2b15d35c782fe3684595c2504349c10a23b4be2e250588057cc69fb098d3ca9c"
+      },
+      {
+        "median_turnover": 363513750.8666667,
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2022.parquet",
+        "security_id": 21614,
+        "sessions": 245,
+        "sha256": "9901deaa7b1312905272a02087067f41c39fc4f3fe9f495ff3fa55e60606b57e"
+      },
+      {
+        "median_turnover": 282641105.30833334,
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2022.parquet",
+        "security_id": 17903,
+        "sessions": 206,
+        "sha256": "84afe678fdc900a83434c4668b452c8df42e3188fe76d706a31a2edece51b5b8"
+      },
+      {
+        "median_turnover": 188272989.06666666,
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2022.parquet",
+        "security_id": 5385,
+        "sessions": 224,
+        "sha256": "2ac8c245780597605f004f83f2c306fd3e65f71d86fbd09961e90373e80ad183"
+      }
+    ],
+    "selection": [
+      {
+        "median_turnover": 1261789401.7833333,
+        "path": "context/stocks-data/NSE/10217/intraday_1m/2022.parquet",
+        "security_id": 10217,
+        "sessions": 217,
+        "sha256": "81fd3f22123d24cc797a5766eee3bccd7ece414f8807e07aecaece54aa8ea8d4"
+      },
+      {
+        "median_turnover": 905944.1333333333,
+        "path": "context/stocks-data/NSE/1030/intraday_1m/2022.parquet",
+        "security_id": 1030,
+        "sessions": 85,
+        "sha256": "2a7dfd37023ce08801daaafafef8e0550ba170450e73595862b1f42a5995671a"
+      },
+      {
+        "median_turnover": 306222.39166666666,
+        "path": "context/stocks-data/NSE/11779/intraday_1m/2022.parquet",
+        "security_id": 11779,
+        "sessions": 32,
+        "sha256": "795518d86ed2a50232d744b24c3dc502cdf20017a5588ccd43c02e135cb41044"
+      },
+      {
+        "median_turnover": 11159543.6,
+        "path": "context/stocks-data/NSE/11868/intraday_1m/2022.parquet",
+        "security_id": 11868,
+        "sessions": 153,
+        "sha256": "ac5ad5eda71a8e219870d1a37ccc6758a0226feaa4c76176af71917fffe42c5f"
+      },
+      {
+        "median_turnover": 964518.1000000001,
+        "path": "context/stocks-data/NSE/12533/intraday_1m/2022.parquet",
+        "security_id": 12533,
+        "sessions": 17,
+        "sha256": "b401ab441c551c351e144ea803c70b8b67dbcfed3eb9636d37534d2c56cd6d78"
+      },
+      {
+        "median_turnover": 716931043.95,
+        "path": "context/stocks-data/NSE/13/intraday_1m/2022.parquet",
+        "security_id": 13,
+        "sessions": 234,
+        "sha256": "d7f13aea21c0bb80fe005e7259092191f8d5694331542a0ca21dd010ad9aacc4"
+      },
+      {
+        "median_turnover": 56284376.79166667,
+        "path": "context/stocks-data/NSE/13061/intraday_1m/2022.parquet",
+        "security_id": 13061,
+        "sessions": 182,
+        "sha256": "dcda5eedbc2f1c53328c3b4ebf997f276167f896e52f832264b7d505c2437a9b"
+      },
+      {
+        "median_turnover": 90961996.05000001,
+        "path": "context/stocks-data/NSE/13288/intraday_1m/2022.parquet",
+        "security_id": 13288,
+        "sessions": 5,
+        "sha256": "9873a1cedb082d1a6e5599b6e7aed7028c6f4bb0e8b0fdeb09771b5d52325537"
+      },
+      {
+        "median_turnover": 90225245.74999999,
+        "path": "context/stocks-data/NSE/13587/intraday_1m/2022.parquet",
+        "security_id": 13587,
+        "sessions": 222,
+        "sha256": "2891e01fee23fbb4a1db95fa290ee57b273617b57b96949feb0221a441912fd2"
+      },
+      {
+        "median_turnover": 6512145.416666666,
+        "path": "context/stocks-data/NSE/1472/intraday_1m/2022.parquet",
+        "security_id": 1472,
+        "sessions": 142,
+        "sha256": "052a0a2869e234efe9c24ed859e65fa36e02b538b2046cef1f8f0b595960077c"
+      },
+      {
+        "median_turnover": 4064584673.916666,
+        "path": "context/stocks-data/NSE/15083/intraday_1m/2022.parquet",
+        "security_id": 15083,
+        "sessions": 245,
+        "sha256": "a3f37ee8c6a9241342354459797390f2f7892fe93921ea7d4f8534e66d991914"
+      },
+      {
+        "median_turnover": 3039491.716666667,
+        "path": "context/stocks-data/NSE/15239/intraday_1m/2022.parquet",
+        "security_id": 15239,
+        "sessions": 159,
+        "sha256": "fc0a5126251bad3641b541e9d68309d6d8472fa250fc0d53d0572eda716e024e"
+      },
+      {
+        "median_turnover": 16227922.7,
+        "path": "context/stocks-data/NSE/16921/intraday_1m/2022.parquet",
+        "security_id": 16921,
+        "sessions": 181,
+        "sha256": "0e9664c0a3834e73ca2b64fde715f2110a1c9ec2a3b166d7238d0399bfc5ffec"
+      },
+      {
+        "median_turnover": 282641105.30833334,
+        "path": "context/stocks-data/NSE/17903/intraday_1m/2022.parquet",
+        "security_id": 17903,
+        "sessions": 206,
+        "sha256": "84afe678fdc900a83434c4668b452c8df42e3188fe76d706a31a2edece51b5b8"
+      },
+      {
+        "median_turnover": 3033670.4833333334,
+        "path": "context/stocks-data/NSE/19073/intraday_1m/2022.parquet",
+        "security_id": 19073,
+        "sessions": 125,
+        "sha256": "68a85bc361c06166a6b9514e3f29cef1154778ef90333199bffc1d0f5f706ded"
+      },
+      {
+        "median_turnover": 5594059.649999999,
+        "path": "context/stocks-data/NSE/19233/intraday_1m/2022.parquet",
+        "security_id": 19233,
+        "sessions": 146,
+        "sha256": "b527746ee25ee0787d4ec1bde4899b799fde1e5b06962100377cfe560e163bcb"
+      },
+      {
+        "median_turnover": 8033731.833333334,
+        "path": "context/stocks-data/NSE/19761/intraday_1m/2022.parquet",
+        "security_id": 19761,
+        "sessions": 146,
+        "sha256": "d6c603bf3af85d402012698bf8c8f5c4190d3566302c1d101ed0b251a2a35ebf"
+      },
+      {
+        "median_turnover": 3530370.9000000004,
+        "path": "context/stocks-data/NSE/20906/intraday_1m/2022.parquet",
+        "security_id": 20906,
+        "sessions": 159,
+        "sha256": "a36dd363133a7773246c68673fb16332f761a0fa71de018876a4152a0a105f02"
+      },
+      {
+        "median_turnover": 0.0,
+        "path": "context/stocks-data/NSE/21218/intraday_1m/2022.parquet",
+        "security_id": 21218,
+        "sessions": 0,
+        "sha256": "640d3d7474c5decdc6c5237fd8a5a46f344e9d6fea41ccc535a09ec02bad6676"
+      },
+      {
+        "median_turnover": 363513750.8666667,
+        "path": "context/stocks-data/NSE/21614/intraday_1m/2022.parquet",
+        "security_id": 21614,
+        "sessions": 245,
+        "sha256": "9901deaa7b1312905272a02087067f41c39fc4f3fe9f495ff3fa55e60606b57e"
+      },
+      {
+        "median_turnover": 970955520.3666667,
+        "path": "context/stocks-data/NSE/22/intraday_1m/2022.parquet",
+        "security_id": 22,
+        "sessions": 245,
+        "sha256": "a756f7a254c36649f5be632c45fa783155bd9c1e5b23d46142b9181e5e1bff7b"
+      },
+      {
+        "median_turnover": 3742806.866666667,
+        "path": "context/stocks-data/NSE/235/intraday_1m/2022.parquet",
+        "security_id": 235,
+        "sessions": 149,
+        "sha256": "d9c2b69711c1e7dbf099d505b956184bf847d3ee53e9f24543d9ed0b6843821c"
+      },
+      {
+        "median_turnover": 3746270504.433333,
+        "path": "context/stocks-data/NSE/25/intraday_1m/2022.parquet",
+        "security_id": 25,
+        "sessions": 245,
+        "sha256": "18c47ed037fddb0d7ac50fc0c1944ae05c48b11e486876142f3f8ef6ac8865eb"
+      },
+      {
+        "median_turnover": 100613.63333333333,
+        "path": "context/stocks-data/NSE/2595/intraday_1m/2022.parquet",
+        "security_id": 2595,
+        "sessions": 105,
+        "sha256": "bd045e5c7171760c986896897e3d14038c63cbfcb956aa97e33cfc3cb32cda6f"
+      },
+      {
+        "median_turnover": 632994516.9166667,
+        "path": "context/stocks-data/NSE/30108/intraday_1m/2022.parquet",
+        "security_id": 30108,
+        "sessions": 244,
+        "sha256": "8e9477a3a0d2b8c2a5f28798423a2acf9e3dd9bdfe94dcf679c0890e3f131f21"
+      },
+      {
+        "median_turnover": 12669739.216666667,
+        "path": "context/stocks-data/NSE/34/intraday_1m/2022.parquet",
+        "security_id": 34,
+        "sessions": 146,
+        "sha256": "7d3f7487c90b06d094f0987435636d95dc483b7dd0a29d4a390faffbf93a9635"
+      },
+      {
+        "median_turnover": 2281351285.3833337,
+        "path": "context/stocks-data/NSE/3563/intraday_1m/2022.parquet",
+        "security_id": 3563,
+        "sessions": 245,
+        "sha256": "4f7085dc35ba2560df4df76bc6a46aa5323d9db9778672d385ff0d77ec7d1a2d"
+      },
+      {
+        "median_turnover": 120993.425,
+        "path": "context/stocks-data/NSE/4/intraday_1m/2022.parquet",
+        "security_id": 4,
+        "sessions": 86,
+        "sha256": "dd4f00e7acb1cc7657d605d983261ec44e4e92428f381c087ed0278fb674639e"
+      },
+      {
+        "median_turnover": 7114998.65,
+        "path": "context/stocks-data/NSE/445/intraday_1m/2022.parquet",
+        "security_id": 445,
+        "sessions": 148,
+        "sha256": "edafc6e9582bff8cd009b06d0d7239bab69e5bdd0c56c6b9ad1d36d58ca82502"
+      },
+      {
+        "median_turnover": 40083528.5,
+        "path": "context/stocks-data/NSE/4481/intraday_1m/2022.parquet",
+        "security_id": 4481,
+        "sessions": 225,
+        "sha256": "924c7ef98e65a9d793f796e1d7225c448ac52edc7829d4c04d3667556e7dce18"
+      },
+      {
+        "median_turnover": 275200.0,
+        "path": "context/stocks-data/NSE/4654/intraday_1m/2022.parquet",
+        "security_id": 4654,
+        "sessions": 7,
+        "sha256": "52492408c7d4f348bfff16137907efb98fc8754c8664dedbbbbd857bb9fdbae6"
+      },
+      {
+        "median_turnover": 74864413.25833333,
+        "path": "context/stocks-data/NSE/474/intraday_1m/2022.parquet",
+        "security_id": 474,
+        "sessions": 154,
+        "sha256": "797ae553260314c05158ed52c81e5e5c36b43ab85a0b08dba4fcb72503139049"
+      },
+      {
+        "median_turnover": 1079151.9833333334,
+        "path": "context/stocks-data/NSE/5248/intraday_1m/2022.parquet",
+        "security_id": 5248,
+        "sessions": 137,
+        "sha256": "9e6894735dd029542b71f066143e700d4ba30b39a3ea285796156019f031ca38"
+      },
+      {
+        "median_turnover": 188272989.06666666,
+        "path": "context/stocks-data/NSE/5385/intraday_1m/2022.parquet",
+        "security_id": 5385,
+        "sessions": 224,
+        "sha256": "2ac8c245780597605f004f83f2c306fd3e65f71d86fbd09961e90373e80ad183"
+      },
+      {
+        "median_turnover": 20513.0,
+        "path": "context/stocks-data/NSE/5549/intraday_1m/2022.parquet",
+        "security_id": 5549,
+        "sessions": 13,
+        "sha256": "36e88d3ca468436d9eaf801ea4e972534d9990da86593b847e813c2b82f8e0d8"
+      },
+      {
+        "median_turnover": 78886045.75,
+        "path": "context/stocks-data/NSE/5578/intraday_1m/2022.parquet",
+        "security_id": 5578,
+        "sessions": 210,
+        "sha256": "8fd411803c3d26743f9368d4d63e56eebafc7f038045c52846e28619f0e9fc0d"
+      },
+      {
+        "median_turnover": 51950849.71666667,
+        "path": "context/stocks-data/NSE/6018/intraday_1m/2022.parquet",
+        "security_id": 6018,
+        "sessions": 231,
+        "sha256": "25d5601d804f652e8f5a7b2926bc49fda0498b0160045b6e2aaea9323c93b6c3"
+      },
+      {
+        "median_turnover": 950076715.7833333,
+        "path": "context/stocks-data/NSE/6066/intraday_1m/2022.parquet",
+        "security_id": 6066,
+        "sessions": 206,
+        "sha256": "be6f6f90a6da44eaa94b10f955e846970e474c23f24a611719a045cf8be212e7"
+      },
+      {
+        "median_turnover": 22108647.266666666,
+        "path": "context/stocks-data/NSE/6232/intraday_1m/2022.parquet",
+        "security_id": 6232,
+        "sessions": 238,
+        "sha256": "aeb22748256fca56dbd058603194fd787b508f69aacb5326ec00c23c1f59e403"
+      },
+      {
+        "median_turnover": 137567980.9583333,
+        "path": "context/stocks-data/NSE/625/intraday_1m/2022.parquet",
+        "security_id": 625,
+        "sessions": 230,
+        "sha256": "8952831f7d5ddffd73e3074ae5bd7281423717b8d124efb502b0bed1adc3c5f8"
+      },
+      {
+        "median_turnover": 521730437.1083333,
+        "path": "context/stocks-data/NSE/7/intraday_1m/2022.parquet",
+        "security_id": 7,
+        "sessions": 244,
+        "sha256": "2b15d35c782fe3684595c2504349c10a23b4be2e250588057cc69fb098d3ca9c"
+      },
+      {
+        "median_turnover": 20382241.466666665,
+        "path": "context/stocks-data/NSE/7053/intraday_1m/2022.parquet",
+        "security_id": 7053,
+        "sessions": 144,
+        "sha256": "d5da71276fe3bb69894c45096f5f900434552bf29a65f47f5363c75dba34e1ad"
+      },
+      {
+        "median_turnover": 1488000.0,
+        "path": "context/stocks-data/NSE/759130/intraday_1m/2022.parquet",
+        "security_id": 759130,
+        "sessions": 1,
+        "sha256": "10ab55b6f3e2b2c84a74d406cefe90af5daa22e560683f5ad2b88f2cbcbb4b94"
+      },
+      {
+        "median_turnover": 8030124.425000001,
+        "path": "context/stocks-data/NSE/7759/intraday_1m/2022.parquet",
+        "security_id": 7759,
+        "sessions": 172,
+        "sha256": "9736e8ffdb847dd4ef6ae9db737e15c75f039f5c2c31f9a3d7f1cb60171ac29f"
+      }
+    ],
+    "sequence_shape": [
+      277704,
+      30,
+      5
+    ],
+    "source_snapshots": {
+      "__init__.py": "109c8b4ba371182518bb8b593b7096d15e7e0cae8dde0aad7f844e05bbf6ca8b",
+      "account.py": "95d978984d7a33f5588e90822ab6a770089d741572ddcb12e11d88a1902e169c",
+      "dataset.py": "780105df9d4800b920843081e30991bfb48a0deea90a8ec097dd033f40f5b40d"
+    },
+    "specification_sha256": "3fa33241ba54fb01ea152c9ccd34437ce0aec8c9a471bedb04eb3467ea02c9ff"
+  },
+  "dataset_module": "research.45_market_dataset.dataset",
+  "dataset_source_sha256": "780105df9d4800b920843081e30991bfb48a0deea90a8ec097dd033f40f5b40d",
+  "horizon_minutes": 15,
+  "limitations": [
+    "historical data, no untouched prospective holdout",
+    "candle execution proxy, no observed spread or source latency",
+    "full-session ex-post data eligibility and current survivor coverage",
+    "multiple models and seeds; no test-based tuning"
+  ],
+  "phase_rows": {
+    "test": 96747,
+    "train": 119238,
+    "validation": 61719
+  },
+  "preregistration_sha256": "1513c8b648fca9954d85e92f1d3ed0d2e1c5585932dcc9e21d9a679cc73ee7c0",
+  "promotion_eligible": false,
+  "rows": 277704,
+  "runtime": {
+    "cuda": false,
+    "numpy": "2.4.5",
+    "pandas": "3.0.3",
+    "python": "3.13.3",
+    "torch": "2.12.1+cpu"
+  },
+  "seeds": [
+    17,
+    29,
+    43
+  ],
+  "sequence_channels": [
+    "ret1_bps",
+    "body_bps",
+    "range_bps",
+    "log1p_causal_volume_local_ratio",
+    "vwapdev_bps"
+  ],
+  "sequence_sha256": "c0e23d284419c631fbcd885f723c819b8568d49e23c15db9cb75b3a5dbc48f25",
+  "sequence_shape": [
+    277704,
+    30,
+    5
+  ],
+  "source_sha256": "f11c9eb425820eac92cdb808776e8742ca14ba1b7f0bd010eb63733e9a3a2388",
+  "target_sha256": "8a418b3ead3c25b718ce272a90f2519ed62c55d166b48dbfd0e341c037badba5",
+  "threshold_net_bps": 2
+}

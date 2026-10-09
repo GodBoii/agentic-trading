@@ -1,0 +1,11 @@
+{
+  "all_finite_predictions": true,
+  "all_saved_checkpoints_reproduce_validation_exactly": true,
+  "all_weights_frozen_before_test": true,
+  "persisted_predictions_exact_readback": true,
+  "predictions_sha256": "6eb208fc1957d8a7121fa25c8586fed1a1abd8d09ac260b41fb2f6d5cf4a5dad",
+  "promotion_eligible": false,
+  "row_order_unchanged": true,
+  "rows": 277704,
+  "variants": 11
+}

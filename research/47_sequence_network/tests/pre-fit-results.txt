@@ -1,0 +1,8 @@
+Command: python -m pytest research/47_sequence_network/tests -q
+Result: 10 passed in 5.07s
+Run before any model fitting or evaluation.
+Coverage includes finite-difference GRU gradients, deterministic training and
+checkpoint restoration, frozen train-only normalization, independent row
+inference under future-row mutation, ridge arithmetic and summary parity.
+Additional shared-adapter checks cover future candle mutations, strictly later
+entry/exit times, explicit transaction fees and raw-direction metric semantics.

@@ -1,0 +1,397 @@
+{
+  "account_checks": [
+    {
+      "account": "constant_training_mean-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "constant_training_mean-test-cost2",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "constant_training_mean-test-cost5",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "constant_training_mean-validation-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "constant_training_mean-validation-cost2",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "constant_training_mean-validation-cost5",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_17-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_17-test-cost2",
+      "pass": true,
+      "trades": 41
+    },
+    {
+      "account": "gru_seed_17-test-cost5",
+      "pass": true,
+      "trades": 11
+    },
+    {
+      "account": "gru_seed_17-validation-cost10",
+      "pass": true,
+      "trades": 1
+    },
+    {
+      "account": "gru_seed_17-validation-cost2",
+      "pass": true,
+      "trades": 56
+    },
+    {
+      "account": "gru_seed_17-validation-cost5",
+      "pass": true,
+      "trades": 13
+    },
+    {
+      "account": "gru_seed_29-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_29-test-cost2",
+      "pass": true,
+      "trades": 61
+    },
+    {
+      "account": "gru_seed_29-test-cost5",
+      "pass": true,
+      "trades": 11
+    },
+    {
+      "account": "gru_seed_29-validation-cost10",
+      "pass": true,
+      "trades": 10
+    },
+    {
+      "account": "gru_seed_29-validation-cost2",
+      "pass": true,
+      "trades": 78
+    },
+    {
+      "account": "gru_seed_29-validation-cost5",
+      "pass": true,
+      "trades": 31
+    },
+    {
+      "account": "gru_seed_43-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_43-test-cost2",
+      "pass": true,
+      "trades": 20
+    },
+    {
+      "account": "gru_seed_43-test-cost5",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_43-validation-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_43-validation-cost2",
+      "pass": true,
+      "trades": 35
+    },
+    {
+      "account": "gru_seed_43-validation-cost5",
+      "pass": true,
+      "trades": 18
+    },
+    {
+      "account": "gru_seed_average-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_average-test-cost2",
+      "pass": true,
+      "trades": 23
+    },
+    {
+      "account": "gru_seed_average-test-cost5",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_average-validation-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "gru_seed_average-validation-cost2",
+      "pass": true,
+      "trades": 36
+    },
+    {
+      "account": "gru_seed_average-validation-cost5",
+      "pass": true,
+      "trades": 9
+    },
+    {
+      "account": "mlp_seed_17-test-cost10",
+      "pass": true,
+      "trades": 2
+    },
+    {
+      "account": "mlp_seed_17-test-cost2",
+      "pass": true,
+      "trades": 65
+    },
+    {
+      "account": "mlp_seed_17-test-cost5",
+      "pass": true,
+      "trades": 15
+    },
+    {
+      "account": "mlp_seed_17-validation-cost10",
+      "pass": true,
+      "trades": 14
+    },
+    {
+      "account": "mlp_seed_17-validation-cost2",
+      "pass": true,
+      "trades": 94
+    },
+    {
+      "account": "mlp_seed_17-validation-cost5",
+      "pass": true,
+      "trades": 35
+    },
+    {
+      "account": "mlp_seed_29-test-cost10",
+      "pass": true,
+      "trades": 1
+    },
+    {
+      "account": "mlp_seed_29-test-cost2",
+      "pass": true,
+      "trades": 57
+    },
+    {
+      "account": "mlp_seed_29-test-cost5",
+      "pass": true,
+      "trades": 13
+    },
+    {
+      "account": "mlp_seed_29-validation-cost10",
+      "pass": true,
+      "trades": 5
+    },
+    {
+      "account": "mlp_seed_29-validation-cost2",
+      "pass": true,
+      "trades": 52
+    },
+    {
+      "account": "mlp_seed_29-validation-cost5",
+      "pass": true,
+      "trades": 17
+    },
+    {
+      "account": "mlp_seed_43-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "mlp_seed_43-test-cost2",
+      "pass": true,
+      "trades": 33
+    },
+    {
+      "account": "mlp_seed_43-test-cost5",
+      "pass": true,
+      "trades": 8
+    },
+    {
+      "account": "mlp_seed_43-validation-cost10",
+      "pass": true,
+      "trades": 9
+    },
+    {
+      "account": "mlp_seed_43-validation-cost2",
+      "pass": true,
+      "trades": 89
+    },
+    {
+      "account": "mlp_seed_43-validation-cost5",
+      "pass": true,
+      "trades": 32
+    },
+    {
+      "account": "mlp_seed_average-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "mlp_seed_average-test-cost2",
+      "pass": true,
+      "trades": 4
+    },
+    {
+      "account": "mlp_seed_average-test-cost5",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "mlp_seed_average-validation-cost10",
+      "pass": true,
+      "trades": 1
+    },
+    {
+      "account": "mlp_seed_average-validation-cost2",
+      "pass": true,
+      "trades": 31
+    },
+    {
+      "account": "mlp_seed_average-validation-cost5",
+      "pass": true,
+      "trades": 12
+    },
+    {
+      "account": "ridge-test-cost10",
+      "pass": true,
+      "trades": 1
+    },
+    {
+      "account": "ridge-test-cost2",
+      "pass": true,
+      "trades": 43
+    },
+    {
+      "account": "ridge-test-cost5",
+      "pass": true,
+      "trades": 6
+    },
+    {
+      "account": "ridge-validation-cost10",
+      "pass": true,
+      "trades": 11
+    },
+    {
+      "account": "ridge-validation-cost2",
+      "pass": true,
+      "trades": 37
+    },
+    {
+      "account": "ridge-validation-cost5",
+      "pass": true,
+      "trades": 25
+    },
+    {
+      "account": "zero_return-test-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "zero_return-test-cost2",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "zero_return-test-cost5",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "zero_return-validation-cost10",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "zero_return-validation-cost2",
+      "pass": true,
+      "trades": 0
+    },
+    {
+      "account": "zero_return-validation-cost5",
+      "pass": true,
+      "trades": 0
+    }
+  ],
+  "checkpoint_checks": [
+    {
+      "inference_tolerance_absolute_bps": 0.0001,
+      "inference_tolerance_relative": 1e-06,
+      "maximum_absolute_difference_bps": 0.0,
+      "sampled_rows": 192,
+      "variant": "gru_seed_17"
+    },
+    {
+      "inference_tolerance_absolute_bps": 0.0001,
+      "inference_tolerance_relative": 1e-06,
+      "maximum_absolute_difference_bps": 0.0,
+      "sampled_rows": 192,
+      "variant": "gru_seed_29"
+    },
+    {
+      "inference_tolerance_absolute_bps": 0.0001,
+      "inference_tolerance_relative": 1e-06,
+      "maximum_absolute_difference_bps": 0.0,
+      "sampled_rows": 192,
+      "variant": "gru_seed_43"
+    },
+    {
+      "inference_tolerance_absolute_bps": 0.0001,
+      "inference_tolerance_relative": 1e-06,
+      "maximum_absolute_difference_bps": 0.0,
+      "sampled_rows": 192,
+      "variant": "mlp_seed_17"
+    },
+    {
+      "inference_tolerance_absolute_bps": 0.0001,
+      "inference_tolerance_relative": 1e-06,
+      "maximum_absolute_difference_bps": 0.0,
+      "sampled_rows": 192,
+      "variant": "mlp_seed_29"
+    },
+    {
+      "inference_tolerance_absolute_bps": 0.0001,
+      "inference_tolerance_relative": 1e-06,
+      "maximum_absolute_difference_bps": 0.0,
+      "sampled_rows": 192,
+      "variant": "mlp_seed_43"
+    }
+  ],
+  "dataset_row_identity_exact_match": true,
+  "frozen_models_sha256": {
+    "gru_seed_17.pt": "3f85d3e09a347c09bf854dbf863e5f8d4fafd4b1cd6d49498cbb8ed4612f9663",
+    "gru_seed_29.pt": "77ec46edf92b71b69c2e1691741aa95163636263b50fe2b6286885c2f2948473",
+    "gru_seed_43.pt": "2fbeada99200b07a3325b72045b52d4a8a7b60eb966ff2dc17b36622589735dd",
+    "mlp_seed_17.pt": "0def0e843e2089d185c5b0be2ddf8b2b595790efcfbf3e71f6688d6750aaeb02",
+    "mlp_seed_29.pt": "879bebf9cbff12f058dc53a9f3642934a6efd5eecb7ff76c7d6d94e0b020ebcf",
+    "mlp_seed_43.pt": "70f243e80a3f90ac2753fd0a471943030a650a9a86fa03df164bbf490c35a616",
+    "ridge.npz": "d764a89e085c075210eedc10e7682eb3da50bb13ca0a704808b3248e37a4c9aa",
+    "scaler.json": "178b07504ada1e05467ec15887a3c5bdc5b8ff03ced20a29d135815634663f83"
+  },
+  "original_frozen_source_snapshot_and_live_source_match": true,
+  "prediction_sha256": "6eb208fc1957d8a7121fa25c8586fed1a1abd8d09ac260b41fb2f6d5cf4a5dad",
+  "promotion_eligible": false,
+  "refit_or_tuning": false,
+  "rows": 277704,
+  "seed_average_exact_match": true,
+  "training_only_scaler_exact_match": true,
+  "validation_only_selection_rule": true
+}

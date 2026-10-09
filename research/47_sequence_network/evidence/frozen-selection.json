@@ -1,0 +1,29 @@
+{
+  "all_seeds_reported": true,
+  "frozen_before_test_predictions": true,
+  "model_sha256": {
+    "gru_seed_17.pt": "3f85d3e09a347c09bf854dbf863e5f8d4fafd4b1cd6d49498cbb8ed4612f9663",
+    "gru_seed_29.pt": "77ec46edf92b71b69c2e1691741aa95163636263b50fe2b6286885c2f2948473",
+    "gru_seed_43.pt": "2fbeada99200b07a3325b72045b52d4a8a7b60eb966ff2dc17b36622589735dd",
+    "mlp_seed_17.pt": "0def0e843e2089d185c5b0be2ddf8b2b595790efcfbf3e71f6688d6750aaeb02",
+    "mlp_seed_29.pt": "879bebf9cbff12f058dc53a9f3642934a6efd5eecb7ff76c7d6d94e0b020ebcf",
+    "mlp_seed_43.pt": "70f243e80a3f90ac2753fd0a471943030a650a9a86fa03df164bbf490c35a616",
+    "ridge.npz": "d764a89e085c075210eedc10e7682eb3da50bb13ca0a704808b3248e37a4c9aa",
+    "scaler.json": "178b07504ada1e05467ec15887a3c5bdc5b8ff03ced20a29d135815634663f83"
+  },
+  "selected_by_validation_rmse": "gru_seed_average",
+  "test_used_for_selection": false,
+  "validation_rmse_bps": {
+    "constant_training_mean": 38.78577826391542,
+    "gru_seed_17": 38.777304659499194,
+    "gru_seed_29": 38.80703446127959,
+    "gru_seed_43": 38.78878112925559,
+    "gru_seed_average": 38.7731216450377,
+    "mlp_seed_17": 38.82780575429331,
+    "mlp_seed_29": 38.8369602829756,
+    "mlp_seed_43": 38.807039738333344,
+    "mlp_seed_average": 38.79579808694125,
+    "ridge": 38.81027876104366,
+    "zero_return": 38.78793087238654
+  }
+}
